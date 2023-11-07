@@ -1,0 +1,22 @@
+name = "PromptingTools"
+uuid = "670122d1-24a8-4d70-bfce-740807c42192"
+authors = ["J S @svilupp and contributors"]
+version = "0.1.0"
+
+[deps]
+HTTP = "cd3eb016-35fb-5094-929b-558a96fad6f3"
+JSON3 = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
+OpenAI = "e9f21f70-7185-4079-aca2-91159181367c"
+
+[compat]
+HTTP = "1"
+JSON3 = "1"
+OpenAI = "0.8.7"
+julia = "1.9,1.10"
+
+[extras]
+Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Aqua", "Test"]
