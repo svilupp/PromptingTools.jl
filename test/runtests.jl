@@ -1,4 +1,5 @@
 using PromptingTools
+using JSON3
 using Test
 using Aqua
 const PT = PromptingTools
@@ -10,4 +11,5 @@ end
     include("utils.jl")
     include("messages.jl")
     include("llm_openai.jl")
+    include("templates.jl")
 end
