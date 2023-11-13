@@ -1,8 +1,8 @@
 ## Rendering of converation history for the OpenAI API
 "Builds a history of the conversation to provide the prompt to the API. All kwargs are passed as replacements such that `{{key}}=>value` in the template.}}"
 function render(schema::AbstractOpenAISchema,
-    messages::Vector{<:AbstractMessage};
-    kwargs...)
+        messages::Vector{<:AbstractMessage};
+        kwargs...)
     ##
     conversation = Dict{String, String}[]
     # TODO: concat system messages together
@@ -98,12 +98,12 @@ msg=aigenerate(conversation)
 ```
 """
 function aigenerate(prompt_schema::AbstractOpenAISchema, prompt; verbose::Bool = true,
-    api_key::String = API_KEY,
-    model::String = MODEL_CHAT,
-    http_kwargs::NamedTuple = (retry_non_idempotent = true,
-        retries = 5,
-        readtimeout = 120), api_kwargs::NamedTuple = NamedTuple(),
-    kwargs...)
+        api_key::String = API_KEY,
+        model::String = MODEL_CHAT,
+        http_kwargs::NamedTuple = (retry_non_idempotent = true,
+            retries = 5,
+            readtimeout = 120), api_kwargs::NamedTuple = NamedTuple(),
+        kwargs...)
     ##
     global MODEL_ALIASES, MODEL_COSTS
     ## Find the unique ID for the model alias provided
@@ -126,15 +126,15 @@ function aigenerate(prompt_schema::AbstractOpenAISchema, prompt; verbose::Bool =
 end
 # Extend OpenAI create_chat to allow for testing/debugging
 function OpenAI.create_chat(schema::AbstractOpenAISchema,
-    api_key::AbstractString,
-    model::AbstractString,
-    conversation;
-    kwargs...)
+        api_key::AbstractString,
+        model::AbstractString,
+        conversation;
+        kwargs...)
     OpenAI.create_chat(api_key, model, conversation; kwargs...)
 end
 function OpenAI.create_chat(schema::TestEchoOpenAISchema, api_key::AbstractString,
-    model::AbstractString,
-    conversation; kwargs...)
+        model::AbstractString,
+        conversation; kwargs...)
     schema.model_id = model
     schema.inputs = conversation
     return schema
@@ -194,14 +194,14 @@ msg.content' * msg.content[:, 1] # [1.0, 0.787]
 
 """
 function aiembed(prompt_schema::AbstractOpenAISchema,
-    doc_or_docs::Union{AbstractString, Vector{<:AbstractString}},
-    postprocess::F = identity; verbose::Bool = true,
-    api_key::String = API_KEY,
-    model::String = MODEL_EMBEDDING,
-    http_kwargs::NamedTuple = (retry_non_idempotent = true,
-        retries = 5,
-        readtimeout = 120), api_kwargs::NamedTuple = NamedTuple(),
-    kwargs...) where {F <: Function}
+        doc_or_docs::Union{AbstractString, Vector{<:AbstractString}},
+        postprocess::F = identity; verbose::Bool = true,
+        api_key::String = API_KEY,
+        model::String = MODEL_EMBEDDING,
+        http_kwargs::NamedTuple = (retry_non_idempotent = true,
+            retries = 5,
+            readtimeout = 120), api_kwargs::NamedTuple = NamedTuple(),
+        kwargs...) where {F <: Function}
     ##
     global MODEL_ALIASES, MODEL_COSTS
     ## Find the unique ID for the model alias provided
@@ -224,15 +224,15 @@ function aiembed(prompt_schema::AbstractOpenAISchema,
 end
 # Extend OpenAI create_embeddings to allow for testing
 function OpenAI.create_embeddings(schema::AbstractOpenAISchema,
-    api_key::AbstractString,
-    docs,
-    model::AbstractString;
-    kwargs...)
+        api_key::AbstractString,
+        docs,
+        model::AbstractString;
+        kwargs...)
     OpenAI.create_embeddings(api_key, docs, model; kwargs...)
 end
 function OpenAI.create_embeddings(schema::TestEchoOpenAISchema, api_key::AbstractString,
-    docs,
-    model::AbstractString; kwargs...)
+        docs,
+        model::AbstractString; kwargs...)
     schema.model_id = model
     schema.inputs = docs
     return schema
@@ -246,9 +246,9 @@ end
 
 Classifies the given prompt/statement as true/false/unknown.
 
-Note: this is a very simple classifier, it is not meant to be used in production. Credit goes to: https://twitter.com/AAAzzam/status/1669753721574633473
+Note: this is a very simple classifier, it is not meant to be used in production. Credit goes to [AAAzzam](https://twitter.com/AAAzzam/status/1669753721574633473).
 
-It uses Logit bias trick to force the model to output only true/false/unknown.
+It uses Logit bias trick and limits the output to 1 token to force the model to output only true/false/unknown.
 
 Output tokens used (via `api_kwargs`):
 - 837: ' true'
@@ -272,36 +272,28 @@ tryparse(Bool, aiclassify("Is two plus two four?")) isa Bool # true
 Output of type `Nothing` marks that the model couldn't classify the statement as true/false.
 
 Ideally, we would like to re-use some helpful system prompt to get more accurate responses.
-For this reason we have templates, eg, `:IsStatementTrue`. By specifying the template, we can provide our statement as the expected variable (`statement` in this case)
+For this reason we have templates, eg, `:JudgeIsItTrue`. By specifying the template, we can provide our statement as the expected variable (`it` in this case)
 See that the model now correctly classifies the statement as "unknown".
 ```julia
-aiclassify(:IsStatementTrue; statement = "Is two plus three a vegetable on Mars?") # unknown
+aiclassify(:JudgeIsItTrue; it = "Is two plus three a vegetable on Mars?") # unknown
 ```
 
 For better results, use higher quality models like gpt4, eg, 
 ```julia
-aiclassify(:IsStatementTrue;
-    statement = "If I had two apples and I got three more, I have five apples now.",
+aiclassify(:JudgeIsItTrue;
+    it = "If I had two apples and I got three more, I have five apples now.",
     model = "gpt4") # true
 ```
 
 """
 function aiclassify(prompt_schema::AbstractOpenAISchema, prompt;
-    api_kwargs::NamedTuple = (logit_bias = Dict(837 => 100, 905 => 100, 9987 => 100),
-        max_tokens = 1, temperature = 0),
-    kwargs...)
+        api_kwargs::NamedTuple = (logit_bias = Dict(837 => 100, 905 => 100, 9987 => 100),
+            max_tokens = 1, temperature = 0),
+        kwargs...)
     ##
     msg = aigenerate(prompt_schema,
         prompt;
         api_kwargs,
         kwargs...)
     return msg
-end
-# Dispatch for templates
-function aiclassify(prompt_schema::AbstractOpenAISchema,
-    template_sym::Symbol;
-    kwargs...)
-    # render template into prompt
-    prompt = render(prompt_schema, Val(template_sym))
-    return aiclassify(prompt_schema, prompt; kwargs...)
 end

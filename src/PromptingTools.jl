@@ -2,7 +2,9 @@ module PromptingTools
 
 using OpenAI
 using JSON3
+using JSON3: StructTypes
 using HTTP
+using PrecompileTools
 
 # GLOBALS
 const MODEL_CHAT = "gpt-3.5-turbo"
@@ -20,7 +22,7 @@ const MODEL_ALIASES = Dict("gpt3" => "gpt-3.5-turbo",
     "gpt4t" => "gpt-4-1106-preview", # 4t is for "4 turbo"
     "gpt3t" => "gpt-3.5-turbo-1106", # 3t is for "3 turbo"
     "ada" => "text-embedding-ada-002")
-# below is defined in llm_interace.jl !
+# the below default is defined in llm_interace.jl !
 # const PROMPT_SCHEMA = OpenAISchema()
 
 include("utils.jl")
@@ -34,6 +36,11 @@ export AIMessage
 # export UserMessage, SystemMessage, DataMessage # for debugging only
 include("messages.jl")
 
+export aitemplates, AITemplate
+include("templates.jl")
+const TEMPLATE_STORE = Dict{Symbol, Any}()
+const TEMPLATE_METADATA = Vector{AITemplateMetadata}()
+
 ## Individual interfaces
 include("llm_openai.jl")
 
@@ -41,4 +48,12 @@ include("llm_openai.jl")
 export @ai_str, @aai_str
 include("macros.jl")
 
+function __init__()
+    # Load templates
+    load_templates!()
 end
+
+# Enable precompilation to reduce start time
+# @setup_workload include("precompilation.jl");
+
+end # module PromptingTools
