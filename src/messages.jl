@@ -5,25 +5,38 @@ abstract type AbstractMessage end
 abstract type AbstractChatMessage <: AbstractMessage end # with text-based content
 abstract type AbstractDataMessage <: AbstractMessage end # with data-based content, eg, embeddings
 
-Base.@kwdef mutable struct SystemMessage{T <: AbstractString} <: AbstractChatMessage
+# Workaround to be able to add metadata to serialized conversations, templates, etc.
+# Ignored by `render` directives
+Base.@kwdef struct MetadataMessage{T <: AbstractString} <: AbstractChatMessage
     content::T
-    variables::Vector{Symbol} = _extract_handlebar_variables(content)
+    description::String = ""
+    version::String = "1"
+    source::String = ""
+    _type::Symbol = :metadatamessage
 end
-Base.@kwdef mutable struct UserMessage{T <: AbstractString} <: AbstractChatMessage
+Base.@kwdef struct SystemMessage{T <: AbstractString} <: AbstractChatMessage
     content::T
     variables::Vector{Symbol} = _extract_handlebar_variables(content)
+    _type::Symbol = :systemmessage
+end
+Base.@kwdef struct UserMessage{T <: AbstractString} <: AbstractChatMessage
+    content::T
+    variables::Vector{Symbol} = _extract_handlebar_variables(content)
+    _type::Symbol = :usermessage
 end
 Base.@kwdef struct AIMessage{T <: Union{AbstractString, Nothing}} <: AbstractChatMessage
     content::T = nothing
     status::Union{Int, Nothing} = nothing
     tokens::Tuple{Int, Int} = (-1, -1)
     elapsed::Float64 = -1.0
+    _type::Symbol = :aimessage
 end
-Base.@kwdef mutable struct DataMessage{T <: Any} <: AbstractDataMessage
+Base.@kwdef struct DataMessage{T <: Any} <: AbstractDataMessage
     content::T
     status::Union{Int, Nothing} = nothing
     tokens::Tuple{Int, Int} = (-1, -1)
     elapsed::Float64 = -1.0
+    _type::Symbol = :datamessage
 end
 
 # content-only constructor
@@ -45,6 +58,8 @@ function Base.show(io::IO, ::MIME"text/plain", m::AbstractChatMessage)
         printstyled(io, type_; color = :light_green)
     elseif m isa UserMessage
         printstyled(io, type_; color = :light_red)
+    elseif m isa MetadataMessage
+        printstyled(io, type_; color = :light_blue)
     else
         print(io, type_)
     end
@@ -59,8 +74,8 @@ end
 
 ## Dispatch for render
 function render(schema::AbstractPromptSchema,
-    messages::Vector{<:AbstractMessage};
-    kwargs...)
+        messages::Vector{<:AbstractMessage};
+        kwargs...)
     render(schema, messages; kwargs...)
 end
 function render(schema::AbstractPromptSchema, msg::AbstractMessage; kwargs...)
@@ -70,13 +85,16 @@ function render(schema::AbstractPromptSchema, msg::AbstractString; kwargs...)
     render(schema, [UserMessage(; content = msg)]; kwargs...)
 end
 
-## Prompt Templates
-# ie, a way to re-use similar prompting patterns (eg, aiclassifier)
-# flow: template -> messages |+ kwargs variables -> chat history
-# Defined through Val() to allow for dispatch
-function render(prompt_schema::AbstractOpenAISchema, template::Val{:IsStatementTrue})
-    [
-        SystemMessage("You are an impartial AI judge evaluting whether the provided statement is \"true\" or \"false\". Answer \"unknown\" if you cannot decide."),
-        UserMessage("##Statement\n\n{{statement}}"),
-    ]
+## Serialization via JSON3
+StructTypes.StructType(::Type{AbstractChatMessage}) = StructTypes.AbstractType()
+StructTypes.StructType(::Type{MetadataMessage}) = StructTypes.Struct()
+StructTypes.StructType(::Type{SystemMessage}) = StructTypes.Struct()
+StructTypes.StructType(::Type{UserMessage}) = StructTypes.Struct()
+StructTypes.StructType(::Type{AIMessage}) = StructTypes.Struct()
+StructTypes.subtypekey(::Type{AbstractChatMessage}) = :_type
+function StructTypes.subtypes(::Type{AbstractChatMessage})
+    (usermessage = UserMessage,
+        aimessage = AIMessage,
+        systemmessage = SystemMessage,
+        metadatamessage = MetadataMessage)
 end
