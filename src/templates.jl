@@ -220,3 +220,19 @@ function aitemplates(query_key::Regex;
         metadata_store)
     return first(found_templates, limit)
 end
+
+## Dispatch for AI templates (unpacks the messages)
+function aigenerate(schema::AbstractPromptSchema, template::AITemplate; kwargs...)
+    aigenerate(schema, render(schema, template); kwargs...)
+end
+function aiclassify(schema::AbstractPromptSchema, template::AITemplate; kwargs...)
+    aiclassify(schema, render(schema, template); kwargs...)
+end
+
+# Shortcut for symbols
+function aigenerate(schema::AbstractPromptSchema, template::Symbol; kwargs...)
+    aigenerate(schema, AITemplate(template); kwargs...)
+end
+function aiclassify(schema::AbstractPromptSchema, template::Symbol; kwargs...)
+    aiclassify(schema, AITemplate(template); kwargs...)
+end

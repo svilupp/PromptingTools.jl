@@ -5,6 +5,13 @@ abstract type AbstractMessage end
 abstract type AbstractChatMessage <: AbstractMessage end # with text-based content
 abstract type AbstractDataMessage <: AbstractMessage end # with data-based content, eg, embeddings
 
+## Allowed inputs for ai* functions, AITemplate is resolved one level higher
+const ALLOWED_PROMPT_TYPE = Union{
+    AbstractString,
+    AbstractMessage,
+    Vector{<:AbstractMessage},
+}
+
 # Workaround to be able to add metadata to serialized conversations, templates, etc.
 # Ignored by `render` directives
 Base.@kwdef struct MetadataMessage{T <: AbstractString} <: AbstractChatMessage

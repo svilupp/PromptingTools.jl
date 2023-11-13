@@ -76,19 +76,3 @@ function aiembed(doc_or_docs, args...; kwargs...)
     aiembed(PROMPT_SCHEMA, doc_or_docs, args...; kwargs...)
 end
 aiclassify(prompt; kwargs...) = aiclassify(PROMPT_SCHEMA, prompt; kwargs...)
-
-## Dispatch for AI templates (unpacks the messages)
-function aigenerate(schema::AbstractPromptSchema, template::AITemplate; kwargs...)
-    aigenerate(schema, render(schema, template); kwargs...)
-end
-function aiclassify(schema::AbstractPromptSchema, template::AITemplate; kwargs...)
-    aiclassify(schema, render(schema, template); kwargs...)
-end
-
-# Shortcut for symbols
-function aigenerate(schema::AbstractPromptSchema, template::Symbol; kwargs...)
-    aigenerate(schema, AITemplate(template); kwargs...)
-end
-function aiclassify(schema::AbstractPromptSchema, template::Symbol; kwargs...)
-    aiclassify(schema, AITemplate(template); kwargs...)
-end

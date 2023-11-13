@@ -39,7 +39,7 @@ end
 
 ## User-Facing API
 """
-    aigenerate([prompt_schema::AbstractOpenAISchema,] prompt; verbose::Bool = true,
+    aigenerate([prompt_schema::AbstractOpenAISchema,] prompt::ALLOWED_PROMPT_TYPE; verbose::Bool = true,
         model::String = MODEL_CHAT,
         http_kwargs::NamedTuple = (;
             retry_non_idempotent = true,
@@ -97,7 +97,8 @@ msg=aigenerate(conversation)
 # AIMessage("Ah, strong feelings you have for your iPhone. A Jedi's path, this is not... <continues>")
 ```
 """
-function aigenerate(prompt_schema::AbstractOpenAISchema, prompt; verbose::Bool = true,
+function aigenerate(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE;
+        verbose::Bool = true,
         api_key::String = API_KEY,
         model::String = MODEL_CHAT,
         http_kwargs::NamedTuple = (retry_non_idempotent = true,
@@ -239,7 +240,7 @@ function OpenAI.create_embeddings(schema::TestEchoOpenAISchema, api_key::Abstrac
 end
 
 """
-    aiclassify(prompt_schema::AbstractOpenAISchema, prompt;
+    aiclassify(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE;
     api_kwargs::NamedTuple = (logit_bias = Dict(837 => 100, 905 => 100, 9987 => 100),
         max_tokens = 1, temperature = 0),
     kwargs...)
@@ -286,7 +287,7 @@ aiclassify(:JudgeIsItTrue;
 ```
 
 """
-function aiclassify(prompt_schema::AbstractOpenAISchema, prompt;
+function aiclassify(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE;
         api_kwargs::NamedTuple = (logit_bias = Dict(837 => 100, 905 => 100, 9987 => 100),
             max_tokens = 1, temperature = 0),
         kwargs...)
