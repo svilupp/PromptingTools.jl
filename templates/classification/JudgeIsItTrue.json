@@ -1,1 +1,21 @@
-[{"content":"Template Metadata","description":"LLM-based classification whether provided statement is true/false/unknown. Statement is provided via `it` placeholder.","version":"1","source":"","_type":"metadatamessage"},{"content":"You are an impartial AI judge evaluting whether the provided statement is \"true\" or \"false\". Answer \"unknown\" if you cannot decide.","variables":[],"_type":"systemmessage"},{"content":"# Statement\n\n{{it}}","variables":["it"],"_type":"usermessage"}]
+[
+    {
+        "content": "Template Metadata",
+        "description": "LLM-based classification whether provided statement is true/false/unknown. Statement is provided via `it` placeholder.",
+        "version": "1",
+        "source": "",
+        "_type": "metadatamessage"
+    },
+    {
+        "content": "You are an impartial AI judge evaluting whether the provided statement is \"true\" or \"false\". Answer \"unknown\" if you cannot decide.",
+        "variables": [],
+        "_type": "systemmessage"
+    },
+    {
+        "content": "# Statement\n\n{{it}}",
+        "variables": [
+            "it"
+        ],
+        "_type": "usermessage"
+    }
+]

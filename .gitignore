@@ -5,5 +5,5 @@
 /docs/Manifest.toml
 /docs/build/
 
-/.DS_Store # macOS folder metadata
-/.vscode
+**/.DS_Store
+**/.vscode

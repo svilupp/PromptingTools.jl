@@ -52,6 +52,22 @@ msgs = PT.render(AITemplate(:JuliaExpertAsk))
 #
 # Now, you know exactly what's in the template! 
 #
-# If you want to modify it, simply change it and save it as a new file with `save_template` (see the docs `?save_template` for more details):
+# If you want to modify it, simply change it and save it as a new file with `save_template` (see the docs `?save_template` for more details).
+# 
+# Let's adjust the previous template to be more specific to a data analysis question:
+tpl = [PT.SystemMessage("You are a world-class Julia language programmer with the knowledge of the latest syntax. You're also a senior Data Scientist and proficient in data analysis in Julia. Your communication is brief and concise. You're precise and answer only when you're confident in the high quality of your answer.")
+    PT.UserMessage("# Question\n\n{{ask}}")]
+# Templates are saved in the `templates` directory of the package. Name of the file will become the template name (eg, call `:JuliaDataExpertAsk`)
+filename = joinpath(pkgdir(PromptingTools),
+    "templates",
+    "persona-task",
+    "JuliaDataExpertAsk.json")
+PT.save_template(filename,
+    tpl;
+    description = "For asking data analysis questions in Julia language. Placeholders: `ask`")
+rm(filename) # cleanup if we don't like it
+# 
+# When you create a new template, remember to re-load the templates with `load_templates!()` so that it's available for use.
+PT.load_templates!();
 #
-# !!! If you have some good templates, please consider sharing them with the community by opening a PR to the `templates` directory!
+# !!! If you have some good templates (or suggestions for the existing ones), please consider sharing them with the community by opening a PR to the `templates` directory!

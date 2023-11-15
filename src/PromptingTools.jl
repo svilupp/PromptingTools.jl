@@ -38,6 +38,7 @@ include("messages.jl")
 
 export aitemplates, AITemplate
 include("templates.jl")
+
 const TEMPLATE_STORE = Dict{Symbol, Any}()
 const TEMPLATE_METADATA = Vector{AITemplateMetadata}()
 
@@ -54,6 +55,6 @@ function __init__()
 end
 
 # Enable precompilation to reduce start time
-# @setup_workload include("precompilation.jl");
+@compile_workload include("precompilation.jl")
 
 end # module PromptingTools
