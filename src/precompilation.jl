@@ -1,5 +1,5 @@
 # Load templates
-load_templates!()
+load_templates!();
 
 # API Calls
 mock_response = Dict(:choices => [Dict(:message => Dict(:content => "Hello!"))],
@@ -12,4 +12,4 @@ msg = aiclassify(schema, "I want to ask {{it}}"; it = "Is this correct?")
 # Use of Templates
 template_name = :JudgeIsItTrue
 msg = aigenerate(schema, template_name; it = "Is this correct?")
-msg = aiclassify(schema, template_name; it = "Is this correct?")
+msg = aiclassify(schema, template_name; it = "Is this correct?");

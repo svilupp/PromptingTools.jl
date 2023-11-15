@@ -36,7 +36,7 @@ ai"What is the capital of \$(country)?"
 # AIMessage("The capital of Spain is Madrid.")
 ```
 
-Pro tip: Use after-string-flags to select the model to be called, eg, `ai"What is the capital of France?"gpt4`. Great for those extra hard questions!
+Pro tip: Use after-string-flags to select the model to be called, eg, `ai"What is the capital of France?"gpt4` (use `gpt4t` for the new GPT-4 Turbo model). Great for those extra hard questions!
 
 For more complex prompt templates, you can use handlebars-style templating and provide variables as keyword arguments:
 
@@ -50,6 +50,8 @@ Pro tip: Use `asyncmap` to run multiple AI-powered tasks concurrently.
 
 Pro tip: If you use slow models (like GPT-4), you can use async version of `@ai_str` -> `@aai_str` to avoid blocking the REPL, eg, `aai"Say hi but slowly!"gpt4`
 
+For more practical examples, see the `examples/` folder and the [Advanced Examples](#advanced-examples) section below.
+
 ## Table of Contents
 
 - [PromptingTools.jl: "Your Daily Dose of AI Efficiency."](#promptingtoolsjl-your-daily-dose-of-ai-efficiency)
@@ -57,7 +59,9 @@ Pro tip: If you use slow models (like GPT-4), you can use async version of `@ai_
   - [Table of Contents](#table-of-contents)
   - [Why PromptingTools.jl](#why-promptingtoolsjl)
   - [Advanced Examples](#advanced-examples)
+    - [Seamless Integration Into Your Workflow](#seamless-integration-into-your-workflow)
     - [Advanced Prompts / Conversations](#advanced-prompts--conversations)
+    - [Templated Prompts](#templated-prompts)
     - [Asynchronous Execution](#asynchronous-execution)
     - [Model Aliases](#model-aliases)
     - [Embeddings](#embeddings)
@@ -90,11 +94,32 @@ Some features:
 
 ## Advanced Examples
 
-TODO:
+TODOs:
 
-[ ] Add more practical examples (DataFrames!)
-[ ] Add mini tasks with structured extraction
-[ ] Add an example of how to build a RAG app in 50 lines
+- [ ] Add more practical examples (with DataFrames!)
+- [ ] Add mini tasks with structured extraction
+- [ ] Add an example of how to build a RAG app in 50 lines
+
+### Seamless Integration Into Your Workflow
+Google search is great, but it's a context switch. You often have to open a few pages and read through the discussion to find the answer you need. Same with the ChatGPT website.
+
+Imagine you are in VSCode, editing your `.gitignore` file. How do I ignore a file in all subfolders again?
+
+All you need to do is to type:
+`aai"What to write in .gitignore to ignore file XYZ in any folder or subfolder?"`
+
+With `aai""` (as opposed to `ai""`), we make a non-blocking call to the LLM to not prevent you from continuing your work. When the answer is ready, we log it from the background:
+
+> [ Info: Tokens: 102 @ Cost: $0.0002 in 2.7 seconds
+> ┌ Info: AIMessage> To ignore a file called "XYZ" in any folder or subfolder, you can add the following line to your .gitignore file:
+> │ 
+> │ ```
+> │ **/XYZ
+> │ ```
+> │ 
+> └ This pattern uses the double asterisk (`**`) to match any folder or subfolder, and then specifies the name of the file you want to ignore.
+
+You probably saved 3-5 minutes on this task and probably another 5-10 minutes, because of the context switch/distraction you avoided. It's a small win, but it adds up quickly.
 
 ### Advanced Prompts / Conversations
 
@@ -125,6 +150,59 @@ new_conversation = vcat(conversation...,msg, UserMessage("Thank you, master Yoda
 aigenerate(new_conversation; object = "old iPhone")
 ```
 > AIMessage("Hmm, possess an old iPhone, I do not. But experience with attachments, I have. Detachment, I learned. True power and freedom, it brings...")
+
+### Templated Prompts
+
+With LLMs, the quality / robustness of your results depends on the quality of your prompts. But writing prompts is hard! That's why we offer a templating system to save you time and effort.
+
+To use a specific template (eg, `` to ask a Julia language):
+```julia
+msg = aigenerate(:JuliaExpertAsk; ask = "How do I add packages?")
+```
+
+The above is equivalent to a more verbose version that explicitly uses the dispatch on `AITemplate`:
+```julia
+msg = aigenerate(AITemplate(:JuliaExpertAsk); ask = "How do I add packages?")
+```
+
+Find available templates with `aitemplates`:
+```julia
+tmps = aitemplates("JuliaExpertAsk")
+# Will surface one specific template
+# 1-element Vector{AITemplateMetadata}:
+# PromptingTools.AITemplateMetadata
+#   name: Symbol JuliaExpertAsk
+#   description: String "For asking questions about Julia language. Placeholders: `ask`"
+#   version: String "1"
+#   wordcount: Int64 237
+#   variables: Array{Symbol}((1,))
+#   system_preview: String "You are a world-class Julia language programmer with the knowledge of the latest syntax. Your commun"
+#   user_preview: String "# Question\n\n{{ask}}"
+#   source: String ""
+```
+The above gives you a good idea of what the template is about, what placeholders are available, and how much it would cost to use it (=wordcount).
+
+Search for all Julia-related templates:
+```julia
+tmps = aitemplates("Julia")
+# 2-element Vector{AITemplateMetadata}... -> more to come later!
+```
+
+If you are on VSCode, you can leverage nice tabular display with `vscodedisplay`:
+```julia
+using DataFrames
+tmps = aitemplates("Julia") |> DataFrame |> vscodedisplay
+```
+
+I have my selected template, how do I use it? Just use the "name" in `aigenerate` or `aiclassify` 
+ like you see in the first example!
+
+You can inspect any template by "rendering" it (this is what the LLM will see):
+```julia
+julia> AITemplate(:JudgeIsItTrue) |> PromptingTools.render
+```
+
+See more examples in the [examples/](examples/) folder.
 
 ### Asynchronous Execution
 
@@ -183,13 +261,15 @@ aiclassify("Is two plus two four?")
 System prompts and higher-quality models can be used for more complex tasks, including knowing when to defer to a human:
 
 ```julia
-aiclassify(:IsStatementTrue; statement = "Is two plus three a vegetable on Mars?", model = "gpt4") 
+aiclassify(:JudgeIsItTrue; it = "Is two plus three a vegetable on Mars?", model = "gpt4t") 
 # unknown
 ```
 
-In the above example, we used a prompt template `:IsStatementTrue`, which automatically expands into the following system prompt (and a separate user prompt): 
+In the above example, we used a prompt template `:JudgeIsItTrue`, which automatically expands into the following system prompt (and a separate user prompt): 
 
 > "You are an impartial AI judge evaluating whether the provided statement is \"true\" or \"false\". Answer \"unknown\" if you cannot decide."
+
+For more information on templates, see the [Templated Prompts](#templated-prompts) section.
 
 ### Data Extraction
 

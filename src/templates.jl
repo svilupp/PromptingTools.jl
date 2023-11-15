@@ -2,7 +2,7 @@
 # Templates are stored as JSON files in the `templates` folder.
 # Once loaded, they are stored in global variable `TEMPLATE_STORE`
 #
-# Flow: template -> messages |+ kwargs variables -> chat history to pass to the model
+# Flow: template -> messages |+ kwargs variables -> "conversation" to pass to the model
 
 ## Types
 """
@@ -20,10 +20,55 @@ AITemplate is a template for a conversation prompt.
 - Ideally, the template name should be self-explanatory, eg, `JudgeIsItTrue` = persona is meant to `judge` some provided information where it is true or false
 
 # Examples
+
+Save time by re-using pre-made templates, just fill in the placeholders with the keyword arguments:
 ```julia
-julia> AITemplate(:JudgeIsItTrue)
+msg = aigenerate(:JuliaExpertAsk; ask = "How do I add packages?")
 ```
 
+The above is equivalent to a more verbose version that explicitly uses the dispatch on `AITemplate`:
+```julia
+msg = aigenerate(AITemplate(:JuliaExpertAsk); ask = "How do I add packages?")
+```
+
+Find available templates with `aitemplates`:
+```julia
+tmps = aitemplates("JuliaExpertAsk")
+# Will surface one specific template
+# 1-element Vector{AITemplateMetadata}:
+# PromptingTools.AITemplateMetadata
+#   name: Symbol JuliaExpertAsk
+#   description: String "For asking questions about Julia language. Placeholders: `ask`"
+#   version: String "1"
+#   wordcount: Int64 237
+#   variables: Array{Symbol}((1,))
+#   system_preview: String "You are a world-class Julia language programmer with the knowledge of the latest syntax. Your commun"
+#   user_preview: String "# Question\n\n{{ask}}"
+#   source: String ""
+```
+The above gives you a good idea of what the template is about, what placeholders are available, and how much it would cost to use it (=wordcount).
+
+Search for all Julia-related templates:
+```julia
+tmps = aitemplates("Julia")
+# 2-element Vector{AITemplateMetadata}... -> more to come later!
+```
+
+If you are on VSCode, you can leverage nice tabular display with `vscodedisplay`:
+```julia
+using DataFrames
+tmps = aitemplates("Julia") |> DataFrame |> vscodedisplay
+```
+
+I have my selected template, how do I use it? Just use the "name" in `aigenerate` or `aiclassify` 
+ like you see in the first example!
+
+You can inspect any template by "rendering" it (this is what the LLM will see):
+```julia
+julia> AITemplate(:JudgeIsItTrue) |> PromptingTools.render
+```
+
+See also: `save_template`, `load_template`, `load_templates!` for more advanced use cases (and the corresponding script in `examples/` folder)
 """
 struct AITemplate
     name::Symbol
@@ -60,7 +105,9 @@ function render(schema::AbstractPromptSchema, template::AITemplate; kwargs...)
     # get template
     return TEMPLATE_STORE[template.name]
 end
+
 # dispatch on default schema
+"Renders provided messaging template (`template`) under the default schema (`PROMPT_SCHEMA`)."
 function render(template::AITemplate; kwargs...)
     global PROMPT_SCHEMA
     render(PROMPT_SCHEMA, template; kwargs...)
@@ -181,13 +228,46 @@ You can search by:
 - `query::AbstractString` which looks for partial matches in the template `name` or `description`
 - `query::Regex` which looks for matches in the template `name`, `description` or any of the message previews
 
-# Examples
-```julia
+# Keyword Arguments
+- `limit::Int` limits the number of returned templates (Defaults to 10)
 
+# Examples
+
+Find available templates with `aitemplates`:
+```julia
+tmps = aitemplates("JuliaExpertAsk")
+# Will surface one specific template
+# 1-element Vector{AITemplateMetadata}:
+# PromptingTools.AITemplateMetadata
+#   name: Symbol JuliaExpertAsk
+#   description: String "For asking questions about Julia language. Placeholders: `ask`"
+#   version: String "1"
+#   wordcount: Int64 237
+#   variables: Array{Symbol}((1,))
+#   system_preview: String "You are a world-class Julia language programmer with the knowledge of the latest syntax. Your commun"
+#   user_preview: String "# Question\n\n{{ask}}"
+#   source: String ""
 ```
+The above gives you a good idea of what the template is about, what placeholders are available, and how much it would cost to use it (=wordcount).
+
+Search for all Julia-related templates:
+```julia
+tmps = aitemplates("Julia")
+# 2-element Vector{AITemplateMetadata}... -> more to come later!
+```
+
+If you are on VSCode, you can leverage nice tabular display with `vscodedisplay`:
+```julia
+using DataFrames
+tmps = aitemplates("Julia") |> DataFrame |> vscodedisplay
+```
+
+I have my selected template, how do I use it? Just use the "name" in `aigenerate` or `aiclassify` 
+ like you see in the first example!
 """
 function aitemplates end
-"Find the top `limit` templates whose `name::Symbol` partially matches the `query_name::Symbol` in `TEMPLATE_METADATA`."
+
+"Find the top-`limit` templates whose `name::Symbol` partially matches the `query_name::Symbol` in `TEMPLATE_METADATA`."
 function aitemplates(query_name::Symbol;
         limit::Int = 10,
         metadata_store::Vector{AITemplateMetadata} = TEMPLATE_METADATA)
@@ -196,7 +276,7 @@ function aitemplates(query_name::Symbol;
             lowercase(string(x.name))), metadata_store)
     return first(found_templates, limit)
 end
-"Find the top `limit` templates whose `name` or `description` fields partially match the `query_key::String` in `TEMPLATE_METADATA`."
+"Find the top-`limit` templates whose `name` or `description` fields partially match the `query_key::String` in `TEMPLATE_METADATA`."
 function aitemplates(query_key::AbstractString;
         limit::Int = 10,
         metadata_store::Vector{AITemplateMetadata} = TEMPLATE_METADATA)
@@ -206,7 +286,7 @@ function aitemplates(query_key::AbstractString;
         metadata_store)
     return first(found_templates, limit)
 end
-"Find the top `limit` templates where provided `query_key::Regex` matches either of `name`, `description` or previews or User or System messages in `TEMPLATE_METADATA`."
+"Find the top-`limit` templates where provided `query_key::Regex` matches either of `name`, `description` or previews or User or System messages in `TEMPLATE_METADATA`."
 function aitemplates(query_key::Regex;
         limit::Int = 10,
         metadata_store::Vector{AITemplateMetadata} = TEMPLATE_METADATA)
