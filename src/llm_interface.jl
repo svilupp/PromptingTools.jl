@@ -40,7 +40,9 @@ end
 
 abstract type AbstractChatMLSchema <: AbstractPromptSchema end
 """
-ChatMLSchema is used by many open-source chatbots, by OpenAI models under the hood and by several models and inferfaces (eg, Ollama, vLLM)
+ChatMLSchema is used by many open-source chatbots, by OpenAI models (under the hood) and by several models and inferfaces (eg, Ollama, vLLM)
+
+You can explore it on [tiktokenizer](https://tiktokenizer.vercel.app/)
 
 It uses the following conversation structure:
 ```
@@ -54,7 +56,19 @@ It uses the following conversation structure:
 """
 struct ChatMLSchema <: AbstractChatMLSchema end
 
-## Dispatch into defaults
+abstract type AbstractManagedSchema <: AbstractPromptSchema end
+
+"""
+Ollama by default manages different models and their associated prompt schemas when you pass `system_prompt` and `prompt` fields to the API.
+
+Warning: It works only for 1 system message and 1 user message, so anything more than that has to be rejected.
+
+If you need to pass more messagese / longer conversational history, you can use define the model-specific schema directly and pass your Ollama requests with `raw=true`, 
+ which disables and templating and schema management by Ollama.
+"""
+struct OllamaManagedSchema <: AbstractManagedSchema end
+
+## Dispatch into default schema
 const PROMPT_SCHEMA = OpenAISchema()
 
 aigenerate(prompt; kwargs...) = aigenerate(PROMPT_SCHEMA, prompt; kwargs...)
