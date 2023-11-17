@@ -1,0 +1,21 @@
+[
+    {
+        "content": "Template Metadata",
+        "description": "Blank template for easy of prompt entry without the `Message` objects. Simply provide keyword arguments for `system` (=system prompt/persona) and `user` (=user/task/data prompt). Placeholders: `system`, `user`",
+        "version": "1",
+        "source": "",
+        "_type": "metadatamessage"
+    },
+    {
+        "content": "{{system}}",
+        "variables": ["system"],
+        "_type": "systemmessage"
+    },
+    {
+        "content": "{{user}}",
+        "variables": [
+            "user"
+        ],
+        "_type": "usermessage"
+    }
+]
