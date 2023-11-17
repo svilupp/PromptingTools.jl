@@ -27,7 +27,7 @@ const MODEL_ALIASES = Dict("gpt3" => "gpt-3.5-turbo",
 
 include("utils.jl")
 
-export aigenerate, aiembed, aiclassify
+export aigenerate, aiembed, aiclassify, aiextract
 # export render # for debugging only
 include("llm_interface.jl")
 
@@ -41,6 +41,9 @@ include("templates.jl")
 
 const TEMPLATE_STORE = Dict{Symbol, Any}()
 const TEMPLATE_METADATA = Vector{AITemplateMetadata}()
+
+## Utilities to support structured extraction
+include("extraction.jl")
 
 ## Individual interfaces
 include("llm_openai.jl")

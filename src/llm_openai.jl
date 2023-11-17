@@ -6,7 +6,6 @@ function render(schema::AbstractOpenAISchema,
     ##
     conversation = Dict{String, String}[]
     # TODO: concat system messages together
-    # TODO: move system msg to the front
 
     has_system_msg = false
     # replace any handlebar variables in the messages
@@ -53,7 +52,6 @@ Generate an AI response based on a given prompt using the OpenAI API.
 - `prompt_schema`: An optional object to specify which prompt template should be applied (Default to `PROMPT_SCHEMA = OpenAISchema`)
 - `prompt`: Can be a string representing the prompt for the AI conversation, a `UserMessage`, a vector of `AbstractMessage` or an `AITemplate`
 - `verbose`: A boolean indicating whether to print additional information.
-- `prompt_schema`: An abstract schema for the prompt.
 - `api_key`: A string representing the API key for accessing the OpenAI API.
 - `model`: A string representing the model to use for generating the response. Can be an alias corresponding to a model ID defined in `MODEL_ALIASES`.
 - `http_kwargs`: A named tuple of HTTP keyword arguments.
@@ -63,7 +61,7 @@ Generate an AI response based on a given prompt using the OpenAI API.
 # Returns
 - `msg`: An `AIMessage` object representing the generated AI message, including the content, status, tokens, and elapsed time.
 
-See also: `ai_str`
+See also: `ai_str`, `aai_str`, `aiembed`, `aiclassify`, `aiextract`
 
 # Example
 
@@ -296,5 +294,147 @@ function aiclassify(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_
         prompt;
         api_kwargs,
         kwargs...)
+    return msg
+end
+
+"""
+    aiextract([prompt_schema::AbstractOpenAISchema,] prompt::ALLOWED_PROMPT_TYPE; 
+    return_type::Type,
+    verbose::Bool = true,
+        model::String = MODEL_CHAT,
+        http_kwargs::NamedTuple = (;
+            retry_non_idempotent = true,
+            retries = 5,
+            readtimeout = 120), api_kwargs::NamedTuple = NamedTuple(),
+        kwargs...)
+
+Extract required information (defined by a struct **`return_type`**) from the provided prompt by leveraging OpenAI function calling mode.
+
+This is a perfect solution for extracting structured information from text (eg, extract organization names in news articles, etc.)
+
+It's effectively a light wrapper around `aigenerate` call, which requires additional keyword argument `return_type` to be provided
+ and will enforce the model outputs to adhere to it.
+
+# Arguments
+- `prompt_schema`: An optional object to specify which prompt template should be applied (Default to `PROMPT_SCHEMA = OpenAISchema`)
+- `prompt`: Can be a string representing the prompt for the AI conversation, a `UserMessage`, a vector of `AbstractMessage` or an `AITemplate`
+- `return_type`: A **struct** TYPE representing the the information we want to extract. Do not provide a struct instance, only the type.
+  If the struct has a docstring, it will be provided to the model as well. It's used to enforce structured model outputs or provide more information.
+- `verbose`: A boolean indicating whether to print additional information.
+- `api_key`: A string representing the API key for accessing the OpenAI API.
+- `model`: A string representing the model to use for generating the response. Can be an alias corresponding to a model ID defined in `MODEL_ALIASES`.
+- `http_kwargs`: A named tuple of HTTP keyword arguments.
+- `api_kwargs`: A named tuple of API keyword arguments.
+- `kwargs`: Prompt variables to be used to fill the prompt/template
+
+# Returns
+- `msg`: An `DataMessage` object representing the extracted data, including the content, status, tokens, and elapsed time. 
+  Use `msg.content` to access the extracted data.
+
+See also: `function_call_signature`, `MaybeExtract`, `aigenerate`
+
+# Example
+
+Do you want to extract some specific measurements from a text like age, weight and height?
+You need to define the information you need as a struct (`return_type`):
+```
+"Person's age, height, and weight."
+struct MyMeasurement
+    age::Int # required
+    height::Union{Int,Nothing} # optional
+    weight::Union{Nothing,Float64} # optional
+end
+msg = aiextract("James is 30, weighs 80kg. He's 180cm tall."; return_type=MyMeasurement)
+# [ Info: Tokens: 129 @ Cost: \$0.0002 in 1.0 seconds
+# PromptingTools.DataMessage(MyMeasurement)
+msg.content
+# MyMeasurement(30, 180, 80.0)
+```
+
+The fields that allow `Nothing` are marked as optional in the schema:
+```
+msg = aiextract("James is 30."; return_type=MyMeasurement)
+# MyMeasurement(30, nothing, nothing)
+```
+
+If there are multiple items you want to extract, define a wrapper struct to get a Vector of `MyMeasurement`:
+```
+struct MyMeasurementWrapper
+    measurements::Vector{MyMeasurement}
+end
+
+msg = aiextract("James is 30, weighs 80kg. He's 180cm tall. Then Jack is 19 but really tall - over 190!"; return_type=ManyMeasurements)
+
+msg.content.measurements
+# 2-element Vector{MyMeasurement}:
+#  MyMeasurement(30, 180, 80.0)
+#  MyMeasurement(19, 190, nothing)
+```
+
+Or if you want your extraction to fail gracefully when data isn't found, use `MaybeExtract{T}` wrapper
+ (this trick is inspired by the Instructor package!):
+```
+using PromptingTools: MaybeExtract
+
+type = MaybeExtract{MyMeasurement}
+# Effectively the same as:
+# struct MaybeExtract{T}
+#     result::Union{T, Nothing} // The result of the extraction
+#     error::Bool // true if a result is found, false otherwise
+#     message::Union{Nothing, String} // Only present if no result is found, should be short and concise
+# end
+
+# If LLM extraction fails, it will return a Dict with `error` and `message` fields instead of the result!
+msg = aiextract("Extract measurements from the text: I am giraffe", type)
+msg.content
+# MaybeExtract{MyMeasurement}(nothing, true, "I'm sorry, but I can only assist with human measurements.")
+```
+
+That way, you can handle the error gracefully and get a reason why extraction failed (in `msg.content.message`).
+
+Note that the error message refers to a giraffe not being a human, 
+ because in our `MyMeasurement` docstring, we said that it's for people!
+"""
+function aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE;
+        return_type::Type,
+        verbose::Bool = true,
+        api_key::String = API_KEY,
+        model::String = MODEL_CHAT,
+        http_kwargs::NamedTuple = (retry_non_idempotent = true,
+            retries = 5,
+            readtimeout = 120), api_kwargs::NamedTuple = NamedTuple(),
+        kwargs...)
+    ##
+    global MODEL_ALIASES, MODEL_COSTS
+    ## Function calling specifics
+    functions = [function_call_signature(return_type)]
+    function_call = Dict(:name => only(functions)["name"])
+    ## Add the function call signature to the api_kwargs
+    api_kwargs = merge(api_kwargs, (; functions, function_call))
+    ## Find the unique ID for the model alias provided
+    model_id = get(MODEL_ALIASES, model, model)
+    conversation = render(prompt_schema, prompt; kwargs...)
+    time = @elapsed r = create_chat(prompt_schema, api_key,
+        model_id,
+        conversation;
+        http_kwargs,
+        api_kwargs...)
+    # "Safe" parsing of the response - it still fails if JSON is invalid
+    content = try
+        r.response[:choices][begin][:message][:function_call][:arguments] |>
+        x -> JSON3.read(x, return_type)
+    catch e
+        @warn "There was an error parsing the response: $e. Using the raw response instead."
+        r.response[:choices][begin][:message][:function_call][:arguments] |>
+        JSON3.read |> copy
+    end
+    msg = DataMessage(; content,
+        status = Int(r.status),
+        tokens = (r.response[:usage][:prompt_tokens],
+            r.response[:usage][:completion_tokens]),
+        elapsed = time)
+    ## Reporting
+    verbose && @info _report_stats(msg, model_id, MODEL_COSTS)
+
     return msg
 end

@@ -90,15 +90,16 @@ Some features:
 - **Easy to Remember**: All exported functions start with `ai...` for better discoverability
 - **Light Wraper Types**: Benefit from Julia's multiple dispatch by having AI outputs wrapped in specific types
 - **Minimal Dependencies**: Enjoy an easy addition to your global environment with very light dependencies
-- **No Context Switching**: Access cutting-edge LLMs with no context switching and minimum extra keystrokes
+- **No Context Switching**: Access cutting-edge LLMs with no context switching and minimum extra keystrokes directly in your REPL
 
 ## Advanced Examples
 
 TODOs:
 
 - [ ] Add more practical examples (with DataFrames!)
-- [ ] Add mini tasks with structured extraction
 - [ ] Add an example of how to build a RAG app in 50 lines
+
+Noteworthy functions: `aigenerate`, `aiembed`, `aiclassify`, `aiextract`, `aitemplates`
 
 ### Seamless Integration Into Your Workflow
 Google search is great, but it's a context switch. You often have to open a few pages and read through the discussion to find the answer you need. Same with the ChatGPT website.
@@ -273,9 +274,52 @@ For more information on templates, see the [Templated Prompts](#templated-prompt
 
 ### Data Extraction
 
-!!! Experimental
+Are you tired of extracting data with regex? You can use LLMs to extract structured data from text!
 
-TBU... with `aiextract`
+All you have to do is to define the structure of the data you want to extract and the LLM will do the rest.
+
+Define a `return_type` with struct. Provide docstrings if needed (improves results and helps with documentation).
+
+Let's start with a hard task - extracting the current weather in a given location:
+```julia
+@enum TemperatureUnits celsius fahrenheit
+"""Extract the current weather in a given location
+
+# Arguments
+- `location`: The city and state, e.g. "San Francisco, CA"
+- `unit`: The unit of temperature to return, either `celsius` or `fahrenheit`
+"""
+struct CurrentWeather
+    location::String
+    unit::Union{Nothing,TemperatureUnits}
+end
+
+# Note that we provide the TYPE itself, not an instance of it!
+msg = aiextract("What's the weather in Salt Lake City in C?"; return_type=CurrentWeather)
+msg.content
+# CurrentWeather("Salt Lake City, UT", celsius)
+```
+
+But you can use it even for more complex tasks, like extracting many entities from a text:
+
+```julia
+"Person's age, height, and weight."
+struct MyMeasurement
+    age::Int
+    height::Union{Int,Nothing}
+    weight::Union{Nothing,Float64}
+end
+struct ManyMeasurements
+    measurements::Vector{MyMeasurement}
+end
+msg = aiextract("James is 30, weighs 80kg. He's 180cm tall. Then Jack is 19 but really tall - over 190!"; return_type=ManyMeasurements)
+msg.content.measurements
+# 2-element Vector{MyMeasurement}:
+#  MyMeasurement(30, 180, 80.0)
+#  MyMeasurement(19, 190, nothing)
+```
+
+There is even a wrapper to help you catch errors together with helpful explanations on why parsing failed. See `?PromptingTools.MaybeExtract` for more information.
 
 ### More Examples
 
