@@ -75,8 +75,15 @@ end
 function Base.show(io::IO, ::MIME"text/plain", m::AbstractDataMessage)
     type_ = string(typeof(m)) |> x -> split(x, "{")[begin]
     printstyled(io, type_; color = :light_yellow)
-    size_str = (m.content) isa AbstractArray ? string(size(m.content)) : "-"
-    print(io, "(", typeof(m.content), " of size ", size_str, ")")
+    # for Embedding messages
+    if m.content isa AbstractArray
+        print(io, "(", typeof(m.content), " of size ", size(m.content), ")")
+        # for any non-types extraction messages
+    elseif m.content isa Dict{Symbol, <:Any}
+        print(io, "(Dict with keys: ", join(keys(m.content), ", "), ")")
+    else
+        print(io, "(", typeof(m.content), ")")
+    end
 end
 
 ## Dispatch for render
