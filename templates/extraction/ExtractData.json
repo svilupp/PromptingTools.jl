@@ -1,7 +1,7 @@
 [
     {
         "content": "Template Metadata",
-        "description": "Great template for detail-oriented tasks like string manipulations, data cleaning, etc. Placeholder: `data`.",
+        "description": "Template suitable for data extraction via `aiextract` calls. Placeholder: `data`.",
         "version": "1",
         "source": "",
         "_type": "metadatamessage"
