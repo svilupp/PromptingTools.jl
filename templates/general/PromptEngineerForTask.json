@@ -1,7 +1,7 @@
 [
     {
         "content": "Template Metadata",
-        "description": "Suggest what could be a good system prompt/user prompt for a given `task`. Placeholder: `task`",
+        "description": "Prompt engineer that suggests what could be a good system prompt/user prompt for a given `task`. Placeholder: `task`",
         "version": "1",
         "source": "",
         "_type": "metadatamessage"
