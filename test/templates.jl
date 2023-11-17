@@ -41,8 +41,8 @@ end
     # Search for multiple with :Task in name
     tmps1 = aitemplates(:Task)
     @test length(tmps1) >= 1
-    tmps2 = aitemplates("Task")
-    @test length(tmps2) == length(tmps1)
+    tmps2 = aitemplates("Task") # broader search
+    @test length(tmps2) >= length(tmps1)
     # Search via regex
     tmps = aitemplates(r"IMPARTIAL AI JUDGE"i)
     @test length(tmps) >= 1
