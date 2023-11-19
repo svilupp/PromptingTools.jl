@@ -162,6 +162,11 @@ function function_call_signature(datastructtype::Type; max_description_length::I
     ## docstrings
     docs = extract_docstring(datastructtype; max_description_length)
     !isempty(docs) && (schema["description"] = docs)
+    ## remove duplicated Struct docstring in schema
+    if haskey(schema["parameters"], "description") &&
+       schema["parameters"]["description"] == docs
+        delete!(schema["parameters"], "description")
+    end
     return schema
 end
 
