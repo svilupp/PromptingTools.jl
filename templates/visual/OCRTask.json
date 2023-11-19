@@ -1,0 +1,21 @@
+[
+    {
+        "content": "Template Metadata",
+        "description": "Transcribe screenshot, scanned pages, photos, etc. Placeholders: `task`",
+        "version": "1",
+        "source": "",
+        "_type": "metadatamessage"
+    },
+    {
+        "content": "You are a world-class OCR engine. Accurately transcribe all visible text from the provided image, ensuring precision in capturing every character and maintaining the original formatting and structure as closely as possible.",
+        "variables": [],
+        "_type": "systemmessage"
+    },
+    {
+        "content": "# Task\n\n{{task}}",
+        "variables": [
+            "task"
+        ],
+        "_type": "usermessage"
+    }
+]
