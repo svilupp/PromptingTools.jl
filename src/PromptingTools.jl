@@ -1,5 +1,6 @@
 module PromptingTools
 
+using Base64: base64encode
 using OpenAI
 using JSON3
 using JSON3: StructTypes
@@ -16,9 +17,11 @@ const MODEL_COSTS = Dict("gpt-3.5-turbo" => (0.0015, 0.002),
     "gpt-3.5-turbo-1106" => (0.001, 0.002),
     "gpt-4" => (0.03, 0.06),
     "gpt-4-1106-preview" => (0.01, 0.03),
+    "gpt-4-vision-preview" => (0.01, 0.03),
     "text-embedding-ada-002" => (0.001, 0.0))
 const MODEL_ALIASES = Dict("gpt3" => "gpt-3.5-turbo",
     "gpt4" => "gpt-4",
+    "gpt4v" => "gpt-4-vision-preview", # 4v is for "4 vision"
     "gpt4t" => "gpt-4-1106-preview", # 4t is for "4 turbo"
     "gpt3t" => "gpt-3.5-turbo-1106", # 3t is for "3 turbo"
     "ada" => "text-embedding-ada-002")
@@ -27,13 +30,13 @@ const MODEL_ALIASES = Dict("gpt3" => "gpt-3.5-turbo",
 
 include("utils.jl")
 
-export aigenerate, aiembed, aiclassify, aiextract
+export aigenerate, aiembed, aiclassify, aiextract, aiscan
 # export render # for debugging only
 include("llm_interface.jl")
 
 ## Conversation history / Prompt elements
 export AIMessage
-# export UserMessage, SystemMessage, DataMessage # for debugging only
+# export UserMessage, UserMessageWithImages, SystemMessage, DataMessage # for debugging only
 include("messages.jl")
 
 export aitemplates, AITemplate

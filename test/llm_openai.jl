@@ -1,5 +1,6 @@
 using PromptingTools: TestEchoOpenAISchema, render, OpenAISchema
-using PromptingTools: AIMessage, SystemMessage, UserMessage, DataMessage
+using PromptingTools: AIMessage, SystemMessage, AbstractMessage
+using PromptingTools: UserMessage, UserMessageWithImages, DataMessage
 
 @testset "render-OpenAI" begin
     schema = OpenAISchema()
@@ -71,7 +72,7 @@ using PromptingTools: AIMessage, SystemMessage, UserMessage, DataMessage
     @test conversation == expected_output
 
     # Given an empty vector of messages, it should return an empty conversation dictionary just with the system prompt
-    messages = PT.AbstractMessage[]
+    messages = AbstractMessage[]
     expected_output = [
         Dict("role" => "system", "content" => "Act as a helpful AI assistant"),
     ]
@@ -118,6 +119,43 @@ using PromptingTools: AIMessage, SystemMessage, UserMessage, DataMessage
     ]
     # Broken: Does not concatenate system messages yet
     @test_broken conversation == expected_output
+
+    # Test UserMessageWithImages
+    messages = [
+        SystemMessage("System message 1"),
+        UserMessageWithImages("User message"; image_url = "https://example.com/image.png"),
+    ]
+    conversation = render(schema, messages)
+    expected_output = Dict{String, Any}[Dict("role" => "system",
+            "content" => "System message 1"),
+        Dict("role" => "user",
+            "content" => Dict{String, Any}[Dict("text" => "User message", "type" => "text"),
+                Dict("image_url" => Dict("detail" => "auto",
+                        "url" => "https://example.com/image.png"),
+                    "type" => "image_url")])]
+    @test conversation == expected_output
+
+    # With a list of images and detail="low"
+    messages = [
+        SystemMessage("System message 2"),
+        UserMessageWithImages("User message";
+            image_url = [
+                "https://example.com/image1.png",
+                "https://example.com/image2.png",
+            ]),
+    ]
+    conversation = render(schema, messages; image_detail = "low")
+    expected_output = Dict{String, Any}[Dict("role" => "system",
+            "content" => "System message 2"),
+        Dict("role" => "user",
+            "content" => Dict{String, Any}[Dict("text" => "User message", "type" => "text"),
+                Dict("image_url" => Dict("detail" => "low",
+                        "url" => "https://example.com/image1.png"),
+                    "type" => "image_url"),
+                Dict("image_url" => Dict("detail" => "low",
+                        "url" => "https://example.com/image2.png"),
+                    "type" => "image_url")])]
+    @test conversation == expected_output
 end
 
 @testset "aigenerate-OpenAI" begin

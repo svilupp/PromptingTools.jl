@@ -103,7 +103,7 @@ function render(schema::AbstractPromptSchema, template::AITemplate; kwargs...)
     haskey(TEMPLATE_STORE, template.name) ||
         error("Template $(template.name) not found in TEMPLATE_STORE")
     # get template
-    return TEMPLATE_STORE[template.name]
+    return TEMPLATE_STORE[template.name] |> copy
 end
 
 # dispatch on default schema
@@ -308,6 +308,12 @@ end
 function aiclassify(schema::AbstractPromptSchema, template::AITemplate; kwargs...)
     aiclassify(schema, render(schema, template); kwargs...)
 end
+function aiextract(schema::AbstractPromptSchema, template::AITemplate; kwargs...)
+    aiextract(schema, render(schema, template); kwargs...)
+end
+function aiscan(schema::AbstractPromptSchema, template::AITemplate; kwargs...)
+    aiscan(schema, render(schema, template); kwargs...)
+end
 
 # Shortcut for symbols
 function aigenerate(schema::AbstractPromptSchema, template::Symbol; kwargs...)
@@ -315,4 +321,10 @@ function aigenerate(schema::AbstractPromptSchema, template::Symbol; kwargs...)
 end
 function aiclassify(schema::AbstractPromptSchema, template::Symbol; kwargs...)
     aiclassify(schema, AITemplate(template); kwargs...)
+end
+function aiextract(schema::AbstractPromptSchema, template::Symbol; kwargs...)
+    aiextract(schema, AITemplate(template); kwargs...)
+end
+function aiscan(schema::AbstractPromptSchema, template::Symbol; kwargs...)
+    aiscan(schema, AITemplate(template); kwargs...)
 end
