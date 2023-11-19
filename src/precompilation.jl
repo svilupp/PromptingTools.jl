@@ -1,13 +1,14 @@
 # Load templates
 load_templates!();
 
-# API Calls
+# API Calls prep
 mock_response = Dict(:choices => [
         Dict(:message => Dict(:content => "Hello!",
             :function_call => Dict(:arguments => JSON3.write(Dict(:x => 1))))),
     ],
     :usage => Dict(:total_tokens => 3, :prompt_tokens => 2, :completion_tokens => 1))
 schema = TestEchoOpenAISchema(; response = mock_response, status = 200)
+
 # API calls
 msg = aigenerate(schema, "I want to ask {{it}}"; it = "Is this correct?")
 msg = aiclassify(schema, "I want to ask {{it}}"; it = "Is this correct?")
@@ -16,7 +17,18 @@ struct X123
     x::Int
 end
 msg = aiextract(schema, "I want to ask {{it}}"; it = "Is this correct?", return_type = X123)
+image_url = "some_mock_url"
+msg = aiscan(schema, "Describe the image"; image_url)
+
 # Use of Templates
 template_name = :JudgeIsItTrue
 msg = aigenerate(schema, template_name; it = "Is this correct?")
 msg = aiclassify(schema, template_name; it = "Is this correct?");
+msg = aiextract(schema,
+    template_name;
+    it = "This doesn't make sense but do run it...",
+    return_type = X123);
+msg = aiscan(schema,
+    template_name;
+    it = "Is the image a Julia logo?",
+    image_url = "some_link_to_julia_logo");

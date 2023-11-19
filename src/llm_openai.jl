@@ -1,11 +1,25 @@
 ## Rendering of converation history for the OpenAI API
-"Builds a history of the conversation to provide the prompt to the API. All kwargs are passed as replacements such that `{{key}}=>value` in the template.}}"
+"""
+    render(schema::AbstractOpenAISchema,
+        messages::Vector{<:AbstractMessage};
+        image_detail::AbstractString = "auto",
+        kwargs...)
+
+Builds a history of the conversation to provide the prompt to the API. All unspecified kwargs are passed as replacements such that `{{key}}=>value` in the template.
+
+# Arguments
+- `image_detail`: Only for `UserMessageWithImages`. It represents the level of detail to include for images. Can be `"auto"`, `"high"`, or `"low"`.
+
+"""
 function render(schema::AbstractOpenAISchema,
         messages::Vector{<:AbstractMessage};
+        image_detail::AbstractString = "auto",
         kwargs...)
     ##
-    conversation = Dict{String, String}[]
-    # TODO: concat system messages together
+    @assert image_detail in ["auto", "high", "low"] "Image detail must be one of: auto, high, low"
+    ##
+    conversation = Dict{String, Any}[]
+    # TODO: concat multiple system messages together (2nd pass)
 
     has_system_msg = false
     # replace any handlebar variables in the messages
@@ -23,6 +37,20 @@ function render(schema::AbstractOpenAISchema,
                             for (key, value) in pairs(kwargs) if key in msg.variables]
             push!(conversation,
                 Dict("role" => "user", "content" => replace(msg.content, replacements...)))
+        elseif msg isa UserMessageWithImages
+            replacements = ["{{$(key)}}" => value
+                            for (key, value) in pairs(kwargs) if key in msg.variables]
+            # Build message content
+            content = Dict{String, Any}[Dict("type" => "text",
+                "text" => replace(msg.content, replacements...))]
+            # Add images
+            for img in msg.image_url
+                push!(content,
+                    Dict("type" => "image_url",
+                        "image_url" => Dict("url" => img,
+                            "detail" => image_detail)))
+            end
+            push!(conversation, Dict("role" => "user", "content" => content))
         elseif msg isa AIMessage
             push!(conversation,
                 Dict("role" => "assistant", "content" => msg.content))
@@ -60,8 +88,9 @@ Generate an AI response based on a given prompt using the OpenAI API.
 
 # Returns
 - `msg`: An `AIMessage` object representing the generated AI message, including the content, status, tokens, and elapsed time.
+ Use `msg.content` to access the extracted string.
 
-See also: `ai_str`, `aai_str`, `aiembed`, `aiclassify`, `aiextract`
+See also: `ai_str`, `aai_str`, `aiembed`, `aiclassify`, `aiextract`, `aiscan`
 
 # Example
 
@@ -429,6 +458,125 @@ function aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_T
         JSON3.read |> copy
     end
     msg = DataMessage(; content,
+        status = Int(r.status),
+        tokens = (r.response[:usage][:prompt_tokens],
+            r.response[:usage][:completion_tokens]),
+        elapsed = time)
+    ## Reporting
+    verbose && @info _report_stats(msg, model_id, MODEL_COSTS)
+
+    return msg
+end
+
+"""
+aiscan([prompt_schema::AbstractOpenAISchema,] prompt::ALLOWED_PROMPT_TYPE; 
+    image_url::Union{Nothing, AbstractString, Vector{<:AbstractString}} = nothing,
+    image_path::Union{Nothing, AbstractString, Vector{<:AbstractString}} = nothing,
+    image_detail::AbstractString = "auto",
+    attach_to_latest::Bool = true,
+    verbose::Bool = true,
+        model::String = MODEL_CHAT,
+        http_kwargs::NamedTuple = (;
+            retry_non_idempotent = true,
+            retries = 5,
+            readtimeout = 120), 
+        api_kwargs::NamedTuple = = (; max_tokens = 2500),
+        kwargs...)
+
+Scans the provided image (`image_url` or `image_path`) with the goal provided in the `prompt`.
+
+Can be used for many multi-modal tasks, such as: OCR (transcribe text in the image), image captioning, image classification, etc.
+
+It's effectively a light wrapper around `aigenerate` call, which uses additional keyword arguments `image_url`, `image_path`, `image_detail` to be provided. 
+ At least one image source (url or path) must be provided.
+
+# Arguments
+- `prompt_schema`: An optional object to specify which prompt template should be applied (Default to `PROMPT_SCHEMA = OpenAISchema`)
+- `prompt`: Can be a string representing the prompt for the AI conversation, a `UserMessage`, a vector of `AbstractMessage` or an `AITemplate`
+- `image_url`: A string or vector of strings representing the URL(s) of the image(s) to scan.
+- `image_path`: A string or vector of strings representing the path(s) of the image(s) to scan.
+- `image_detail`: A string representing the level of detail to include for images. Can be `"auto"`, `"high"`, or `"low"`. See [OpenAI Vision Guide](https://platform.openai.com/docs/guides/vision) for more details.
+- `attach_to_latest`: A boolean how to handle if a conversation with multiple `UserMessage` is provided. When `true`, the images are attached to the latest `UserMessage`.
+- `verbose`: A boolean indicating whether to print additional information.
+- `api_key`: A string representing the API key for accessing the OpenAI API.
+- `model`: A string representing the model to use for generating the response. Can be an alias corresponding to a model ID defined in `MODEL_ALIASES`.
+- `http_kwargs`: A named tuple of HTTP keyword arguments.
+- `api_kwargs`: A named tuple of API keyword arguments.
+- `kwargs`: Prompt variables to be used to fill the prompt/template
+
+# Returns
+- `msg`: An `AIMessage` object representing the generated AI message, including the content, status, tokens, and elapsed time.
+ Use `msg.content` to access the extracted string.
+
+See also: `ai_str`, `aai_str`, `aigenerate`, `aiembed`, `aiclassify`, `aiextract`
+
+# Notes
+
+- All examples below use model "gpt4v", which is an alias for model ID "gpt-4-vision-preview"
+- `max_tokens` in the `api_kwargs` is preset to 2500, otherwise OpenAI enforces a default of only a few hundred tokens (~300). If your output is truncated, increase this value
+
+# Example
+
+Describe the provided image:
+```julia
+msg = aiscan("Describe the image"; image_path="julia.png", model="gpt4v")
+# [ Info: Tokens: 1141 @ Cost: \$0.0117 in 2.2 seconds
+# AIMessage("The image shows a logo consisting of the word "julia" written in lowercase")
+```
+
+You can provide multiple images at once as a vector and ask for "low" level of detail (cheaper):
+```julia
+msg = aiscan("Describe the image"; image_path=["julia.png","python.png"], image_detail="low", model="gpt4v")
+```
+
+You can use this function as a nice and quick OCR (transcribe text in the image) with a template `:OCRTask`. 
+Let's transcribe some SQL code from a screenshot (no more re-typing!):
+
+```julia
+# Screenshot of some SQL code
+image_url = "https://www.sqlservercentral.com/wp-content/uploads/legacy/8755f69180b7ac7ee76a69ae68ec36872a116ad4/24622.png"
+msg = aiscan(:OCRTask; image_url, model="gpt4v", task="Transcribe the SQL code in the image.", api_kwargs=(; max_tokens=2500))
+
+# [ Info: Tokens: 362 @ Cost: \$0.0045 in 2.5 seconds
+# AIMessage("```sql
+# update Orders <continue>
+
+# You can add syntax highlighting of the outputs via Markdown
+using Markdown
+msg.content |> Markdown.parse
+```
+
+Notice that we enforce `max_tokens = 2500`. That's because OpenAI seems to default to ~300 tokens, which provides incomplete outputs.
+Hence, we set this value to 2500 as a default. If you still get truncated outputs, increase this value.
+
+"""
+function aiscan(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE;
+        image_url::Union{Nothing, AbstractString, Vector{<:AbstractString}} = nothing,
+        image_path::Union{Nothing, AbstractString, Vector{<:AbstractString}} = nothing,
+        image_detail::AbstractString = "auto",
+        attach_to_latest::Bool = true,
+        verbose::Bool = true,
+        api_key::String = API_KEY,
+        model::String = MODEL_CHAT,
+        http_kwargs::NamedTuple = (retry_non_idempotent = true,
+            retries = 5,
+            readtimeout = 120), api_kwargs::NamedTuple = (; max_tokens = 2500),
+        kwargs...)
+    ##
+    global MODEL_ALIASES, MODEL_COSTS
+    ## Find the unique ID for the model alias provided
+    model_id = get(MODEL_ALIASES, model, model)
+    ## Vision-specific functionality
+    msgs = attach_images_to_user_message(prompt; image_url, image_path, attach_to_latest)
+    ## Build the conversation, pass what image detail is required (if provided)
+    conversation = render(prompt_schema, msgs; image_detail, kwargs...)
+    ## Model call
+    time = @elapsed r = create_chat(prompt_schema, api_key,
+        model_id,
+        conversation;
+        http_kwargs,
+        api_kwargs...)
+    msg = AIMessage(; content = r.response[:choices][begin][:message][:content] |> strip,
         status = Int(r.status),
         tokens = (r.response[:usage][:prompt_tokens],
             r.response[:usage][:completion_tokens]),
