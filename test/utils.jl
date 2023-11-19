@@ -1,4 +1,5 @@
 using PromptingTools: _extract_handlebar_variables, _report_stats
+using PromptingTools: _string_to_vector, _encode_local_image
 
 @testset "extract_handlebar_variables" begin
     # Extracts handlebar variables enclosed in double curly braces
@@ -37,4 +38,20 @@ end
     # Returns a string without cost when it's zero
     expected_output = "Tokens: 6 in 5.0 seconds"
     @test _report_stats(msg, model, Dict(model => (0, 0))) == expected_output
+end
+
+@testset "_string_to_vector" begin
+    @test _string_to_vector("Hello") == ["Hello"]
+    @test _string_to_vector(["Hello", "World"]) == ["Hello", "World"]
+end
+
+@testset "_encode_local_image" begin
+    image_path = joinpath(@__DIR__, "data", "julia.png")
+    output = _encode_local_image(image_path)
+    @test output isa String
+    @test occursin("data:image/png;base64,", output)
+    output2 = _encode_local_image([image_path, image_path])
+    @test output2 isa Vector
+    @test output2[1] == output2[2] == output
+    @test_throws AssertionError _encode_local_image("not an path")
 end

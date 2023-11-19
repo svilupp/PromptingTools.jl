@@ -67,6 +67,7 @@ For more practical examples, see the `examples/` folder and the [Advanced Exampl
     - [Embeddings](#embeddings)
     - [Classification](#classification)
     - [Data Extraction](#data-extraction)
+    - [OCR and Image Comprehension](#ocr-and-image-comprehension)
     - [More Examples](#more-examples)
   - [Package Interface](#package-interface)
   - [Frequently Asked Questions](#frequently-asked-questions)
@@ -189,7 +190,7 @@ tmps = aitemplates("Julia")
 # 2-element Vector{AITemplateMetadata}... -> more to come later!
 ```
 
-If you are on VSCode, you can leverage nice tabular display with `vscodedisplay`:
+If you are on VSCode, you can leverage a nice tabular display with `vscodedisplay`:
 ```julia
 using DataFrames
 tmps = aitemplates("Julia") |> DataFrame |> vscodedisplay
@@ -320,6 +321,36 @@ msg.content.measurements
 ```
 
 There is even a wrapper to help you catch errors together with helpful explanations on why parsing failed. See `?PromptingTools.MaybeExtract` for more information.
+
+### OCR and Image Comprehension
+
+With the `aiscan` function, you can interact with images as if they were text.
+
+You can simply describe a provided image:
+```julia
+msg = aiscan("Describe the image"; image_path="julia.png", model="gpt4v")
+# [ Info: Tokens: 1141 @ Cost: \$0.0117 in 2.2 seconds
+# AIMessage("The image shows a logo consisting of the word "julia" written in lowercase")
+```
+
+Or you can do an OCR of a screenshot. 
+Let's transcribe some SQL code from a screenshot (no more re-typing!), we use a template `:OCRTask`:
+
+```julia
+# Screenshot of some SQL code
+image_url = "https://www.sqlservercentral.com/wp-content/uploads/legacy/8755f69180b7ac7ee76a69ae68ec36872a116ad4/24622.png"
+msg = aiscan(:OCRTask; image_url, model="gpt4v", task="Transcribe the SQL code in the image.", api_kwargs=(; max_tokens=2500))
+
+# [ Info: Tokens: 362 @ Cost: \$0.0045 in 2.5 seconds
+# AIMessage("```sql
+# update Orders <continue>
+```
+
+You can add syntax highlighting of the outputs via Markdown
+```julia
+using Markdown
+msg.content |> Markdown.parse
+```
 
 ### More Examples
 

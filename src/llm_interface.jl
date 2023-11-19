@@ -12,6 +12,7 @@ function aigenerate end
 function aiembed end
 function aiclassify end
 function aiextract end
+function aiscan end
 
 ## Prompt Schema
 "Defines different prompting styles based on the model training and fine-tuning."
@@ -77,3 +78,4 @@ function aiembed(doc_or_docs, args...; kwargs...)
 end
 aiclassify(prompt; kwargs...) = aiclassify(PROMPT_SCHEMA, prompt; kwargs...)
 aiextract(prompt; kwargs...) = aiextract(PROMPT_SCHEMA, prompt; kwargs...)
+aiscan(prompt; kwargs...) = aiscan(PROMPT_SCHEMA, prompt; kwargs...)
