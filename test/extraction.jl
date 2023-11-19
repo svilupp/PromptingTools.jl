@@ -210,8 +210,7 @@ end
                 "weight" => Dict{String, Any}("type" => "number"),
                 "age" => Dict{String, Any}("type" => "integer")),
             "required" => ["age"],
-            "type" => "object",
-            "description" => "Some docstring\n"),
+            "type" => "object"),
         "description" => "Some docstring\n")
     @test output == expected_output
 
