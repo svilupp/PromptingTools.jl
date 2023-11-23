@@ -68,6 +68,7 @@ For more practical examples, see the `examples/` folder and the [Advanced Exampl
     - [Classification](#classification)
     - [Data Extraction](#data-extraction)
     - [OCR and Image Comprehension](#ocr-and-image-comprehension)
+  - [Using Ollama models](#using-ollama-models)
     - [More Examples](#more-examples)
   - [Package Interface](#package-interface)
   - [Frequently Asked Questions](#frequently-asked-questions)
@@ -351,6 +352,33 @@ You can add syntax highlighting of the outputs via Markdown
 using Markdown
 msg.content |> Markdown.parse
 ```
+
+## Using Ollama models
+
+[Ollama.ai](https://ollama.ai/) is an amazingly simply tool that allows you to run several Large Language Models (LLM) on your computer. It's especially suitable when you're working with some sensitive data that should not be sent anywhere.
+
+TODO: assumes it's working, but it's not yet!
+
+We can use Ollama models with the `aigenerate` function:
+```julia
+const PT = PromptingTools
+schema = PT.OllamaManagedSchema()
+
+msg = aigenerate(schema, "Say hi!"; model="openhermes2.5-mistral")
+# [ Info: Tokens: 69 in 0.9 seconds
+# AIMessage("Hello! How can I assist you today?")
+```
+
+And we can also use the `aiembed` function:
+```julia
+msg = aiembed(schema, "Embed me", copy; model="openhermes2.5-mistral")
+msg.content # 4096-element JSON3.Array{Float64...
+
+msg = aiembed(schema, ["Embed me", "Embed me"]; model="openhermes2.5-mistral")
+msg.content # 4096×2 Matrix{Float64}:
+```
+
+TODO: Add FAQ how to setup Ollama.ai
 
 ### More Examples
 

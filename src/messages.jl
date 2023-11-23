@@ -57,6 +57,7 @@ function (MSG::Type{<:AbstractChatMessage})(prompt::AbstractString)
     MSG(; content = prompt)
 end
 isusermessage(m::AbstractMessage) = m isa UserMessage
+issystemmessage(m::AbstractMessage) = m isa SystemMessage
 
 # equality check for testing, only equal if all fields are equal and type is the same
 Base.var"=="(m1::AbstractMessage, m2::AbstractMessage) = false
