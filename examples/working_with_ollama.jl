@@ -1,3 +1,9 @@
+# # Local models with Ollama.ai
+
+# This file contains examples of how to work with [Ollama.ai](https://ollama.ai/) models.
+# It assumes that you've already installated and launched the Ollama server. For more details or troubleshooting advice, see the [Frequently Asked Questions](@ref) section.
+#
+# First, let's import the package and define a helper link for calling un-exported functions:
 using PromptingTools
 const PT = PromptingTools
 
@@ -6,38 +12,35 @@ schema = PT.OllamaManagedSchema()
 # You can choose models from https://ollama.ai/library - I prefer `openhermes2.5-mistral`
 model = "openhermes2.5-mistral"
 
-# # Text Generation with aigenerate
+# ## Text Generation with aigenerate
 
-# ## Simple message
+# ### Simple message
 msg = aigenerate(schema, "Say hi!"; model)
 
-# ## Standard string interpolation
+# ### Standard string interpolation
 a = 1
 msg = aigenerate(schema, "What is `$a+$a`?"; model)
 
 name = "John"
 msg = aigenerate(schema, "Say hi to {{name}}."; name, model)
 
-# ## Advanced Prompts
+# ### Advanced Prompts
 conversation = [
     PT.SystemMessage("You're master Yoda from Star Wars trying to help the user become a Yedi."),
     PT.UserMessage("I have feelings for my iPhone. What should I do?")]
 msg = aigenerate(schema, conversation; model)
 
-# # Embeddings with aiembed
+# ## Embeddings with aiembed
 
-# ## Simple embedding for one document
-msg = aiembed(schema, "Embed me"; model)
-msg.content
+# ### Simple embedding for one document
+msg = aiembed(schema, "Embed me"; model) # access msg.content
 
 # One document and we materialize the data into a Vector with copy (`postprocess` function argument)
 msg = aiembed(schema, "Embed me", copy; model)
-msg.content
 
-# ## Multiple documents embedding
+# ### Multiple documents embedding
 # Multiple documents - embedded sequentially, you can get faster speed with async
 msg = aiembed(schema, ["Embed me", "Embed me"]; model)
-msg.content
 
 # You can use Threads.@spawn or asyncmap, whichever you prefer, to paralellize the model calls
 docs = ["Embed me", "Embed me"]
@@ -46,7 +49,7 @@ tasks = asyncmap(docs) do doc
 end
 embedding = mapreduce(x -> x.content, hcat, tasks)
 
-# ## Using postprocessing function
+# ### Using postprocessing function
 # Add normalization as postprocessing function to normalize embeddings on reception (for easy cosine similarity later)
 using LinearAlgebra
 schema = PT.OllamaManagedSchema()
@@ -57,4 +60,4 @@ msg = aiembed(schema,
     model = "openhermes2.5-mistral")
 
 # Cosine similarity is then a simple multiplication
-msg.content' * msg.content[:, 1] # [1.0, 0.34]
+msg.content' * msg.content[:, 1]
