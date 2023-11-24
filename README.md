@@ -18,6 +18,13 @@ Getting started with PromptingTools.jl is as easy as importing the package and u
 Note: You will need to set your OpenAI API key as an environment variable before using PromptingTools.jl (see the [Creating OpenAI API Key](#creating-openai-api-key) section below). 
 For a quick start, simply set it via `ENV["OPENAI_API_KEY"] = "your-api-key"`
 
+Install PromptingTools.jl:
+```julia
+using Pkg
+Pkg.add("https://github.com/svilupp/PromptingTools.jl")
+```
+
+And we're ready to go!
 ```julia
 using PromptingTools
 
