@@ -18,7 +18,7 @@ Getting started with PromptingTools.jl is as easy as importing the package and u
 Note: You will need to set your OpenAI API key as an environment variable before using PromptingTools.jl (see the [Creating OpenAI API Key](#creating-openai-api-key) section below). 
 For a quick start, simply set it via `ENV["OPENAI_API_KEY"] = "your-api-key"`
 
-Install PromptingTools.jl:
+Install PromptingTools:
 ```julia
 using Pkg
 Pkg.add("https://github.com/svilupp/PromptingTools.jl")
@@ -75,7 +75,7 @@ For more practical examples, see the `examples/` folder and the [Advanced Exampl
     - [Classification](#classification)
     - [Data Extraction](#data-extraction)
     - [OCR and Image Comprehension](#ocr-and-image-comprehension)
-  - [Using Ollama models](#using-ollama-models)
+    - [Using Ollama models](#using-ollama-models)
     - [More Examples](#more-examples)
   - [Package Interface](#package-interface)
   - [Frequently Asked Questions](#frequently-asked-questions)
@@ -362,7 +362,7 @@ using Markdown
 msg.content |> Markdown.parse
 ```
 
-## Using Ollama models
+### Using Ollama models
 
 [Ollama.ai](https://ollama.ai/) is an amazingly simple tool that allows you to run several Large Language Models (LLM) on your computer. It's especially suitable when you're working with some sensitive data that should not be sent anywhere.
 
