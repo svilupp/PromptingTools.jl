@@ -58,6 +58,7 @@ It uses the following conversation structure:
 struct ChatMLSchema <: AbstractChatMLSchema end
 
 abstract type AbstractManagedSchema <: AbstractPromptSchema end
+abstract type AbstractOllamaManagedSchema <: AbstractManagedSchema end
 
 """
 Ollama by default manages different models and their associated prompt schemas when you pass `system_prompt` and `prompt` fields to the API.
@@ -67,7 +68,15 @@ Warning: It works only for 1 system message and 1 user message, so anything more
 If you need to pass more messagese / longer conversational history, you can use define the model-specific schema directly and pass your Ollama requests with `raw=true`, 
  which disables and templating and schema management by Ollama.
 """
-struct OllamaManagedSchema <: AbstractManagedSchema end
+struct OllamaManagedSchema <: AbstractOllamaManagedSchema end
+
+"Echoes the user's input back to them. Used for testing the implementation"
+@kwdef mutable struct TestEchoOllamaManagedSchema <: AbstractOllamaManagedSchema
+    response::AbstractDict
+    status::Integer
+    model_id::String = ""
+    inputs::Any = nothing
+end
 
 ## Dispatch into default schema
 const PROMPT_SCHEMA = OpenAISchema()
