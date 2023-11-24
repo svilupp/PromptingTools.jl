@@ -19,6 +19,14 @@ makedocs(;
         assets = String[]),
     pages = [
         "Home" => "index.md",
+        "Getting Started" => "getting_started.md",
+        "Examples" => [
+            "Various examples" => "examples/readme_examples.md",
+            "Using AITemplates" => "examples/working_with_aitemplates.md",
+            "Local models with Ollama.ai" => "examples/working_with_ollama.md",
+        ],
+        "F.A.Q." => "frequently_asked_questions.md",
+        "Reference" => "reference.md",
     ])
 
 deploydocs(;

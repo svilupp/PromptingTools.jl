@@ -1,0 +1,289 @@
+# Various Examples
+
+Noteworthy functions: `aigenerate`, `aiembed`, `aiclassify`, `aiextract`, `aitemplates`
+
+## Seamless Integration Into Your Workflow
+Google search is great, but it's a context switch. You often have to open a few pages and read through the discussion to find the answer you need. Same with the ChatGPT website.
+
+Imagine you are in VSCode, editing your `.gitignore` file. How do I ignore a file in all subfolders again?
+
+All you need to do is to type:
+`aai"What to write in .gitignore to ignore file XYZ in any folder or subfolder?"`
+
+With `aai""` (as opposed to `ai""`), we make a non-blocking call to the LLM to not prevent you from continuing your work. When the answer is ready, we log it from the background:
+
+```plaintext
+[ Info: Tokens: 102 @ Cost: $0.0002 in 2.7 seconds
+┌ Info: AIMessage> To ignore a file called "XYZ" in any folder or subfolder, you can add the following line to your .gitignore file:
+│ 
+│ ```
+│ **/XYZ
+│ ```
+│ 
+└ This pattern uses the double asterisk (`**`) to match any folder or subfolder, and then specifies the name of the file you want to ignore.
+```
+
+You probably saved 3-5 minutes on this task and probably another 5-10 minutes, because of the context switch/distraction you avoided. It's a small win, but it adds up quickly.
+
+## Advanced Prompts / Conversations
+
+You can use the `aigenerate` function to replace handlebar variables (eg, `{{name}}`) via keyword arguments.
+
+```julia
+msg = aigenerate("Say hello to {{name}}!", name="World")
+```
+
+The more complex prompts are effectively a conversation (a set of messages), where you can have messages from three entities: System, User, AI Assistant. We provide the corresponding types for each of them: `SystemMessage`, `UserMessage`, `AIMessage`. 
+
+```julia
+using PromptingTools: SystemMessage, UserMessage
+
+conversation = [
+    SystemMessage("You're master Yoda from Star Wars trying to help the user become a Jedi."),
+    UserMessage("I have feelings for my {{object}}. What should I do?")]
+msg = aigenerate(conversation; object = "old iPhone")
+```
+
+```plaintext
+AIMessage("Ah, a dilemma, you have. Emotional attachment can cloud your path to becoming a Jedi. To be attached to material possessions, you must not. The iPhone is but a tool, nothing more. Let go, you must.
+
+Seek detachment, young padawan. Reflect upon the impermanence of all things. Appreciate the memories it gave you, and gratefully part ways. In its absence, find new experiences to grow and become one with the Force. Only then, a true Jedi, you shall become.")
+```
+
+You can also use it to build conversations, eg, 
+```julia
+new_conversation = vcat(conversation...,msg, UserMessage("Thank you, master Yoda! Do you have {{object}} to know what it feels like?"))
+aigenerate(new_conversation; object = "old iPhone")
+```
+    
+```plaintext
+> AIMessage("Hmm, possess an old iPhone, I do not. But experience with attachments, I have. Detachment, I learned. True power and freedom, it brings...")
+```
+
+## Templated Prompts
+
+With LLMs, the quality / robustness of your results depends on the quality of your prompts. But writing prompts is hard! That's why we offer a templating system to save you time and effort.
+
+To use a specific template (eg, `` to ask a Julia language):
+```julia
+msg = aigenerate(:JuliaExpertAsk; ask = "How do I add packages?")
+```
+
+The above is equivalent to a more verbose version that explicitly uses the dispatch on `AITemplate`:
+```julia
+msg = aigenerate(AITemplate(:JuliaExpertAsk); ask = "How do I add packages?")
+```
+
+Find available templates with `aitemplates`:
+```julia
+tmps = aitemplates("JuliaExpertAsk")
+# Will surface one specific template
+# 1-element Vector{AITemplateMetadata}:
+# PromptingTools.AITemplateMetadata
+#   name: Symbol JuliaExpertAsk
+#   description: String "For asking questions about Julia language. Placeholders: `ask`"
+#   version: String "1"
+#   wordcount: Int64 237
+#   variables: Array{Symbol}((1,))
+#   system_preview: String "You are a world-class Julia language programmer with the knowledge of the latest syntax. Your commun"
+#   user_preview: String "# Question\n\n{{ask}}"
+#   source: String ""
+```
+The above gives you a good idea of what the template is about, what placeholders are available, and how much it would cost to use it (=wordcount).
+
+Search for all Julia-related templates:
+```julia
+tmps = aitemplates("Julia")
+# 2-element Vector{AITemplateMetadata}... -> more to come later!
+```
+
+If you are on VSCode, you can leverage a nice tabular display with `vscodedisplay`:
+```julia
+using DataFrames
+tmps = aitemplates("Julia") |> DataFrame |> vscodedisplay
+```
+
+I have my selected template, how do I use it? Just use the "name" in `aigenerate` or `aiclassify` 
+ like you see in the first example!
+
+You can inspect any template by "rendering" it (this is what the LLM will see):
+```julia
+julia> AITemplate(:JudgeIsItTrue) |> PromptingTools.render
+```
+
+See more examples in the [Examples](https://github.com/svilupp/PromptingTools.jl/tree/main/examples) folder.
+
+## Asynchronous Execution
+
+You can leverage `asyncmap` to run multiple AI-powered tasks concurrently, improving performance for batch operations. 
+
+```julia
+prompts = [aigenerate("Translate 'Hello, World!' to {{language}}"; language) for language in ["Spanish", "French", "Mandarin"]]
+responses = asyncmap(aigenerate, prompts)
+```
+
+Pro tip: You can limit the number of concurrent tasks with the keyword `asyncmap(...; ntasks=10)`.
+
+## Model Aliases
+
+Certain tasks require more powerful models. All user-facing functions have a keyword argument `model` that can be used to specify the model to be used. For example, you can use `model = "gpt-4-1106-preview"` to use the latest GPT-4 Turbo model. However, no one wants to type that!
+
+We offer a set of model aliases (eg, "gpt3", "gpt4", "gpt4t" -> the above GPT-4 Turbo, etc.) that can be used instead. 
+
+Each `ai...` call first looks up the provided model name in the dictionary `PromptingTools.MODEL_ALIASES`, so you can easily extend with your own aliases! 
+
+```julia
+const PT = PromptingTools
+PT.MODEL_ALIASES["gpt4t"] = "gpt-4-1106-preview"
+```
+
+These aliases also can be used as flags in the `@ai_str` macro, eg, `ai"What is the capital of France?"gpt4t` (GPT-4 Turbo has a knowledge cut-off in April 2023, so it's useful for more contemporary questions).
+
+## Embeddings
+
+Use the `aiembed` function to create embeddings via the default OpenAI model that can be used for semantic search, clustering, and more complex AI workflows.
+
+```julia
+text_to_embed = "The concept of artificial intelligence."
+msg = aiembed(text_to_embed)
+embedding = msg.content # 1536-element Vector{Float64}
+```
+
+If you plan to calculate the cosine distance between embeddings, you can normalize them first:
+```julia
+using LinearAlgebra
+msg = aiembed(["embed me", "and me too"], LinearAlgebra.normalize)
+
+# calculate cosine distance between the two normalized embeddings as a simple dot product
+msg.content' * msg.content[:, 1] # [1.0, 0.787]
+```
+
+## Classification
+
+You can use the `aiclassify` function to classify any provided statement as true/false/unknown. This is useful for fact-checking, hallucination or NLI checks, moderation, filtering, sentiment analysis, feature engineering and more.
+
+```julia
+aiclassify("Is two plus two four?") 
+# true
+```
+
+System prompts and higher-quality models can be used for more complex tasks, including knowing when to defer to a human:
+
+```julia
+aiclassify(:JudgeIsItTrue; it = "Is two plus three a vegetable on Mars?", model = "gpt4t") 
+# unknown
+```
+
+In the above example, we used a prompt template `:JudgeIsItTrue`, which automatically expands into the following system prompt (and a separate user prompt): 
+
+> "You are an impartial AI judge evaluating whether the provided statement is \"true\" or \"false\". Answer \"unknown\" if you cannot decide."
+
+For more information on templates, see the [Templated Prompts](#templated-prompts) section.
+
+## Data Extraction
+
+Are you tired of extracting data with regex? You can use LLMs to extract structured data from text!
+
+All you have to do is to define the structure of the data you want to extract and the LLM will do the rest.
+
+Define a `return_type` with struct. Provide docstrings if needed (improves results and helps with documentation).
+
+Let's start with a hard task - extracting the current weather in a given location:
+```julia
+@enum TemperatureUnits celsius fahrenheit
+"""Extract the current weather in a given location
+
+# Arguments
+- `location`: The city and state, e.g. "San Francisco, CA"
+- `unit`: The unit of temperature to return, either `celsius` or `fahrenheit`
+"""
+struct CurrentWeather
+    location::String
+    unit::Union{Nothing,TemperatureUnits}
+end
+
+# Note that we provide the TYPE itself, not an instance of it!
+msg = aiextract("What's the weather in Salt Lake City in C?"; return_type=CurrentWeather)
+msg.content
+# CurrentWeather("Salt Lake City, UT", celsius)
+```
+
+But you can use it even for more complex tasks, like extracting many entities from a text:
+
+```julia
+"Person's age, height, and weight."
+struct MyMeasurement
+    age::Int
+    height::Union{Int,Nothing}
+    weight::Union{Nothing,Float64}
+end
+struct ManyMeasurements
+    measurements::Vector{MyMeasurement}
+end
+msg = aiextract("James is 30, weighs 80kg. He's 180cm tall. Then Jack is 19 but really tall - over 190!"; return_type=ManyMeasurements)
+msg.content.measurements
+# 2-element Vector{MyMeasurement}:
+#  MyMeasurement(30, 180, 80.0)
+#  MyMeasurement(19, 190, nothing)
+```
+
+There is even a wrapper to help you catch errors together with helpful explanations on why parsing failed. See `?PromptingTools.MaybeExtract` for more information.
+
+## OCR and Image Comprehension
+
+With the `aiscan` function, you can interact with images as if they were text.
+
+You can simply describe a provided image:
+```julia
+msg = aiscan("Describe the image"; image_path="julia.png", model="gpt4v")
+# [ Info: Tokens: 1141 @ Cost: \$0.0117 in 2.2 seconds
+# AIMessage("The image shows a logo consisting of the word "julia" written in lowercase")
+```
+
+Or you can do an OCR of a screenshot. 
+Let's transcribe some SQL code from a screenshot (no more re-typing!), we use a template `:OCRTask`:
+
+```julia
+# Screenshot of some SQL code
+image_url = "https://www.sqlservercentral.com/wp-content/uploads/legacy/8755f69180b7ac7ee76a69ae68ec36872a116ad4/24622.png"
+msg = aiscan(:OCRTask; image_url, model="gpt4v", task="Transcribe the SQL code in the image.", api_kwargs=(; max_tokens=2500))
+
+# [ Info: Tokens: 362 @ Cost: \$0.0045 in 2.5 seconds
+# AIMessage("```sql
+# update Orders <continue>
+```
+
+You can add syntax highlighting of the outputs via Markdown
+```julia
+using Markdown
+msg.content |> Markdown.parse
+```
+
+## Using Ollama models
+
+[Ollama.ai](https://ollama.ai/) is an amazingly simple tool that allows you to run several Large Language Models (LLM) on your computer. It's especially suitable when you're working with some sensitive data that should not be sent anywhere.
+
+Let's assume you have installed Ollama, downloaded a model, and it's running in the background.
+
+We can use it with the `aigenerate` function:
+
+```julia
+const PT = PromptingTools
+schema = PT.OllamaManagedSchema() # notice the different schema!
+
+msg = aigenerate(schema, "Say hi!"; model="openhermes2.5-mistral")
+# [ Info: Tokens: 69 in 0.9 seconds
+# AIMessage("Hello! How can I assist you today?")
+```
+
+And we can also use the `aiembed` function:
+
+```julia
+msg = aiembed(schema, "Embed me", copy; model="openhermes2.5-mistral")
+msg.content # 4096-element JSON3.Array{Float64...
+
+msg = aiembed(schema, ["Embed me", "Embed me"]; model="openhermes2.5-mistral")
+msg.content # 4096×2 Matrix{Float64}:
+```
+
+If you're getting errors, check that Ollama is running - see the [Setup Guide for Ollama](#setup-guide-for-ollama) section below.
