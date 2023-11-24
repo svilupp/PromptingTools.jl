@@ -50,6 +50,7 @@ include("extraction.jl")
 
 ## Individual interfaces
 include("llm_openai.jl")
+include("llm_ollama_managed.jl")
 
 ## Convenience utils
 export @ai_str, @aai_str

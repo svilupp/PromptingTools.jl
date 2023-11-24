@@ -117,9 +117,11 @@ msg.content # "The sum of `1+1` is `2`."
 ___
 You can provide the whole conversation or more intricate prompts as a `Vector{AbstractMessage}`:
 ```julia
+const PT = PromptingTools
+
 conversation = [
-    SystemMessage("You're master Yoda from Star Wars trying to help the user become a Yedi."),
-    UserMessage("I have feelings for my iPhone. What should I do?")]
+    PT.SystemMessage("You're master Yoda from Star Wars trying to help the user become a Yedi."),
+    PT.UserMessage("I have feelings for my iPhone. What should I do?")]
 msg=aigenerate(conversation)
 # AIMessage("Ah, strong feelings you have for your iPhone. A Jedi's path, this is not... <continues>")
 ```
@@ -239,7 +241,6 @@ function aiembed(prompt_schema::AbstractOpenAISchema,
         model_id;
         http_kwargs,
         api_kwargs...)
-    @info r.response |> typeof
     msg = DataMessage(;
         content = mapreduce(x -> postprocess(x[:embedding]), hcat, r.response[:data]),
         status = Int(r.status),
