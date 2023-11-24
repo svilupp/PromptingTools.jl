@@ -89,7 +89,7 @@ function ollama_api(prompt_schema::AbstractOllamaManagedSchema, prompt::Abstract
         [],# no headers
         JSON3.write(body); http_kwargs...)
     body = JSON3.read(resp.body)
-    return (; response, resp.status)
+    return (; response = body, resp.status)
 end
 # For testing
 function ollama_api(prompt_schema::TestEchoOllamaManagedSchema, prompt::AbstractString;
