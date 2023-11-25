@@ -1,5 +1,38 @@
+using PromptingTools: split_by_length
 using PromptingTools: _extract_handlebar_variables, _report_stats
 using PromptingTools: _string_to_vector, _encode_local_image
+
+@testset "split_by_length" begin
+    text = "Hello world. How are you?"
+    chunks = split_by_length(text, max_length = 100)
+    @test length(chunks) == 1
+    @test chunks[1] == text
+    chunks = split_by_length(text, max_length = 25)
+    @test length(chunks) == 1
+    @test chunks[1] == text
+    @test maximum(length.(chunks)) <= 25
+    chunks = split_by_length(text, max_length = 10)
+    @test length(chunks) == 4
+    @test maximum(length.(chunks)) <= 10
+    chunks = split_by_length(text, max_length = 11)
+    @test length(chunks) == 3
+    @test maximum(length.(chunks)) <= 11
+    @test join(chunks, "") == text
+
+    # Test with empty text
+    chunks = split_by_length("")
+    @test isempty(chunks)
+
+    # Test custom separator
+    text = "Hello,World,"^50
+    chunks = split_by_length(text, separator = ",", max_length = length(text))
+    @test length(chunks) == 1
+    @test chunks[1] == text
+    chunks = split_by_length(text, separator = ",", max_length = 20)
+    @test length(chunks) == 34
+    @test maximum(length.(chunks)) <= 20
+    @test join(chunks, "") == text
+end
 
 @testset "extract_handlebar_variables" begin
     # Extracts handlebar variables enclosed in double curly braces
