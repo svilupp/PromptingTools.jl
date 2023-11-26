@@ -1,4 +1,35 @@
 ### USEFUL BUT NOT EXPORTED FUNCTIONS
+
+"""
+    replace_words(text::AbstractString, words::Vector{<:AbstractString}; replacement::AbstractString="ABC")
+
+Replace all occurrences of words in `words` with `replacement` in `text`. Useful to quickly remove specific names or entities from a text.
+
+# Arguments
+- `text::AbstractString`: The text to be processed.
+- `words::Vector{<:AbstractString}`: A vector of words to be replaced.
+- `replacement::AbstractString="ABC"`: The replacement string to be used. Defaults to "ABC".
+
+# Example
+```julia
+text = "Disney is a great company"
+replace_words(text, ["Disney", "Snow White", "Mickey Mouse"])
+# Output: "ABC is a great company"
+```
+"""
+replace_words(text::AbstractString, words::Vector{<:AbstractString}; replacement::AbstractString = "ABC") = replace_words(text,
+    Regex("\\b$(join(words, "\\b|\\b"))\\b", "i"),
+    replacement)
+function replace_words(text::AbstractString, pattern::Regex, replacement::AbstractString)
+    replace(text, pattern => replacement)
+end
+# dispatch for single word
+function replace_words(text::AbstractString,
+        word::AbstractString;
+        replacement::AbstractString = "ABC")
+    replace_words(text, [word]; replacement)
+end
+
 """
     split_by_length(text::String; separator::String=" ", max_length::Int=35000) -> Vector{String}
 

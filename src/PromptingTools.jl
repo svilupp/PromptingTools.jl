@@ -1,6 +1,7 @@
 module PromptingTools
 
 using Base64: base64encode
+using Logging
 using OpenAI
 using JSON3
 using JSON3: StructTypes
@@ -61,7 +62,9 @@ function __init__()
     load_templates!()
 end
 
-# Enable precompilation to reduce start time
-@compile_workload include("precompilation.jl")
+# Enable precompilation to reduce start time, disabled logging
+with_logger(NullLogger()) do
+    @compile_workload include("precompilation.jl")
+end
 
 end # module PromptingTools
