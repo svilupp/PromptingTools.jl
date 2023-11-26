@@ -1,6 +1,17 @@
-using PromptingTools: split_by_length
+using PromptingTools: split_by_length, replace_words
 using PromptingTools: _extract_handlebar_variables, _report_stats
 using PromptingTools: _string_to_vector, _encode_local_image
+
+@testset "replace_words" begin
+    words = ["Disney", "Snow White", "Mickey Mouse"]
+    @test replace_words("Disney is a great company",
+        ["Disney", "Snow White", "Mickey Mouse"]) == "ABC is a great company"
+    @test replace_words("Snow White and Mickey Mouse are great",
+        ["Disney", "Snow White", "Mickey Mouse"]) == "ABC and ABC are great"
+    @test replace_words("LSTM is a great model", "LSTM") == "ABC is a great model"
+    @test replace_words("LSTM is a great model", "LSTM"; replacement = "XYZ") ==
+          "XYZ is a great model"
+end
 
 @testset "split_by_length" begin
     text = "Hello world. How are you?"
