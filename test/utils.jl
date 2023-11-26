@@ -1,5 +1,49 @@
+using PromptingTools: split_by_length, replace_words
 using PromptingTools: _extract_handlebar_variables, _report_stats
 using PromptingTools: _string_to_vector, _encode_local_image
+
+@testset "replace_words" begin
+    words = ["Disney", "Snow White", "Mickey Mouse"]
+    @test replace_words("Disney is a great company",
+        ["Disney", "Snow White", "Mickey Mouse"]) == "ABC is a great company"
+    @test replace_words("Snow White and Mickey Mouse are great",
+        ["Disney", "Snow White", "Mickey Mouse"]) == "ABC and ABC are great"
+    @test replace_words("LSTM is a great model", "LSTM") == "ABC is a great model"
+    @test replace_words("LSTM is a great model", "LSTM"; replacement = "XYZ") ==
+          "XYZ is a great model"
+end
+
+@testset "split_by_length" begin
+    text = "Hello world. How are you?"
+    chunks = split_by_length(text, max_length = 100)
+    @test length(chunks) == 1
+    @test chunks[1] == text
+    chunks = split_by_length(text, max_length = 25)
+    @test length(chunks) == 1
+    @test chunks[1] == text
+    @test maximum(length.(chunks)) <= 25
+    chunks = split_by_length(text, max_length = 10)
+    @test length(chunks) == 4
+    @test maximum(length.(chunks)) <= 10
+    chunks = split_by_length(text, max_length = 11)
+    @test length(chunks) == 3
+    @test maximum(length.(chunks)) <= 11
+    @test join(chunks, "") == text
+
+    # Test with empty text
+    chunks = split_by_length("")
+    @test isempty(chunks)
+
+    # Test custom separator
+    text = "Hello,World,"^50
+    chunks = split_by_length(text, separator = ",", max_length = length(text))
+    @test length(chunks) == 1
+    @test chunks[1] == text
+    chunks = split_by_length(text, separator = ",", max_length = 20)
+    @test length(chunks) == 34
+    @test maximum(length.(chunks)) <= 20
+    @test join(chunks, "") == text
+end
 
 @testset "extract_handlebar_variables" begin
     # Extracts handlebar variables enclosed in double curly braces

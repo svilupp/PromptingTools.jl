@@ -32,8 +32,10 @@ end
 
 @testset "Templates - search" begin
     # search all
-    tmps = aitemplates("")
+    tmps = aitemplates(""; limit = typemax(Int))
     @test tmps == PT.TEMPLATE_METADATA
+    @info length(tmps)
+    @info length(PT.TEMPLATE_METADATA)
     # Exact search for JudgeIsItTrue
     tmps = aitemplates(:JudgeIsItTrue)
     @test length(tmps) == 1

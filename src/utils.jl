@@ -1,3 +1,105 @@
+### USEFUL BUT NOT EXPORTED FUNCTIONS
+
+"""
+    replace_words(text::AbstractString, words::Vector{<:AbstractString}; replacement::AbstractString="ABC")
+
+Replace all occurrences of words in `words` with `replacement` in `text`. Useful to quickly remove specific names or entities from a text.
+
+# Arguments
+- `text::AbstractString`: The text to be processed.
+- `words::Vector{<:AbstractString}`: A vector of words to be replaced.
+- `replacement::AbstractString="ABC"`: The replacement string to be used. Defaults to "ABC".
+
+# Example
+```julia
+text = "Disney is a great company"
+replace_words(text, ["Disney", "Snow White", "Mickey Mouse"])
+# Output: "ABC is a great company"
+```
+"""
+replace_words(text::AbstractString, words::Vector{<:AbstractString}; replacement::AbstractString = "ABC") = replace_words(text,
+    Regex("\\b$(join(words, "\\b|\\b"))\\b", "i"),
+    replacement)
+function replace_words(text::AbstractString, pattern::Regex, replacement::AbstractString)
+    replace(text, pattern => replacement)
+end
+# dispatch for single word
+function replace_words(text::AbstractString,
+        word::AbstractString;
+        replacement::AbstractString = "ABC")
+    replace_words(text, [word]; replacement)
+end
+
+"""
+    split_by_length(text::String; separator::String=" ", max_length::Int=35000) -> Vector{String}
+
+Split a given string `text` into chunks of a specified maximum length `max_length`. 
+This is particularly useful for splitting larger documents or texts into smaller segments, suitable for models or systems with smaller context windows.
+
+# Arguments
+- `text::String`: The text to be split.
+- `separator::String=" "`: The separator used to split the text into minichunks. Defaults to a space character.
+- `max_length::Int=35000`: The maximum length of each chunk. Defaults to 35,000 characters, which should fit within 16K context window.
+
+# Returns
+`Vector{String}`: A vector of strings, each representing a chunk of the original text that is smaller than or equal to `max_length`.
+
+# Notes
+
+- The function ensures that each chunk is as close to `max_length` as possible without exceeding it.
+- If the `text` is empty, the function returns an empty array.
+- The `separator` is re-added to the text chunks after splitting, preserving the original structure of the text as closely as possible.
+
+# Examples
+
+Splitting text with the default separator (" "):
+```julia
+text = "Hello world. How are you?"
+chunks = splitbysize(text; max_length=13)
+length(chunks) # Output: 2
+```
+
+Using a custom separator and custom `max_length`
+```julia
+text = "Hello,World," ^ 2900 # length 34900 chars
+split_by_length(text; separator=",", max_length=10000) # for 4K context window
+length(chunks[1]) # Output: 4
+```
+"""
+function split_by_length(text::String; separator::String = " ", max_length::Int = 35000)
+    minichunks = split(text, separator)
+    sep_length = length(separator)
+    chunks = String[]
+    current_chunk = IOBuffer()
+    current_length = 0
+    for i in eachindex(minichunks)
+        sep_length_ = i < length(minichunks) ? sep_length : 0
+        # Check if the current chunk is full
+        if current_length + length(minichunks[i]) + sep_length_ > max_length
+            # Save chunk, excluding the current mini chunk
+            save_chunk = String(take!(current_chunk))
+            if length(save_chunk) > 0
+                push!(chunks, save_chunk)
+            end
+            current_length = 0
+        end
+        write(current_chunk, minichunks[i])
+        current_length += length(minichunks[i])
+        if i < length(minichunks)
+            write(current_chunk, separator)
+            current_length += sep_length
+        end
+    end
+
+    # Add the last chunk if it's not empty
+    final_chunk = String(take!(current_chunk))
+    if length(final_chunk) > 0
+        push!(chunks, final_chunk)
+    end
+
+    return chunks
+end
+### INTERNAL FUNCTIONS - DO NOT USE DIRECTLY
 # helper to extract handlebar variables (eg, `{{var}}`) from a prompt string
 function _extract_handlebar_variables(s::AbstractString)
     Symbol[Symbol(m[1]) for m in eachmatch(r"\{\{([^\}]+)\}\}", s)]
