@@ -43,7 +43,8 @@ ai"What is the capital of \$(country)?"
 # AIMessage("The capital of Spain is Madrid.")
 ```
 
-Pro tip: Use after-string-flags to select the model to be called, eg, `ai"What is the capital of France?"gpt4` (use `gpt4t` for the new GPT-4 Turbo model). Great for those extra hard questions!
+> [!TIP]
+> Use after-string-flags to select the model to be called, eg, `ai"What is the capital of France?"gpt4` (use `gpt4t` for the new GPT-4 Turbo model). Great for those extra hard questions!
 
 For more complex prompt templates, you can use handlebars-style templating and provide variables as keyword arguments:
 
@@ -53,9 +54,11 @@ msg = aigenerate("What is the capital of {{country}}? Is the population larger t
 # AIMessage("The capital of Spain is Madrid. And yes, the population of Madrid is larger than 1 million. As of 2020, the estimated population of Madrid is around 3.3 million people.")
 ```
 
-Pro tip: Use `asyncmap` to run multiple AI-powered tasks concurrently.
+> [!TIP]
+> Use `asyncmap` to run multiple AI-powered tasks concurrently.
 
-Pro tip: If you use slow models (like GPT-4), you can use async version of `@ai_str` -> `@aai_str` to avoid blocking the REPL, eg, `aai"Say hi but slowly!"gpt4`
+> [!TIP]
+> If you use slow models (like GPT-4), you can use async version of `@ai_str` -> `@aai_str` to avoid blocking the REPL, eg, `aai"Say hi but slowly!"gpt4`
 
 For more practical examples, see the `examples/` folder and the [Advanced Examples](#advanced-examples) section below.
 
@@ -225,7 +228,8 @@ prompts = [aigenerate("Translate 'Hello, World!' to {{language}}"; language) for
 responses = asyncmap(aigenerate, prompts)
 ```
 
-Pro tip: You can limit the number of concurrent tasks with the keyword `asyncmap(...; ntasks=10)`.
+> [!TIP]
+> You can limit the number of concurrent tasks with the keyword `asyncmap(...; ntasks=10)`.
 
 ### Model Aliases
 
@@ -491,7 +495,8 @@ Resources:
 - [OpenAI Documentation](https://platform.openai.com/docs/quickstart?context=python)
 - [Visual tutorial](https://www.maisieai.com/help/how-to-get-an-openai-api-key-for-chatgpt)
 
-Pro tip: Always set the spending limits!
+> [!TIP]
+> Always set the spending limits!
 
 ### Setting OpenAI Spending Limits
 
