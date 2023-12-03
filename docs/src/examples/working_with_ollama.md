@@ -38,6 +38,36 @@ model = "openhermes2.5-mistral"
 "openhermes2.5-mistral"
 ````
 
+## Setting Ollama as a default LLM
+
+We need to change the global variables for PROMPT_SCHEMA and default models
+
+```julia
+using PromptingTools
+const PT = PromptingTools
+
+
+PT.PROMPT_SCHEMA = PT.OllamaManagedSchema()
+PT.MODEL_CHAT = "openhermes2.5-mistral"
+# You could do the same for PT.MODEL_EMBEDDING
+```
+
+We can also add a nicer alias for the above Mistral model
+
+```julia
+PT.MODEL_ALIASES["mistral"]= "openhermes2.5-mistral"
+# potentially also yi 34bn if you want a bigger more powerful model
+PT.MODEL_ALIASES["yi"]= "yi:34b-chat"
+```
+
+Now, we can use the `@ai_str` macro with Ollama models:
+```julia
+ai"Say hi to me!" # defaults to mistral because we set MODEL_CHAT above
+ai"Say hi to me in Chinese!"yi # defaults to yi 34Bn model
+```
+
+Note: Another quite popular model is `zephyr:7b-beta`
+
 ## Text Generation with aigenerate
 
 ### Simple message

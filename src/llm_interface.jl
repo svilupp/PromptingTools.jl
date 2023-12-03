@@ -79,7 +79,7 @@ struct OllamaManagedSchema <: AbstractOllamaManagedSchema end
 end
 
 ## Dispatch into default schema
-const PROMPT_SCHEMA = OpenAISchema()
+const PROMPT_SCHEMA::AbstractPromptSchema = OpenAISchema()
 
 aigenerate(prompt; kwargs...) = aigenerate(PROMPT_SCHEMA, prompt; kwargs...)
 function aiembed(doc_or_docs, args...; kwargs...)
