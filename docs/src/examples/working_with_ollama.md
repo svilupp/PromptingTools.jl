@@ -5,7 +5,7 @@ EditURL = "../../../examples/working_with_ollama.jl"
 # Local models with Ollama.ai
 
 This file contains examples of how to work with [Ollama.ai](https://ollama.ai/) models.
-It assumes that you've already installated and launched the Ollama server. For more details or troubleshooting advice, see the [Frequently Asked Questions](@ref) section.
+It assumes that you've already installed and launched the Ollama server. Quick check: open the following website in your browser `http://127.0.0.1:11434/` and you should see the message "Ollama is running". For more details or troubleshooting advice, see the [Frequently Asked Questions](@ref) section.
 
 First, let's import the package and define a helper link for calling un-exported functions:
 

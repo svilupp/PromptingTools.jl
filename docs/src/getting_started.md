@@ -32,11 +32,11 @@ Resources:
 
 ## Installation
 
-The PromptingTools package has not yet been registered. But it can be installed using the following commands:
+PromptingTools can be installed using the following commands:
 
 ```julia
 using Pkg
-Pkg.add("https://github.com/svilupp/PromptingTools.jl")
+Pkg.add("PromptingTools.jl")
 ```
 
 Throughout the rest of this tutorial, we will assume that you have installed the
