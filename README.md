@@ -21,7 +21,7 @@ For a quick start, simply set it via `ENV["OPENAI_API_KEY"] = "your-api-key"`
 Install PromptingTools:
 ```julia
 using Pkg
-Pkg.add("https://github.com/svilupp/PromptingTools.jl")
+Pkg.add("PromptingTools.jl")
 ```
 
 And we're ready to go!
@@ -33,7 +33,7 @@ ai"What is the capital of France?"
 # AIMessage("The capital of France is Paris.")
 ```
 
-Returned object is a light wrapper with generated message in field `:content` (eg, `ans.content`) for additional downstream processing.
+The returned object is a light wrapper with a generated message in the field `:content` (eg, `ans.content`) for additional downstream processing.
 
 You can easily inject any variables with string interpolation:
 ```julia
