@@ -228,18 +228,3 @@ b=2
         @test cb.output.b == 2
     end
 end
-
-## Create eval object
-evaluation = Dict("name" => definition["name"], "parsed" => !isnothing(cb.expression),
-    "executed" => isvalid(cb),
-    "unit_tests_passed" => test_count, "examples_executed" => example_count,
-    "tokens" => msg.tokens,
-    "elapsed_seconds" => msg.elapsed, "cost" => get_query_cost(msg, model),
-    "model" => model,
-    "timestamp" => timestamp, "prompt_strategy" => prompt_strategy)
-
-eval = (; name = definition["name"], parsed = !isnothing(cb.expression),
-    executed = isvalid(cb),
-    unit_tests_passed = test_count, examples_executed = example_count, tokens = msg.tokens,
-    elapsed_seconds = msg.elapsed, cost = get_query_cost(msg, model), model = model,
-    timestamp = timestamp, prompt_strategy = prompt_strategy)
