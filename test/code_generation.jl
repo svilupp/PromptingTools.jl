@@ -131,7 +131,7 @@ end
         eval!(cb)
         @test cb.success == false
         @test !isvalid(cb)
-        @test cb.error isa Base.Meta.ParseError
+        @test cb.error isa Exception # can be Base.Meta.ParseError or ErrorException depending on Julia version
     end
     # Test that it captures execution errors
     let cb = AICode(; code = """
