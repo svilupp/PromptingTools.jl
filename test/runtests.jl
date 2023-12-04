@@ -14,4 +14,19 @@ end
     include("extraction.jl")
     include("llm_openai.jl")
     include("templates.jl")
+    include("code_generation.jl")
+end
+
+# Part of code_generation.jl / @testset "eval!" begin
+# Test that it captures test failures, we need to move it to the main file as it as it doesn't work inside a testset
+let cb = AICode(; code = """
+    @test 1==2
+    """)
+    eval!(cb)
+    @test cb.success == false
+    @info cb.error cb.output
+    @test cb.error isa Test.FallbackTestSetException
+    @test !isnothing(cb.expression) # parsed
+    @test occursin("Test Failed", cb.stdout) # capture details of the test failure
+    @test isnothing(cb.output) # because it failed
 end

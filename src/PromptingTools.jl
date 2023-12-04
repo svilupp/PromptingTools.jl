@@ -52,6 +52,11 @@ const TEMPLATE_METADATA = Vector{AITemplateMetadata}()
 ## Utilities to support structured extraction
 include("extraction.jl")
 
+## Utilities to support code generation
+export AICode
+# Not export extract_code_blocks, extract_function_name
+include("code_generation.jl")
+
 ## Individual interfaces
 include("llm_openai.jl")
 include("llm_ollama_managed.jl")
