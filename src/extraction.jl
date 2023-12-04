@@ -1,7 +1,5 @@
 # These are utilities to support structured data extraction tasks through the OpenAI function calling interface (wrapped by `aiextract`)
 #
-# TODOs: 
-# - add support for enums
 to_json_type(s::Type{<:AbstractString}) = "string"
 to_json_type(n::Type{<:Real}) = "number"
 to_json_type(n::Type{<:Integer}) = "integer"
