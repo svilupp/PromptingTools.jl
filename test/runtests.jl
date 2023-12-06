@@ -12,8 +12,10 @@ end
     include("utils.jl")
     include("messages.jl")
     include("extraction.jl")
+    include("llm_shared.jl")
     include("llm_openai.jl")
     include("templates.jl")
+    include("serialization.jl")
     include("code_generation.jl")
 end
 

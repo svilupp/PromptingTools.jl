@@ -5,32 +5,37 @@
 """
     render(schema::AbstractOllamaManagedSchema,
         messages::Vector{<:AbstractMessage};
+        conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         kwargs...)
 
 Builds a history of the conversation to provide the prompt to the API. All unspecified kwargs are passed as replacements such that `{{key}}=>value` in the template.
 
 Note: Due to its "managed" nature, at most 2 messages can be provided (`system` and `prompt` inputs in the API).
+
+# Keyword Arguments
+- `conversation`: Not allowed for this schema. Provided only for compatibility.
 """
 function render(schema::AbstractOllamaManagedSchema,
         messages::Vector{<:AbstractMessage};
+        conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         kwargs...)
     ## 
     @assert length(messages)<=2 "Managed schema only supports 2 messages (eg, a system and user)"
     @assert count(isusermessage, messages)<=1 "Managed schema only supports at most 1 User message"
     @assert count(issystemmessage, messages)<=1 "Managed schema only supports at most 1 System message"
+    @assert length(conversation)==0 "OllamaManagedSchema does not allow providing past conversation history. Use the `prompt` argument or `ChatMLSchema`."
     ## API expects: system=SystemMessage, prompt=UserMessage
     system, prompt = nothing, nothing
 
+    ## First pass: keep the message types but make the replacements provided in `kwargs`
+    messages_replaced = render(NoSchema(), messages; conversation, kwargs...)
+
     # replace any handlebar variables in the messages
-    for msg in messages
+    for msg in messages_replaced
         if msg isa SystemMessage
-            replacements = ["{{$(key)}}" => value
-                            for (key, value) in pairs(kwargs) if key in msg.variables]
-            system = replace(msg.content, replacements...)
+            system = msg.content
         elseif msg isa UserMessage
-            replacements = ["{{$(key)}}" => value
-                            for (key, value) in pairs(kwargs) if key in msg.variables]
-            prompt = replace(msg.content, replacements...)
+            prompt = msg.content
         elseif msg isa UserMessageWithImages
             error("Managed schema does not support UserMessageWithImages. Please use OpenAISchema instead.")
         elseif msg isa AIMessage
@@ -40,8 +45,6 @@ function render(schema::AbstractOllamaManagedSchema,
     end
     ## Sense check
     @assert !isnothing(prompt) "Managed schema requires at least 1 User message, ie, no `prompt` provided!"
-    ## Add default system prompt if not provided
-    isnothing(system) && (system = "Act as a helpful AI assistant")
 
     return (; system, prompt)
 end
@@ -105,6 +108,7 @@ end
     aigenerate(prompt_schema::AbstractOllamaManagedSchema, prompt::ALLOWED_PROMPT_TYPE; verbose::Bool = true,
         model::String = MODEL_CHAT,
         return_all::Bool = false, dry_run::Bool = false,
+        conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         http_kwargs::NamedTuple = NamedTuple(), api_kwargs::NamedTuple = NamedTuple(),
         kwargs...)
 
@@ -118,6 +122,7 @@ Generate an AI response based on a given prompt using the OpenAI API.
 - `model`: A string representing the model to use for generating the response. Can be an alias corresponding to a model ID defined in `MODEL_ALIASES`.
 - `return_all::Bool=false`: If `true`, returns the entire conversation history, otherwise returns only the last message (the `AIMessage`).
 - `dry_run::Bool=false`: If `true`, skips sending the messages to the model (for debugging, often used with `return_all=true`).
+- `conversation::AbstractVector{<:AbstractMessage}=[]`: Not allowed for this schema. Provided only for compatibility.
 - `http_kwargs::NamedTuple`: Additional keyword arguments for the HTTP request. Defaults to empty `NamedTuple`.
 - `api_kwargs::NamedTuple`: Additional keyword arguments for the Ollama API. Defaults to an empty `NamedTuple`.
 - `kwargs`: Prompt variables to be used to fill the prompt/template
@@ -179,17 +184,18 @@ function aigenerate(prompt_schema::AbstractOllamaManagedSchema, prompt::ALLOWED_
         api_key::String = API_KEY,
         model::String = MODEL_CHAT,
         return_all::Bool = false, dry_run::Bool = false,
+        conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         http_kwargs::NamedTuple = NamedTuple(), api_kwargs::NamedTuple = NamedTuple(),
         kwargs...)
     ##
     global MODEL_ALIASES, MODEL_COSTS
     ## Find the unique ID for the model alias provided
     model_id = get(MODEL_ALIASES, model, model)
-    conversation = render(prompt_schema, prompt; kwargs...)
+    conv_rendered = render(prompt_schema, prompt; conversation, kwargs...)
 
     if !dry_run
-        time = @elapsed resp = ollama_api(prompt_schema, conversation.prompt;
-            conversation.system, endpoint = "generate", model, http_kwargs, api_kwargs...)
+        time = @elapsed resp = ollama_api(prompt_schema, conv_rendered.prompt;
+            conv_rendered.system, endpoint = "generate", model, http_kwargs, api_kwargs...)
         msg = AIMessage(; content = resp.response[:response] |> strip,
             status = Int(resp.status),
             tokens = (resp.response[:prompt_eval_count],
@@ -202,7 +208,13 @@ function aigenerate(prompt_schema::AbstractOllamaManagedSchema, prompt::ALLOWED_
     end
 
     ## Select what to return
-    output = finalize_outputs(prompt, conversation, msg; return_all, dry_run, kwargs...)
+    output = finalize_outputs(prompt,
+        conv_rendered,
+        msg;
+        conversation,
+        return_all,
+        dry_run,
+        kwargs...)
     return output
 end
 

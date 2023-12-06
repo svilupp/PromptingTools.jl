@@ -25,17 +25,41 @@ Base.@kwdef struct SystemMessage{T <: AbstractString} <: AbstractChatMessage
     content::T
     variables::Vector{Symbol} = _extract_handlebar_variables(content)
     _type::Symbol = :systemmessage
+    SystemMessage{T}(c, v, t) where {T <: AbstractString} = new(c, v, t)
+end
+function SystemMessage(content::T,
+        variables::Vector{Symbol},
+        type::Symbol) where {T <: AbstractString}
+    not_allowed_kwargs = intersect(variables, RESERVED_KWARGS)
+    @assert length(not_allowed_kwargs)==0 "Error: Some placeholders are invalid, as they are reserved for `ai*` functions. Change: $(join(not_allowed_kwargs,","))"
+    return SystemMessage{T}(content, variables, type)
 end
 Base.@kwdef struct UserMessage{T <: AbstractString} <: AbstractChatMessage
     content::T
     variables::Vector{Symbol} = _extract_handlebar_variables(content)
     _type::Symbol = :usermessage
+    UserMessage{T}(c, v, t) where {T <: AbstractString} = new(c, v, t)
+end
+function UserMessage(content::T,
+        variables::Vector{Symbol},
+        type::Symbol) where {T <: AbstractString}
+    not_allowed_kwargs = intersect(variables, RESERVED_KWARGS)
+    @assert length(not_allowed_kwargs)==0 "Error: Some placeholders are invalid, as they are reserved for `ai*` functions. Change: $(join(not_allowed_kwargs,","))"
+    return UserMessage{T}(content, variables, type)
 end
 Base.@kwdef struct UserMessageWithImages{T <: AbstractString} <: AbstractChatMessage
     content::T
     image_url::Vector{<:AbstractString} # no default! fail when not provided
     variables::Vector{Symbol} = _extract_handlebar_variables(content)
     _type::Symbol = :usermessagewithimages
+    UserMessageWithImages{T}(c, i, v, t) where {T <: AbstractString} = new(c, i, v, t)
+end
+function UserMessageWithImages(content::T, image_url::Vector{<:AbstractString},
+        variables::Vector{Symbol},
+        type::Symbol) where {T <: AbstractString}
+    not_allowed_kwargs = intersect(variables, RESERVED_KWARGS)
+    @assert length(not_allowed_kwargs)==0 "Error: Some placeholders are invalid, as they are reserved for `ai*` functions. Change: $(join(not_allowed_kwargs,","))"
+    return UserMessageWithImages{T}(content, image_url, variables, type)
 end
 Base.@kwdef struct AIMessage{T <: Union{AbstractString, Nothing}} <: AbstractChatMessage
     content::T = nothing
