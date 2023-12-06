@@ -1,26 +1,7 @@
 using PromptingTools: AbstractChatMessage, SystemMessage, UserMessage, MetadataMessage
 using PromptingTools: render
-using PromptingTools: save_template, load_template, load_templates!, aitemplates
+using PromptingTools: load_templates!, aitemplates
 using PromptingTools: TestEchoOpenAISchema
-
-@testset "Templates - save/load" begin
-    description = "Some description"
-    version = "1.1"
-    msgs = [
-        SystemMessage("You are an impartial AI judge evaluting whether the provided statement is \"true\" or \"false\". Answer \"unknown\" if you cannot decide."),
-        UserMessage("# Statement\n\n{{it}}"),
-    ]
-    tmp, _ = mktemp()
-    save_template(tmp,
-        msgs;
-        description, version)
-    template, metadata = load_template(tmp)
-    @test template == msgs
-    @test metadata[1].description == description
-    @test metadata[1].version == version
-    @test metadata[1].content == "Template Metadata"
-    @test metadata[1].source == ""
-end
 
 @testset "Template rendering" begin
     template = AITemplate(:JudgeIsItTrue)

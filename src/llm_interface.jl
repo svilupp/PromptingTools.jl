@@ -13,10 +13,15 @@ function aiembed end
 function aiclassify end
 function aiextract end
 function aiscan end
+# Re-usable blocks are defined in src/llm_shared.jl
 
 ## Prompt Schema
 "Defines different prompting styles based on the model training and fine-tuning."
 abstract type AbstractPromptSchema end
+
+"Schema that keeps messages (<:AbstractMessage) and does not transform for any specific model. It used by the first pass of the prompt rendering system (see `?render`)."
+struct NoSchema <: AbstractPromptSchema end
+
 abstract type AbstractOpenAISchema <: AbstractPromptSchema end
 
 """

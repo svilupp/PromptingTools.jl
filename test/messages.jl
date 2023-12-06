@@ -15,6 +15,13 @@ using PromptingTools: _encode_local_image, attach_images_to_user_message
         @test typeof(msg) <: T
         @test msg.content == content
     end
+    # Check the Reserved keywords
+    content = "{{model}}"
+    @test_throws AssertionError UserMessage(content)
+    @test_throws AssertionError UserMessage(; content)
+    @test_throws AssertionError SystemMessage(content)
+    @test_throws AssertionError SystemMessage(; content)
+    @test_throws AssertionError UserMessageWithImages(; content, image_url = ["a"])
 end
 
 @testset "UserMessageWithImages" begin

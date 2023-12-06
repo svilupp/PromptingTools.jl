@@ -113,35 +113,7 @@ function render(template::AITemplate; kwargs...)
     render(PROMPT_SCHEMA, template; kwargs...)
 end
 
-## Loading / Saving
-"Saves provided messaging template (`messages`) to `io_or_file`. Automatically adds metadata based on provided keyword arguments."
-function save_template(io_or_file::Union{IO, AbstractString},
-        messages::AbstractVector{<:AbstractChatMessage};
-        content::AbstractString = "Template Metadata",
-        description::AbstractString = "",
-        version::AbstractString = "1",
-        source::AbstractString = "")
-
-    # create metadata
-    metadata_msg = MetadataMessage(; content, description, version, source)
-
-    # save template to IO or file
-    JSON3.write(io_or_file, [metadata_msg, messages...])
-end
-"Loads messaging template from `io_or_file` and returns tuple of template messages and metadata."
-function load_template(io_or_file::Union{IO, AbstractString})
-    messages = JSON3.read(io_or_file, Vector{AbstractChatMessage})
-    template, metadata = AbstractChatMessage[], MetadataMessage[]
-    for i in eachindex(messages)
-        msg = messages[i]
-        if msg isa MetadataMessage
-            push!(metadata, msg)
-        else
-            push!(template, msg)
-        end
-    end
-    return template, metadata
-end
+## Loading/saving -- see src/serialization.jl
 
 """
         remove_templates!()

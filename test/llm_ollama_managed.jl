@@ -44,6 +44,11 @@ using PromptingTools: UserMessage, UserMessageWithImages, DataMessage
     @test_throws AssertionError aigenerate(schema,
         [UserMessage("abc"), UserMessage("abc")])
 
+    # error if conversation is provided
+    @test_throws AssertionError aigenerate(schema,
+        UserMessage("abc");
+        conversation = [SystemMessage("abc")])
+
     # Double check templating
     messages = [
         SystemMessage("Act as a helpful AI assistant"),
