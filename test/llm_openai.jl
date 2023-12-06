@@ -15,6 +15,13 @@ using PromptingTools: UserMessage, UserMessageWithImages, DataMessage
     ]
     conversation = render(schema, messages; name = "John")
     @test conversation == expected_output
+    # Test with dry_run=true on ai* functions
+    @test aigenerate(schema, messages; name = "John", dry_run = true) == nothing
+    @test aigenerate(schema, messages; name = "John", dry_run = true, return_all = true) ==
+          expected_output
+    @test aiclassify(schema, messages; name = "John", dry_run = true) == nothing
+    @test aiclassify(schema, messages; name = "John", dry_run = true, return_all = true) ==
+          expected_output
 
     # AI message does NOT replace variables
     messages = [
@@ -142,6 +149,24 @@ using PromptingTools: UserMessage, UserMessageWithImages, DataMessage
                         "url" => "https://example.com/image2.png"),
                     "type" => "image_url")])]
     @test conversation == expected_output
+    # Test with dry_run=true
+    messages_alt = [
+        SystemMessage("System message 2"),
+        UserMessage("User message"),
+    ]
+    image_url = ["https://example.com/image1.png",
+        "https://example.com/image2.png"]
+    @test aiscan(schema,
+        copy(messages_alt);
+        image_detail = "low", image_url,
+        dry_run = true,
+        return_all = true) == expected_output
+    @test aiscan(schema,
+        copy(messages_alt);
+        image_detail = "low",
+        image_url,
+        dry_run = true) ==
+          nothing
 end
 
 @testset "aigenerate-OpenAI" begin
