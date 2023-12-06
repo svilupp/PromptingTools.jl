@@ -104,6 +104,7 @@ end
 """
     aigenerate(prompt_schema::AbstractOllamaManagedSchema, prompt::ALLOWED_PROMPT_TYPE; verbose::Bool = true,
         model::String = MODEL_CHAT,
+        return_all::Bool = false, dry_run::Bool = false,
         http_kwargs::NamedTuple = NamedTuple(), api_kwargs::NamedTuple = NamedTuple(),
         kwargs...)
 
@@ -115,6 +116,8 @@ Generate an AI response based on a given prompt using the OpenAI API.
 - `verbose`: A boolean indicating whether to print additional information.
 - `api_key`: Provided for interface consistency. Not needed for locally hosted Ollama.
 - `model`: A string representing the model to use for generating the response. Can be an alias corresponding to a model ID defined in `MODEL_ALIASES`.
+- `return_all::Bool=false`: If `true`, returns the entire conversation history, otherwise returns only the last message (the `AIMessage`).
+- `dry_run::Bool=false`: If `true`, skips sending the messages to the model (for debugging, often used with `return_all=true`).
 - `http_kwargs::NamedTuple`: Additional keyword arguments for the HTTP request. Defaults to empty `NamedTuple`.
 - `api_kwargs::NamedTuple`: Additional keyword arguments for the Ollama API. Defaults to an empty `NamedTuple`.
 - `kwargs`: Prompt variables to be used to fill the prompt/template
@@ -175,6 +178,7 @@ function aigenerate(prompt_schema::AbstractOllamaManagedSchema, prompt::ALLOWED_
         verbose::Bool = true,
         api_key::String = API_KEY,
         model::String = MODEL_CHAT,
+        return_all::Bool = false, dry_run::Bool = false,
         http_kwargs::NamedTuple = NamedTuple(), api_kwargs::NamedTuple = NamedTuple(),
         kwargs...)
     ##
@@ -182,17 +186,24 @@ function aigenerate(prompt_schema::AbstractOllamaManagedSchema, prompt::ALLOWED_
     ## Find the unique ID for the model alias provided
     model_id = get(MODEL_ALIASES, model, model)
     conversation = render(prompt_schema, prompt; kwargs...)
-    time = @elapsed resp = ollama_api(prompt_schema, conversation.prompt;
-        conversation.system, endpoint = "generate", model, http_kwargs, api_kwargs...)
-    msg = AIMessage(; content = resp.response[:response] |> strip,
-        status = Int(resp.status),
-        tokens = (resp.response[:prompt_eval_count],
-            resp.response[:eval_count]),
-        elapsed = time)
-    ## Reporting
-    verbose && @info _report_stats(msg, model_id, MODEL_COSTS)
 
-    return msg
+    if !dry_run
+        time = @elapsed resp = ollama_api(prompt_schema, conversation.prompt;
+            conversation.system, endpoint = "generate", model, http_kwargs, api_kwargs...)
+        msg = AIMessage(; content = resp.response[:response] |> strip,
+            status = Int(resp.status),
+            tokens = (resp.response[:prompt_eval_count],
+                resp.response[:eval_count]),
+            elapsed = time)
+        ## Reporting
+        verbose && @info _report_stats(msg, model_id, MODEL_COSTS)
+    else
+        msg = nothing
+    end
+
+    ## Select what to return
+    output = finalize_outputs(prompt, conversation, msg; return_all, dry_run, kwargs...)
+    return output
 end
 
 """
