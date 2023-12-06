@@ -3,46 +3,43 @@
     render(schema::AbstractOpenAISchema,
         messages::Vector{<:AbstractMessage};
         image_detail::AbstractString = "auto",
+        conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         kwargs...)
 
 Builds a history of the conversation to provide the prompt to the API. All unspecified kwargs are passed as replacements such that `{{key}}=>value` in the template.
 
-# Arguments
+# Keyword Arguments
 - `image_detail`: Only for `UserMessageWithImages`. It represents the level of detail to include for images. Can be `"auto"`, `"high"`, or `"low"`.
+- `conversation`: An optional vector of `AbstractMessage` objects representing the conversation history. If not provided, it is initialized as an empty vector.
 
 """
 function render(schema::AbstractOpenAISchema,
         messages::Vector{<:AbstractMessage};
         image_detail::AbstractString = "auto",
+        conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         kwargs...)
     ##
     @assert image_detail in ["auto", "high", "low"] "Image detail must be one of: auto, high, low"
-    ##
-    conversation = Dict{String, Any}[]
-    # TODO: concat multiple system messages together (2nd pass)
+    ## First pass: keep the message types but make the replacements provided in `kwargs`
+    messages_replaced = render(NoSchema(), messages; conversation, kwargs...)
 
-    has_system_msg = false
+    ## Second pass: convert to the OpenAI schema
+    conversation = Dict{String, Any}[]
+
     # replace any handlebar variables in the messages
-    for msg in messages
-        if msg isa SystemMessage
-            replacements = ["{{$(key)}}" => value
-                            for (key, value) in pairs(kwargs) if key in msg.variables]
-            # move it to the front
-            pushfirst!(conversation,
-                Dict("role" => "system",
-                    "content" => replace(msg.content, replacements...)))
-            has_system_msg = true
-        elseif msg isa UserMessage
-            replacements = ["{{$(key)}}" => value
-                            for (key, value) in pairs(kwargs) if key in msg.variables]
-            push!(conversation,
-                Dict("role" => "user", "content" => replace(msg.content, replacements...)))
-        elseif msg isa UserMessageWithImages
-            replacements = ["{{$(key)}}" => value
-                            for (key, value) in pairs(kwargs) if key in msg.variables]
+    for msg in messages_replaced
+        role = if msg isa SystemMessage
+            "system"
+        elseif msg isa UserMessage || msg isa UserMessageWithImages
+            "user"
+        elseif msg isa AIMessage
+            "assistant"
+        end
+        ## Special case for images
+        if msg isa UserMessageWithImages
             # Build message content
             content = Dict{String, Any}[Dict("type" => "text",
-                "text" => replace(msg.content, replacements...))]
+                "text" => msg.content)]
             # Add images
             for img in msg.image_url
                 push!(content,
@@ -50,26 +47,22 @@ function render(schema::AbstractOpenAISchema,
                         "image_url" => Dict("url" => img,
                             "detail" => image_detail)))
             end
-            push!(conversation, Dict("role" => "user", "content" => content))
-        elseif msg isa AIMessage
-            push!(conversation,
-                Dict("role" => "assistant", "content" => msg.content))
+        else
+            content = msg.content
         end
-        # Note: Ignores any DataMessage or other types
+        push!(conversation, Dict("role" => role, "content" => content))
     end
-    ## Add default system prompt if not provided
-    !has_system_msg && pushfirst!(conversation,
-        Dict("role" => "system", "content" => "Act as a helpful AI assistant"))
 
     return conversation
 end
 
 ## User-Facing API
 """
-    aigenerate([prompt_schema::AbstractOpenAISchema,] prompt::ALLOWED_PROMPT_TYPE; verbose::Bool = true,
-        model::String = MODEL_CHAT,
-        http_kwargs::NamedTuple = (;
-            retry_non_idempotent = true,
+    aigenerate(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE;
+        verbose::Bool = true,
+        api_key::String = API_KEY,
+        model::String = MODEL_CHAT, return_all::Bool = false, dry_run::Bool = false,
+        http_kwargs::NamedTuple = (retry_non_idempotent = true,
             retries = 5,
             readtimeout = 120), api_kwargs::NamedTuple = NamedTuple(),
         kwargs...)
@@ -82,15 +75,23 @@ Generate an AI response based on a given prompt using the OpenAI API.
 - `verbose`: A boolean indicating whether to print additional information.
 - `api_key`: A string representing the API key for accessing the OpenAI API.
 - `model`: A string representing the model to use for generating the response. Can be an alias corresponding to a model ID defined in `MODEL_ALIASES`.
+- `return_all::Bool=false`: If `true`, returns the entire conversation history, otherwise returns only the last message (the `AIMessage`).
+- `dry_run::Bool=false`: If `true`, skips sending the messages to the model (for debugging, often used with `return_all=true`).
+- `conversation`: An optional vector of `AbstractMessage` objects representing the conversation history. If not provided, it is initialized as an empty vector.
 - `http_kwargs`: A named tuple of HTTP keyword arguments.
 - `api_kwargs`: A named tuple of API keyword arguments.
 - `kwargs`: Prompt variables to be used to fill the prompt/template
 
 # Returns
+
+If `return_all=false` (default):
 - `msg`: An `AIMessage` object representing the generated AI message, including the content, status, tokens, and elapsed time.
  Use `msg.content` to access the extracted string.
 
-See also: `ai_str`, `aai_str`, `aiembed`, `aiclassify`, `aiextract`, `aiscan`
+If `return_all=true`:
+- `conversation`: A vector of `AbstractMessage` objects representing the conversation history, including the response from the AI model (`AIMessage`).
+
+See also: `ai_str`, `aai_str`, `aiembed`, `aiclassify`, `aiextract`, `aiscan`, `aitemplates`
 
 # Example
 
@@ -129,7 +130,8 @@ msg=aigenerate(conversation)
 function aigenerate(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE;
         verbose::Bool = true,
         api_key::String = API_KEY,
-        model::String = MODEL_CHAT,
+        model::String = MODEL_CHAT, return_all::Bool = false, dry_run::Bool = false,
+        conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         http_kwargs::NamedTuple = (retry_non_idempotent = true,
             retries = 5,
             readtimeout = 120), api_kwargs::NamedTuple = NamedTuple(),
@@ -138,21 +140,35 @@ function aigenerate(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_
     global MODEL_ALIASES, MODEL_COSTS
     ## Find the unique ID for the model alias provided
     model_id = get(MODEL_ALIASES, model, model)
-    conversation = render(prompt_schema, prompt; kwargs...)
-    time = @elapsed r = create_chat(prompt_schema, api_key,
-        model_id,
-        conversation;
-        http_kwargs,
-        api_kwargs...)
-    msg = AIMessage(; content = r.response[:choices][begin][:message][:content] |> strip,
-        status = Int(r.status),
-        tokens = (r.response[:usage][:prompt_tokens],
-            r.response[:usage][:completion_tokens]),
-        elapsed = time)
-    ## Reporting
-    verbose && @info _report_stats(msg, model_id, MODEL_COSTS)
+    conv_rendered = render(prompt_schema, prompt; conversation, kwargs...)
 
-    return msg
+    if !dry_run
+        time = @elapsed r = create_chat(prompt_schema, api_key,
+            model_id,
+            conv_rendered;
+            http_kwargs,
+            api_kwargs...)
+        msg = AIMessage(;
+            content = r.response[:choices][begin][:message][:content] |> strip,
+            status = Int(r.status),
+            tokens = (r.response[:usage][:prompt_tokens],
+                r.response[:usage][:completion_tokens]),
+            elapsed = time)
+        ## Reporting
+        verbose && @info _report_stats(msg, model_id, MODEL_COSTS)
+    else
+        msg = nothing
+    end
+    ## Select what to return
+    output = finalize_outputs(prompt,
+        conv_rendered,
+        msg;
+        conversation,
+        return_all,
+        dry_run,
+        kwargs...)
+
+    return output
 end
 # Extend OpenAI create_chat to allow for testing/debugging
 function OpenAI.create_chat(schema::AbstractOpenAISchema,
@@ -176,7 +192,7 @@ end
             postprocess::F = identity;
             verbose::Bool = true,
             api_key::String = API_KEY,
-            model::String = MODEL_EMBEDDING,
+            model::String = MODEL_EMBEDDING, 
             http_kwargs::NamedTuple = (retry_non_idempotent = true,
                                        retries = 5,
                                        readtimeout = 120),
@@ -197,7 +213,7 @@ The `aiembed` function generates embeddings for the given input using a specifie
 - `kwargs...`: Additional keyword arguments.
 
 ## Returns
-- `msg`: A `DataMessage` object containing the embeddings, status, token count, and elapsed time.
+- `msg`: A `DataMessage` object containing the embeddings, status, token count, and elapsed time. Use `msg.content` to access the embeddings.
 
 # Example
 
@@ -236,6 +252,7 @@ function aiembed(prompt_schema::AbstractOpenAISchema,
     global MODEL_ALIASES, MODEL_COSTS
     ## Find the unique ID for the model alias provided
     model_id = get(MODEL_ALIASES, model, model)
+
     time = @elapsed r = create_embeddings(prompt_schema, api_key,
         doc_or_docs,
         model_id;
@@ -332,6 +349,8 @@ end
     return_type::Type,
     verbose::Bool = true,
         model::String = MODEL_CHAT,
+        return_all::Bool = false, dry_run::Bool = false,  
+        conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         http_kwargs::NamedTuple = (;
             retry_non_idempotent = true,
             retries = 5,
@@ -353,13 +372,21 @@ It's effectively a light wrapper around `aigenerate` call, which requires additi
 - `verbose`: A boolean indicating whether to print additional information.
 - `api_key`: A string representing the API key for accessing the OpenAI API.
 - `model`: A string representing the model to use for generating the response. Can be an alias corresponding to a model ID defined in `MODEL_ALIASES`.
+- `return_all::Bool=false`: If `true`, returns the entire conversation history, otherwise returns only the last message (the `AIMessage`).
+- `dry_run::Bool=false`: If `true`, skips sending the messages to the model (for debugging, often used with `return_all=true`).
+- `conversation`: An optional vector of `AbstractMessage` objects representing the conversation history. If not provided, it is initialized as an empty vector.
 - `http_kwargs`: A named tuple of HTTP keyword arguments.
 - `api_kwargs`: A named tuple of API keyword arguments.
 - `kwargs`: Prompt variables to be used to fill the prompt/template
 
 # Returns
+If `return_all=false` (default):
 - `msg`: An `DataMessage` object representing the extracted data, including the content, status, tokens, and elapsed time. 
   Use `msg.content` to access the extracted data.
+
+If `return_all=true`:
+- `conversation`: A vector of `AbstractMessage` objects representing the full conversation history, including the response from the AI model (`DataMessage`).
+
 
 See also: `function_call_signature`, `MaybeExtract`, `aigenerate`
 
@@ -430,6 +457,8 @@ function aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_T
         verbose::Bool = true,
         api_key::String = API_KEY,
         model::String = MODEL_CHAT,
+        return_all::Bool = false, dry_run::Bool = false,
+        conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         http_kwargs::NamedTuple = (retry_non_idempotent = true,
             retries = 5,
             readtimeout = 120), api_kwargs::NamedTuple = NamedTuple(),
@@ -443,30 +472,43 @@ function aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_T
     api_kwargs = merge(api_kwargs, (; functions, function_call))
     ## Find the unique ID for the model alias provided
     model_id = get(MODEL_ALIASES, model, model)
-    conversation = render(prompt_schema, prompt; kwargs...)
-    time = @elapsed r = create_chat(prompt_schema, api_key,
-        model_id,
-        conversation;
-        http_kwargs,
-        api_kwargs...)
-    # "Safe" parsing of the response - it still fails if JSON is invalid
-    content = try
-        r.response[:choices][begin][:message][:function_call][:arguments] |>
-        x -> JSON3.read(x, return_type)
-    catch e
-        @warn "There was an error parsing the response: $e. Using the raw response instead."
-        r.response[:choices][begin][:message][:function_call][:arguments] |>
-        JSON3.read |> copy
-    end
-    msg = DataMessage(; content,
-        status = Int(r.status),
-        tokens = (r.response[:usage][:prompt_tokens],
-            r.response[:usage][:completion_tokens]),
-        elapsed = time)
-    ## Reporting
-    verbose && @info _report_stats(msg, model_id, MODEL_COSTS)
+    conv_rendered = render(prompt_schema, prompt; conversation, kwargs...)
 
-    return msg
+    if !dry_run
+        time = @elapsed r = create_chat(prompt_schema, api_key,
+            model_id,
+            conv_rendered;
+            http_kwargs,
+            api_kwargs...)
+        # "Safe" parsing of the response - it still fails if JSON is invalid
+        content = try
+            r.response[:choices][begin][:message][:function_call][:arguments] |>
+            x -> JSON3.read(x, return_type)
+        catch e
+            @warn "There was an error parsing the response: $e. Using the raw response instead."
+            r.response[:choices][begin][:message][:function_call][:arguments] |>
+            JSON3.read |> copy
+        end
+        msg = DataMessage(; content,
+            status = Int(r.status),
+            tokens = (r.response[:usage][:prompt_tokens],
+                r.response[:usage][:completion_tokens]),
+            elapsed = time)
+        ## Reporting
+        verbose && @info _report_stats(msg, model_id, MODEL_COSTS)
+    else
+        msg = nothing
+    end
+    ## Select what to return
+    output = finalize_outputs(prompt,
+        conv_rendered,
+        msg;
+        conversation,
+        return_all,
+        dry_run,
+        kwargs...)
+
+    return output
 end
 
 """
@@ -477,6 +519,8 @@ aiscan([prompt_schema::AbstractOpenAISchema,] prompt::ALLOWED_PROMPT_TYPE;
     attach_to_latest::Bool = true,
     verbose::Bool = true,
         model::String = MODEL_CHAT,
+        return_all::Bool = false, dry_run::Bool = false,
+        conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         http_kwargs::NamedTuple = (;
             retry_non_idempotent = true,
             retries = 5,
@@ -501,15 +545,22 @@ It's effectively a light wrapper around `aigenerate` call, which uses additional
 - `verbose`: A boolean indicating whether to print additional information.
 - `api_key`: A string representing the API key for accessing the OpenAI API.
 - `model`: A string representing the model to use for generating the response. Can be an alias corresponding to a model ID defined in `MODEL_ALIASES`.
+- `return_all::Bool=false`: If `true`, returns the entire conversation history, otherwise returns only the last message (the `AIMessage`).
+- `dry_run::Bool=false`: If `true`, skips sending the messages to the model (for debugging, often used with `return_all=true`).
+- `conversation`: An optional vector of `AbstractMessage` objects representing the conversation history. If not provided, it is initialized as an empty vector.
 - `http_kwargs`: A named tuple of HTTP keyword arguments.
 - `api_kwargs`: A named tuple of API keyword arguments.
 - `kwargs`: Prompt variables to be used to fill the prompt/template
 
 # Returns
+If `return_all=false` (default):
 - `msg`: An `AIMessage` object representing the generated AI message, including the content, status, tokens, and elapsed time.
  Use `msg.content` to access the extracted string.
 
-See also: `ai_str`, `aai_str`, `aigenerate`, `aiembed`, `aiclassify`, `aiextract`
+If `return_all=true`:
+- `conversation`: A vector of `AbstractMessage` objects representing the full conversation history, including the response from the AI model (`AIMessage`).
+
+See also: `ai_str`, `aai_str`, `aigenerate`, `aiembed`, `aiclassify`, `aiextract`, `aitemplates`
 
 # Notes
 
@@ -559,6 +610,8 @@ function aiscan(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE
         verbose::Bool = true,
         api_key::String = API_KEY,
         model::String = MODEL_CHAT,
+        return_all::Bool = false, dry_run::Bool = false,
+        conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         http_kwargs::NamedTuple = (retry_non_idempotent = true,
             retries = 5,
             readtimeout = 120), api_kwargs::NamedTuple = (; max_tokens = 2500),
@@ -570,20 +623,34 @@ function aiscan(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE
     ## Vision-specific functionality
     msgs = attach_images_to_user_message(prompt; image_url, image_path, attach_to_latest)
     ## Build the conversation, pass what image detail is required (if provided)
-    conversation = render(prompt_schema, msgs; image_detail, kwargs...)
-    ## Model call
-    time = @elapsed r = create_chat(prompt_schema, api_key,
-        model_id,
-        conversation;
-        http_kwargs,
-        api_kwargs...)
-    msg = AIMessage(; content = r.response[:choices][begin][:message][:content] |> strip,
-        status = Int(r.status),
-        tokens = (r.response[:usage][:prompt_tokens],
-            r.response[:usage][:completion_tokens]),
-        elapsed = time)
-    ## Reporting
-    verbose && @info _report_stats(msg, model_id, MODEL_COSTS)
+    conv_rendered = render(prompt_schema, msgs; conversation, image_detail, kwargs...)
+    if !dry_run
+        ## Model call
+        time = @elapsed r = create_chat(prompt_schema, api_key,
+            model_id,
+            conv_rendered;
+            http_kwargs,
+            api_kwargs...)
+        msg = AIMessage(;
+            content = r.response[:choices][begin][:message][:content] |> strip,
+            status = Int(r.status),
+            tokens = (r.response[:usage][:prompt_tokens],
+                r.response[:usage][:completion_tokens]),
+            elapsed = time)
+        ## Reporting
+        verbose && @info _report_stats(msg, model_id, MODEL_COSTS)
+    else
+        msg = nothing
+    end
 
-    return msg
+    ## Select what to return // input `msgs` to preserve the image attachments
+    output = finalize_outputs(msgs,
+        conv_rendered,
+        msg;
+        conversation,
+        return_all,
+        dry_run,
+        kwargs...)
+
+    return output
 end

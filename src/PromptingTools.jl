@@ -32,6 +32,19 @@ const MODEL_ALIASES = Dict("gpt3" => "gpt-3.5-turbo",
 # the below default is defined in llm_interace.jl !
 # const PROMPT_SCHEMA = OpenAISchema()
 
+"The following keywords are reserved for internal use in the `ai*` functions and cannot be used as placeholders in the Messages"
+const RESERVED_KWARGS = [
+    :http_kwargs,
+    :api_kwargs,
+    :conversation,
+    :return_all,
+    :dry_run,
+    :image_url,
+    :image_path,
+    :image_detail,
+    :model,
+]
+
 include("utils.jl")
 
 export aigenerate, aiembed, aiclassify, aiextract, aiscan
@@ -49,6 +62,9 @@ include("templates.jl")
 const TEMPLATE_STORE = Dict{Symbol, Any}()
 const TEMPLATE_METADATA = Vector{AITemplateMetadata}()
 
+# export save_conversation, load_conversation, save_template, load_template
+include("serialization.jl")
+
 ## Utilities to support structured extraction
 include("extraction.jl")
 
@@ -58,6 +74,7 @@ export AICode
 include("code_generation.jl")
 
 ## Individual interfaces
+include("llm_shared.jl")
 include("llm_openai.jl")
 include("llm_ollama_managed.jl")
 

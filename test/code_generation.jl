@@ -227,4 +227,21 @@ b=2
         @test cb.stdout == "hello\nworld\n"
         @test cb.output.b == 2
     end
+
+    # Methods - copy
+    let msg = AIMessage("""
+        ```julia
+        println(\"hello\")
+        ```
+        Some text
+        ```julia
+        println(\"world\")
+        b=2
+        ```
+        """)
+        cb = AICode(msg)
+        cb_copy = Base.copy(cb)
+        @test cb_copy.code == cb.code
+        @test cb_copy !== cb
+    end
 end
