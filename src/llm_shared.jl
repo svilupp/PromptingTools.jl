@@ -65,7 +65,7 @@ end
 
 """
     finalize_outputs(prompt::ALLOWED_PROMPT_TYPE, conv_rendered::Any,
-        msg::AbstractMessage;
+        msg::Union{Nothing, AbstractMessage};
         return_all::Bool = false,
         dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
@@ -81,7 +81,7 @@ Finalizes the outputs of the ai* functions by either returning the conversation 
 - `kwargs...`: Variables to replace in the prompt template.
 """
 function finalize_outputs(prompt::ALLOWED_PROMPT_TYPE, conv_rendered::Any,
-        msg::AbstractMessage;
+        msg::Union{Nothing, AbstractMessage};
         return_all::Bool = false,
         dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
