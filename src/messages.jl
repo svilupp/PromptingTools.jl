@@ -64,6 +64,10 @@ Base.var"=="(m1::AbstractMessage, m2::AbstractMessage) = false
 function Base.var"=="(m1::T, m2::T) where {T <: AbstractMessage}
     all([getproperty(m1, f) == getproperty(m2, f) for f in fieldnames(T)])
 end
+Base.length(t::AbstractMessage) = nfields(t)
+function Base.iterate(t::AbstractMessage, iter = 1)
+    iter > nfields(t) ? nothing : (getfield(t, iter), iter + 1)
+end
 
 ## Vision Models -- Constructor and Conversion
 "Construct `UserMessageWithImages` with 1 or more images. Images can be either URLs or local paths."
