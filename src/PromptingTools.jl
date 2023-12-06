@@ -58,6 +58,7 @@ export AICode
 include("code_generation.jl")
 
 ## Individual interfaces
+include("llm_shared.jl")
 include("llm_openai.jl")
 include("llm_ollama_managed.jl")
 
