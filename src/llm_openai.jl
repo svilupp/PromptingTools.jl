@@ -181,7 +181,7 @@ end
             postprocess::F = identity;
             verbose::Bool = true,
             api_key::String = API_KEY,
-            model::String = MODEL_EMBEDDING, return_all::Bool = false, dry_run::Bool = false,
+            model::String = MODEL_EMBEDDING, 
             http_kwargs::NamedTuple = (retry_non_idempotent = true,
                                        retries = 5,
                                        readtimeout = 120),
@@ -197,18 +197,12 @@ The `aiembed` function generates embeddings for the given input using a specifie
 - `verbose::Bool`: A flag indicating whether to print verbose information. Defaults to `true`.
 - `api_key::String`: The API key to use for the OpenAI API. Defaults to `API_KEY`.
 - `model::String`: The model to use for generating embeddings. Defaults to `MODEL_EMBEDDING`.
-- `return_all::Bool=false`: If `true`, returns the entire conversation history, otherwise returns only the last message (the `AIMessage`).
-- `dry_run::Bool=false`: If `true`, skips sending the messages to the model (for debugging, often used with `return_all=true`).
 - `http_kwargs::NamedTuple`: Additional keyword arguments for the HTTP request. Defaults to `(retry_non_idempotent = true, retries = 5, readtimeout = 120)`.
 - `api_kwargs::NamedTuple`: Additional keyword arguments for the OpenAI API. Defaults to an empty `NamedTuple`.
 - `kwargs...`: Additional keyword arguments.
 
 ## Returns
-If `return_all=false` (default):
 - `msg`: A `DataMessage` object containing the embeddings, status, token count, and elapsed time. Use `msg.content` to access the embeddings.
-
-If `return_all=true`:
-- `conversation`: A vector of `AbstractMessage` objects representing the conversation history, including the response from the AI model (`DataMessage`).
 
 # Example
 
@@ -239,7 +233,6 @@ function aiembed(prompt_schema::AbstractOpenAISchema,
         postprocess::F = identity; verbose::Bool = true,
         api_key::String = API_KEY,
         model::String = MODEL_EMBEDDING,
-        return_all::Bool = false, dry_run::Bool = false,
         http_kwargs::NamedTuple = (retry_non_idempotent = true,
             retries = 5,
             readtimeout = 120), api_kwargs::NamedTuple = NamedTuple(),
@@ -249,27 +242,20 @@ function aiembed(prompt_schema::AbstractOpenAISchema,
     ## Find the unique ID for the model alias provided
     model_id = get(MODEL_ALIASES, model, model)
 
-    if !dry_run
-        time = @elapsed r = create_embeddings(prompt_schema, api_key,
-            doc_or_docs,
-            model_id;
-            http_kwargs,
-            api_kwargs...)
-        msg = DataMessage(;
-            content = mapreduce(x -> postprocess(x[:embedding]), hcat, r.response[:data]),
-            status = Int(r.status),
-            tokens = (r.response[:usage][:prompt_tokens], 0),
-            elapsed = time)
-        ## Reporting
-        verbose && @info _report_stats(msg, model_id, MODEL_COSTS)
-    else
-        msg = nothing
-    end
+    time = @elapsed r = create_embeddings(prompt_schema, api_key,
+        doc_or_docs,
+        model_id;
+        http_kwargs,
+        api_kwargs...)
+    msg = DataMessage(;
+        content = mapreduce(x -> postprocess(x[:embedding]), hcat, r.response[:data]),
+        status = Int(r.status),
+        tokens = (r.response[:usage][:prompt_tokens], 0),
+        elapsed = time)
+    ## Reporting
+    verbose && @info _report_stats(msg, model_id, MODEL_COSTS)
 
-    ## Select what to return
-    output = finalize_outputs(prompt, conversation, msg; return_all, dry_run, kwargs...)
-
-    return output
+    return msg
 end
 # Extend OpenAI create_embeddings to allow for testing
 function OpenAI.create_embeddings(schema::AbstractOpenAISchema,

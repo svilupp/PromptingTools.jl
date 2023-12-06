@@ -24,7 +24,6 @@ let cb = AICode(; code = """
     """)
     eval!(cb)
     @test cb.success == false
-    @info cb.error cb.output
     @test cb.error isa Test.FallbackTestSetException
     @test !isnothing(cb.expression) # parsed
     @test occursin("Test Failed", cb.stdout) # capture details of the test failure
