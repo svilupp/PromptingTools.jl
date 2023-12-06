@@ -106,20 +106,6 @@ using PromptingTools: UserMessage, UserMessageWithImages, DataMessage
     conversation = render(schema, messages)
     @test conversation == expected_output
 
-    # Given a schema and a vector of messages with multiple system messages, it should concatenate them together in the conversation dictionary.
-    messages = [
-        SystemMessage("System message 1"),
-        SystemMessage("System message 2"),
-        UserMessage("User message"),
-    ]
-    conversation = render(schema, messages)
-    expected_output = [
-        Dict("role" => "system", "content" => "System message 1\nSystem message 2"),
-        Dict("role" => "user", "content" => "User message"),
-    ]
-    # Broken: Does not concatenate system messages yet
-    @test_broken conversation == expected_output
-
     # Test UserMessageWithImages
     messages = [
         SystemMessage("System message 1"),
