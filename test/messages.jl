@@ -1,6 +1,7 @@
 using PromptingTools: AIMessage, SystemMessage, MetadataMessage
 using PromptingTools: UserMessage, UserMessageWithImages, DataMessage
 using PromptingTools: _encode_local_image, attach_images_to_user_message
+using PromptingTools: isusermessage, issystemmessage, isdatamessage
 
 @testset "Message constructors" begin
     # Creates an instance of MSG with the given content string.
@@ -22,6 +23,12 @@ using PromptingTools: _encode_local_image, attach_images_to_user_message
     @test_throws AssertionError SystemMessage(content)
     @test_throws AssertionError SystemMessage(; content)
     @test_throws AssertionError UserMessageWithImages(; content, image_url = ["a"])
+
+    # Check methods
+    content = "Hello, world!"
+    @test UserMessage(content) |> isusermessage
+    @test SystemMessage(content) |> issystemmessage
+    @test DataMessage(; content) |> isdatamessage
 end
 
 @testset "UserMessageWithImages" begin

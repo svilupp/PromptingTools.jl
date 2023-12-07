@@ -4,11 +4,10 @@ using PromptingTools: save_template, load_template
 
 @testset "Serialization - Messages" begin
     # Test save_conversation
-    messages = [
-        SystemMessage("System message 1"),
+    messages = AbstractMessage[SystemMessage("System message 1"),
         UserMessage("User message"),
         AIMessage("AI message"),
-    ]
+        DataMessage(; content = "Data message")]
     tmp, _ = mktemp()
     save_conversation(tmp, messages)
     # Test load_conversation
