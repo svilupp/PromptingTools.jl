@@ -163,6 +163,38 @@ function detect_missing_packages(imports_required::AbstractVector{<:Symbol})
     end
 end
 
+"Checks if a given string has a Julia prompt (`julia> `) at the beginning of a line."
+has_julia_prompt(s::T) where {T <: AbstractString} = occursin(r"^julia> "m, s)
+
+"""
+    remove_julia_prompt(s::T) where {T<:AbstractString}
+
+If it detects a julia prompt, it removes it and all lines that do not have it (except for those that belong to the code block).
+"""
+function remove_julia_prompt(s::T) where {T <: AbstractString}
+    if !has_julia_prompt(s)
+        return s
+    end
+    # Has julia prompt, so we need to parse it line by line
+    lines = split(s, '\n')
+    code_line = false
+    io = IOBuffer()
+    for line in lines
+        if startswith(line, r"^julia> ")
+            code_line = true
+            # remove the prompt
+            println(io, replace(line, "julia> " => ""))
+        elseif code_line && startswith(line, r"^ ")
+            # continuation of the code line
+            println(io, line)
+        else
+            code_line = false
+        end
+    end
+    # strip removes training whitespace and newlines
+    String(take!(io)) |> strip
+end
+
 """
     extract_code_blocks(markdown_content::String) -> Vector{String}
 
@@ -215,8 +247,8 @@ function extract_code_blocks(markdown_content::AbstractString)
     # Find all matches and extract the code
     matches = eachmatch(pattern, markdown_content)
 
-    # Extract and clean the code blocks
-    code_blocks = String[m.captures[1] for m in matches]
+    # Extract and clean the code blocks (remove the julia prompt)
+    code_blocks = String[remove_julia_prompt(m.captures[1]) for m in matches]
 
     return code_blocks
 end

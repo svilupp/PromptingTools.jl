@@ -1,6 +1,6 @@
 using PromptingTools: extract_julia_imports
 using PromptingTools: detect_pkg_operation, detect_missing_packages, extract_function_name
-using PromptingTools: extract_code_blocks, eval!
+using PromptingTools: has_julia_prompt, remove_julia_prompt, extract_code_blocks, eval!
 
 @testset "extract_imports tests" begin
     @test extract_julia_imports("using Test, LinearAlgebra") ==
@@ -27,6 +27,48 @@ end
     @test detect_pkg_operation("blabla Pkg.activate(\".\")") == true
     @test detect_pkg_operation("hello world;") == false
     @test detect_pkg_operation("import Pkg;") == false
+end
+
+@testset "has_julia_prompt" begin
+    @test has_julia_prompt("julia> a=1")
+    @test has_julia_prompt("""
+# something else first
+julia> a=1
+""")
+    @test !has_julia_prompt("""
+    # something
+    # new
+    a=1
+    """)
+end
+
+@testset "remove_julia_prompt" begin
+    @test remove_julia_prompt("julia> a=1") == "a=1"
+    @test remove_julia_prompt("""
+# something else first
+julia> a=1
+# output
+""") == "a=1"
+    @test remove_julia_prompt("""
+    # something
+    # new
+    a=1
+    """) == """
+    # something
+    # new
+    a=1
+    """
+    @test remove_julia_prompt("""
+julia> a=\"\"\"
+ hey
+ there
+ \"\"\"
+"hey\nthere\n"
+  """) == """
+a=\"\"\"
+ hey
+ there
+ \"\"\""""
 end
 
 @testset "extract_code_blocks" begin
