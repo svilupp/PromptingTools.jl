@@ -82,6 +82,7 @@ function (MSG::Type{<:AbstractChatMessage})(prompt::AbstractString)
 end
 isusermessage(m::AbstractMessage) = m isa UserMessage
 issystemmessage(m::AbstractMessage) = m isa SystemMessage
+isdatamessage(m::AbstractMessage) = m isa DataMessage
 
 # equality check for testing, only equal if all fields are equal and type is the same
 Base.var"=="(m1::AbstractMessage, m2::AbstractMessage) = false
@@ -187,15 +188,30 @@ function render(schema::AbstractPromptSchema, msg::AbstractString; kwargs...)
 end
 
 ## Serialization via JSON3
+StructTypes.StructType(::Type{AbstractMessage}) = StructTypes.AbstractType()
+StructTypes.subtypekey(::Type{AbstractMessage}) = :_type
+function StructTypes.subtypes(::Type{AbstractMessage})
+    (usermessage = UserMessage,
+        usermessagewithimages = UserMessageWithImages,
+        aimessage = AIMessage,
+        systemmessage = SystemMessage,
+        metadatamessage = MetadataMessage,
+        datamessage = DataMessage)
+end
+
 StructTypes.StructType(::Type{AbstractChatMessage}) = StructTypes.AbstractType()
-StructTypes.StructType(::Type{MetadataMessage}) = StructTypes.Struct()
-StructTypes.StructType(::Type{SystemMessage}) = StructTypes.Struct()
-StructTypes.StructType(::Type{UserMessage}) = StructTypes.Struct()
-StructTypes.StructType(::Type{AIMessage}) = StructTypes.Struct()
 StructTypes.subtypekey(::Type{AbstractChatMessage}) = :_type
 function StructTypes.subtypes(::Type{AbstractChatMessage})
     (usermessage = UserMessage,
+        usermessagewithimages = UserMessageWithImages,
         aimessage = AIMessage,
         systemmessage = SystemMessage,
         metadatamessage = MetadataMessage)
 end
+
+StructTypes.StructType(::Type{MetadataMessage}) = StructTypes.Struct()
+StructTypes.StructType(::Type{SystemMessage}) = StructTypes.Struct()
+StructTypes.StructType(::Type{UserMessage}) = StructTypes.Struct()
+StructTypes.StructType(::Type{UserMessageWithImages}) = StructTypes.Struct()
+StructTypes.StructType(::Type{AIMessage}) = StructTypes.Struct()
+StructTypes.StructType(::Type{DataMessage}) = StructTypes.Struct()

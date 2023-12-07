@@ -31,10 +31,10 @@ end
 ## Variants without metadata:
 "Saves provided conversation (`messages`) to `io_or_file`. If you need to add some metadata, see `save_template`."
 function save_conversation(io_or_file::Union{IO, AbstractString},
-        messages::AbstractVector{<:AbstractChatMessage})
+        messages::AbstractVector{<:AbstractMessage})
     JSON3.write(io_or_file, messages)
 end
 "Loads a conversation (`messages`) from `io_or_file`"
 function load_conversation(io_or_file::Union{IO, AbstractString})
-    messages = JSON3.read(io_or_file, Vector{AbstractChatMessage})
+    messages = JSON3.read(io_or_file, Vector{AbstractMessage})
 end
