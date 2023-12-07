@@ -1,14 +1,16 @@
-using PromptingTools: AIMessage, SystemMessage, UserMessage
+using PromptingTools: AIMessage,
+    SystemMessage, UserMessage, UserMessageWithImages, AbstractMessage, DataMessage
 using PromptingTools: save_conversation, load_conversation
 using PromptingTools: save_template, load_template
 
 @testset "Serialization - Messages" begin
     # Test save_conversation
-    messages = [
-        SystemMessage("System message 1"),
+    messages = AbstractMessage[SystemMessage("System message 1"),
         UserMessage("User message"),
         AIMessage("AI message"),
-    ]
+        UserMessageWithImages(; content = "a", image_url = String["b", "c"]),
+        DataMessage(;
+            content = "Data message")]
     tmp, _ = mktemp()
     save_conversation(tmp, messages)
     # Test load_conversation
