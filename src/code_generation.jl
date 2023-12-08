@@ -16,7 +16,7 @@
 abstract type AbstractCodeBlock end
 
 """
-    AICode(code::AbstractString; safe_eval::Bool=false, prefix::AbstractString="", suffix::AbstractString="")
+    AICode(code::AbstractString; auto_eval::Bool=true, safe_eval::Bool=false, prefix::AbstractString="", suffix::AbstractString="")
 
 A mutable structure representing a code block (received from the AI model) with automatic parsing, execution, and output/error capturing capabilities.
 
@@ -44,6 +44,7 @@ See also: `PromptingTools.extract_code_blocks`, `PromptingTools.eval!`
 - `error::Union{Nothing, Exception}`: Any exception raised during the execution of the code block.
 
 # Keyword Arguments
+- `auto_eval::Bool`: If set to `true`, the code block is automatically parsed and evaluated upon instantiation. Defaults to `true`.
 - `safe_eval::Bool`: If set to `true`, the code block checks for package operations (e.g., installing new packages) and missing imports, and then evaluates the code inside a bespoke scratch module. This is to ensure that the evaluation does not alter any user-defined variables or the global state. Defaults to `false`.
 - `prefix::AbstractString`: A string to be prepended to the code block before parsing and evaluation.
   Useful to add some additional code definition or necessary imports. Defaults to an empty string.
@@ -100,11 +101,13 @@ eval(code.expression)
 end
 # Eager evaluation if instantiated with a string
 function (CB::Type{T})(md::AbstractString;
+        auto_eval::Bool = true,
         safe_eval::Bool = true,
         prefix::AbstractString = "",
         suffix::AbstractString = "") where {T <: AbstractCodeBlock}
     cb = CB(; code = md)
-    eval!(cb; safe_eval, prefix, suffix)
+    auto_eval && eval!(cb; safe_eval, prefix, suffix)
+    return cb
 end
 Base.isvalid(cb::AbstractCodeBlock) = cb.success == true
 function Base.copy(cb::AbstractCodeBlock)
@@ -331,14 +334,23 @@ function eval!(cb::AbstractCodeBlock;
         prefix::AbstractString = "",
         suffix::AbstractString = "")
     (; code) = cb
+    # reset
+    cb.success = nothing
+    cb.error = nothing
+    cb.expression = nothing
+    cb.output = nothing
     code_extra = string(prefix, "\n", code, "\n", suffix)
-    ## Safety checks on `code` only
+    ## Safety checks on `code` only -- treat it as a parsing failure
     if safe_eval
-        detect_pkg_operation(code) &&
-            throw(error("Error: Use of package manager (`Pkg.*`) detected! Please verify the safety of the code or disable the safety check (`safe_eval=false`)"))
         detected, missing_packages = detect_missing_packages(extract_julia_imports(code))
-        detected &&
-            throw(error("Error: Failed package import. Missing packages: $(join(string.(missing_packages),", ")). Please add them or disable the safety check (`safe_eval=false`)"))
+        if detect_pkg_operation(code) || detected
+            cb.success = false
+            detect_pkg_operation(code) &&
+                (cb.error = ErrorException("Safety Error: Use of package manager (`Pkg.*`) detected! Please verify the safety of the code or disable the safety check (`safe_eval=false`)"))
+            detected &&
+                (cb.error = ErrorException("Safety Error: Failed package import. Missing packages: $(join(string.(missing_packages),", ")). Please add them or disable the safety check (`safe_eval=false`)"))
+            return cb
+        end
     end
     ## Parse into an expression
     try
