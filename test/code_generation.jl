@@ -1,6 +1,7 @@
 using PromptingTools: extract_julia_imports
 using PromptingTools: detect_pkg_operation, detect_missing_packages, extract_function_name
 using PromptingTools: has_julia_prompt, remove_julia_prompt, extract_code_blocks, eval!
+using PromptingTools: escape_interpolation, find_subsequence_positions
 
 @testset "extract_imports tests" begin
     @test extract_julia_imports("using Test, LinearAlgebra") ==
@@ -71,6 +72,29 @@ a=\"\"\"
  \"\"\""""
 end
 
+@testset "escape_interpolation" begin
+    @test escape_interpolation("aaa") == "aaa"
+    @test escape_interpolation("\$") == String(['\\', '$'])
+end
+
+@testset "find_subsequence_positions" begin
+    # Test 1: Basic functionality
+    @test find_subsequence_positions(codeunits("ab"), codeunits("cababcab")) == [2, 4, 7]
+
+    # Test 2: Subsequence not in sequence
+    @test find_subsequence_positions(codeunits("xyz"), codeunits("hello")) == []
+
+    # Test 3: Empty subsequence -- should return all positions+1
+    @test find_subsequence_positions(codeunits(""), codeunits("hello")) == 1:6
+
+    # Test 4: Subsequence longer than sequence
+    @test find_subsequence_positions(codeunits("longsubsequence"), codeunits("short")) == []
+
+    # Test 5: Repeated characters
+    @test find_subsequence_positions(codeunits("ana"), codeunits("banana")) == [2, 4]
+    @test find_subsequence_positions(codeunits("a"), codeunits("a"^6)) == 1:6
+end
+
 @testset "extract_code_blocks" begin
     # Single Julia Code Block
     markdown_content = """
@@ -79,7 +103,8 @@ end
     println("Hello, World!")
     ```
     """
-    @test extract_code_blocks(markdown_content) == ["println(\"Hello, World!\")"]
+    @test extract_code_blocks(markdown_content) ==
+          SubString{String}["println(\"Hello, World!\")"]
 
     # Multiple Julia Code Blocks
     markdown_content = """
@@ -92,7 +117,7 @@ end
     ```
     """
     @test extract_code_blocks(markdown_content) ==
-          ["println(\"First Block\")", "println(\"Second Block\")"]
+          SubString{String}["println(\"First Block\")", "println(\"Second Block\")"]
 
     # No Julia Code Blocks
     markdown_content = """
@@ -109,9 +134,10 @@ end
     println("This is Julia")
     ```
     """
-    @test extract_code_blocks(markdown_content) == ["println(\"This is Julia\")"]
+    @test extract_code_blocks(markdown_content) ==
+          SubString{String}["println(\"This is Julia\")"]
 
-    # Nested Code Blocks"
+    # Nested Blocks (plain block outer)
     markdown_content = """
     ```
     ```julia
@@ -119,7 +145,28 @@ end
     ```
     ```
     """
-    @test extract_code_blocks(markdown_content) == ["println(\"Nested Block\")"]
+    @test extract_code_blocks(markdown_content) ==
+          SubString{String}["println(\"Nested Block\")"]
+
+    # Nested Julia code blocks
+    markdown_example = """
+    ```julia
+    # Outer Julia code block
+
+    # An example of a nested Julia code block in markdown
+    \"\"\"
+    ```julia
+    x = 5
+    println(x)
+    ```
+    \"\"\"
+
+    y = 10
+    println(y)
+    ```
+    """
+    @test extract_code_blocks(markdown_example) ==
+          SubString{String}["# Outer Julia code block\n\n# An example of a nested Julia code block in markdown\n\"\"\"\n```julia\nx = 5\nprintln(x)\n```\n\"\"\"\n\ny = 10\nprintln(y)"]
 end
 
 @testset "extract_function_name" begin
