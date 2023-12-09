@@ -199,6 +199,47 @@ function remove_julia_prompt(s::T) where {T <: AbstractString}
 end
 
 """
+    find_subsequence_positions(subseq, seq) -> Vector{Int}
+
+Find all positions of a subsequence `subseq` within a larger sequence `seq`. Used to lookup positions of code blocks in markdown.
+
+This function scans the sequence `seq` and identifies all starting positions where the subsequence `subseq` is found. Both `subseq` and `seq` should be vectors of integers, typically obtained using `codeunits` on strings.
+
+# Arguments
+- `subseq`: A vector of integers representing the subsequence to search for.
+- `seq`: A vector of integers representing the larger sequence in which to search.
+
+# Returns
+- `Vector{Int}`: A vector of starting positions (1-based indices) where the subsequence is found in the sequence.
+
+# Examples
+```julia
+find_subsequence_positions(codeunits("ab"), codeunits("cababcab")) # Returns [2, 5]
+```
+"""
+function find_subsequence_positions(subseq, seq)
+    positions = Int[]
+    len_subseq = length(subseq)
+    len_seq = length(seq)
+    lim = len_seq - len_subseq + 1
+    cur = 1
+    while cur <= lim
+        match = true
+        @inbounds for i in 1:len_subseq
+            if seq[cur + i - 1] != subseq[i]
+                match = false
+                break
+            end
+        end
+        if match
+            push!(positions, cur)
+        end
+        cur += 1
+    end
+    return positions
+end
+
+"""
     extract_code_blocks(markdown_content::String) -> Vector{String}
 
 Extract Julia code blocks from a markdown string.
@@ -243,17 +284,45 @@ extract_code_blocks(markdown_multiple)
 # Output: ["x = 5", "y = x + 2"]
 ```
 """
-function extract_code_blocks(markdown_content::AbstractString)
-    # Define the pattern for Julia code blocks
-    pattern = r"```julia\n(.*?)\n```"s
+function extract_code_blocks(markdown_content::T) where {T <: AbstractString}
+    # Convert content and delimiters to codeunits
+    content_units = codeunits(markdown_content)
+    start_delim_units = codeunits("```julia")
+    end_delim_units = codeunits("```")
 
-    # Find all matches and extract the code
-    matches = eachmatch(pattern, markdown_content)
+    # Find all starting and ending positions of code blocks
+    start_positions = find_subsequence_positions(start_delim_units, content_units)
+    end_positions = setdiff(find_subsequence_positions(end_delim_units, content_units),
+        start_positions)
+    unused_end_positions = trues(length(end_positions))
 
-    # Extract and clean the code blocks (remove the julia prompt)
-    code_blocks = String[remove_julia_prompt(m.captures[1]) for m in matches]
+    # Generate code block position pairs
+    block_positions = Tuple{Int, Int}[]
+    for start_pos in reverse(start_positions)
+        for (i, end_pos) in enumerate(end_positions)
+            if end_pos > start_pos && unused_end_positions[i]
+                push!(block_positions, (start_pos, end_pos))
+                unused_end_positions[i] = false
+                break
+            end
+        end
+    end
 
-    return code_blocks
+    # Filter out nested blocks (only if they have full overlap)
+    filtered_positions = filter(inner -> !any(outer -> (outer[1] < inner[1]) &&
+                (inner[2] < outer[2]),
+            block_positions),
+        block_positions)
+
+    # Extract code blocks
+    code_blocks = SubString{T}[]
+    for (start_pos, end_pos) in filtered_positions
+        code_block = markdown_content[(start_pos + length(start_delim_units)):(end_pos - 1)]
+        # Also remove the julia prompt
+        push!(code_blocks, remove_julia_prompt(strip(code_block)))
+    end
+
+    return reverse(code_blocks) # Reverse to maintain original order
 end
 
 """
