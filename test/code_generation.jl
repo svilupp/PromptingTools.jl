@@ -1,7 +1,7 @@
 using PromptingTools: extract_julia_imports
 using PromptingTools: detect_pkg_operation, detect_missing_packages, extract_function_name
 using PromptingTools: has_julia_prompt, remove_julia_prompt, extract_code_blocks, eval!
-using PromptingTools: find_subsequence_positions
+using PromptingTools: escape_interpolation, find_subsequence_positions
 
 @testset "extract_imports tests" begin
     @test extract_julia_imports("using Test, LinearAlgebra") ==
@@ -70,6 +70,11 @@ a=\"\"\"
  hey
  there
  \"\"\""""
+end
+
+@testset "escape_interpolation" begin
+    @test escape_interpolation("aaa") == "aaa"
+    @test escape_interpolation("\$") == String(['\\', '$'])
 end
 
 @testset "find_subsequence_positions" begin

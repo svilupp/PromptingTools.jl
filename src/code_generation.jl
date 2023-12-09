@@ -198,6 +198,9 @@ function remove_julia_prompt(s::T) where {T <: AbstractString}
     String(take!(io)) |> strip
 end
 
+# escape dollar sign only if not preceeded by backslash already, ie, unescaped -- use negative lookbehind
+escape_interpolation(s::AbstractString) = replace(s, r"(?<!\\)\$" => String(['\\', '$']))
+
 """
     find_subsequence_positions(subseq, seq) -> Vector{Int}
 
