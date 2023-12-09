@@ -203,12 +203,16 @@ end
 @testset "eval! kwargs" begin
     ## Safe Eval == true mode
     # package that is not available
-    cb = AICode(; code = "using ExoticPackage123")
-    @test_throws Exception eval!(cb)
-    @test_throws "ExoticPackage123" eval!(cb)
+    cb = AICode(; code = "using ExoticPackage123") |> eval!
+    @test cb.error isa Exception
+    @test occursin("Safety Error", cb.error.msg)
+    @test occursin("ExoticPackage123", cb.error.msg)
     # Pkg operations
-    cb = AICode(; code = "Pkg.activate(\".\")")
-    @test_throws Exception eval!(cb)
+    cb = AICode(; code = "Pkg.activate(\".\")") |> eval!
+    @test cb.error isa Exception
+    @test occursin("Safety Error", cb.error.msg)
+    @test occursin("Use of package manager ", cb.error.msg)
+
     # Evaluate inside a gensym'd module
     cb = AICode(; code = "a=1") |> eval!
     @test occursin("SafeCustomModule", string(cb.output))
@@ -249,6 +253,17 @@ end
         @test cb.success == true
         @test cb.stdout == "Hello\n"
         @test cb.output.a == 1
+    end
+
+    # Test auto-eval=false
+    let cb = AICode("""
+        println("Hello")
+        a=1
+        """; auto_eval = false)
+        # eval! is automatic
+        @test isnothing(cb.expression)
+        @test isnothing(cb.error)
+        @test cb.success == nothing
     end
 
     # From AI Message
