@@ -319,7 +319,8 @@ function extract_code_blocks(markdown_content::T) where {T <: AbstractString}
         block_positions)
 
     # Extract code blocks
-    code_blocks = SubString{T}[]
+    eltype_ = typeof(@view(markdown_content[begin:end]))
+    code_blocks = eltype_[]
     for (start_pos, end_pos) in filtered_positions
         code_block = markdown_content[(start_pos + length(start_delim_units)):(end_pos - 1)]
         # Also remove the julia prompt
