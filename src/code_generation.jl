@@ -199,6 +199,7 @@ function remove_julia_prompt(s::T) where {T <: AbstractString}
 end
 
 # escape dollar sign only if not preceeded by backslash already, ie, unescaped -- use negative lookbehind
+# Useful in cases where we have double nested interpolation, eg, string code -> has string literal -> function with interpolation inside it
 escape_interpolation(s::AbstractString) = replace(s, r"(?<!\\)\$" => String(['\\', '$']))
 
 """
