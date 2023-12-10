@@ -13,6 +13,7 @@ end
     include("messages.jl")
     include("extraction.jl")
     include("user_preferences.jl")
+    include("llm_interface.jl")
     include("llm_shared.jl")
     include("llm_openai.jl")
     include("templates.jl")
