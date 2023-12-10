@@ -85,7 +85,7 @@ end
 
 ## Dispatch into a default schema (can be set by Preferences.jl)
 # Since we load it as strings, we need to convert it to a symbol and instantiate it
-const PROMPT_SCHEMA::AbstractPromptSchema = @load_preference("PROMPT_SCHEMA",
+global PROMPT_SCHEMA::AbstractPromptSchema = @load_preference("PROMPT_SCHEMA",
     default="OpenAISchema") |> x -> getproperty(@__MODULE__, Symbol(x))()
 
 function aigenerate(prompt; model = MODEL_CHAT, kwargs...)
