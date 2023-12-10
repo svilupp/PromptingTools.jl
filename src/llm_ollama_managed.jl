@@ -106,7 +106,7 @@ end
 ## User-Facing API
 """
     aigenerate(prompt_schema::AbstractOllamaManagedSchema, prompt::ALLOWED_PROMPT_TYPE; verbose::Bool = true,
-        model::String = MODEL_CHAT,
+        api_key::String = "", model::String = MODEL_CHAT,
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         http_kwargs::NamedTuple = NamedTuple(), api_kwargs::NamedTuple = NamedTuple(),
@@ -181,28 +181,29 @@ Note: Managed Ollama currently supports at most 1 User Message and 1 System Mess
 """
 function aigenerate(prompt_schema::AbstractOllamaManagedSchema, prompt::ALLOWED_PROMPT_TYPE;
         verbose::Bool = true,
-        api_key::String = API_KEY,
+        api_key::String = "",
         model::String = MODEL_CHAT,
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         http_kwargs::NamedTuple = NamedTuple(), api_kwargs::NamedTuple = NamedTuple(),
         kwargs...)
     ##
-    global MODEL_ALIASES, MODEL_COSTS
+    global MODEL_ALIASES
     ## Find the unique ID for the model alias provided
     model_id = get(MODEL_ALIASES, model, model)
     conv_rendered = render(prompt_schema, prompt; conversation, kwargs...)
 
     if !dry_run
         time = @elapsed resp = ollama_api(prompt_schema, conv_rendered.prompt;
-            conv_rendered.system, endpoint = "generate", model, http_kwargs, api_kwargs...)
+            conv_rendered.system, endpoint = "generate", model_id, http_kwargs,
+            api_kwargs...)
         msg = AIMessage(; content = resp.response[:response] |> strip,
             status = Int(resp.status),
             tokens = (resp.response[:prompt_eval_count],
                 resp.response[:eval_count]),
             elapsed = time)
         ## Reporting
-        verbose && @info _report_stats(msg, model_id, MODEL_COSTS)
+        verbose && @info _report_stats(msg, model_id)
     else
         msg = nothing
     end
@@ -223,7 +224,7 @@ end
             doc_or_docs::Union{AbstractString, Vector{<:AbstractString}},
             postprocess::F = identity;
             verbose::Bool = true,
-            api_key::String = API_KEY,
+            api_key::String = "",
             model::String = MODEL_EMBEDDING,
             http_kwargs::NamedTuple = (retry_non_idempotent = true,
                                        retries = 5,
@@ -239,7 +240,7 @@ The `aiembed` function generates embeddings for the given input using a specifie
   so users should consider implementing an async version with with `Threads.@spawn`
 - `postprocess::F`: The post-processing function to apply to each embedding. Defaults to the identity function, but could be `LinearAlgebra.normalize`.
 - `verbose::Bool`: A flag indicating whether to print verbose information. Defaults to `true`.
-- `api_key::String`: The API key to use for the OpenAI API. Defaults to `API_KEY`.
+- `api_key::String`: The API key to use for the OpenAI API. Defaults to `""`.
 - `model::String`: The model to use for generating embeddings. Defaults to `MODEL_EMBEDDING`.
 - `http_kwargs::NamedTuple`: Additional keyword arguments for the HTTP request. Defaults to empty `NamedTuple`.
 - `api_kwargs::NamedTuple`: Additional keyword arguments for the Ollama API. Defaults to an empty `NamedTuple`.
@@ -295,34 +296,34 @@ msg.content # 4096-element Vector{Float64}
 function aiembed(prompt_schema::AbstractOllamaManagedSchema,
         doc::AbstractString,
         postprocess::F = identity; verbose::Bool = true,
-        api_key::String = API_KEY,
+        api_key::String = "",
         model::String = MODEL_EMBEDDING,
         http_kwargs::NamedTuple = NamedTuple(), api_kwargs::NamedTuple = NamedTuple(),
         kwargs...) where {F <: Function}
     ##
-    global MODEL_ALIASES, MODEL_COSTS
+    global MODEL_ALIASES
     ## Find the unique ID for the model alias provided
     model_id = get(MODEL_ALIASES, model, model)
     time = @elapsed resp = ollama_api(prompt_schema, doc;
-        endpoint = "embeddings", model, http_kwargs, api_kwargs...)
+        endpoint = "embeddings", model_id, http_kwargs, api_kwargs...)
     msg = DataMessage(;
         content = postprocess(resp.response[:embedding]),
         status = Int(resp.status),
         tokens = (0, 0), # token counts are not provided for embeddings
         elapsed = time)
     ## Reporting
-    verbose && @info _report_stats(msg, model_id, MODEL_COSTS)
+    verbose && @info _report_stats(msg, model_id)
 
     return msg
 end
 function aiembed(prompt_schema::AbstractOllamaManagedSchema,
         docs::Vector{<:AbstractString},
         postprocess::F = identity; verbose::Bool = true,
-        api_key::String = API_KEY,
+        api_key::String = "",
         model::String = MODEL_EMBEDDING,
         kwargs...) where {F <: Function}
     ##
-    global MODEL_ALIASES, MODEL_COSTS
+    global MODEL_ALIASES
     ## Find the unique ID for the model alias provided
     model_id = get(MODEL_ALIASES, model, model)
     ## Send each document individually (no parallelism)
@@ -341,7 +342,7 @@ function aiembed(prompt_schema::AbstractOllamaManagedSchema,
         tokens = (0, 0),# not tracked for embeddings in Ollama
         elapsed = sum(x -> x.elapsed, messages))
     ## Reporting
-    verbose && @info _report_stats(msg, model_id, MODEL_COSTS)
+    verbose && @info _report_stats(msg, model_id)
 
     return msg
 end

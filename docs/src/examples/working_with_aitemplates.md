@@ -37,14 +37,26 @@ msg = aigenerate(:JuliaExpertAsk; ask = "How do I add packages?")
 ````
 
 ````
-AIMessage("To add packages in Julia, you can use the built-in package manager called `Pkg`. Here are the steps:
+AIMessage("To add packages in Julia, you can use the `Pkg` module. Here are the steps:
 
-1. Open the Julia REPL (Read-Eval-Print Loop).
-2. Press the `]` key to enter the package manager mode.
-3. Use the `add` command followed by the name of the package you want to install. For example, to install the `DataFrames` package, type: `add DataFrames`.
-4. Press the `backspace` or `ctrl + C` key to exit the package manager mode and return to the REPL.
+1. Start Julia by running the Julia REPL (Read-Eval-Print Loop).
+2. Press the `]` key to enter the Pkg mode.
+3. To add a package, use the `add` command followed by the package name.
+4. Press the backspace key to exit Pkg mode and return to the Julia REPL.
 
-After following these steps, the specified package will be installed and available for use in your Julia environment.")
+For example, to add the `Example` package, you would enter:
+
+```julia
+]add Example
+```
+
+After the package is added, you can start using it in your Julia code by using the `using` keyword. For the `Example` package, you would add the following line to your code:
+
+```julia
+using Example
+```
+
+Note: The first time you add a package, Julia may take some time to download and compile the package and its dependencies.")
 ````
 
 You can see that it had a placeholder for the actual question (`ask`) that we provided as a keyword argument.
@@ -90,8 +102,8 @@ msgs = PT.render(AITemplate(:JuliaExpertAsk))
 
 ````
 2-element Vector{PromptingTools.AbstractChatMessage}:
- SystemMessage("You are a world-class Julia language programmer with the knowledge of the latest syntax. Your communication is brief and concise. You're precise and answer only when you're confident in the high quality of your answer.")
- UserMessage{String}("# Question\n\n{{ask}}", [:ask], :usermessage)
+ PromptingTools.SystemMessage("You are a world-class Julia language programmer with the knowledge of the latest syntax. Your communication is brief and concise. You're precise and answer only when you're confident in the high quality of your answer.")
+ PromptingTools.UserMessage{String}("# Question\n\n{{ask}}", [:ask], :usermessage)
 ````
 
 Now, you know exactly what's in the template!
@@ -107,8 +119,8 @@ tpl = [PT.SystemMessage("You are a world-class Julia language programmer with th
 
 ````
 2-element Vector{PromptingTools.AbstractChatMessage}:
- SystemMessage("You are a world-class Julia language programmer with the knowledge of the latest syntax. You're also a senior Data Scientist and proficient in data analysis in Julia. Your communication is brief and concise. You're precise and answer only when you're confident in the high quality of your answer.")
- UserMessage{String}("# Question\n\n{{ask}}", [:ask], :usermessage)
+ PromptingTools.SystemMessage("You are a world-class Julia language programmer with the knowledge of the latest syntax. You're also a senior Data Scientist and proficient in data analysis in Julia. Your communication is brief and concise. You're precise and answer only when you're confident in the high quality of your answer.")
+ PromptingTools.UserMessage{String}("# Question\n\n{{ask}}", [:ask], :usermessage)
 ````
 
 Templates are saved in the `templates` directory of the package. Name of the file will become the template name (eg, call `:JuliaDataExpertAsk`)

@@ -113,6 +113,10 @@ Base.isvalid(cb::AbstractCodeBlock) = cb.success == true
 function Base.copy(cb::AbstractCodeBlock)
     AICode(cb.code, cb.expression, cb.stdout, cb.output, cb.success, cb.error)
 end
+# equality check for testing, only equal if all fields are equal and type is the same
+function Base.var"=="(c1::T, c2::T) where {T <: AICode}
+    all([getproperty(c1, f) == getproperty(c2, f) for f in fieldnames(T)])
+end
 function Base.show(io::IO, cb::AICode)
     success_str = cb.success === nothing ? "N/A" : titlecase(string(cb.success))
     expression_str = cb.expression === nothing ? "N/A" : "True"
