@@ -188,7 +188,7 @@ function aigenerate(prompt_schema::AbstractOllamaManagedSchema, prompt::ALLOWED_
         http_kwargs::NamedTuple = NamedTuple(), api_kwargs::NamedTuple = NamedTuple(),
         kwargs...)
     ##
-    global MODEL_ALIASES, MODEL_COSTS
+    global MODEL_ALIASES
     ## Find the unique ID for the model alias provided
     model_id = get(MODEL_ALIASES, model, model)
     conv_rendered = render(prompt_schema, prompt; conversation, kwargs...)
@@ -202,7 +202,7 @@ function aigenerate(prompt_schema::AbstractOllamaManagedSchema, prompt::ALLOWED_
                 resp.response[:eval_count]),
             elapsed = time)
         ## Reporting
-        verbose && @info _report_stats(msg, model_id, MODEL_COSTS)
+        verbose && @info _report_stats(msg, model_id)
     else
         msg = nothing
     end
@@ -300,7 +300,7 @@ function aiembed(prompt_schema::AbstractOllamaManagedSchema,
         http_kwargs::NamedTuple = NamedTuple(), api_kwargs::NamedTuple = NamedTuple(),
         kwargs...) where {F <: Function}
     ##
-    global MODEL_ALIASES, MODEL_COSTS
+    global MODEL_ALIASES
     ## Find the unique ID for the model alias provided
     model_id = get(MODEL_ALIASES, model, model)
     time = @elapsed resp = ollama_api(prompt_schema, doc;
@@ -311,7 +311,7 @@ function aiembed(prompt_schema::AbstractOllamaManagedSchema,
         tokens = (0, 0), # token counts are not provided for embeddings
         elapsed = time)
     ## Reporting
-    verbose && @info _report_stats(msg, model_id, MODEL_COSTS)
+    verbose && @info _report_stats(msg, model_id)
 
     return msg
 end
@@ -322,7 +322,7 @@ function aiembed(prompt_schema::AbstractOllamaManagedSchema,
         model::String = MODEL_EMBEDDING,
         kwargs...) where {F <: Function}
     ##
-    global MODEL_ALIASES, MODEL_COSTS
+    global MODEL_ALIASES
     ## Find the unique ID for the model alias provided
     model_id = get(MODEL_ALIASES, model, model)
     ## Send each document individually (no parallelism)
@@ -341,7 +341,7 @@ function aiembed(prompt_schema::AbstractOllamaManagedSchema,
         tokens = (0, 0),# not tracked for embeddings in Ollama
         elapsed = sum(x -> x.elapsed, messages))
     ## Reporting
-    verbose && @info _report_stats(msg, model_id, MODEL_COSTS)
+    verbose && @info _report_stats(msg, model_id)
 
     return msg
 end

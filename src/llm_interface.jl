@@ -83,13 +83,32 @@ struct OllamaManagedSchema <: AbstractOllamaManagedSchema end
     inputs::Any = nothing
 end
 
-## Dispatch into default schema
-const PROMPT_SCHEMA::AbstractPromptSchema = OpenAISchema()
+## Dispatch into a default schema (can be set by Preferences.jl)
+const PROMPT_SCHEMA::AbstractPromptSchema = @load_preference("PROMPT_SCHEMA",
+    default=OpenAISchema())
 
-aigenerate(prompt; kwargs...) = aigenerate(PROMPT_SCHEMA, prompt; kwargs...)
-function aiembed(doc_or_docs, args...; kwargs...)
-    aiembed(PROMPT_SCHEMA, doc_or_docs, args...; kwargs...)
+function aigenerate(prompt; model, kwargs...)
+    global MODEL_REGISTRY
+    # first look up the model schema in the model registry; otherwise, use the default schema PROMPT_SCHEMA
+    schema = get(MODEL_REGISTRY, model, (; schema = PROMPT_SCHEMA)).schema
+    aigenerate(schema, prompt; model, kwargs...)
 end
-aiclassify(prompt; kwargs...) = aiclassify(PROMPT_SCHEMA, prompt; kwargs...)
-aiextract(prompt; kwargs...) = aiextract(PROMPT_SCHEMA, prompt; kwargs...)
-aiscan(prompt; kwargs...) = aiscan(PROMPT_SCHEMA, prompt; kwargs...)
+function aiembed(doc_or_docs, args...; kwargs...)
+    global MODEL_REGISTRY
+    schema = get(MODEL_REGISTRY, model, (; schema = PROMPT_SCHEMA)).schema
+    aiembed(schema, doc_or_docs, args...; kwargs...)
+end
+function aiclassify(prompt; kwargs...)
+    global MODEL_REGISTRY
+    schema = get(MODEL_REGISTRY, model, (; schema = PROMPT_SCHEMA)).schema
+    aiclassify(schema, prompt; kwargs...)
+end
+function aiextract(prompt; kwargs...)
+    global MODEL_REGISTRY
+    schema = get(MODEL_REGISTRY, model, (; schema = PROMPT_SCHEMA)).schema
+    aiextract(schema, prompt; kwargs...)
+end
+function aiscan(prompt; kwargs...)
+    schema = get(MODEL_REGISTRY, model, (; schema = PROMPT_SCHEMA)).schema
+    aiscan(schema, prompt; kwargs...)
+end

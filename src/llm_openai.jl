@@ -137,7 +137,7 @@ function aigenerate(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_
             readtimeout = 120), api_kwargs::NamedTuple = NamedTuple(),
         kwargs...)
     ##
-    global MODEL_ALIASES, MODEL_COSTS
+    global MODEL_ALIASES
     ## Find the unique ID for the model alias provided
     model_id = get(MODEL_ALIASES, model, model)
     conv_rendered = render(prompt_schema, prompt; conversation, kwargs...)
@@ -155,7 +155,7 @@ function aigenerate(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_
                 r.response[:usage][:completion_tokens]),
             elapsed = time)
         ## Reporting
-        verbose && @info _report_stats(msg, model_id, MODEL_COSTS)
+        verbose && @info _report_stats(msg, model_id)
     else
         msg = nothing
     end
@@ -249,7 +249,7 @@ function aiembed(prompt_schema::AbstractOpenAISchema,
             readtimeout = 120), api_kwargs::NamedTuple = NamedTuple(),
         kwargs...) where {F <: Function}
     ##
-    global MODEL_ALIASES, MODEL_COSTS
+    global MODEL_ALIASES
     ## Find the unique ID for the model alias provided
     model_id = get(MODEL_ALIASES, model, model)
 
@@ -264,7 +264,7 @@ function aiembed(prompt_schema::AbstractOpenAISchema,
         tokens = (r.response[:usage][:prompt_tokens], 0),
         elapsed = time)
     ## Reporting
-    verbose && @info _report_stats(msg, model_id, MODEL_COSTS)
+    verbose && @info _report_stats(msg, model_id)
 
     return msg
 end
@@ -464,7 +464,7 @@ function aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_T
             readtimeout = 120), api_kwargs::NamedTuple = NamedTuple(),
         kwargs...)
     ##
-    global MODEL_ALIASES, MODEL_COSTS
+    global MODEL_ALIASES
     ## Function calling specifics
     functions = [function_call_signature(return_type)]
     function_call = Dict(:name => only(functions)["name"])
@@ -495,7 +495,7 @@ function aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_T
                 r.response[:usage][:completion_tokens]),
             elapsed = time)
         ## Reporting
-        verbose && @info _report_stats(msg, model_id, MODEL_COSTS)
+        verbose && @info _report_stats(msg, model_id)
     else
         msg = nothing
     end
@@ -617,7 +617,7 @@ function aiscan(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE
             readtimeout = 120), api_kwargs::NamedTuple = (; max_tokens = 2500),
         kwargs...)
     ##
-    global MODEL_ALIASES, MODEL_COSTS
+    global MODEL_ALIASES
     ## Find the unique ID for the model alias provided
     model_id = get(MODEL_ALIASES, model, model)
     ## Vision-specific functionality
@@ -638,7 +638,7 @@ function aiscan(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE
                 r.response[:usage][:completion_tokens]),
             elapsed = time)
         ## Reporting
-        verbose && @info _report_stats(msg, model_id, MODEL_COSTS)
+        verbose && @info _report_stats(msg, model_id)
     else
         msg = nothing
     end
