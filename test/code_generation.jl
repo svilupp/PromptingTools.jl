@@ -349,3 +349,46 @@ b=2
         @test cb_copy !== cb
     end
 end
+
+@testset "AICode-methods" begin
+    ## SHOW
+    # Test with All Fields as `nothing`
+    code_block = AICode(""; auto_eval = false)
+    buffer = IOBuffer()
+    show(buffer, code_block)
+    output = String(take!(buffer))
+    @test output ==
+          "AICode(Success: N/A, Parsed: N/A, Evaluated: N/A, Error Caught: N/A, StdOut: N/A, Code: 1 Lines)"
+
+    # Test with All Fields Set
+    code_block = AICode("println(\"Hello World\")")
+    buffer = IOBuffer()
+    show(buffer, code_block)
+    output = String(take!(buffer))
+    @test output ==
+          "AICode(Success: True, Parsed: True, Evaluated: True, Error Caught: N/A, StdOut: True, Code: 1 Lines)"
+
+    # Test with error
+    code_block = AICode("error(\"Test Error\"))\nprint(\"\")")
+    buffer = IOBuffer()
+    show(buffer, code_block)
+    output = String(take!(buffer))
+    @test output ==
+          "AICode(Success: False, Parsed: True, Evaluated: N/A, Error Caught: True, StdOut: True, Code: 2 Lines)"
+
+    ## EQUALITY
+    # Test Comparing Two Identical Code Blocks -- if it's not safe_eval, it's not equal (gensym'd Safe module for output!)
+    code1 = AICode("print(\"Hello\")"; safe_eval = false)
+    code2 = AICode("print(\"Hello\")"; safe_eval = false)
+    @test code1 == code2
+
+    # Test Comparing Two Different Code Blocks
+    code1 = AICode("print(\"Hello\")")
+    code2 = AICode("print(\"World\")")
+    @test code1 != code2
+
+    # Different gensym!
+    code1 = AICode("print(\"Hello\")"; safe_eval = true)
+    code2 = AICode("print(\"Hello\")"; safe_eval = false)
+    @test code1 != code2
+end

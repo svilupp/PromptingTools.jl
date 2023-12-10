@@ -6,31 +6,11 @@ using OpenAI
 using JSON3
 using JSON3: StructTypes
 using HTTP
+import Preferences
+using Preferences: @load_preference, @set_preferences!
 using PrecompileTools
 
-# GLOBALS
-const MODEL_CHAT = "gpt-3.5-turbo"
-const MODEL_EMBEDDING = "text-embedding-ada-002"
-const API_KEY = get(ENV, "OPENAI_API_KEY", "")
-# Note: Disable this warning by setting OPENAI_API_KEY to anything
-isempty(API_KEY) &&
-    @warn "OPENAI_API_KEY environment variable not set! OpenAI models will not be available - set API key directly via `PromptingTools.API_KEY=<api-key>`!"
-
-# Cost per 1K tokens as of 7th November 2023
-const MODEL_COSTS = Dict("gpt-3.5-turbo" => (0.0015, 0.002),
-    "gpt-3.5-turbo-1106" => (0.001, 0.002),
-    "gpt-4" => (0.03, 0.06),
-    "gpt-4-1106-preview" => (0.01, 0.03),
-    "gpt-4-vision-preview" => (0.01, 0.03),
-    "text-embedding-ada-002" => (0.001, 0.0))
-const MODEL_ALIASES = Dict("gpt3" => "gpt-3.5-turbo",
-    "gpt4" => "gpt-4",
-    "gpt4v" => "gpt-4-vision-preview", # 4v is for "4 vision"
-    "gpt4t" => "gpt-4-1106-preview", # 4t is for "4 turbo"
-    "gpt3t" => "gpt-3.5-turbo-1106", # 3t is for "3 turbo"
-    "ada" => "text-embedding-ada-002")
-# the below default is defined in llm_interace.jl !
-# const PROMPT_SCHEMA = OpenAISchema()
+# GLOBALS and Preferences are managed by Preferences.jl - see src/preferences.jl for details
 
 "The following keywords are reserved for internal use in the `ai*` functions and cannot be used as placeholders in the Messages"
 const RESERVED_KWARGS = [
@@ -50,6 +30,9 @@ include("utils.jl")
 export aigenerate, aiembed, aiclassify, aiextract, aiscan
 # export render # for debugging only
 include("llm_interface.jl")
+
+# sets up the global registry of models and default model choices
+include("user_preferences.jl")
 
 ## Conversation history / Prompt elements
 export AIMessage

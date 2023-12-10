@@ -60,7 +60,7 @@ end
 """
     aigenerate(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE;
         verbose::Bool = true,
-        api_key::String = API_KEY,
+        api_key::String = OPENAI_API_KEY,
         model::String = MODEL_CHAT, return_all::Bool = false, dry_run::Bool = false,
         http_kwargs::NamedTuple = (retry_non_idempotent = true,
             retries = 5,
@@ -129,7 +129,7 @@ msg=aigenerate(conversation)
 """
 function aigenerate(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE;
         verbose::Bool = true,
-        api_key::String = API_KEY,
+        api_key::String = OPENAI_API_KEY,
         model::String = MODEL_CHAT, return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         http_kwargs::NamedTuple = (retry_non_idempotent = true,
@@ -137,7 +137,7 @@ function aigenerate(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_
             readtimeout = 120), api_kwargs::NamedTuple = NamedTuple(),
         kwargs...)
     ##
-    global MODEL_ALIASES, MODEL_COSTS
+    global MODEL_ALIASES
     ## Find the unique ID for the model alias provided
     model_id = get(MODEL_ALIASES, model, model)
     conv_rendered = render(prompt_schema, prompt; conversation, kwargs...)
@@ -155,7 +155,7 @@ function aigenerate(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_
                 r.response[:usage][:completion_tokens]),
             elapsed = time)
         ## Reporting
-        verbose && @info _report_stats(msg, model_id, MODEL_COSTS)
+        verbose && @info _report_stats(msg, model_id)
     else
         msg = nothing
     end
@@ -191,7 +191,7 @@ end
             doc_or_docs::Union{AbstractString, Vector{<:AbstractString}},
             postprocess::F = identity;
             verbose::Bool = true,
-            api_key::String = API_KEY,
+            api_key::String = OPENAI_API_KEY,
             model::String = MODEL_EMBEDDING, 
             http_kwargs::NamedTuple = (retry_non_idempotent = true,
                                        retries = 5,
@@ -206,7 +206,7 @@ The `aiembed` function generates embeddings for the given input using a specifie
 - `doc_or_docs::Union{AbstractString, Vector{<:AbstractString}}`: The document or list of documents to generate embeddings for.
 - `postprocess::F`: The post-processing function to apply to each embedding. Defaults to the identity function.
 - `verbose::Bool`: A flag indicating whether to print verbose information. Defaults to `true`.
-- `api_key::String`: The API key to use for the OpenAI API. Defaults to `API_KEY`.
+- `api_key::String`: The API key to use for the OpenAI API. Defaults to `OPENAI_API_KEY`.
 - `model::String`: The model to use for generating embeddings. Defaults to `MODEL_EMBEDDING`.
 - `http_kwargs::NamedTuple`: Additional keyword arguments for the HTTP request. Defaults to `(retry_non_idempotent = true, retries = 5, readtimeout = 120)`.
 - `api_kwargs::NamedTuple`: Additional keyword arguments for the OpenAI API. Defaults to an empty `NamedTuple`.
@@ -242,14 +242,14 @@ msg.content' * msg.content[:, 1] # [1.0, 0.787]
 function aiembed(prompt_schema::AbstractOpenAISchema,
         doc_or_docs::Union{AbstractString, Vector{<:AbstractString}},
         postprocess::F = identity; verbose::Bool = true,
-        api_key::String = API_KEY,
+        api_key::String = OPENAI_API_KEY,
         model::String = MODEL_EMBEDDING,
         http_kwargs::NamedTuple = (retry_non_idempotent = true,
             retries = 5,
             readtimeout = 120), api_kwargs::NamedTuple = NamedTuple(),
         kwargs...) where {F <: Function}
     ##
-    global MODEL_ALIASES, MODEL_COSTS
+    global MODEL_ALIASES
     ## Find the unique ID for the model alias provided
     model_id = get(MODEL_ALIASES, model, model)
 
@@ -264,7 +264,7 @@ function aiembed(prompt_schema::AbstractOpenAISchema,
         tokens = (r.response[:usage][:prompt_tokens], 0),
         elapsed = time)
     ## Reporting
-    verbose && @info _report_stats(msg, model_id, MODEL_COSTS)
+    verbose && @info _report_stats(msg, model_id)
 
     return msg
 end
@@ -455,7 +455,7 @@ Note that the error message refers to a giraffe not being a human,
 function aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE;
         return_type::Type,
         verbose::Bool = true,
-        api_key::String = API_KEY,
+        api_key::String = OPENAI_API_KEY,
         model::String = MODEL_CHAT,
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
@@ -464,7 +464,7 @@ function aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_T
             readtimeout = 120), api_kwargs::NamedTuple = NamedTuple(),
         kwargs...)
     ##
-    global MODEL_ALIASES, MODEL_COSTS
+    global MODEL_ALIASES
     ## Function calling specifics
     functions = [function_call_signature(return_type)]
     function_call = Dict(:name => only(functions)["name"])
@@ -495,7 +495,7 @@ function aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_T
                 r.response[:usage][:completion_tokens]),
             elapsed = time)
         ## Reporting
-        verbose && @info _report_stats(msg, model_id, MODEL_COSTS)
+        verbose && @info _report_stats(msg, model_id)
     else
         msg = nothing
     end
@@ -517,7 +517,7 @@ aiscan([prompt_schema::AbstractOpenAISchema,] prompt::ALLOWED_PROMPT_TYPE;
     image_path::Union{Nothing, AbstractString, Vector{<:AbstractString}} = nothing,
     image_detail::AbstractString = "auto",
     attach_to_latest::Bool = true,
-    verbose::Bool = true,
+    verbose::Bool = true, api_key::String = OPENAI_API_KEY,
         model::String = MODEL_CHAT,
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
@@ -608,7 +608,7 @@ function aiscan(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE
         image_detail::AbstractString = "auto",
         attach_to_latest::Bool = true,
         verbose::Bool = true,
-        api_key::String = API_KEY,
+        api_key::String = OPENAI_API_KEY,
         model::String = MODEL_CHAT,
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
@@ -617,7 +617,7 @@ function aiscan(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE
             readtimeout = 120), api_kwargs::NamedTuple = (; max_tokens = 2500),
         kwargs...)
     ##
-    global MODEL_ALIASES, MODEL_COSTS
+    global MODEL_ALIASES
     ## Find the unique ID for the model alias provided
     model_id = get(MODEL_ALIASES, model, model)
     ## Vision-specific functionality
@@ -638,7 +638,7 @@ function aiscan(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE
                 r.response[:usage][:completion_tokens]),
             elapsed = time)
         ## Reporting
-        verbose && @info _report_stats(msg, model_id, MODEL_COSTS)
+        verbose && @info _report_stats(msg, model_id)
     else
         msg = nothing
     end

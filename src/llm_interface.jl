@@ -83,13 +83,33 @@ struct OllamaManagedSchema <: AbstractOllamaManagedSchema end
     inputs::Any = nothing
 end
 
-## Dispatch into default schema
-const PROMPT_SCHEMA::AbstractPromptSchema = OpenAISchema()
+## Dispatch into a default schema (can be set by Preferences.jl)
+# Since we load it as strings, we need to convert it to a symbol and instantiate it
+global PROMPT_SCHEMA::AbstractPromptSchema = @load_preference("PROMPT_SCHEMA",
+    default="OpenAISchema") |> x -> getproperty(@__MODULE__, Symbol(x))()
 
-aigenerate(prompt; kwargs...) = aigenerate(PROMPT_SCHEMA, prompt; kwargs...)
-function aiembed(doc_or_docs, args...; kwargs...)
-    aiembed(PROMPT_SCHEMA, doc_or_docs, args...; kwargs...)
+function aigenerate(prompt; model = MODEL_CHAT, kwargs...)
+    global MODEL_REGISTRY
+    # first look up the model schema in the model registry; otherwise, use the default schema PROMPT_SCHEMA
+    schema = get(MODEL_REGISTRY, model, (; schema = PROMPT_SCHEMA)).schema
+    aigenerate(schema, prompt; model, kwargs...)
 end
-aiclassify(prompt; kwargs...) = aiclassify(PROMPT_SCHEMA, prompt; kwargs...)
-aiextract(prompt; kwargs...) = aiextract(PROMPT_SCHEMA, prompt; kwargs...)
-aiscan(prompt; kwargs...) = aiscan(PROMPT_SCHEMA, prompt; kwargs...)
+function aiembed(doc_or_docs, args...; model = MODEL_EMBEDDING, kwargs...)
+    global MODEL_REGISTRY
+    schema = get(MODEL_REGISTRY, model, (; schema = PROMPT_SCHEMA)).schema
+    aiembed(schema, doc_or_docs, args...; kwargs...)
+end
+function aiclassify(prompt; model = MODEL_CHAT, kwargs...)
+    global MODEL_REGISTRY
+    schema = get(MODEL_REGISTRY, model, (; schema = PROMPT_SCHEMA)).schema
+    aiclassify(schema, prompt; kwargs...)
+end
+function aiextract(prompt; model = MODEL_CHAT, kwargs...)
+    global MODEL_REGISTRY
+    schema = get(MODEL_REGISTRY, model, (; schema = PROMPT_SCHEMA)).schema
+    aiextract(schema, prompt; kwargs...)
+end
+function aiscan(prompt; model = MODEL_CHAT, kwargs...)
+    schema = get(MODEL_REGISTRY, model, (; schema = PROMPT_SCHEMA)).schema
+    aiscan(schema, prompt; kwargs...)
+end
