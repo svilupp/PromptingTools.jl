@@ -77,11 +77,11 @@ end
 
     # Returns a string with a cost
     expected_output = "Tokens: 6 @ Cost: \$0.007 in 5.0 seconds"
-    @test _report_stats(msg, model, Dict(model => (2, 1))) == expected_output
+    @test _report_stats(msg, model, 2e-3, 1e-3) == expected_output
 
     # Returns a string without cost when it's zero
     expected_output = "Tokens: 6 in 5.0 seconds"
-    @test _report_stats(msg, model, Dict(model => (0, 0))) == expected_output
+    @test _report_stats(msg, model, 0, 0) == expected_output
 end
 
 @testset "_string_to_vector" begin

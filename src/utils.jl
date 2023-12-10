@@ -110,9 +110,15 @@ function _extract_handlebar_variables(vect::Vector{Dict{String, <:AbstractString
 end
 
 # helper to produce summary message of how many tokens were used and for how much
-function _report_stats(msg, model::String, model_costs::AbstractDict = Dict())
-    token_prices = get(model_costs, model, (0.0, 0.0))
-    cost = sum(msg.tokens ./ 1000 .* token_prices)
+function _report_stats(msg,
+        model::String,
+        cost_of_token_prompt::Number = get(MODEL_REGISTRY,
+            model,
+            (; cost_of_token_prompt = 0.0)).cost_of_token_prompt,
+        cost_of_token_generation::Number = get(MODEL_REGISTRY, model,
+            (; cost_of_token_generation = 0.0)).cost_of_token_generation)
+    cost = (msg.tokens[1] * cost_of_token_prompt +
+            msg.tokens[2] * cost_of_token_generation)
     cost_str = iszero(cost) ? "" : " @ Cost: \$$(round(cost; digits=4))"
 
     return "Tokens: $(sum(msg.tokens))$(cost_str) in $(round(msg.elapsed;digits=1)) seconds"
