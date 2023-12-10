@@ -514,7 +514,7 @@ Resources:
 
 If you use a local model (eg, with Ollama), it's free. If you use any commercial APIs (eg, OpenAI), you will likely pay per "token" (a sub-word unit).
 
-For example, a simple request with a simple question and 1 sentence response in return (”Is statement XYZ a positive comment”) will cost you ~$0.0001 (ie, one hundredth of a cent)
+For example, a simple request with a simple question and 1 sentence response in return (”Is statement XYZ a positive comment”) will cost you ~$0.0001 (ie, one-hundredth of a cent)
 
 **Is it worth paying for?**
 
