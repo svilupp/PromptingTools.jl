@@ -33,8 +33,7 @@ using PromptingTools: UserMessage, UserMessageWithImages, DataMessage
             Dict(:message => Dict(:function_call => Dict(:arguments => "{\"content\": \"x\"}"))),
         ],
         :usage => Dict(:total_tokens => 3, :prompt_tokens => 2, :completion_tokens => 1))
-    response1[:choices][begin][:message][:function_call][:arguments] |>
-    x -> JSON3.read(x, MyType)
+
     schema = TestEchoOpenAISchema(; response = response1, status = 200)
     PromptingTools.PROMPT_SCHEMA = schema
     struct MyType
