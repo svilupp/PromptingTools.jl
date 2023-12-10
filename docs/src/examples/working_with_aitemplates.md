@@ -1,5 +1,5 @@
 ```@meta
-EditURL = "<unknown>/examples/working_with_aitemplates.jl"
+EditURL = "../../../examples/working_with_aitemplates.jl"
 ```
 
 # Using AITemplates

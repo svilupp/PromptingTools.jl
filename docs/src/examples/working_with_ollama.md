@@ -1,5 +1,5 @@
 ```@meta
-EditURL = "<unknown>/examples/working_with_ollama.jl"
+EditURL = "../../../examples/working_with_ollama.jl"
 ```
 
 # Local models with Ollama.ai
