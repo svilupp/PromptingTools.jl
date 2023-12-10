@@ -114,8 +114,7 @@ function Base.copy(cb::AbstractCodeBlock)
     AICode(cb.code, cb.expression, cb.stdout, cb.output, cb.success, cb.error)
 end
 # equality check for testing, only equal if all fields are equal and type is the same
-Base.var"=="(m1::AbstractCodeBlock, m2::AbstractCodeBlock) = false
-function Base.var"=="(c1::T, c2::T) where {T <: AbstractCodeBlock}
+function Base.var"=="(c1::T, c2::T) where {T <: AICode}
     all([getproperty(c1, f) == getproperty(c2, f) for f in fieldnames(T)])
 end
 function Base.show(io::IO, cb::AICode)
