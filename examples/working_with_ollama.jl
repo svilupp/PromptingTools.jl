@@ -7,28 +7,50 @@
 using PromptingTools
 const PT = PromptingTools
 
-# Notice the schema change! If you want this to be the new default, you need to change `PT.PROMPT_SCHEMA`
-schema = PT.OllamaManagedSchema()
-# You can choose models from https://ollama.ai/library - I prefer `openhermes2.5-mistral`
-model = "openhermes2.5-mistral"
+# There were are several models from https://ollama.ai/library that we have added to our `PT.MODEL_REGISTRY`, which means you don't need to worry about schema changes:
+# Eg, "llama2" or "openhermes2.5-mistral" (see `PT.list_registry()` and `PT.list_aliases()`)
+#
+# Note: You must download these models prior to using them with `ollama pull <model_name>` in your Terminal.
 
 # ## Text Generation with aigenerate
 
 # ### Simple message
-msg = aigenerate(schema, "Say hi!"; model)
+#
+# TL;DR if you use models in `PT.MODEL_REGISTRY`, you don't need to add `schema` as the first argument:
+#
+msg = aigenerate("Say hi!"; model = "llama2")
 
 # ### Standard string interpolation
+model = "openhermes2.5-mistral"
+
 a = 1
-msg = aigenerate(schema, "What is `$a+$a`?"; model)
+msg = aigenerate("What is `$a+$a`?"; model)
 
 name = "John"
-msg = aigenerate(schema, "Say hi to {{name}}."; name, model)
+msg = aigenerate("Say hi to {{name}}."; name, model)
 
 # ### Advanced Prompts
 conversation = [
     PT.SystemMessage("You're master Yoda from Star Wars trying to help the user become a Yedi."),
     PT.UserMessage("I have feelings for my iPhone. What should I do?")]
-msg = aigenerate(schema, conversation; model)
+msg = aigenerate(conversation; model)
+
+# ### Schema Changes / Custom models
+# If you're using some model that is not in the registry, you can either add it:
+PT.register_model!(;
+    name = "llama123",
+    schema = PT.OllamaManagedSchema(),
+    description = "Some model")
+PT.MODEL_ALIASES["l123"] = "llama123" # set an alias you like for it
+
+# OR define the schema explicitly (to avoid dispatch on global `PT.PROMPT_SCHEMA`):
+schema = PT.OllamaManagedSchema()
+aigenerate(schema, "Say hi!"; model = "llama2")
+
+# Note: If you only use Ollama, you can change the default schema to `PT.OllamaManagedSchema()` 
+# via `PT.set_preferences!("PROMPT_SCHEMA" => "OllamaManagedSchema", "MODEL_CHAT"=>"llama2")`
+#
+# Restart your session and run `aigenerate("Say hi!")` to test it.
 
 # ## Embeddings with aiembed
 

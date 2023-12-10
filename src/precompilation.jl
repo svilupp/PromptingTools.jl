@@ -1,5 +1,9 @@
 # Load templates
+load_template(joinpath(@__DIR__, "..", "templates", "general", "BlankSystemUser.json"))
 load_templates!();
+
+# Preferences
+@load_preference("MODEL_CHAT", default="x")
 
 # API Calls prep
 mock_response = Dict(:choices => [

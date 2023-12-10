@@ -546,10 +546,14 @@ A better way:
 - On a Mac, add the configuration line to your terminal's configuration file (eg, `~/.zshrc`). It will get automatically loaded every time you launch the terminal
 - On Windows, set it as a system variable in "Environment Variables" settings (see the Resources)
 
+We also support Preferences.jl, so you can simply run: `PromptingTools.set_preferences!("OPENAI_API_KEY"="your-api-key")` and it will be persisted across sessions. 
+To see the current preferences, run `PromptingTools.get_preferences("OPENAI_API_KEY")`.
+
+Be careful NOT TO COMMIT `LocalPreferences.toml` to GitHub, as it would show your API Key to the world!
+
 Resources: 
 - [OpenAI Guide](https://platform.openai.com/docs/quickstart?context=python)
 
-Note: In the future, we hope to add `Preferences.jl`-based workflow to set the API key and other preferences.
 
 ### Understanding the API Keyword Arguments in `aigenerate` (`api_kwargs`)
   

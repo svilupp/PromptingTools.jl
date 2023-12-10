@@ -5,15 +5,17 @@
     PREFERENCES
 
 You can set preferences for PromptingTools by setting environment variables (for `OPENAI_API_KEY` only) 
-    or by using the `@set_preferences!` macro (see `Preferences.jl`). 
+    or by using the `set_preferences!`.
     It will create a `LocalPreferences.toml` file in your current directory and will reload your prefences from there.
+
+Check your preferences by calling `get_preferences(key::String)`.
     
-If you can always check if a preference has been set by `@has_preference("<KEY>")` or directly get its value by `@load_preference("<KEY>")`.
-    
-# Available Preferences (for `@set_preferences!`)
+# Available Preferences (for `set_preferences!`)
 - `OPENAI_API_KEY`: The API key for the OpenAI API. See [OpenAI's documentation](https://platform.openai.com/docs/quickstart?context=python) for more information.
 - `MODEL_CHAT`: The default model to use for aigenerate and most ai* calls. See `MODEL_REGISTRY` for a list of available models or define your own.
 - `MODEL_EMBEDDING`: The default model to use for aiembed (embedding documents). See `MODEL_REGISTRY` for a list of available models or define your own.
+- `PROMPT_SCHEMA`: The default prompt schema to use for aigenerate and most ai* calls (if not specified in `MODEL_REGISTRY`). Set as a string, eg, `"OpenAISchema"`.
+    See `PROMPT_SCHEMA` for more information.
 - `MODEL_ALIASES`: A dictionary of model aliases (`alias => full_model_name`). Aliases are used to refer to models by their aliases instead of their full names to make it more convenient to use them.
     See `MODEL_ALIASES` for more information.
 
@@ -25,23 +27,81 @@ Define your `register_model!()` calls in your `startup.jl` file to make them ava
 
 Preferences.jl takes priority over ENV variables, so if you set a preference, it will override the ENV variable.
 
-WARNING: Never ever sync your `LocalPreferences.toml` file! It contains your API key and other sensitive information!!!
+WARNING: NEVER EVER sync your `LocalPreferences.toml` file! It contains your API key and other sensitive information!!!
 """
 const PREFERENCES = nothing
 
+"""
+    set_preferences!(pairs::Pair{String, <:Any}...)
+
+Set preferences for PromptingTools. See `?PREFERENCES` for more information. 
+
+See also: `get_preferences`
+
+# Example
+
+Change your API key and default model:
+```julia
+PromptingTools.set_preferences!("OPENAI_API_KEY" => "key1", "MODEL_CHAT" => "chat1")
+```
+"""
+function set_preferences!(pairs::Pair{String, <:Any}...)
+    allowed_preferences = [
+        "OPENAI_API_KEY",
+        "MODEL_CHAT",
+        "MODEL_EMBEDDING",
+        "MODEL_ALIASES",
+        "PROMPT_SCHEMA",
+    ]
+    for (key, value) in pairs
+        @assert key in allowed_preferences "Unknown preference '$key'! (Allowed preferences: $(join(allowed_preferences,", "))"
+        @set_preferences!(key=>value)
+        if key == "MODEL_ALIASES" || key == "PROMPT_SCHEMA"
+            # cannot change in the same session
+            continue
+        else
+            setproperty!(@__MODULE__, Symbol(key), value)
+        end
+    end
+    @info("Preferences set; restart your Julia session for this change to take effect!")
+end
+"""
+    get_preferences(key::String)
+
+Get preferences for PromptingTools. See `?PREFERENCES` for more information.
+
+See also: `set_preferences!`
+
+# Example
+```julia
+PromptingTools.get_preferences("MODEL_CHAT")
+```
+"""
+function get_preferences(key::String)
+    allowed_preferences = [
+        "OPENAI_API_KEY",
+        "MODEL_CHAT",
+        "MODEL_EMBEDDING",
+        "MODEL_ALIASES",
+        "PROMPT_SCHEMA",
+    ]
+    @assert key in allowed_preferences "Unknown preference '$key'! (Allowed preferences: $(join(allowed_preferences,", "))"
+    getproperty(@__MODULE__, Symbol(key))
+end
+
 ## Load up GLOBALS
 const MODEL_CHAT::String = @load_preference("MODEL_CHAT", default="gpt-3.5-turbo")
-const MODEL_EMBEDDING::String = @load_preference("MODEL_CHAT",
+const MODEL_EMBEDDING::String = @load_preference("MODEL_EMBEDDING",
     default="text-embedding-ada-002")
 # the prompt schema default is defined in llm_interace.jl !
 # const PROMPT_SCHEMA = OpenAISchema()
 
 # First, load from preferences, then from environment variables
-const API_KEY::String = @load_preference("OPENAI_API_KEY",
+const OPENAI_API_KEY::String = @load_preference("OPENAI_API_KEY",
     default=get(ENV, "OPENAI_API_KEY", ""))
 # Note: Disable this warning by setting OPENAI_API_KEY to anything
-isempty(API_KEY) &&
-    @warn "OPENAI_API_KEY environment variable not set! OpenAI models will not be available - set API key directly via `PromptingTools.API_KEY=<api-key>`!"
+isempty(OPENAI_API_KEY) &&
+    @warn "OPENAI_API_KEY variable not set! OpenAI models will not be available - set API key directly via `PromptingTools.OPENAI_API_KEY=<api-key>`!"
 
 ## Model registry
 # A dictionary of model names and their specs (ie, name, costs per token, etc.)
@@ -279,6 +339,11 @@ function Base.delete!(registry::ModelRegistry, key::String)
     haskey(registry.aliases, key) && delete!(registry.aliases, key)
     return registry
 end
+
+"Shows the list of models in the registry. Add more with `register_model!`."
+list_registry() = sort(collect(keys(MODEL_REGISTRY.registry)))
+"Shows the Dictionary of model aliases in the registry. Add more with `MODEL_ALIASES[alias] = model_name`."
+list_aliases() = MODEL_REGISTRY.aliases
 
 """
     MODEL_ALIASES

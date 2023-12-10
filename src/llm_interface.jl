@@ -84,31 +84,32 @@ struct OllamaManagedSchema <: AbstractOllamaManagedSchema end
 end
 
 ## Dispatch into a default schema (can be set by Preferences.jl)
+# Since we load it as strings, we need to convert it to a symbol and instantiate it
 const PROMPT_SCHEMA::AbstractPromptSchema = @load_preference("PROMPT_SCHEMA",
-    default=OpenAISchema())
+    default="OpenAISchema") |> x -> getproperty(@__MODULE__, Symbol(x))()
 
-function aigenerate(prompt; model, kwargs...)
+function aigenerate(prompt; model = MODEL_CHAT, kwargs...)
     global MODEL_REGISTRY
     # first look up the model schema in the model registry; otherwise, use the default schema PROMPT_SCHEMA
     schema = get(MODEL_REGISTRY, model, (; schema = PROMPT_SCHEMA)).schema
     aigenerate(schema, prompt; model, kwargs...)
 end
-function aiembed(doc_or_docs, args...; kwargs...)
+function aiembed(doc_or_docs, args...; model = MODEL_EMBEDDING, kwargs...)
     global MODEL_REGISTRY
     schema = get(MODEL_REGISTRY, model, (; schema = PROMPT_SCHEMA)).schema
     aiembed(schema, doc_or_docs, args...; kwargs...)
 end
-function aiclassify(prompt; kwargs...)
+function aiclassify(prompt; model = MODEL_CHAT, kwargs...)
     global MODEL_REGISTRY
     schema = get(MODEL_REGISTRY, model, (; schema = PROMPT_SCHEMA)).schema
     aiclassify(schema, prompt; kwargs...)
 end
-function aiextract(prompt; kwargs...)
+function aiextract(prompt; model = MODEL_CHAT, kwargs...)
     global MODEL_REGISTRY
     schema = get(MODEL_REGISTRY, model, (; schema = PROMPT_SCHEMA)).schema
     aiextract(schema, prompt; kwargs...)
 end
-function aiscan(prompt; kwargs...)
+function aiscan(prompt; model = MODEL_CHAT, kwargs...)
     schema = get(MODEL_REGISTRY, model, (; schema = PROMPT_SCHEMA)).schema
     aiscan(schema, prompt; kwargs...)
 end

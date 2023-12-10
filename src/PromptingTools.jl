@@ -6,7 +6,8 @@ using OpenAI
 using JSON3
 using JSON3: StructTypes
 using HTTP
-using Preferences
+import Preferences
+using Preferences: @load_preference, @set_preferences!
 using PrecompileTools
 
 # GLOBALS and Preferences are managed by Preferences.jl - see src/preferences.jl for details
