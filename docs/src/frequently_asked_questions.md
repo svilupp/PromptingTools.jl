@@ -55,7 +55,7 @@ Resources:
 
 If you use a local model (eg, with Ollama), it's free. If you use any commercial APIs (eg, OpenAI), you will likely pay per "token" (a sub-word unit).
 
-For example, a simple request with a simple question and 1 sentence response in return (”Is statement XYZ a positive comment”) will cost you ~$0.0001 (ie, one hundredth of a cent)
+For example, a simple request with a simple question and 1 sentence response in return (”Is statement XYZ a positive comment”) will cost you ~$0.0001 (ie, one-hundredth of a cent)
 
 **Is it worth paying for?**
 
@@ -90,7 +90,15 @@ A better way:
 Resources: 
 - [OpenAI Guide](https://platform.openai.com/docs/quickstart?context=python)
 
-Note: In the future, we hope to add `Preferences.jl`-based workflow to set the API key and other preferences.
+## Setting the API Key via Preferences.jl
+
+You can also set the API key in `LocalPreferences.toml`, so it persists across sessions and projects.
+
+Use: `PromptingTools.set_preferences!("OPENAI_API_KEY"="your-api-key")`
+
+To double-check, run `PromptingTools.get_preferences("OPENAI_API_KEY")` and you should see your key!
+
+See more detail in the `?PromptingTools.PREFERENCES` docstring.
 
 ## Understanding the API Keyword Arguments in `aigenerate` (`api_kwargs`)
   

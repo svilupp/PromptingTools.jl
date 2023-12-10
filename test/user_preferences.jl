@@ -1,6 +1,39 @@
 using PromptingTools: ModelSpec,
     register_model!, MODEL_REGISTRY, MODEL_ALIASES, ModelRegistry
-using PromptingTools: OpenAISchema, OllamaManagedSchema
+using PromptingTools: list_registry, list_aliases
+using PromptingTools: OpenAISchema, OllamaManagedSchema, set_preferences!, get_preferences
+
+@testset "set_preferences!" begin
+    # Remember old preferences
+    OLD_MODEL_CHAT = get_preferences("MODEL_CHAT")
+    OLD_MODEL_EMBEDDING = get_preferences("MODEL_EMBEDDING")
+    OLD_OPENAI_API_KEY = get_preferences("OPENAI_API_KEY")
+
+    # Test Setting Allowed Preferences
+    @testset "Allowed Preferences" for pref in [
+        "OPENAI_API_KEY",
+        "MODEL_CHAT",
+        "MODEL_EMBEDDING",
+    ]
+        set_preferences!(pref => "test_value")
+        @test get_preferences(pref) == "test_value"  # Assuming a get_preferences function exists
+        @test getproperty(PromptingTools, Symbol(pref)) == "test_value"  # Check if the module-level variable is updated
+    end
+
+    # Test Attempting to Set a Disallowed Preference
+    @test_throws AssertionError set_preferences!("UNKNOWN_PREF" => "value")
+    @test_throws AssertionError get_preferences("UNKNOWN_PREF")
+
+    # Test Setting Multiple Preferences at Once
+    set_preferences!("OPENAI_API_KEY" => "key1", "MODEL_CHAT" => "chat1")
+    @test get_preferences("OPENAI_API_KEY") == "key1"
+    @test get_preferences("MODEL_CHAT") == "chat1"
+
+    # Return back to previous state
+    set_preferences!("OPENAI_API_KEY" => OLD_OPENAI_API_KEY,
+        "MODEL_CHAT" => OLD_MODEL_CHAT,
+        "MODEL_EMBEDDING" => OLD_MODEL_EMBEDDING)
+end
 
 @testset "ModelSpec" begin
     # Test for Correct Initialization
@@ -88,4 +121,8 @@ end
 
     expected_output = "ModelRegistry with $(length(MODEL_REGISTRY.registry)) models and $(length(MODEL_REGISTRY.aliases)) aliases. See `?MODEL_REGISTRY` for more information."
     @test output == expected_output
+
+    # list functions
+    @test list_registry() == sort(collect(keys(MODEL_REGISTRY.registry)))
+    @test list_aliases() == MODEL_REGISTRY.aliases
 end
