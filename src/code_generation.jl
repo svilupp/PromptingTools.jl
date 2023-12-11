@@ -129,6 +129,26 @@ function Base.show(io::IO, cb::AICode)
         "AICode(Success: $success_str, Parsed: $expression_str, Evaluated: $output_str, Error Caught: $error_str, StdOut: $stdout_str, Code: $count_lines Lines)")
 end
 
+## Parsing error detection
+function isparsed(ex::Expr)
+    parse_error = Meta.isexpr(ex, :toplevel) && !isempty(ex.args) &&
+                  Meta.isexpr(ex.args[end], (:error, :incomplete))
+    return !parse_error
+end
+function isparsed(ex::Nothing)
+    return false
+end
+function isparseerror(err::Exception)
+    return err isa Base.Meta.ParseError ||
+           (err isa ErrorException && startswith(err.msg, "syntax:"))
+end
+function isparseerror(err::Nothing)
+    return false
+end
+function isparsed(cb::AICode)
+    return isparsed(cb.expression) && !isparseerror(cb.error)
+end
+
 ## Overload for AIMessage - simply extracts the code blocks and concatenates them
 function AICode(msg::AIMessage; kwargs...)
     code = extract_code_blocks(msg.content) |> Base.Fix2(join, "\n")
@@ -171,7 +191,7 @@ function detect_missing_packages(imports_required::AbstractVector{<:Symbol})
 end
 
 "Checks if a given string has a Julia prompt (`julia> `) at the beginning of a line."
-has_julia_prompt(s::T) where {T <: AbstractString} = occursin(r"^julia> "m, s)
+has_julia_prompt(s::T) where {T <: AbstractString} = occursin(r"(:?^julia> |^> )"m, s)
 
 """
     remove_julia_prompt(s::T) where {T<:AbstractString}
@@ -191,6 +211,10 @@ function remove_julia_prompt(s::T) where {T <: AbstractString}
             code_line = true
             # remove the prompt
             println(io, replace(line, "julia> " => ""))
+        elseif startswith(line, r"^> ")
+            code_line = true
+            # remove the prompt
+            println(io, replace(line, "> " => ""))
         elseif code_line && startswith(line, r"^ ")
             # continuation of the code line
             println(io, line)
@@ -429,6 +453,12 @@ function eval!(cb::AbstractCodeBlock;
                 (cb.error = ErrorException("Safety Error: Failed package import. Missing packages: $(join(string.(missing_packages),", ")). Please add them or disable the safety check (`safe_eval=false`)"))
             return cb
         end
+    end
+    ## Catch bad code extraction
+    if isempty(code)
+        cb.error = ErrorException("Parse Error: No code found!")
+        cb.success = false
+        return cb
     end
     ## Parse into an expression
     try
