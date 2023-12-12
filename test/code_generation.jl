@@ -1,5 +1,6 @@
 using PromptingTools: extract_julia_imports
-using PromptingTools: detect_pkg_operation, detect_missing_packages, extract_function_name
+using PromptingTools: detect_pkg_operation,
+    detect_missing_packages, extract_function_name, remove_unsafe_lines
 using PromptingTools: has_julia_prompt, remove_julia_prompt, extract_code_blocks, eval!
 using PromptingTools: escape_interpolation, find_subsequence_positions
 using PromptingTools: AICode, isparsed, isparseerror
@@ -29,6 +30,20 @@ end
     @test detect_pkg_operation("blabla Pkg.activate(\".\")") == true
     @test detect_pkg_operation("hello world;") == false
     @test detect_pkg_operation("import Pkg;") == false
+end
+
+@testset "remove_unsafe_lines" begin
+    @test remove_unsafe_lines("Pkg.activate(\".\")") == ""
+    @test remove_unsafe_lines("Pkg.add(\"SomePkg\")") == ""
+    s = """
+  a=1
+  Pkg.add("a")
+  b=2
+  Pkg.add("b")
+  using 12315456NotExisting
+  """
+    @test remove_unsafe_lines(s) == "a=1\nb=2\n"
+    @test remove_unsafe_lines("Nothing"; verbose = true) == "Nothing\n"
 end
 
 @testset "has_julia_prompt" begin
@@ -344,6 +359,22 @@ b=2
         @test cb.success == true
         @test cb.stdout == "hello\nworld\n"
         @test cb.output.b == 2
+    end
+    # skip_unsafe=true
+    s = """
+
+  """
+    let msg = AIMessage("""
+      ```julia
+      a=1
+      Pkg.add("a")
+      b=2
+      Pkg.add("b")
+      using 12315456NotExisting
+      ```
+      """)
+        cb = AICode(msg; skip_unsafe = true)
+        @test cb.code == "a=1\nb=2\n"
     end
 
     # Methods - copy

@@ -150,8 +150,12 @@ function isparsed(cb::AICode)
 end
 
 ## Overload for AIMessage - simply extracts the code blocks and concatenates them
-function AICode(msg::AIMessage; kwargs...)
+function AICode(msg::AIMessage;
+        verbose::Bool = false,
+        skip_unsafe::Bool = false,
+        kwargs...)
     code = extract_code_blocks(msg.content) |> Base.Fix2(join, "\n")
+    skip_unsafe && (code = remove_unsafe_lines(code; verbose))
     return AICode(code; kwargs...)
 end
 
@@ -181,6 +185,9 @@ end
 
 # Utility to pinpoint unavailable dependencies
 function detect_missing_packages(imports_required::AbstractVector{<:Symbol})
+    # shortcut if no packages are required
+    isempty(imports_required) && return false, Symbol[]
+    #
     available_packages = Base.loaded_modules |> values .|> Symbol
     missing_packages = filter(pkg -> !in(pkg, available_packages), imports_required)
     if length(missing_packages) > 0
@@ -188,6 +195,20 @@ function detect_missing_packages(imports_required::AbstractVector{<:Symbol})
     else
         return false, Symbol[]
     end
+end
+
+"Iterates over the lines of a string and removes those that contain a package operation or a missing import."
+function remove_unsafe_lines(code::AbstractString; verbose::Bool = false)
+    io = IOBuffer()
+    for line in readlines(IOBuffer(code))
+        if !detect_pkg_operation(line) &&
+           !detect_missing_packages(extract_julia_imports(line))[1]
+            println(io, line)
+        else
+            verbose && @info "Unsafe line removed: $line"
+        end
+    end
+    return String(take!(io))
 end
 
 "Checks if a given string has a Julia prompt (`julia> `) at the beginning of a line."
