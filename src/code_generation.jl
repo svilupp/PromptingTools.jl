@@ -119,7 +119,7 @@ function Base.var"=="(c1::T, c2::T) where {T <: AICode}
 end
 function Base.show(io::IO, cb::AICode)
     success_str = cb.success === nothing ? "N/A" : titlecase(string(cb.success))
-    expression_str = cb.expression === nothing ? "N/A" : "True"
+    expression_str = cb.expression === nothing ? "N/A" : titlecase(string(isparsed(cb)))
     stdout_str = cb.stdout === nothing ? "N/A" : "True"
     output_str = cb.output === nothing ? "N/A" : "True"
     error_str = cb.error === nothing ? "N/A" : "True"

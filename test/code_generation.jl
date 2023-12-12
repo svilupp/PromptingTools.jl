@@ -414,7 +414,7 @@ end
           "AICode(Success: True, Parsed: True, Evaluated: True, Error Caught: N/A, StdOut: True, Code: 1 Lines)"
 
     # Test with error
-    code_block = AICode("error(\"Test Error\"))\nprint(\"\")")
+    code_block = AICode("error(\"Test Error\")\nprint(\"\")")
     buffer = IOBuffer()
     show(buffer, code_block)
     output = String(take!(buffer))
