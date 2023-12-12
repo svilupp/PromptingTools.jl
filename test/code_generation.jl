@@ -1,7 +1,9 @@
 using PromptingTools: extract_julia_imports
-using PromptingTools: detect_pkg_operation, detect_missing_packages, extract_function_name
+using PromptingTools: detect_pkg_operation,
+    detect_missing_packages, extract_function_name, remove_unsafe_lines
 using PromptingTools: has_julia_prompt, remove_julia_prompt, extract_code_blocks, eval!
 using PromptingTools: escape_interpolation, find_subsequence_positions
+using PromptingTools: AICode, isparsed, isparseerror
 
 @testset "extract_imports tests" begin
     @test extract_julia_imports("using Test, LinearAlgebra") ==
@@ -30,12 +32,33 @@ end
     @test detect_pkg_operation("import Pkg;") == false
 end
 
+@testset "remove_unsafe_lines" begin
+    @test remove_unsafe_lines("Pkg.activate(\".\")") == ""
+    @test remove_unsafe_lines("Pkg.add(\"SomePkg\")") == ""
+    s = """
+  a=1
+  Pkg.add("a")
+  b=2
+  Pkg.add("b")
+  using 12315456NotExisting
+  """
+    @test remove_unsafe_lines(s) == "a=1\nb=2\n"
+    @test remove_unsafe_lines("Nothing"; verbose = true) == "Nothing\n"
+end
+
 @testset "has_julia_prompt" begin
     @test has_julia_prompt("julia> a=1")
+    @test has_julia_prompt("> a=1")
     @test has_julia_prompt("""
 # something else first
 julia> a=1
 """)
+    @test has_julia_prompt("""
+    > a=\"\"\"
+     hey
+     there
+     \"\"\"
+    """)
     @test !has_julia_prompt("""
     # something
     # new
@@ -45,6 +68,7 @@ end
 
 @testset "remove_julia_prompt" begin
     @test remove_julia_prompt("julia> a=1") == "a=1"
+    @test remove_julia_prompt("> a=1") == "a=1"
     @test remove_julia_prompt("""
 # something else first
 julia> a=1
@@ -281,8 +305,13 @@ end
     @test cb.output == 123
     @test a123 == 123
 
+    # Check that empty code is invalid
+    cb = AICode("")
+    @test !isvalid(cb)
+    @test cb.error isa Exception
+
     # Test prefix and suffix
-    cb = AICode(; code = "")
+    cb = AICode(; code = "x=1")
     eval!(cb; prefix = "a=1", suffix = "b=2")
     @test cb.output.a == 1
     @test cb.output.b == 2
@@ -331,6 +360,22 @@ b=2
         @test cb.stdout == "hello\nworld\n"
         @test cb.output.b == 2
     end
+    # skip_unsafe=true
+    s = """
+
+  """
+    let msg = AIMessage("""
+      ```julia
+      a=1
+      Pkg.add("a")
+      b=2
+      Pkg.add("b")
+      using 12315456NotExisting
+      ```
+      """)
+        cb = AICode(msg; skip_unsafe = true)
+        @test cb.code == "a=1\nb=2\n"
+    end
 
     # Methods - copy
     let msg = AIMessage("""
@@ -369,7 +414,7 @@ end
           "AICode(Success: True, Parsed: True, Evaluated: True, Error Caught: N/A, StdOut: True, Code: 1 Lines)"
 
     # Test with error
-    code_block = AICode("error(\"Test Error\"))\nprint(\"\")")
+    code_block = AICode("error(\"Test Error\")\nprint(\"\")")
     buffer = IOBuffer()
     show(buffer, code_block)
     output = String(take!(buffer))
@@ -391,4 +436,27 @@ end
     code1 = AICode("print(\"Hello\")"; safe_eval = true)
     code2 = AICode("print(\"Hello\")"; safe_eval = false)
     @test code1 != code2
+end
+@testset "isparsed, isparseerror" begin
+    ## isparsed
+    @test isparsed(:(x = 1)) == true
+    # parse an incomplete call
+    @test isparsed(Meta.parseall("(")) == false
+    # parse an error call
+    @test isparsed(Meta.parseall("+-+-+--+")) == false
+    # nothing
+    @test isparsed(nothing) == false
+    # Validate that we don't have false positives with error
+    @test isparsed(Meta.parseall("error(\"s\")")) == true
+
+    ## isparseerror
+    @test isparseerror(nothing) == false
+    @test isparseerror(ErrorException("syntax: unexpected \"(\" in argument list")) == true
+    @test isparseerror(Base.Meta.ParseError("xyz")) == true
+
+    # AICode
+    cb = AICode("(")
+    @test isparsed(cb) == false
+    cb = AICode("a+1")
+    @test isparsed(cb) == true
 end

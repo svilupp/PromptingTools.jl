@@ -119,7 +119,7 @@ function Base.var"=="(c1::T, c2::T) where {T <: AICode}
 end
 function Base.show(io::IO, cb::AICode)
     success_str = cb.success === nothing ? "N/A" : titlecase(string(cb.success))
-    expression_str = cb.expression === nothing ? "N/A" : "True"
+    expression_str = cb.expression === nothing ? "N/A" : titlecase(string(isparsed(cb)))
     stdout_str = cb.stdout === nothing ? "N/A" : "True"
     output_str = cb.output === nothing ? "N/A" : "True"
     error_str = cb.error === nothing ? "N/A" : "True"
@@ -129,9 +129,33 @@ function Base.show(io::IO, cb::AICode)
         "AICode(Success: $success_str, Parsed: $expression_str, Evaluated: $output_str, Error Caught: $error_str, StdOut: $stdout_str, Code: $count_lines Lines)")
 end
 
+## Parsing error detection
+function isparsed(ex::Expr)
+    parse_error = Meta.isexpr(ex, :toplevel) && !isempty(ex.args) &&
+                  Meta.isexpr(ex.args[end], (:error, :incomplete))
+    return !parse_error
+end
+function isparsed(ex::Nothing)
+    return false
+end
+function isparseerror(err::Exception)
+    return err isa Base.Meta.ParseError ||
+           (err isa ErrorException && startswith(err.msg, "syntax:"))
+end
+function isparseerror(err::Nothing)
+    return false
+end
+function isparsed(cb::AICode)
+    return isparsed(cb.expression) && !isparseerror(cb.error)
+end
+
 ## Overload for AIMessage - simply extracts the code blocks and concatenates them
-function AICode(msg::AIMessage; kwargs...)
+function AICode(msg::AIMessage;
+        verbose::Bool = false,
+        skip_unsafe::Bool = false,
+        kwargs...)
     code = extract_code_blocks(msg.content) |> Base.Fix2(join, "\n")
+    skip_unsafe && (code = remove_unsafe_lines(code; verbose))
     return AICode(code; kwargs...)
 end
 
@@ -161,6 +185,9 @@ end
 
 # Utility to pinpoint unavailable dependencies
 function detect_missing_packages(imports_required::AbstractVector{<:Symbol})
+    # shortcut if no packages are required
+    isempty(imports_required) && return false, Symbol[]
+    #
     available_packages = Base.loaded_modules |> values .|> Symbol
     missing_packages = filter(pkg -> !in(pkg, available_packages), imports_required)
     if length(missing_packages) > 0
@@ -170,8 +197,22 @@ function detect_missing_packages(imports_required::AbstractVector{<:Symbol})
     end
 end
 
+"Iterates over the lines of a string and removes those that contain a package operation or a missing import."
+function remove_unsafe_lines(code::AbstractString; verbose::Bool = false)
+    io = IOBuffer()
+    for line in readlines(IOBuffer(code))
+        if !detect_pkg_operation(line) &&
+           !detect_missing_packages(extract_julia_imports(line))[1]
+            println(io, line)
+        else
+            verbose && @info "Unsafe line removed: $line"
+        end
+    end
+    return String(take!(io))
+end
+
 "Checks if a given string has a Julia prompt (`julia> `) at the beginning of a line."
-has_julia_prompt(s::T) where {T <: AbstractString} = occursin(r"^julia> "m, s)
+has_julia_prompt(s::T) where {T <: AbstractString} = occursin(r"(:?^julia> |^> )"m, s)
 
 """
     remove_julia_prompt(s::T) where {T<:AbstractString}
@@ -191,6 +232,10 @@ function remove_julia_prompt(s::T) where {T <: AbstractString}
             code_line = true
             # remove the prompt
             println(io, replace(line, "julia> " => ""))
+        elseif startswith(line, r"^> ")
+            code_line = true
+            # remove the prompt
+            println(io, replace(line, "> " => ""))
         elseif code_line && startswith(line, r"^ ")
             # continuation of the code line
             println(io, line)
@@ -429,6 +474,12 @@ function eval!(cb::AbstractCodeBlock;
                 (cb.error = ErrorException("Safety Error: Failed package import. Missing packages: $(join(string.(missing_packages),", ")). Please add them or disable the safety check (`safe_eval=false`)"))
             return cb
         end
+    end
+    ## Catch bad code extraction
+    if isempty(code)
+        cb.error = ErrorException("Parse Error: No code found!")
+        cb.success = false
+        return cb
     end
     ## Parse into an expression
     try
