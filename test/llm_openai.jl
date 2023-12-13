@@ -179,7 +179,8 @@ end
 
 @testset "OpenAI.create_chat" begin
     # Test CustomOpenAISchema() with a mock server
-    echo_server = HTTP.serve!(8081) do req
+    PORT = rand(1000:2000)
+    echo_server = HTTP.serve!(PORT) do req
         content = JSON3.read(req.body)
         user_msg = last(content[:messages])
         response = Dict(:choices => [Dict(:message => user_msg)],
@@ -194,9 +195,33 @@ end
     msg = aigenerate(CustomOpenAISchema(),
         prompt;
         model = "my_model",
-        api_kwargs = (; url = "http://localhost:8081"),
+        api_kwargs = (; url = "http://localhost:$(PORT)"),
         return_all = false)
     @test msg.content == prompt
+    @test msg.tokens == (length(prompt), 0)
+
+    # clean up
+    close(echo_server)
+end
+@testset "OpenAI.create_embeddings" begin
+    # Test CustomOpenAISchema() with a mock server
+    PORT = rand(1000:2000)
+    echo_server = HTTP.serve!(PORT) do req
+        content = JSON3.read(req.body)
+        response = Dict(:data => [Dict(:embedding => ones(128))],
+            :usage => Dict(:total_tokens => length(content[:input]),
+                :prompt_tokens => length(content[:input]),
+                :completion_tokens => 0))
+        return HTTP.Response(200, JSON3.write(response))
+    end
+
+    prompt = "Embed me!!"
+    msg = aiembed(CustomOpenAISchema(),
+        prompt;
+        model = "my_model",
+        api_kwargs = (; url = "http://localhost:$(PORT)"),
+        return_all = false)
+    @test msg.content == ones(128)
     @test msg.tokens == (length(prompt), 0)
 
     # clean up
