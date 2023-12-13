@@ -303,7 +303,8 @@ It all just works, because we have registered the models in the `PromptingTools.
 Under the hood, we use a dedicated schema `MistralOpenAISchema` that leverages most of the OpenAI-specific code base, so you can always provide that explicitly as the first argument:
 
 ```julia
-msg = aigenerate(MistralOpenAISchema(), "Say Hi!"; model="mistral-tiny", api_key=ENV["MISTRALAI_API_KEY"])
+const PT = PromptingTools
+msg = aigenerate(PT.MistralOpenAISchema(), "Say Hi!"; model="mistral-tiny", api_key=ENV["MISTRALAI_API_KEY"])
 ```
 As you can see, we can load your API key either from the ENV or via the Preferences.jl mechanism (see `?PREFERENCES` for more information).
 
@@ -314,7 +315,7 @@ As long as they are compatible with the OpenAI API (eg, sending `messages` with 
 # Set your API key and the necessary base URL for the API
 api_key = "..."
 prompt = "Say hi!"
-msg = aigenerate(CustomOpenAISchema(), prompt; model="my_model", api_key, api_kwargs=(; url="http://localhost:8081"))
+msg = aigenerate(PT.CustomOpenAISchema(), prompt; model="my_model", api_key, api_kwargs=(; url="http://localhost:8081"))
 ```
 
 As you can see, it also works for any local models that you might have running on your computer!
