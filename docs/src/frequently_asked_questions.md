@@ -70,6 +70,8 @@ Resources:
 
 ## Configuring the Environment Variable for API Key
 
+This is a guide for OpenAI's API key, but it works for any other API key you might need (eg, `MISTRALAI_API_KEY` for MistralAI API).
+
 To use the OpenAI API with PromptingTools.jl, set your API key as an environment variable:
 
 ```julia

@@ -146,6 +146,61 @@ function OpenAI.create_chat(schema::MistralOpenAISchema,
     OpenAI.create_chat(provider, model, conversation; kwargs...)
 end
 
+# Extend OpenAI create_embeddings to allow for testing
+function OpenAI.create_embeddings(schema::AbstractOpenAISchema,
+        api_key::AbstractString,
+        docs,
+        model::AbstractString;
+        kwargs...)
+    OpenAI.create_embeddings(api_key, docs, model; kwargs...)
+end
+function OpenAI.create_embeddings(schema::TestEchoOpenAISchema, api_key::AbstractString,
+        docs,
+        model::AbstractString; kwargs...)
+    schema.model_id = model
+    schema.inputs = docs
+    return schema
+end
+function OpenAI.create_embeddings(schema::CustomOpenAISchema,
+        api_key::AbstractString,
+        docs,
+        model::AbstractString;
+        url::String = "http://localhost:8080",
+        kwargs...)
+    # Build the corresponding provider object
+    # Create chat will automatically pass our data to endpoint `/embeddings`
+    provider = CustomProvider(; api_key, base_url = url)
+    OpenAI.create_embeddings(provider, docs, model; kwargs...)
+end
+function OpenAI.create_embeddings(schema::MistralOpenAISchema,
+        api_key::AbstractString,
+        docs,
+        model::AbstractString;
+        url::String = "https://api.mistral.ai/v1",
+        kwargs...)
+    # Build the corresponding provider object
+    # try to override provided api_key because the default is OpenAI key
+    provider = CustomProvider(;
+        api_key = isempty(MISTRALAI_API_KEY) ? api_key : MISTRALAI_API_KEY,
+        base_url = url)
+    OpenAI.create_embeddings(provider, docs, model; kwargs...)
+end
+
+## Temporary fix -- it will be moved upstream
+function OpenAI.create_embeddings(provider::AbstractCustomProvider,
+        input,
+        model_id::String = OpenAI.DEFAULT_EMBEDDING_MODEL_ID;
+        http_kwargs::NamedTuple = NamedTuple(),
+        kwargs...)
+    return OpenAI.openai_request("embeddings",
+        provider;
+        method = "POST",
+        http_kwargs = http_kwargs,
+        model = model_id,
+        input,
+        kwargs...)
+end
+
 ## User-Facing API
 """
     aigenerate(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE;
@@ -342,21 +397,6 @@ function aiembed(prompt_schema::AbstractOpenAISchema,
     verbose && @info _report_stats(msg, model_id)
 
     return msg
-end
-# Extend OpenAI create_embeddings to allow for testing
-function OpenAI.create_embeddings(schema::AbstractOpenAISchema,
-        api_key::AbstractString,
-        docs,
-        model::AbstractString;
-        kwargs...)
-    OpenAI.create_embeddings(api_key, docs, model; kwargs...)
-end
-function OpenAI.create_embeddings(schema::TestEchoOpenAISchema, api_key::AbstractString,
-        docs,
-        model::AbstractString; kwargs...)
-    schema.model_id = model
-    schema.inputs = docs
-    return schema
 end
 
 """
