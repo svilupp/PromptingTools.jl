@@ -1,9 +1,64 @@
 using PromptingTools: extract_julia_imports
 using PromptingTools: detect_pkg_operation,
     detect_missing_packages, extract_function_name, remove_unsafe_lines
-using PromptingTools: has_julia_prompt, remove_julia_prompt, extract_code_blocks, eval!
+using PromptingTools: has_julia_prompt,
+    remove_julia_prompt, extract_code_blocks, extract_code_blocks_fallback, eval!
 using PromptingTools: escape_interpolation, find_subsequence_positions
-using PromptingTools: AICode, isparsed, isparseerror
+using PromptingTools: AICode, isparsed, isparseerror, is_julia_code, is_julia_expr
+
+@testset "is_julia_expr" begin
+    # Valid Julia Expressions
+    @test is_julia_expr(:(x = 1)) == true
+    @test is_julia_expr(:(x === y)) == true
+    @test is_julia_expr(:(for i in 1:10
+        println(i)
+    end)) == true
+    @test is_julia_expr(:(function foo()
+        return 42
+    end)) == true
+    @test is_julia_expr(:(if x > 0
+        println("positive")
+    end)) == true
+
+    # Invalid Expressions
+    @test is_julia_expr(:(12345)) == false
+
+    # Nested Expressions
+    @test is_julia_expr(:(begin
+        x = 1
+        y = 2
+    end)) == true
+
+    # Non-Expr Types
+    @test is_julia_expr(42) == false
+    @test is_julia_expr("string") == false
+    @test is_julia_expr([1, 2, 3]) == false
+end
+
+@testset "is_julia_code" begin
+
+    # Valid Julia Code
+    @test is_julia_code("x = 1 + 2") == true
+    @test is_julia_code("println(\"Hello, world!\")") == true
+    @test is_julia_code("function foo()\nreturn 42\nend") == true
+
+    # Invalid Julia Code
+    @test is_julia_code("x ==== y") == false
+
+    # Empty String
+    @test is_julia_code("") == false
+
+    # Non-Code Strings
+    @test is_julia_code("This is a plain text, not a code.") == false
+
+    # Complex Julia Expressions
+    @test is_julia_code("for i in 1:10\nprintln(i)\nend") == true
+    @test is_julia_code("if x > 0\nprintln(\"positive\")\nelse\nprintln(\"non-positive\")\nend") ==
+          true
+
+    # Invalid Syntax
+    @test is_julia_code("function foo() return 42") == false  # Missing 'end' keyword
+end
 
 @testset "extract_imports tests" begin
     @test extract_julia_imports("using Test, LinearAlgebra") ==
@@ -12,6 +67,8 @@ using PromptingTools: AICode, isparsed, isparseerror
           Symbol.(["Test", "ABC", "DEF", "GEM"])
     @test extract_julia_imports("import PackageA.PackageB: funcA\nimport PackageC") ==
           Symbol.(["PackageA.PackageB", "PackageC"])
+    @test extract_julia_imports("using Base.Threads\nusing Main.MyPkg") ==
+          Symbol[]
 end
 
 @testset "detect_missing_packages" begin
@@ -193,6 +250,32 @@ end
           SubString{String}["# Outer Julia code block\n\n# An example of a nested Julia code block in markdown\n\"\"\"\n```julia\nx = 5\nprintln(x)\n```\n\"\"\"\n\ny = 10\nprintln(y)"]
 end
 
+@testset "extract_code_blocks_fallback" begin
+
+    # Basic Functionality Test
+    @test extract_code_blocks_fallback("```\ncode block\n```") == ["code block"]
+
+    # No Code Blocks Test
+    @test isempty(extract_code_blocks_fallback("Some text without code blocks"))
+
+    # Adjacent Code Blocks Test
+    @test extract_code_blocks_fallback("```code1``` ```code2```") == ["code1", "", "code2"]
+
+    # Special Characters Test
+    @test extract_code_blocks_fallback("```\n<>&\"'\n```") == ["<>&\"'"]
+
+    # Large Input Test
+    large_input = "```" * repeat("large code block\n", 10) * "```"
+    @test extract_code_blocks_fallback(large_input) ==
+          [strip(repeat("large code block\n", 10))]
+
+    # Empty String Test
+    @test isempty(extract_code_blocks_fallback(""))
+
+    # Different Delimiter Test
+    @test extract_code_blocks_fallback("~~~\ncode block\n~~~", "~~~") == ["code block"]
+end
+
 @testset "extract_function_name" begin
     # Test 1: Test an explicit function declaration
     @test extract_function_name("function testFunction1()\nend") == "testFunction1"
@@ -360,10 +443,26 @@ b=2
         @test cb.stdout == "hello\nworld\n"
         @test cb.output.b == 2
     end
+    # Fallback extraction method
+    let msg = AIMessage("""
+```
+println(\"hello\")
+```
+Some text
+```
+println(\"world\")
+b=2
+```
+""")
+        cb = AICode(msg)
+        @test !isnothing(cb.expression)
+        @test isnothing(cb.error)
+        @test cb.success == true
+        @test cb.stdout == "hello\nworld\n"
+        @test cb.output.b == 2
+    end
     # skip_unsafe=true
-    s = """
 
-  """
     let msg = AIMessage("""
       ```julia
       a=1
