@@ -12,6 +12,7 @@ Check your preferences by calling `get_preferences(key::String)`.
     
 # Available Preferences (for `set_preferences!`)
 - `OPENAI_API_KEY`: The API key for the OpenAI API. See [OpenAI's documentation](https://platform.openai.com/docs/quickstart?context=python) for more information.
+- `MISTRALAI_API_KEY`: The API key for the Mistral AI API. See [Mistral AI's documentation](https://docs.mistral.ai/) for more information.
 - `MODEL_CHAT`: The default model to use for aigenerate and most ai* calls. See `MODEL_REGISTRY` for a list of available models or define your own.
 - `MODEL_EMBEDDING`: The default model to use for aiembed (embedding documents). See `MODEL_REGISTRY` for a list of available models or define your own.
 - `PROMPT_SCHEMA`: The default prompt schema to use for aigenerate and most ai* calls (if not specified in `MODEL_REGISTRY`). Set as a string, eg, `"OpenAISchema"`.
@@ -24,6 +25,7 @@ Define your `register_model!()` calls in your `startup.jl` file to make them ava
 
 # Available ENV Variables
 - `OPENAI_API_KEY`: The API key for the OpenAI API. 
+- `MISTRALAI_API_KEY`: The API key for the Mistral AI API.
 
 Preferences.jl takes priority over ENV variables, so if you set a preference, it will override the ENV variable.
 
@@ -47,6 +49,7 @@ PromptingTools.set_preferences!("OPENAI_API_KEY" => "key1", "MODEL_CHAT" => "cha
 """
 function set_preferences!(pairs::Pair{String, <:Any}...)
     allowed_preferences = [
+        "MISTRALAI_API_KEY",
         "OPENAI_API_KEY",
         "MODEL_CHAT",
         "MODEL_EMBEDDING",
@@ -79,6 +82,7 @@ PromptingTools.get_preferences("MODEL_CHAT")
 """
 function get_preferences(key::String)
     allowed_preferences = [
+        "MISTRALAI_API_KEY",
         "OPENAI_API_KEY",
         "MODEL_CHAT",
         "MODEL_EMBEDDING",
@@ -98,10 +102,13 @@ const MODEL_EMBEDDING::String = @load_preference("MODEL_EMBEDDING",
 
 # First, load from preferences, then from environment variables
 const OPENAI_API_KEY::String = @load_preference("OPENAI_API_KEY",
-    default=get(ENV, "OPENAI_API_KEY", ""))
+    default=get(ENV, "OPENAI_API_KEY", ""));
 # Note: Disable this warning by setting OPENAI_API_KEY to anything
 isempty(OPENAI_API_KEY) &&
     @warn "OPENAI_API_KEY variable not set! OpenAI models will not be available - set API key directly via `PromptingTools.OPENAI_API_KEY=<api-key>`!"
+
+const MISTRALAI_API_KEY::String = @load_preference("MISTRALAI_API_KEY",
+    default=get(ENV, "MISTRALAI_API_KEY", ""));
 
 ## Model registry
 # A dictionary of model names and their specs (ie, name, costs per token, etc.)
@@ -261,7 +268,27 @@ registry = Dict{String, ModelSpec}("gpt-3.5-turbo" => ModelSpec("gpt-3.5-turbo",
         OllamaManagedSchema(),
         0.0,
         0.0,
-        "Yi is a 34B parameter model finetuned by X on top of base model from Starling AI."))
+        "Yi is a 34B parameter model finetuned by X on top of base model from Starling AI."),
+    "mistral-tiny" => ModelSpec("mistral-tiny",
+        MistralOpenAISchema(),
+        1.4e-7,
+        4.53e-7,
+        "Mistral AI's hosted version of Mistral-7B-v0.2. Great for simple tasks."),
+    "mistral-small" => ModelSpec("mistral-small",
+        MistralOpenAISchema(),
+        6.47e-7,
+        1.94e-6,
+        "Mistral AI's hosted version of Mixtral-8x7B-v0.1. Good for more complicated tasks."),
+    "mistral-medium" => ModelSpec("mistral-medium",
+        MistralOpenAISchema(),
+        2.7e-6,
+        8.09e-6,
+        "Mistral AI's hosted version of their best model available. Details unknown."),
+    "mistral-embed" => ModelSpec("mistral-embed",
+        MistralOpenAISchema(),
+        1.08e-7,
+        0.0,
+        "Mistral AI's hosted model for embeddings."))
 
 ### Model Registry Structure
 @kwdef mutable struct ModelRegistry

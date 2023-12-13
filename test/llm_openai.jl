@@ -1,6 +1,7 @@
 using PromptingTools: TestEchoOpenAISchema, render, OpenAISchema
 using PromptingTools: AIMessage, SystemMessage, AbstractMessage
 using PromptingTools: UserMessage, UserMessageWithImages, DataMessage
+using PromptingTools: CustomProvider, CustomOpenAISchema, MistralOpenAISchema
 
 @testset "render-OpenAI" begin
     schema = OpenAISchema()
@@ -169,6 +170,39 @@ using PromptingTools: UserMessage, UserMessageWithImages, DataMessage
           nothing
 end
 
+@testset "OpenAI.build_url,OpenAI.auth_header" begin
+    provider = CustomProvider(; base_url = "http://localhost:8082", api_version = "xyz")
+    @test OpenAI.build_url(provider, "endpoint1") == "http://localhost:8082/endpoint1"
+    @test OpenAI.auth_header(provider, "ABC") ==
+          ["Authorization" => "Bearer ABC", "Content-Type" => "application/json"]
+end
+
+@testset "OpenAI.create_chat" begin
+    # Test CustomOpenAISchema() with a mock server
+    echo_server = HTTP.serve!(8081) do req
+        content = JSON3.read(req.body)
+        user_msg = last(content[:messages])
+        response = Dict(:choices => [Dict(:message => user_msg)],
+            :model => content[:model],
+            :usage => Dict(:total_tokens => length(user_msg[:content]),
+                :prompt_tokens => length(user_msg[:content]),
+                :completion_tokens => 0))
+        return HTTP.Response(200, JSON3.write(response))
+    end
+
+    prompt = "Say Hi!"
+    msg = aigenerate(CustomOpenAISchema(),
+        prompt;
+        model = "my_model",
+        api_kwargs = (; url = "http://localhost:8081"),
+        return_all = false)
+    @test msg.content == prompt
+    @test msg.tokens == (length(prompt), 0)
+
+    # clean up
+    close(echo_server)
+end
+
 @testset "aigenerate-OpenAI" begin
     # corresponds to OpenAI API v1
     response = Dict(:choices => [Dict(:message => Dict(:content => "Hello!"))],
@@ -176,7 +210,7 @@ end
 
     # Test the monkey patch
     schema = TestEchoOpenAISchema(; response, status = 200)
-    msg = PT.OpenAI.create_chat(schema, "", "", "Hello")
+    msg = OpenAI.create_chat(schema, "", "", "Hello")
     @test msg isa TestEchoOpenAISchema
 
     # Real generation API

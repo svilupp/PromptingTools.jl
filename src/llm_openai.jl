@@ -56,6 +56,96 @@ function render(schema::AbstractOpenAISchema,
     return conversation
 end
 
+## OpenAI.jl back-end
+## Types
+# "Providers" are a way to use other APIs that are compatible with OpenAI API specs, eg, Azure and mamy more
+# Define our sub-type to distinguish it from other OpenAI.jl providers
+abstract type AbstractCustomProvider <: OpenAI.AbstractOpenAIProvider end
+Base.@kwdef struct CustomProvider <: AbstractCustomProvider
+    api_key::String = ""
+    base_url::String = "http://localhost:8080"
+    api_version::String = ""
+end
+function OpenAI.build_url(provider::AbstractCustomProvider, api::AbstractString)
+    string(provider.base_url, "/", api)
+end
+function OpenAI.auth_header(provider::AbstractCustomProvider, api_key::AbstractString)
+    OpenAI.auth_header(OpenAI.OpenAIProvider(provider.api_key,
+            provider.base_url,
+            provider.api_version),
+        api_key)
+end
+## Extend OpenAI create_chat to allow for testing/debugging
+# Default passthrough
+function OpenAI.create_chat(schema::AbstractOpenAISchema,
+        api_key::AbstractString,
+        model::AbstractString,
+        conversation;
+        kwargs...)
+    OpenAI.create_chat(api_key, model, conversation; kwargs...)
+end
+
+# Overload for testing/debugging
+function OpenAI.create_chat(schema::TestEchoOpenAISchema, api_key::AbstractString,
+        model::AbstractString,
+        conversation; kwargs...)
+    schema.model_id = model
+    schema.inputs = conversation
+    return schema
+end
+
+"""
+    OpenAI.create_chat(schema::CustomOpenAISchema,
+  api_key::AbstractString,
+  model::AbstractString,
+  conversation;
+  url::String="http://localhost:8080",
+  kwargs...)
+
+Dispatch to the OpenAI.create_chat function, for any OpenAI-compatible API. 
+
+It expects `url` keyword argument. Provide it to the `aigenerate` function via `api_kwargs=(; url="my-url")`
+
+It will forward your query to the "chat/completions" endpoint of the base URL that you provided (=`url`).
+"""
+function OpenAI.create_chat(schema::CustomOpenAISchema,
+        api_key::AbstractString,
+        model::AbstractString,
+        conversation;
+        url::String = "http://localhost:8080",
+        kwargs...)
+    # Build the corresponding provider object
+    # Create chat will automatically pass our data to endpoint `/chat/completions`
+    provider = CustomProvider(; api_key, base_url = url)
+    OpenAI.create_chat(provider, model, conversation; kwargs...)
+end
+
+"""
+    OpenAI.create_chat(schema::MistralOpenAISchema,
+  api_key::AbstractString,
+  model::AbstractString,
+  conversation;
+  url::String="https://api.mistral.ai/v1",
+  kwargs...)
+
+Dispatch to the OpenAI.create_chat function, but with the MistralAI API parameters. 
+
+It tries to access the `MISTRALAI_API_KEY` ENV variable, but you can also provide it via the `api_key` keyword argument.
+"""
+function OpenAI.create_chat(schema::MistralOpenAISchema,
+        api_key::AbstractString,
+        model::AbstractString,
+        conversation;
+        url::String = "https://api.mistral.ai/v1",
+        kwargs...)
+    # Build the corresponding provider object
+    # try to override provided api_key because the default is OpenAI key
+    provider = CustomProvider(;
+        api_key = isempty(MISTRALAI_API_KEY) ? api_key : MISTRALAI_API_KEY,
+        base_url = url)
+    OpenAI.create_chat(provider, model, conversation; kwargs...)
+end
+
 ## User-Facing API
 """
     aigenerate(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE;
@@ -169,21 +259,6 @@ function aigenerate(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_
         kwargs...)
 
     return output
-end
-# Extend OpenAI create_chat to allow for testing/debugging
-function OpenAI.create_chat(schema::AbstractOpenAISchema,
-        api_key::AbstractString,
-        model::AbstractString,
-        conversation;
-        kwargs...)
-    OpenAI.create_chat(api_key, model, conversation; kwargs...)
-end
-function OpenAI.create_chat(schema::TestEchoOpenAISchema, api_key::AbstractString,
-        model::AbstractString,
-        conversation; kwargs...)
-    schema.model_id = model
-    schema.inputs = conversation
-    return schema
 end
 
 """
