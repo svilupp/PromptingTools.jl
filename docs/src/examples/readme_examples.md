@@ -287,3 +287,37 @@ msg.content # 4096×2 Matrix{Float64}:
 ```
 
 If you're getting errors, check that Ollama is running - see the [Setup Guide for Ollama](#setup-guide-for-ollama) section below.
+
+## Using MistralAI API and other OpenAI-compatible APIs
+
+Mistral models have long been dominating the open-source space. They are now available via their API, so you can use them with PromptingTools.jl!
+
+```julia
+msg = aigenerate("Say hi!"; model="mistral-tiny")
+# [ Info: Tokens: 114 @ Cost: $0.0 in 0.9 seconds
+# AIMessage("Hello there! I'm here to help answer any questions you might have, or assist you with tasks to the best of my abilities. How can I be of service to you today? If you have a specific question, feel free to ask and I'll do my best to provide accurate and helpful information. If you're looking for general assistance, I can help you find resources or information on a variety of topics. Let me know how I can help.")
+```
+
+It all just works, because we have registered the models in the `PromptingTools.MODEL_REGISTRY`! There are currently 4 models available: `mistral-tiny`, `mistral-small`, `mistral-medium`, `mistral-embed`.
+
+Under the hood, we use a dedicated schema `MistralOpenAISchema` that leverages most of the OpenAI-specific code base, so you can always provide that explicitly as the first argument:
+
+```julia
+const PT = PromptingTools
+msg = aigenerate(PT.MistralOpenAISchema(), "Say Hi!"; model="mistral-tiny", api_key=ENV["MISTRALAI_API_KEY"])
+```
+As you can see, we can load your API key either from the ENV or via the Preferences.jl mechanism (see `?PREFERENCES` for more information).
+
+But MistralAI are not the only ones! There are many other exciting providers, eg, [Perplexity.ai](https://docs.perplexity.ai/), [Fireworks.ai](https://app.fireworks.ai/).
+As long as they are compatible with the OpenAI API (eg, sending `messages` with `role` and `content` keys), you can use them with PromptingTools.jl by using `schema = CustomOpenAISchema()`:
+
+```julia
+# Set your API key and the necessary base URL for the API
+api_key = "..."
+prompt = "Say hi!"
+msg = aigenerate(PT.CustomOpenAISchema(), prompt; model="my_model", api_key, api_kwargs=(; url="http://localhost:8081"))
+```
+
+As you can see, it also works for any local models that you might have running on your computer!
+
+Note: At the moment, we only support `aigenerate` and `aiembed` functions for MistralAI and other OpenAI-compatible APIs. We plan to extend the support in the future.
