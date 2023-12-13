@@ -149,12 +149,79 @@ function isparsed(cb::AICode)
     return isparsed(cb.expression) && !isparseerror(cb.error)
 end
 
+## Parsing Helpers
+JULIA_EXPR_HEADS = [
+    :block,
+    :quote,
+    :call,
+    :macrocall,
+    :(=),
+    :function,
+    :for,
+    :if,
+    :while,
+    :let,
+    :try,
+    :catch,
+    :finally,
+    :method,
+    :tuple,
+    :array,
+    :index,
+    :ref,
+    :.,
+    :do,
+    :curly,
+    :typed_vcat,
+    :typed_hcat,
+    :typed_vcat,
+    :comprehension,
+    :generator,
+    :kw,
+    :where,
+]
+# Checks if the provided expression `ex` has some hallmarks of Julia code. Very naive!
+# Serves as a quick check to avoid trying to eval output cells (```plaintext ... ```)
+is_julia_expr(ex::Any) = false
+function is_julia_expr(ex::Expr)
+    ## Expression itself
+    Meta.isexpr(ex, JULIA_EXPR_HEADS) && return true
+    ## Its arguments
+    for arg in ex.args
+        Meta.isexpr(arg, JULIA_EXPR_HEADS) && return true
+    end
+    ## Nothing found...
+    return false
+end
+
+## Check if a given String seems to be a valid Julia expression (simple heuristics)
+function is_julia_code(code::AbstractString)
+    # Try to parse the expression, return false if parsing fails
+    expr = try
+        Meta.parseall(code)
+    catch
+        return false
+    end
+
+    if isparsed(expr) && is_julia_expr(expr)
+        return true
+    else
+        return false
+    end
+end
+
 ## Overload for AIMessage - simply extracts the code blocks and concatenates them
 function AICode(msg::AIMessage;
         verbose::Bool = false,
         skip_unsafe::Bool = false,
         kwargs...)
-    code = extract_code_blocks(msg.content) |> Base.Fix2(join, "\n")
+    code = extract_code_blocks(msg.content)
+    if isempty(code)
+        ## Fallback option for generic code fence, we must check if the content is parseable
+        code = extract_code_blocks_fallback(msg.content) |>
+               x -> filter(is_julia_code, x)
+    end
+    code = join(code, "\n")
     skip_unsafe && (code = remove_unsafe_lines(code; verbose))
     return AICode(code; kwargs...)
 end
@@ -176,8 +243,10 @@ function extract_julia_imports(input::AbstractString)
             subparts = map(x -> contains(x, ':') ? split(x, ':')[1] : x,
                 split(subparts, ","))
             subparts = replace(join(subparts, ' '), ',' => ' ')
-            packages = filter(!isempty, split(subparts, " ")) .|> Symbol
-            append!(package_names, packages)
+            packages = filter(x -> !isempty(x) && !startswith(x, "Base") &&
+                                       !startswith(x, "Main"),
+                split(subparts, " "))
+            append!(package_names, Symbol.(packages))
         end
     end
     return package_names
@@ -303,6 +372,8 @@ The extracted code blocks are returned as a vector of strings, with each string 
 
 Note: Only the content within the code fences is extracted, and the code fences themselves are not included in the output.
 
+See also: `extract_code_blocks_fallback`
+
 # Arguments
 - `markdown_content::String`: A string containing the markdown content from which Julia code blocks are to be extracted.
 
@@ -377,6 +448,60 @@ function extract_code_blocks(markdown_content::T) where {T <: AbstractString}
     end
 
     return reverse(code_blocks) # Reverse to maintain original order
+end
+
+"""
+    extract_code_blocks_fallback(markdown_content::String, delim::AbstractString="```")
+
+Extract Julia code blocks from a markdown string using a fallback method (splitting by arbitrary `delim`-iters).
+Much more simplistic than `extract_code_blocks` and does not support nested code blocks.
+
+It is often used as a fallback for smaller LLMs that forget to code fence ```julia ... ```.
+
+# Example
+
+```julia
+code = \"\"\"
+\`\`\`
+println("hello")
+\`\`\`
+
+Some text
+
+\`\`\`
+println("world")
+\`\`\`
+\"\"\"
+
+# We extract text between triple backticks and check each blob if it looks like a valid Julia code
+code_parsed = extract_code_blocks_fallback(code) |> x -> filter(is_julia_code, x) |> x -> join(x, "\n")
+```
+"""
+function extract_code_blocks_fallback(markdown_content::T,
+        delim::AbstractString = "```") where {T <: AbstractString}
+    # Convert content and delimiters to codeunits
+    content_units = codeunits(markdown_content)
+    delim_units = codeunits(delim)
+    delim_positions = find_subsequence_positions(delim_units, content_units)
+
+    # Extract code blocks
+    eltype_ = typeof(@view(markdown_content[begin:end]))
+    code_blocks = Vector{eltype_}()
+    isempty(delim_positions) && return code_blocks
+
+    # Run the extraction
+    start_pos = delim_positions[1]
+    for end_pos in delim_positions
+        if end_pos > start_pos
+            code_block = markdown_content[(start_pos + length(delim_units)):(end_pos - 1)]
+            # Also remove the julia prompt
+            push!(code_blocks, remove_julia_prompt(strip(code_block)))
+            # Reset the start
+            start_pos = end_pos
+        end
+    end
+
+    return code_blocks
 end
 
 """
