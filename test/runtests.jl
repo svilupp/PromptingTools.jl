@@ -1,5 +1,5 @@
 using PromptingTools
-using JSON3
+using OpenAI, HTTP, JSON3
 using Test
 using Aqua
 const PT = PromptingTools
