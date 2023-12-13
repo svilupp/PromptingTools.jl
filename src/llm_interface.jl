@@ -44,6 +44,48 @@ struct OpenAISchema <: AbstractOpenAISchema end
     inputs::Any = nothing
 end
 
+"""
+    CustomOpenAISchema 
+    
+CustomOpenAISchema() allows user to call any OpenAI-compatible API.
+
+All user needs to do is to pass this schema as the first argument and provide the BASE URL of the API to call (`api_kwargs.url`).
+
+# Example
+
+Assumes that we have a local server running at `http://localhost:8081`:
+
+```julia
+api_key = "..."
+prompt = "Say hi!"
+msg = aigenerate(CustomOpenAISchema(), prompt; model="my_model", api_key, api_kwargs=(; url="http://localhost:8081"))
+```
+
+"""
+struct CustomOpenAISchema <: AbstractOpenAISchema end
+
+"""
+    MistralOpenAISchema
+
+MistralOpenAISchema() allows user to call MistralAI API known for mistral and mixtral models.
+
+It's a flavor of CustomOpenAISchema() with a url preset to `https://api.mistral.ai`.
+
+Most models have been registered, so you don't even have to specify the schema
+
+# Example
+
+Let's call `mistral-tiny` model:
+```julia
+api_key = "..." # can be set via ENV["MISTRAL_API_KEY"] or via our preference system
+msg = aigenerate("Say hi!"; model="mistral_tiny", api_key)
+```
+
+See `?PREFERENCES` for more details on how to set your API key permanently.
+
+"""
+struct MistralOpenAISchema <: AbstractOpenAISchema end
+
 abstract type AbstractChatMLSchema <: AbstractPromptSchema end
 """
 ChatMLSchema is used by many open-source chatbots, by OpenAI models (under the hood) and by several models and inferfaces (eg, Ollama, vLLM)
