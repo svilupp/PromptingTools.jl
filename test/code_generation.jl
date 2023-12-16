@@ -187,6 +187,12 @@ end
     @test extract_code_blocks(markdown_content) ==
           SubString{String}["println(\"Hello, World!\")"]
 
+    # at edges (no newlines)
+    markdown_content = """```julia
+println("hello")
+```"""
+    @test extract_code_blocks(markdown_content) ==
+          SubString{String}["println(\"hello\")"]
     # Multiple Julia Code Blocks
     markdown_content = """
     ```julia
@@ -270,13 +276,14 @@ end
     @test isempty(extract_code_blocks_fallback("Some text without code blocks"))
 
     # Adjacent Code Blocks Test
-    @test extract_code_blocks_fallback("```code1``` ```code2```") == ["code1", "", "code2"]
+    @test extract_code_blocks_fallback("```\ncode1\n```\n \n```\ncode2\n```") ==
+          ["code1", "", "code2"]
 
     # Special Characters Test
     @test extract_code_blocks_fallback("```\n<>&\"'\n```") == ["<>&\"'"]
 
     # Large Input Test
-    large_input = "```" * repeat("large code block\n", 10) * "```"
+    large_input = "```\n" * repeat("large code block\n", 10) * "```"
     @test extract_code_blocks_fallback(large_input) ==
           [strip(repeat("large code block\n", 10))]
 

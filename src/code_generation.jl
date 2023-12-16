@@ -430,13 +430,22 @@ extract_code_blocks(markdown_multiple)
 function extract_code_blocks(markdown_content::T) where {T <: AbstractString}
     # Convert content and delimiters to codeunits
     content_units = codeunits(markdown_content)
-    start_delim_units = codeunits("```julia")
-    end_delim_units = codeunits("```\n")
+    # Ideal code fences
+    start_delim_units1 = codeunits("\n```julia\n")
+    end_delim_units1 = codeunits("\n```\n")
+    # Fallback code fences
+    start_delim_units2 = codeunits("```julia\n")
+    end_delim_units2 = codeunits("\n```")
 
     # Find all starting and ending positions of code blocks
-    start_positions = find_subsequence_positions(start_delim_units, content_units)
-    end_positions = setdiff(find_subsequence_positions(end_delim_units, content_units),
-        start_positions)
+    pos = find_subsequence_positions(start_delim_units1, content_units)
+    pos2 = find_subsequence_positions(start_delim_units2, content_units)
+    # the +1 offset is because the first pattern starts 1 character earlier
+    start_positions = vcat(pos2, pos .+ 1) |> unique
+
+    pos = find_subsequence_positions(end_delim_units1, content_units)
+    pos2 = find_subsequence_positions(end_delim_units2, content_units)
+    end_positions = vcat(pos, pos2) |> unique
     unused_end_positions = trues(length(end_positions))
 
     # Generate code block position pairs
@@ -461,7 +470,9 @@ function extract_code_blocks(markdown_content::T) where {T <: AbstractString}
     eltype_ = typeof(@view(markdown_content[begin:end]))
     code_blocks = Vector{eltype_}()
     for (start_pos, end_pos) in filtered_positions
-        code_block = markdown_content[(start_pos + length(start_delim_units)):(end_pos - 1)]
+        start_ = (start_pos + length(start_delim_units2))
+        end_ = prevind(markdown_content, end_pos)
+        code_block = markdown_content[start_:end_]
         # Also remove the julia prompt
         push!(code_blocks, remove_julia_prompt(strip(code_block)))
     end
@@ -470,7 +481,7 @@ function extract_code_blocks(markdown_content::T) where {T <: AbstractString}
 end
 
 """
-    extract_code_blocks_fallback(markdown_content::String, delim::AbstractString="```")
+    extract_code_blocks_fallback(markdown_content::String, delim::AbstractString="\\n```\\n")
 
 Extract Julia code blocks from a markdown string using a fallback method (splitting by arbitrary `delim`-iters).
 Much more simplistic than `extract_code_blocks` and does not support nested code blocks.
@@ -497,22 +508,38 @@ code_parsed = extract_code_blocks_fallback(code) |> x -> filter(is_julia_code, x
 ```
 """
 function extract_code_blocks_fallback(markdown_content::T,
-        delim::AbstractString = "```") where {T <: AbstractString}
+        delim::AbstractString = "\n```\n") where {T <: AbstractString}
     # Convert content and delimiters to codeunits
     content_units = codeunits(markdown_content)
+    content_length = length(content_units)
     delim_units = codeunits(delim)
     delim_positions = find_subsequence_positions(delim_units, content_units)
 
     # Extract code blocks
     eltype_ = typeof(@view(markdown_content[begin:end]))
     code_blocks = Vector{eltype_}()
-    isempty(delim_positions) && return code_blocks
+    isempty(delim_positions) && !startswith(markdown_content, lstrip(delim)) &&
+        return code_blocks
 
     # Run the extraction
-    start_pos = delim_positions[1]
-    for end_pos in delim_positions
-        if end_pos > start_pos
-            code_block = markdown_content[(start_pos + length(delim_units)):(end_pos - 1)]
+    # catch if we're missing the opening mark because of document start
+    no_newline_start = lstrip(delim)
+    start_pos = if no_newline_start != delim &&
+                   startswith(markdown_content, no_newline_start)
+        (length(codeunits(no_newline_start)) - length(delim_units))
+    else
+        delim_positions[1]
+    end
+    no_new_line_end = rstrip(delim)
+    if no_new_line_end != delim && endswith(markdown_content, no_new_line_end)
+        last_end = 1 + content_length - length(codeunits(no_new_line_end))
+        push!(delim_positions, last_end)
+    end
+    # start the iteration
+    for end_pos in unique(delim_positions)
+        if end_pos > start_pos && end_pos <= content_length
+            end_ = prevind(markdown_content, end_pos)
+            code_block = markdown_content[(start_pos + length(delim_units)):end_]
             # Also remove the julia prompt
             push!(code_blocks, remove_julia_prompt(strip(code_block)))
             # Reset the start
