@@ -498,6 +498,11 @@ b=2
       """)
         cb = AICode(msg; skip_unsafe = true)
         @test cb.code == "a=1\nb=2\n"
+
+        # dispatch on text
+        code = extract_code_blocks(msg.content) |> x -> join(x, "\n")
+        cb = AICode(code; skip_unsafe = true)
+        @test cb.code == "a=1\nb=2\n"
     end
 
     # skip_invalid=true

@@ -17,8 +17,12 @@ abstract type AbstractCodeBlock end
 
 """
     AICode(code::AbstractString; auto_eval::Bool=true, safe_eval::Bool=false, 
-    skip_unsafe::Bool=false, skip_unsafe::Bool=false, capture_stdout::Bool=true,
+    skip_unsafe::Bool=false, capture_stdout::Bool=true, verbose::Bool=false,
     prefix::AbstractString="", suffix::AbstractString="")
+
+    AICode(msg::AIMessage; auto_eval::Bool=true, safe_eval::Bool=false, 
+    skip_unsafe::Bool=false, skip_invalid::Bool=false, capture_stdout::Bool=true,
+    verbose::Bool=false, prefix::AbstractString="", suffix::AbstractString="")
 
 A mutable structure representing a code block (received from the AI model) with automatic parsing, execution, and output/error capturing capabilities.
 
@@ -50,6 +54,7 @@ See also: `PromptingTools.extract_code_blocks`, `PromptingTools.eval!`
 - `safe_eval::Bool`: If set to `true`, the code block checks for package operations (e.g., installing new packages) and missing imports, and then evaluates the code inside a bespoke scratch module. This is to ensure that the evaluation does not alter any user-defined variables or the global state. Defaults to `false`.
 - `skip_unsafe::Bool`: If set to `true`, we skip any lines in the code block that are deemed unsafe (eg, `Pkg` operations). Defaults to `false`.
 - `skip_invalid::Bool`: If set to `true`, we skip code blocks that do not even parse. Defaults to `false`.
+- `verbose::Bool`: If set to `true`, we print out any lines that are skipped due to being unsafe. Defaults to `false`.
 - `capture_stdout::Bool`: If set to `true`, we capture any stdout outputs (eg, test failures) in `cb.stdout`. Defaults to `true`.
 - `prefix::AbstractString`: A string to be prepended to the code block before parsing and evaluation.
   Useful to add some additional code definition or necessary imports. Defaults to an empty string.
@@ -108,9 +113,12 @@ end
 function (CB::Type{T})(md::AbstractString;
         auto_eval::Bool = true,
         safe_eval::Bool = true,
+        skip_unsafe::Bool = false,
         capture_stdout::Bool = true,
+        verbose::Bool = false,
         prefix::AbstractString = "",
         suffix::AbstractString = "") where {T <: AbstractCodeBlock}
+    skip_unsafe && (md = remove_unsafe_lines(md; verbose))
     cb = CB(; code = md)
     auto_eval && eval!(cb; safe_eval, capture_stdout, prefix, suffix)
     return cb
