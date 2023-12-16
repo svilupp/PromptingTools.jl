@@ -16,7 +16,9 @@
 abstract type AbstractCodeBlock end
 
 """
-    AICode(code::AbstractString; auto_eval::Bool=true, safe_eval::Bool=false, prefix::AbstractString="", suffix::AbstractString="")
+    AICode(code::AbstractString; auto_eval::Bool=true, safe_eval::Bool=false, 
+    skip_unsafe::Bool=false, skip_unsafe::Bool=false, capture_stdout::Bool=true,
+    prefix::AbstractString="", suffix::AbstractString="")
 
 A mutable structure representing a code block (received from the AI model) with automatic parsing, execution, and output/error capturing capabilities.
 
@@ -48,6 +50,7 @@ See also: `PromptingTools.extract_code_blocks`, `PromptingTools.eval!`
 - `safe_eval::Bool`: If set to `true`, the code block checks for package operations (e.g., installing new packages) and missing imports, and then evaluates the code inside a bespoke scratch module. This is to ensure that the evaluation does not alter any user-defined variables or the global state. Defaults to `false`.
 - `skip_unsafe::Bool`: If set to `true`, we skip any lines in the code block that are deemed unsafe (eg, `Pkg` operations). Defaults to `false`.
 - `skip_invalid::Bool`: If set to `true`, we skip code blocks that do not even parse. Defaults to `false`.
+- `capture_stdout::Bool`: If set to `true`, we capture any stdout outputs (eg, test failures) in `cb.stdout`. Defaults to `true`.
 - `prefix::AbstractString`: A string to be prepended to the code block before parsing and evaluation.
   Useful to add some additional code definition or necessary imports. Defaults to an empty string.
 - `suffix::AbstractString`: A string to be appended to the code block before parsing and evaluation. 
@@ -560,7 +563,11 @@ function extract_function_name(code_block::AbstractString)
 end
 
 """
-    eval!(cb::AICode; safe_eval::Bool=true, prefix::AbstractString="", suffix::AbstractString="")
+    eval!(cb::AbstractCodeBlock;
+        safe_eval::Bool = true,
+        capture_stdout::Bool = true,
+        prefix::AbstractString = "",
+        suffix::AbstractString = "")
 
 Evaluates a code block `cb` in-place. It runs automatically when AICode is instantiated with a String.
 
@@ -572,13 +579,14 @@ Steps:
 - Parse the text in `cb.code`
 - Evaluate the parsed expression
 - Capture outputs of the evaluated in `cb.output`
-- Capture any stdout outputs (eg, test failures) in `cb.stdout`
+- [OPTIONAL] Capture any stdout outputs (eg, test failures) in `cb.stdout`
 - If any error exception is raised, it is saved in `cb.error`
 - Finally, if all steps were successful, success is set to `cb.success = true`
 
 # Keyword Arguments
 - `safe_eval::Bool`: If `true`, we first check for any Pkg operations (eg, installing new packages) and missing imports, 
   then the code will be evaluated inside a bespoke scratch module (not to change any user variables)
+- `capture_stdout::Bool`: If `true`, we capture any stdout outputs (eg, test failures) in `cb.stdout`
 - `prefix::AbstractString`: A string to be prepended to the code block before parsing and evaluation.
   Useful to add some additional code definition or necessary imports. Defaults to an empty string.
 - `suffix::AbstractString`: A string to be appended to the code block before parsing and evaluation. 
@@ -586,6 +594,7 @@ Steps:
 """
 function eval!(cb::AbstractCodeBlock;
         safe_eval::Bool = true,
+        capture_stdout::Bool = true,
         prefix::AbstractString = "",
         suffix::AbstractString = "")
     (; code) = cb
@@ -626,8 +635,33 @@ function eval!(cb::AbstractCodeBlock;
     ## Eval
     safe_module = gensym("SafeCustomModule")
     # Prepare to catch any stdout
-    pipe = Pipe()
-    redirect_stdout(pipe) do
+    if capture_stdout
+        pipe = Pipe()
+        redirect_stdout(pipe) do
+            try
+                # eval in Main module to have access to std libs, but inside a custom module for safety
+                if safe_eval
+                    cb.output = @eval(Main, module $safe_module
+                    using Test # just in case unit tests are provided
+                    $(cb.expression)
+                    end)
+                else
+                    # Evaluate the code directly into Main
+                    cb.output = @eval(Main, begin
+                        using Test # just in case unit tests are provided
+                        $(cb.expression)
+                    end)
+                end
+                cb.success = true
+            catch e
+                cb.error = e
+                cb.success = false
+            end
+        end
+        close(Base.pipe_writer(pipe))
+        cb.stdout = read(pipe, String)
+    else
+        # Ignore stdout, just eval
         try
             # eval in Main module to have access to std libs, but inside a custom module for safety
             if safe_eval
@@ -648,7 +682,5 @@ function eval!(cb::AbstractCodeBlock;
             cb.success = false
         end
     end
-    close(Base.pipe_writer(pipe))
-    cb.stdout = read(pipe, String)
     return cb
 end
