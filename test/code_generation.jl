@@ -248,6 +248,17 @@ end
     """
     @test extract_code_blocks(markdown_example) ==
           SubString{String}["# Outer Julia code block\n\n# An example of a nested Julia code block in markdown\n\"\"\"\n```julia\nx = 5\nprintln(x)\n```\n\"\"\"\n\ny = 10\nprintln(y)"]
+
+    # Tough case of regex inside a function
+    markdown_example = """
+```julia
+function find_match(md::AbstractString)
+    return match(r"```\\n(?:(?!\\n```)\\s*.*\\n?)*\\s*```", md)
+end
+```
+"""
+    @test extract_code_blocks(markdown_example) ==
+          SubString{String}["function find_match(md::AbstractString)\n    return match(r\"```\\n(?:(?!\\n```)\\s*.*\\n?)*\\s*```\", md)\nend"]
 end
 
 @testset "extract_code_blocks_fallback" begin
@@ -443,6 +454,7 @@ b=2
         @test cb.stdout == "hello\nworld\n"
         @test cb.output.b == 2
     end
+
     # Fallback extraction method
     let msg = AIMessage("""
 ```
@@ -461,8 +473,8 @@ b=2
         @test cb.stdout == "hello\nworld\n"
         @test cb.output.b == 2
     end
-    # skip_unsafe=true
 
+    # skip_unsafe=true
     let msg = AIMessage("""
       ```julia
       a=1
@@ -474,6 +486,24 @@ b=2
       """)
         cb = AICode(msg; skip_unsafe = true)
         @test cb.code == "a=1\nb=2\n"
+    end
+
+    # skip_invalid=true
+    let msg = AIMessage("""
+        ```julia
+        println("Hello world!")
+        ```
+
+        ```julia
+        println("Hello world!) # missing quote
+        ```
+        """)
+        cb = AICode(msg; skip_invalid = true)
+        @test cb.code == "println(\"Hello world!\")"
+
+        # if it's not switched on
+        cb = AICode(msg; skip_invalid = false)
+        @test !isvalid(cb)
     end
 
     # Methods - copy
