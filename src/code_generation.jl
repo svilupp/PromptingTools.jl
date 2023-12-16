@@ -108,10 +108,11 @@ end
 function (CB::Type{T})(md::AbstractString;
         auto_eval::Bool = true,
         safe_eval::Bool = true,
+        capture_stdout::Bool = true,
         prefix::AbstractString = "",
         suffix::AbstractString = "") where {T <: AbstractCodeBlock}
     cb = CB(; code = md)
-    auto_eval && eval!(cb; safe_eval, prefix, suffix)
+    auto_eval && eval!(cb; safe_eval, capture_stdout, prefix, suffix)
     return cb
 end
 Base.isvalid(cb::AbstractCodeBlock) = cb.success == true
