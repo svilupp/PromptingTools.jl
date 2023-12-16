@@ -409,6 +409,18 @@ end
     eval!(cb; prefix = "a=1", suffix = "b=2")
     @test cb.output.a == 1
     @test cb.output.b == 2
+
+    # Whether to capture stdout
+    cb = AICode(; code = "println(\"Hello\")")
+    eval!(cb; capture_stdout = false)
+    @test cb.stdout == nothing
+    @test cb.code == "println(\"Hello\")"
+    @test isvalid(cb)
+
+    eval!(cb; capture_stdout = true)
+    @test cb.stdout == "Hello\n"
+    @test cb.code == "println(\"Hello\")"
+    @test isvalid(cb)
 end
 
 @testset "AICode constructors" begin
@@ -485,6 +497,11 @@ b=2
       ```
       """)
         cb = AICode(msg; skip_unsafe = true)
+        @test cb.code == "a=1\nb=2\n"
+
+        # dispatch on text
+        code = extract_code_blocks(msg.content) |> x -> join(x, "\n")
+        cb = AICode(code; skip_unsafe = true)
         @test cb.code == "a=1\nb=2\n"
     end
 
