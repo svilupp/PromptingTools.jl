@@ -46,6 +46,8 @@ See also: `PromptingTools.extract_code_blocks`, `PromptingTools.eval!`
 # Keyword Arguments
 - `auto_eval::Bool`: If set to `true`, the code block is automatically parsed and evaluated upon instantiation. Defaults to `true`.
 - `safe_eval::Bool`: If set to `true`, the code block checks for package operations (e.g., installing new packages) and missing imports, and then evaluates the code inside a bespoke scratch module. This is to ensure that the evaluation does not alter any user-defined variables or the global state. Defaults to `false`.
+- `skip_unsafe::Bool`: If set to `true`, we skip any lines in the code block that are deemed unsafe (eg, `Pkg` operations). Defaults to `false`.
+- `skip_invalid::Bool`: If set to `true`, we skip code blocks that do not even parse. Defaults to `false`.
 - `prefix::AbstractString`: A string to be prepended to the code block before parsing and evaluation.
   Useful to add some additional code definition or necessary imports. Defaults to an empty string.
 - `suffix::AbstractString`: A string to be appended to the code block before parsing and evaluation. 
@@ -214,12 +216,17 @@ end
 function AICode(msg::AIMessage;
         verbose::Bool = false,
         skip_unsafe::Bool = false,
+        skip_invalid::Bool = false,
         kwargs...)
     code = extract_code_blocks(msg.content)
     if isempty(code)
         ## Fallback option for generic code fence, we must check if the content is parseable
-        code = extract_code_blocks_fallback(msg.content) |>
-               x -> filter(is_julia_code, x)
+        code = extract_code_blocks_fallback(msg.content)
+        skip_invalid = true # set to true if we use fallback option
+    end
+    if skip_invalid
+        ## Filter out extracted code blocks that do not even parse
+        filter!(is_julia_code, code)
     end
     code = join(code, "\n")
     skip_unsafe && (code = remove_unsafe_lines(code; verbose))
@@ -412,7 +419,7 @@ function extract_code_blocks(markdown_content::T) where {T <: AbstractString}
     # Convert content and delimiters to codeunits
     content_units = codeunits(markdown_content)
     start_delim_units = codeunits("```julia")
-    end_delim_units = codeunits("```")
+    end_delim_units = codeunits("```\n")
 
     # Find all starting and ending positions of code blocks
     start_positions = find_subsequence_positions(start_delim_units, content_units)
