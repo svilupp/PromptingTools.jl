@@ -432,16 +432,17 @@ function extract_code_blocks(markdown_content::T) where {T <: AbstractString}
     content_units = codeunits(markdown_content)
     # Ideal code fences
     start_delim_units1 = codeunits("\n```julia\n")
-    end_delim_units1 = codeunits("\n```\n")
-    # Fallback code fences
     start_delim_units2 = codeunits("```julia\n")
+    start_delim_units3 = codeunits("```julia ") # happens to small models
+    end_delim_units1 = codeunits("\n```\n")
     end_delim_units2 = codeunits("\n```")
 
     # Find all starting and ending positions of code blocks
     pos = find_subsequence_positions(start_delim_units1, content_units)
     pos2 = find_subsequence_positions(start_delim_units2, content_units)
+    pos3 = find_subsequence_positions(start_delim_units3, content_units)
     # the +1 offset is because the first pattern starts 1 character earlier
-    start_positions = vcat(pos2, pos .+ 1) |> unique
+    start_positions = vcat(pos2, pos .+ 1, pos3) |> unique |> sort
 
     pos = find_subsequence_positions(end_delim_units1, content_units)
     pos2 = find_subsequence_positions(end_delim_units2, content_units)

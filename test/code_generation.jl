@@ -265,6 +265,18 @@ end
 """
     @test extract_code_blocks(markdown_example) ==
           SubString{String}["function find_match(md::AbstractString)\n    return match(r\"```\\n(?:(?!\\n```)\\s*.*\\n?)*\\s*```\", md)\nend"]
+
+    # Some small models forget newlines
+    no_newline = """
+  ```julia function clean_column(col::AbstractString)
+      col = strip(lowercase(col))
+      col = replace(col, r"[-\\s]+", "_")
+      col
+  end
+  ```
+  """
+    @test extract_code_blocks(no_newline) ==
+          SubString{String}["function clean_column(col::AbstractString)\n    col = strip(lowercase(col))\n    col = replace(col, r\"[-\\s]+\", \"_\")\n    col\nend"]
 end
 
 @testset "extract_code_blocks_fallback" begin
@@ -289,6 +301,18 @@ end
 
     # Empty String Test
     @test isempty(extract_code_blocks_fallback(""))
+
+    # delimiter inside of code
+    delim_in_middle = """
+      ```
+      function myadd(a, b)
+          # here is a silly comment that ends with ```
+          return a + b
+      end
+      ```
+      """
+    @test extract_code_blocks_fallback(delim_in_middle) ==
+          SubString{String}["function myadd(a, b)\n    # here is a silly comment that ends with ```\n    return a + b\nend"]
 
     # Different Delimiter Test
     @test extract_code_blocks_fallback("~~~\ncode block\n~~~", "~~~") == ["code block"]
