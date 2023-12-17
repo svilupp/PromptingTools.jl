@@ -187,6 +187,12 @@ end
     @test extract_code_blocks(markdown_content) ==
           SubString{String}["println(\"Hello, World!\")"]
 
+    # at edges (no newlines)
+    markdown_content = """```julia
+println("hello")
+```"""
+    @test extract_code_blocks(markdown_content) ==
+          SubString{String}["println(\"hello\")"]
     # Multiple Julia Code Blocks
     markdown_content = """
     ```julia
@@ -259,6 +265,18 @@ end
 """
     @test extract_code_blocks(markdown_example) ==
           SubString{String}["function find_match(md::AbstractString)\n    return match(r\"```\\n(?:(?!\\n```)\\s*.*\\n?)*\\s*```\", md)\nend"]
+
+    # Some small models forget newlines
+    no_newline = """
+  ```julia function clean_column(col::AbstractString)
+      col = strip(lowercase(col))
+      col = replace(col, r"[-\\s]+", "_")
+      col
+  end
+  ```
+  """
+    @test extract_code_blocks(no_newline) ==
+          SubString{String}["function clean_column(col::AbstractString)\n    col = strip(lowercase(col))\n    col = replace(col, r\"[-\\s]+\", \"_\")\n    col\nend"]
 end
 
 @testset "extract_code_blocks_fallback" begin
@@ -270,18 +288,31 @@ end
     @test isempty(extract_code_blocks_fallback("Some text without code blocks"))
 
     # Adjacent Code Blocks Test
-    @test extract_code_blocks_fallback("```code1``` ```code2```") == ["code1", "", "code2"]
+    @test extract_code_blocks_fallback("```\ncode1\n```\n \n```\ncode2\n```") ==
+          ["code1", "", "code2"]
 
     # Special Characters Test
     @test extract_code_blocks_fallback("```\n<>&\"'\n```") == ["<>&\"'"]
 
     # Large Input Test
-    large_input = "```" * repeat("large code block\n", 10) * "```"
+    large_input = "```\n" * repeat("large code block\n", 10) * "```"
     @test extract_code_blocks_fallback(large_input) ==
           [strip(repeat("large code block\n", 10))]
 
     # Empty String Test
     @test isempty(extract_code_blocks_fallback(""))
+
+    # delimiter inside of code
+    delim_in_middle = """
+      ```
+      function myadd(a, b)
+          # here is a silly comment that ends with ```
+          return a + b
+      end
+      ```
+      """
+    @test extract_code_blocks_fallback(delim_in_middle) ==
+          SubString{String}["function myadd(a, b)\n    # here is a silly comment that ends with ```\n    return a + b\nend"]
 
     # Different Delimiter Test
     @test extract_code_blocks_fallback("~~~\ncode block\n~~~", "~~~") == ["code block"]
