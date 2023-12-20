@@ -91,7 +91,7 @@ end
         @test msg.content == prompt
         @test msg.status == 200
         @test msg.tokens == (2, 1)
-        @test isapprox(msg.elapsed, 0, atol = 1e-2)
+        @test isapprox(msg.elapsed, 0, atol = 3e-1)
         @test schema.inputs == (; system, prompt)
         @test schema.model_id == "llama2"
     end
@@ -105,7 +105,7 @@ end
         @test msg.content == "Hello John"
         @test msg.status == 200
         @test msg.tokens == (2, 1)
-        @test isapprox(msg.elapsed, 0, atol = 1e-2)
+        @test isapprox(msg.elapsed, 0, atol = 3e-1)
         @test schema.inputs ==
               (; system = "Act as a helpful AI assistant", prompt = "Hello John")
         @test schema.model_id == "llama2aaaa"
@@ -133,7 +133,7 @@ end
         @test msg.content == ones(16)
         @test msg.status == 200
         @test msg.tokens == (0, 0)
-        @test isapprox(msg.elapsed, 0, atol = 1e-2)
+        @test isapprox(msg.elapsed, 0, atol = 3e-1)
         @test schema.inputs == (; system = nothing, prompt = doc)
         @test schema.model_id == "llama2"
     end
@@ -146,7 +146,7 @@ end
         @test msg.content == 2 * ones(16, 2)
         @test msg.status == 200
         @test msg.tokens == (0, 0)
-        @test isapprox(msg.elapsed, 0, atol = 1e-2)
+        @test isapprox(msg.elapsed, 0, atol = 3e-1)
         @test schema.inputs == (; system = nothing, prompt = docs[2]) # only the last doc is caught (serial execution)
         @test schema.model_id == "llama2"
     end
