@@ -195,7 +195,7 @@ function aigenerate(prompt_schema::AbstractOllamaManagedSchema, prompt::ALLOWED_
 
     if !dry_run
         time = @elapsed resp = ollama_api(prompt_schema, conv_rendered.prompt;
-            conv_rendered.system, endpoint = "generate", model_id, http_kwargs,
+            conv_rendered.system, endpoint = "generate", model = model_id, http_kwargs,
             api_kwargs...)
         msg = AIMessage(; content = resp.response[:response] |> strip,
             status = Int(resp.status),
@@ -305,7 +305,7 @@ function aiembed(prompt_schema::AbstractOllamaManagedSchema,
     ## Find the unique ID for the model alias provided
     model_id = get(MODEL_ALIASES, model, model)
     time = @elapsed resp = ollama_api(prompt_schema, doc;
-        endpoint = "embeddings", model_id, http_kwargs, api_kwargs...)
+        endpoint = "embeddings", model = model_id, http_kwargs, api_kwargs...)
     msg = DataMessage(;
         content = postprocess(resp.response[:embedding]),
         status = Int(resp.status),
@@ -332,7 +332,7 @@ function aiembed(prompt_schema::AbstractOllamaManagedSchema,
         postprocess;
         verbose = false,
         api_key,
-        model,
+        model = model_id,
         kwargs...)
                 for doc in docs]
     ## Aggregate results
