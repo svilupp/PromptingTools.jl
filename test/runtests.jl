@@ -35,3 +35,8 @@ let cb = AICode(; code = """
     @test occursin("Test Failed", cb.stdout) # capture details of the test failure
     @test isnothing(cb.output) # because it failed
 end
+
+## Run experimental
+@testset "Experimental" begin
+    include("Experimental/RAGTools.jl/runtests.jl")
+end
