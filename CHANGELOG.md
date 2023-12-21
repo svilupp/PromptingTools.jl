@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Experimental sub-module RAGTools providing basic Retrieval-Augmented Generation functionality. See `?RAGTools` for more information. It's nested inside of `PromptingTools.Experimental.RAGTools` to signify that it might change in the future.
 
 ### Fixed
 - Stricter code parsing in `AICode` to avoid false positives (code blocks must end with "```\n" to catch comments inside text)
