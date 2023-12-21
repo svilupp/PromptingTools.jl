@@ -1,6 +1,7 @@
 using PromptingTools: split_by_length, replace_words
-using PromptingTools: _extract_handlebar_variables, _report_stats
+using PromptingTools: _extract_handlebar_variables, call_cost, _report_stats
 using PromptingTools: _string_to_vector, _encode_local_image
+using PromptingTools: DataMessage, AIMessage
 
 @testset "replace_words" begin
     words = ["Disney", "Snow White", "Mickey Mouse"]
@@ -32,7 +33,7 @@ end
 
     # Test with empty text
     chunks = split_by_length("")
-    @test isempty(chunks)
+    @test chunks == [""]
 
     # Test custom separator
     text = "Hello,World,"^50
@@ -43,6 +44,34 @@ end
     @test length(chunks) == 34
     @test maximum(length.(chunks)) <= 20
     @test join(chunks, "") == text
+
+    ### Multiple separators
+    # Single separator
+    text = "First sentence. Second sentence. Third sentence."
+    chunks = split_by_length(text, ["."], max_length = 15)
+    @test length(chunks) == 3
+    @test chunks == ["First sentence.", " Second sentence.", " Third sentence."]
+
+    # Multiple separators
+    text = "Paragraph 1\n\nParagraph 2. Sentence 1. Sentence 2.\nParagraph 3"
+    separators = ["\n\n", ". ", "\n"]
+    chunks = split_by_length(text, separators, max_length = 20)
+    @test length(chunks) == 5
+    @test chunks[1] == "Paragraph 1\n\n"
+    @test chunks[2] == "Paragraph 2. "
+    @test chunks[3] == "Sentence 1. "
+    @test chunks[4] == "Sentence 2.\n"
+    @test chunks[5] == "Paragraph 3"
+
+    # empty separators
+    text = "Some text without separators."
+    @test_throws AssertionError split_by_length(text, String[], max_length = 10)
+    # edge cases
+    text = "Short text"
+    separators = ["\n\n", ". ", "\n"]
+    chunks = split_by_length(text, separators, max_length = 50)
+    @test length(chunks) == 1
+    @test chunks[1] == text
 end
 
 @testset "extract_handlebar_variables" begin
@@ -68,20 +97,34 @@ end
     @test actual_output == expected_output
 end
 
+@testset "call_cost" begin
+    msg = AIMessage(; content = "", tokens = (1000, 2000))
+    cost = call_cost(msg, "unknown_model")
+    @test cost == 0.0
+    @test call_cost(msg, "gpt-3.5-turbo") ≈ 1000 * 1.5e-6 + 2e-6 * 2000
+
+    msg = DataMessage(; content = nothing, tokens = (1000, 1000))
+    cost = call_cost(msg, "unknown_model")
+    @test cost == 0.0
+    @test call_cost(msg, "gpt-3.5-turbo") ≈ 1000 * 1.5e-6 + 2e-6 * 1000
+
+    @test call_cost(msg,
+        "gpt-3.5-turbo";
+        cost_of_token_prompt = 1,
+        cost_of_token_generation = 1) ≈ 1000 + 1000
+end
+
 @testset "report_stats" begin
     # Returns a string with the total number of tokens and elapsed time when given a message and model
     msg = AIMessage(; content = "", tokens = (1, 5), elapsed = 5.0)
-    model = "model"
+    model = "unknown_model"
     expected_output = "Tokens: 6 in 5.0 seconds"
     @test _report_stats(msg, model) == expected_output
 
     # Returns a string with a cost
-    expected_output = "Tokens: 6 @ Cost: \$0.007 in 5.0 seconds"
-    @test _report_stats(msg, model, 2e-3, 1e-3) == expected_output
-
-    # Returns a string without cost when it's zero
-    expected_output = "Tokens: 6 in 5.0 seconds"
-    @test _report_stats(msg, model, 0, 0) == expected_output
+    msg = AIMessage(; content = "", tokens = (1000, 5000), elapsed = 5.0)
+    expected_output = "Tokens: 6000 @ Cost: \$0.0115 in 5.0 seconds"
+    @test _report_stats(msg, "gpt-3.5-turbo") == expected_output
 end
 
 @testset "_string_to_vector" begin

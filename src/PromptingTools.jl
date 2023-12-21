@@ -65,6 +65,9 @@ include("llm_ollama_managed.jl")
 export @ai_str, @aai_str
 include("macros.jl")
 
+## Experimental modules
+include("Experimental/Experimental.jl")
+
 function __init__()
     # Load templates
     load_templates!()
