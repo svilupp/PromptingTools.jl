@@ -38,5 +38,5 @@ end
 
 ## Run experimental
 @testset "Experimental" begin
-    include("Experimental/RAGTools.jl/runtests.jl")
+    include("Experimental/RAGTools/runtests.jl")
 end
