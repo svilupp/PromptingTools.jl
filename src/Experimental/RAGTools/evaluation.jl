@@ -132,20 +132,57 @@ function score_retrieval_rank(orig_context::AbstractString,
               (occursin.(candidate_context, Ref(orig_context))))
 end
 
-"Single QAEvalItem evalution"
+"""
+    run_qa_evals(qa_item::QAEvalItem, ctx::RAGContext; verbose::Bool = true,
+                 parameters_dict::AbstractDict, judge_template::Symbol = :RAGJudgeAnswerFromContext,
+                 model_judge::AbstractString) -> QAEvalResult
+
+Evaluates a single `QAEvalItem` using a RAG context (`RAGContext`) and returns a `QAEvalResult` structure. This function assesses the relevance and accuracy of the answers generated in a QA evaluation context.
+
+# Arguments
+- `qa_item::QAEvalItem`: The QA evaluation item containing the question and its answer.
+- `ctx::RAGContext`: The context used for generating the QA pair, including the original context and the answers.
+  Comes from `airag(...; return_context=true)`
+- `verbose::Bool`: If `true`, enables verbose logging. Defaults to `true`.
+- `parameters_dict::AbstractDict`: Track any parameters used for later evaluations.
+- `judge_template::Symbol`: The template symbol for the AI model used to judge the answer. Defaults to `:RAGJudgeAnswerFromContext`.
+- `model_judge::AbstractString`: The AI model used for judging the answer's quality. 
+  Defaults to standard chat model, but it is advisable to use more powerful model GPT-4.
+
+# Returns
+`QAEvalResult`: An evaluation result that includes various scores and metadata related to the QA evaluation.
+
+# Notes
+- The function computes a retrieval score and rank based on how well the context matches the QA context.
+- It then uses the `judge_template` and `model_judge` to score the answer's accuracy and relevance.
+- In case of errors during evaluation, the function logs a warning (if `verbose` is `true`) and the `answer_score` will be set to `nothing`.
+
+# Examples
+
+Evaluating a QA pair using a specific context and model:
+```julia
+qa_item = QAEvalItem(question="What is the capital of France?", answer="Paris", context="France is a country in Europe.")
+ctx = RAGContext(source="Wikipedia", context="France is a country in Europe.", answer="Paris")
+parameters_dict = Dict("param1" => "value1", "param2" => "value2")
+
+eval_result = run_qa_evals(qa_item, ctx, parameters_dict=parameters_dict, model_judge="MyAIJudgeModel")
+```
+"""
 function run_qa_evals(qa_item::QAEvalItem, ctx::RAGContext;
         verbose::Bool = true, parameters_dict::AbstractDict,
-        judge_template::Symbol = :RAGJudgeAnswerFromContext,
-        model_judge::AbstractString)
+        judge_template::Symbol = :RAGJudgeAnswerFromContextShort,
+        model_judge::AbstractString = PT.MODEL_CHAT)
     retrieval_score = score_retrieval_hit(qa_item.context, ctx.context)
     retrieval_rank = score_retrieval_rank(qa_item.context, ctx.context)
+
+    # Note we could evaluate if RAGContext and QAEvalItem are at least using the same sources etc. 
 
     answer_score = try
         msg = aiextract(judge_template; model = model_judge, verbose,
             ctx.context,
-            question,
-            msg.content,
-            return_type = RAG.JudgeAllScores)
+            ctx.question,
+            ctx.answer,
+            return_type = JudgeAllScores)
         final_rating = if msg.content isa AbstractDict && haskey(msg.content, :final_rating)
             # if return type parsing failed
             msg.content[:final_rating]
@@ -159,7 +196,7 @@ function run_qa_evals(qa_item::QAEvalItem, ctx::RAGContext;
     end
 
     return QAEvalResult(;
-        ctx.source,
+        qa_item.source,
         qa_item.context,
         qa_item.question,
         ctx.answer,

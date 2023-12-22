@@ -134,6 +134,7 @@ function airag(index::AbstractChunkIndex, rag_template::Symbol = :RAGAnswerFromC
             question,
             answer = msg.content,
             context,
+            sources = sources(index)[reranked_candidates.positions],
             emb_candidates,
             tag_candidates,
             filtered_candidates,

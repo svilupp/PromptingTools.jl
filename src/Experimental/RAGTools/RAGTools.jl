@@ -27,7 +27,7 @@ include("retrieval.jl")
 export airag
 include("generation.jl")
 
-export build_qa_evals
+export build_qa_evals, run_qa_evals
 include("evaluation.jl")
 
 end
