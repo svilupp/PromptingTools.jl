@@ -1,9 +1,9 @@
-# # Small example for how to build a RAG system with new RAGTools
+# # Small example for how to build a RAG system with the new RAGTools
 # Note: RAGTools is still experimental and will change in the future. Ideally, they will be cleaned up and moved to a dedicated package
 
 using LinearAlgebra, SparseArrays
 using PromptingTools
-using PromptingTools.Experimental.RAGTools
+using PromptingTools.Experimental.RAGTools # Experimental! May change
 using JSON3, Serialization, DataFramesMeta
 using Statistics: mean
 const PT = PromptingTools
