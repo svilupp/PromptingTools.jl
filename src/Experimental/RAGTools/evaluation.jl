@@ -1,8 +1,8 @@
 ### For testing and eval
 # This is a return_type for extraction when generating Q&A set with aiextract
 @kwdef struct QAItem
-    question::String
-    answer::String
+    question::String = ""
+    answer::String = ""
 end
 # This is for saving in JSON format for evaluation later
 @kwdef struct QAEvalItem
@@ -12,12 +12,24 @@ end
     answer::String = ""
 end
 
+@kwdef struct QAEvalResult
+    source::AbstractString
+    context::AbstractString
+    question::AbstractString
+    answer::AbstractString
+    retrieval_score::Union{Number, Nothing} = nothing
+    retrieval_rank::Union{Int, Nothing} = nothing
+    answer_score::Union{Number, Nothing} = nothing
+    parameters::AbstractDict
+end
+
 "Provide the `final_rating` between 1-5. Provide the rationale for it."
 @kwdef struct JudgeRating
     rationale::Union{Nothing, String} = nothing
     final_rating::Int
 end
-"Explain the `final_rating` in `rationale`"
+
+"`final_rating` is the average of all scoring criteria. Explain the `final_rating` in `rationale`"
 @kwdef struct JudgeAllScores
     relevance::Int
     completeness::Int
@@ -33,7 +45,7 @@ function Base.isvalid(x::QAEvalItem)
 end
 
 # Nicer show method with some colors!
-function Base.show(io::IO, t::Union{QAItem, QAEvalItem})
+function Base.show(io::IO, t::Union{QAItem, QAEvalItem, QAEvalResult})
     printstyled(io, "$(nameof(typeof(t))):\n", color = :green, bold = true)
     for f in fieldnames(typeof(t))
         printstyled(io, " ", f, color = :blue, bold = true)
@@ -42,6 +54,7 @@ function Base.show(io::IO, t::Union{QAItem, QAEvalItem})
 end
 # Define how JSON3 should serialize/deserialize the struct into JSON files
 JSON3.StructTypes.StructType(::Type{QAEvalItem}) = JSON3.StructTypes.Struct()
+JSON3.StructTypes.StructType(::Type{QAEvalResult}) = JSON3.StructTypes.Struct()
 
 """
     build_qa_evals(doc_chunks::Vector{<:AbstractString}, sources::Vector{<:AbstractString};
@@ -103,4 +116,55 @@ function build_qa_evals(doc_chunks::Vector{<:AbstractString},
     end
     verbose && @info "Q&A Sets built! (cost: \$$(round(cost_tracker[], digits=3)))"
     return filter(isvalid, output)
+end
+
+"Returns 1.0 if `context` overlaps or is contained within any of the `candidate_context`"
+function score_retrieval_hit(orig_context::AbstractString,
+        candidate_context::Vector{<:AbstractString})
+    1.0 * (any(occursin.(Ref(orig_context), candidate_context)) ||
+     any(occursin.(candidate_context, Ref(orig_context))))
+end
+
+"Returns Integer rank of the position where `context` overlaps or is contained within a `candidate_context`"
+function score_retrieval_rank(orig_context::AbstractString,
+        candidate_context::Vector{<:AbstractString})
+    findfirst((occursin.(Ref(orig_context), candidate_context)) .||
+              (occursin.(candidate_context, Ref(orig_context))))
+end
+
+"Single QAEvalItem evalution"
+function run_qa_evals(qa_item::QAEvalItem, ctx::RAGContext;
+        verbose::Bool = true, parameters_dict::AbstractDict,
+        judge_template::Symbol = :RAGJudgeAnswerFromContext,
+        model_judge::AbstractString)
+    retrieval_score = score_retrieval_hit(qa_item.context, ctx.context)
+    retrieval_rank = score_retrieval_rank(qa_item.context, ctx.context)
+
+    answer_score = try
+        msg = aiextract(judge_template; model = model_judge, verbose,
+            ctx.context,
+            question,
+            msg.content,
+            return_type = RAG.JudgeAllScores)
+        final_rating = if msg.content isa AbstractDict && haskey(msg.content, :final_rating)
+            # if return type parsing failed
+            msg.content[:final_rating]
+        else
+            # if return_type worked
+            msg.content.final_rating
+        end
+    catch e
+        verbose && @warn "Error in QA eval ($(qa_item.question)): $e"
+        nothing
+    end
+
+    return QAEvalResult(;
+        ctx.source,
+        qa_item.context,
+        qa_item.question,
+        ctx.answer,
+        retrieval_score,
+        retrieval_rank,
+        answer_score,
+        parameters = parameters_dict)
 end

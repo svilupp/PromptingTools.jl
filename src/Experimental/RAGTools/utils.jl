@@ -1,3 +1,9 @@
+# Utility to check model suitability
+function _check_aiextract_capability(model::AbstractString)
+    # Check that the provided model is known and that it is an OpenAI model (for the aiextract function to work)
+    @assert haskey(PT.MODEL_REGISTRY,
+        model)&&PT.MODEL_REGISTRY[model].schema isa PT.AbstractOpenAISchema "Only OpenAI models support the metadata extraction now. $model is not a registered OpenAI model."
+end
 # Utitity to be able to combine indices from different sources/documents easily
 function merge_labeled_matrices(mat1::AbstractMatrix{T1},
         vocab1::Vector{String},

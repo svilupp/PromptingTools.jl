@@ -36,20 +36,20 @@ function Base.var"=="(i1::ChunkIndex, i2::ChunkIndex)
 end
 
 function Base.vcat(i1::ChunkIndex, i2::ChunkIndex)
-    tags, tags_vocab = if (isnothing(tags(i1)) || isnothing(tags(i2)))
+    tags_, tags_vocab_ = if (isnothing(tags(i1)) || isnothing(tags(i2)))
         nothing, nothing
     elseif tags_vocab(i1) == tags_vocab(i2)
         vcat(tags(i1), tags(i2)), tags_vocab(i1)
     else
         merge_labeled_matrices(tags(i1), tags_vocab(i1), tags(i2), tags_vocab(i2))
     end
-    embeddings = (isnothing(embeddings(i1)) || isnothing(embeddings(i2))) ? nothing :
-                 hcat(embeddings(i1), embeddings(i2))
+    embeddings_ = (isnothing(embeddings(i1)) || isnothing(embeddings(i2))) ? nothing :
+                  hcat(embeddings(i1), embeddings(i2))
     ChunkIndex(;
         chunks = vcat(chunks(i1), chunks(i2)),
-        embeddings,
-        tags,
-        tags_vocab,
+        embeddings = embeddings_,
+        tags = tags_,
+        tags_vocab = tags_vocab_,
         sources = vcat(i1.sources, i2.sources))
 end
 
@@ -95,6 +95,8 @@ function Base.var"&"(cc1::CandidateChunks, cc2::CandidateChunks)
 end
 function Base.getindex(ci::ChunkIndex, candidate::CandidateChunks, field::Symbol = :chunks)
     @assert field==:chunks "Only `chunks` field is supported for now"
+    len_ = length(chunks(ci))
+    @assert all(1 .<= candidate.positions .<= len_) "Some positions are out of bounds"
     if ci.id == candidate.index_id
         chunks(ci)[candidate.positions]
     else
@@ -114,10 +116,11 @@ end
 """
     RAGContext
 
-A struct for debugging RAG answers. It contains the question, context, and the candidate chunks at each step of the RAG pipeline.
+A struct for debugging RAG answers. It contains the question, answer, context, and the candidate chunks at each step of the RAG pipeline.
 """
 @kwdef struct RAGContext
     question::AbstractString
+    answer::AbstractString
     context::Vector{<:AbstractString}
     emb_candidates::CandidateChunks
     tag_candidates::Union{Nothing, CandidateChunks}
