@@ -36,9 +36,12 @@ function build_index end
 
 """
     build_index(files::Vector{<:AbstractString};
-    separators=["\n\n", ". ", "\n"], max_length::Int=256,
-    extract_metadata::Bool=false, verbose::Bool=true, metadata_template::Symbol=:RAGExtractMetadataShort,
-    model_embedding::String=PT.MODEL_EMBEDDING, model_metadata::String=PT.MODEL_CHAT)
+        separators = ["\n\n", ". ", "\n"], max_length::Int = 256,
+        extract_metadata::Bool = false, verbose::Bool = true,
+        metadata_template::Symbol = :RAGExtractMetadataShort,
+        model_embedding::String = PT.MODEL_EMBEDDING,
+        model_metadata::String = PT.MODEL_CHAT,
+        api_kwargs::NamedTuple = NamedTuple())
 
 Build an index for RAG (Retriever-Augmented Generation) applications from the provided file paths. 
 The function processes each file, splits its content into chunks, embeds these chunks, 
@@ -46,7 +49,7 @@ optionally extracts metadata, and then compiles this information into a retrieva
 
 # Arguments
 - `files`: A vector of valid file paths to be indexed.
-- `separators`: A list of strings used as separators for splitting the text in each file into chunks. Default is `["\\n\\n", ". ", "\\n"]`.
+- `separators`: A list of strings used as separators for splitting the text in each file into chunks. Default is `["\n\n", ". ", "\n"]`.
 - `max_length`: The maximum length of each chunk (if possible with provided separators). Default is 256.
 - `extract_metadata`: A boolean flag indicating whether to extract metadata from each chunk (to build filter `tags` in the index). Default is `false`.
   Metadata extraction incurs additional cost and requires `model_metadata` and `metadata_template` to be provided.
@@ -54,6 +57,7 @@ optionally extracts metadata, and then compiles this information into a retrieva
 - `metadata_template`: A symbol indicating the template to be used for metadata extraction. Default is `:RAGExtractMetadataShort`.
 - `model_embedding`: The model to use for embedding.
 - `model_metadata`: The model to use for metadata extraction.
+- `api_kwargs`: Parameters to be provided to the API endpoint.
 
 # Returns
 - `ChunkIndex`: An object containing the compiled index of chunks, embeddings, tags, vocabulary, and sources.
@@ -77,7 +81,8 @@ function build_index(files::Vector{<:AbstractString};
         extract_metadata::Bool = false, verbose::Bool = true,
         metadata_template::Symbol = :RAGExtractMetadataShort,
         model_embedding::String = PT.MODEL_EMBEDDING,
-        model_metadata::String = PT.MODEL_CHAT)
+        model_metadata::String = PT.MODEL_CHAT,
+        api_kwargs::NamedTuple = NamedTuple())
     ##
     @assert all(isfile, files) "Some `files` don't exist (Check: $(join(filter(!isfile,files),", "))"
 
@@ -101,14 +106,12 @@ function build_index(files::Vector{<:AbstractString};
 
         # Notice that we embed all doc_chunks at once, not one by one
         # OpenAI supports embedding multiple documents to reduce the number of API calls/network latency time
-        emb = aiembed(doc_chunks, _normalize; model = model_embedding, verbose)
+        emb = aiembed(doc_chunks, _normalize; model = model_embedding, verbose, api_kwargs)
         Threads.atomic_add!(cost_tracker, PT.call_cost(emb, model_embedding)) # track costs
         push!(output_embeddings, Float32.(emb.content))
 
         if extract_metadata && !isempty(model_metadata)
-            # Check that the provided model is known and that it is an OpenAI model (for the aiextract function to work)
-            @assert haskey(PT.MODEL_REGISTRY,
-                model_metadata)&&PT.MODEL_REGISTRY[model_metadata].schema == PT.OpenAISchema() "Only OpenAI models support the metadata extraction now. $model_metadata is not a registered OpenAI model."
+            _check_aiextract_capability(model_metadata)
             metadata_ = asyncmap(doc_chunks) do chunk
                 try
                     msg = aiextract(metadata_template;
@@ -116,7 +119,7 @@ function build_index(files::Vector{<:AbstractString};
                         text = chunk,
                         instructions = "None.",
                         verbose,
-                        model = model_metadata)
+                        model = model_metadata, api_kwargs)
                     Threads.atomic_add!(cost_tracker, PT.call_cost(msg, model_metadata)) # track costs
                     items = metadata_extract(msg.content.items)
                 catch
@@ -129,7 +132,7 @@ function build_index(files::Vector{<:AbstractString};
     ## Create metadata tags and associated vocabulary
     tags, tags_vocab = if !isempty(output_metadata)
         # Requires SparseArrays.jl!
-        _build_tags(vcat(output_metadata...)) # need to vcat to be on the "chunk-level"
+        build_tags(vcat(output_metadata...)) # need to vcat to be on the "chunk-level"
     else
         tags, tags_vocab = nothing, nothing
     end

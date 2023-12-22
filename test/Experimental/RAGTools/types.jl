@@ -1,121 +1,154 @@
+using PromptingTools.Experimental.RAGTools: ChunkIndex, MultiIndex, CandidateChunks
+using PromptingTools.Experimental.RAGTools: embeddings, chunks, tags, tags_vocab, sources
 
-@testset "merge_labeled_matrices" begin
-    # Test with dense matrices and overlapping vocabulary
-    mat1 = [1 2; 3 4]
-    vocab1 = ["word1", "word2"]
-    mat2 = [5 6; 7 8]
-    vocab2 = ["word2", "word3"]
+@testset "ChunkIndex" begin
+    # Test constructors and basic accessors
+    chunks_test = ["chunk1", "chunk2"]
+    emb_test = ones(2, 2)
+    tags_test = sparse([1, 2], [1, 2], [true, true], 2, 2)
+    tags_vocab_test = ["vocab1", "vocab2"]
+    sources_test = ["source1", "source2"]
+    ci = ChunkIndex(chunks = chunks_test,
+        embeddings = emb_test,
+        tags = tags_test,
+        tags_vocab = tags_vocab_test,
+        sources = sources_test)
 
-    merged_mat, combined_vocab = merge_labeled_matrices(mat1, vocab1, mat2, vocab2)
+    @test chunks(ci) == chunks_test
+    @test (embeddings(ci)) == emb_test
+    @test tags(ci) == tags_test
+    @test tags_vocab(ci) == tags_vocab_test
+    @test sources(ci) == sources_test
 
-    @test size(merged_mat) == (4, 3)
-    @test combined_vocab == ["word1", "word2", "word3"]
-    @test merged_mat == [1 2 0; 3 4 0; 0 5 6; 0 7 8]
+    # Test identity/equality
+    ci1 = ChunkIndex(chunks = ["chunk1", "chunk2"], sources = ["source1", "source2"])
+    ci2 = ChunkIndex(chunks = ["chunk1", "chunk2"], sources = ["source1", "source2"])
+    @test ci1 == ci2
 
-    # Test with sparse matrices and disjoint vocabulary
-    mat1 = sparse([1 0; 0 2])
-    vocab1 = ["word1", "word2"]
-    mat2 = sparse([3 0; 0 4])
-    vocab2 = ["word3", "word4"]
+    # Test equality with different chunks and sources
+    ci2 = ChunkIndex(chunks = ["chunk3", "chunk4"], sources = ["source3", "source4"])
+    @test ci1 != ci2
 
-    merged_mat, combined_vocab = merge_labeled_matrices(mat1, vocab1, mat2, vocab2)
+    # Test hcat with ChunkIndex
+    # Setup two different ChunkIndex with different tags and then hcat them
+    chunks1 = ["chunk1", "chunk2"]
+    tags1 = sparse([1, 2], [1, 2], [true, true], 2, 3)
+    tags_vocab1 = ["vocab1", "vocab2", "vocab3"]
+    sources1 = ["source1", "source1"]
+    ci1 = ChunkIndex(chunks = chunks1,
+        tags = tags1,
+        tags_vocab = tags_vocab1,
+        sources = sources1)
 
-    @test size(merged_mat) == (4, 4)
-    @test combined_vocab == ["word1", "word2", "word3", "word4"]
-    @test merged_mat == sparse([1 0 0 0; 0 2 0 0; 0 0 3 0; 0 0 0 4])
+    chunks2 = ["chunk3", "chunk4"]
+    tags2 = sparse([1, 2], [1, 3], [true, true], 2, 3)
+    tags_vocab2 = ["vocab1", "vocab3", "vocab4"]
+    sources2 = ["source2", "source2"]
+    ci2 = ChunkIndex(chunks = chunks2,
+        tags = tags2,
+        tags_vocab = tags_vocab2,
+        sources = sources2)
 
-    # Test with different data types
-    mat1 = [1.0 2.0; 3.0 4.0]
-    vocab1 = ["word1", "word2"]
-    mat2 = [5 6; 7 8]
-    vocab2 = ["word2", "word3"]
+    combined_ci = vcat(ci1, ci2)
+    @test size(tags(combined_ci), 1) == 4
+    @test size(tags(combined_ci), 2) == 4
+    @test length(unique(vcat(tags_vocab(ci1), tags_vocab(ci2)))) ==
+          length(tags_vocab(combined_ci))
+    @test sources(combined_ci) == vcat(sources(ci1), (sources(ci2)))
 
-    merged_mat, combined_vocab = merge_labeled_matrices(mat1, vocab1, mat2, vocab2)
-
-    @test eltype(merged_mat) == Float64
-    @test size(merged_mat) == (4, 3)
-    @test combined_vocab == ["word1", "word2", "word3"]
-    @test merged_mat ≈ [1.0 2.0 0.0; 3.0 4.0 0.0; 0.0 5.0 6.0; 0.0 7.0 8.0]
+    # Test base var"==" with ChunkIndex
+    ci1 = ChunkIndex(chunks = ["chunk1"],
+        tags = trues(3, 1),
+        tags_vocab = ["vocab1"],
+        sources = ["source1"])
+    ci2 = ChunkIndex(chunks = ["chunk1"],
+        tags = trues(3, 1),
+        tags_vocab = ["vocab1"],
+        sources = ["source1"])
+    @test ci1 == ci2
 end
 
-@testset "ChunkIndex and MultiIndex getindex Tests" begin
-    @testset "ChunkIndex getindex" begin
-        ci = ChunkIndex(:index1, ["chunk1", "chunk2", "chunk3"])
-        candidate = CandidateChunks(:index1, [1, 3])
+@testset "MultiIndex" begin
+    # Test constructors/accessors
+    # MultiIndex behaves as a container for ChunkIndexes
+    cin1 = ChunkIndex(chunks = ["chunk1"], sources = ["source1"])
+    cin2 = ChunkIndex(chunks = ["chunk2"], sources = ["source2"])
+    multi_index = MultiIndex(indexes = [cin1, cin2])
+    @test length(multi_index.indexes) == 2
+    @test cin1 in multi_index.indexes
+    @test cin2 in multi_index.indexes
 
-        @test getindex(ci, candidate) == ["chunk1", "chunk3"]
-        @test getindex(ci, candidate, :chunks) == ["chunk1", "chunk3"]
-        @test_throws AssertionError getindex(ci, candidate, :unsupported_field)
+    # Test base var"==" with MultiIndex
+    # Case where MultiIndexes are equal
+    cin1 = ChunkIndex(chunks = ["chunk1"], sources = ["source1"])
+    cin2 = ChunkIndex(chunks = ["chunk2"], sources = ["source2"])
+    mi1 = MultiIndex(indexes = [cin1, cin2])
+    mi2 = MultiIndex(indexes = [cin1, cin2])
+    @test mi1 == mi2
 
-        # Test with non-matching index_id
-        candidate_wrong_id = CandidateChunks(:index2, [1, 3])
-        @test getindex(ci, candidate_wrong_id) == String[]
-    end
-
-    @testset "MultiIndex getindex" begin
-        ci1 = ChunkIndex(:index1, ["chunk1", "chunk2"])
-        ci2 = ChunkIndex(:index2, ["chunk3", "chunk4"])
-        mi = MultiIndex([ci1, ci2])
-        candidate = CandidateChunks(:index2, [2])
-
-        @test getindex(mi, candidate) == ["chunk4"]
-        @test getindex(mi, candidate, :chunks) == ["chunk4"]
-        @test_throws AssertionError getindex(mi, candidate, :unsupported_field)
-
-        # Test with non-existing index_id
-        candidate_non_existing = CandidateChunks(:index3, [1])
-        @test getindex(mi, candidate_non_existing) == String[]
-    end
+    # Test equality with different ChunkIndexes inside
+    cin1 = ChunkIndex(chunks = ["chunk1"], sources = ["source1"])
+    cin2 = ChunkIndex(chunks = ["chunk2"], sources = ["source2"])
+    mi1 = MultiIndex(indexes = [cin1])
+    mi2 = MultiIndex(indexes = [cin2])
+    @test mi1 != mi2
 end
 
-@testset "MultiIndex Equality Tests" begin
-    index1 = ChunkIndex(:A)
-    index2 = ChunkIndex(:B)
-    index3 = ChunkIndex(:C)
+@testset "getindex with CandidateChunks" begin
+    # Initialize a ChunkIndex with test data
+    chunks_data = ["First chunk", "Second chunk", "Third chunk"]
+    embeddings_data = rand(3, 3)  # Random matrix with 3 embeddings
+    tags_data = sparse(Bool[1 1; 0 1; 1 0])  # Some arbitrary sparse matrix representation
+    tags_vocab_data = ["tag1", "tag2"]
+    chunk_sym = Symbol("TestChunkIndex")
+    test_chunk_index = ChunkIndex(chunks = chunks_data,
+        embeddings = embeddings_data,
+        tags = tags_data,
+        tags_vocab = tags_vocab_data,
+        sources = repeat(["test_source"], 3),
+        id = chunk_sym)
 
-    mi1 = MultiIndex([index1, index2])
-    mi2 = MultiIndex([index1, index2])
-    mi3 = MultiIndex([index2, index3])
-    mi4 = MultiIndex([index1, index2, index3])
-    mi5 = MultiIndex([index2, index1])
+    # Test to get chunks based on valid CandidateChunks
+    candidate_chunks = CandidateChunks(index_id = chunk_sym,
+        positions = [1, 3],
+        distances = [0.1, 0.2])
+    @test collect(test_chunk_index[candidate_chunks]) == ["First chunk", "Third chunk"]
 
-    @test mi1 == mi2  # Identical MultiIndexes
-    @test mi1 != mi3  # Different indexes
-    @test mi1 != mi4  # Different number of indexes
-    @test mi3 != mi4  # Different indexes and different lengths
-    @test mi1 == mi5  # Same indexes, different order
-end
+    # Test with empty positions, which should result in an empty array
+    candidate_chunks_empty = CandidateChunks(index_id = chunk_sym,
+        positions = Int[],
+        distances = Float32[])
+    @test isempty(test_chunk_index[candidate_chunks_empty])
 
-@testset "CandidateChunks" begin
-    # Different Index IDs and Intersecting Positions
-    cc1 = CandidateChunks(index_id = :index1,
-        positions = [1, 2, 3],
-        distances = [0.1, 0.2, 0.3])
-    cc2 = CandidateChunks(index_id = :index2,
-        positions = [2, 3, 4],
-        distances = [0.3, 0.2, 0.1])
-    cc3 = CandidateChunks(index_id = :index1,
-        positions = [3, 4, 5],
-        distances = [0.3, 0.4, 0.5])
+    # Test with positions out of bounds, should handle gracefully without errors
+    candidate_chunks_oob = CandidateChunks(index_id = chunk_sym,
+        positions = [10, -1],
+        distances = [0.5, 0.6])
+    @test_throws AssertionError test_chunk_index[candidate_chunks_oob]
 
-    # Different index IDs
-    result_diff_id = cc1 & cc2
-    @test result_diff_id.index_id == :index1
-    @test isempty(result_diff_id.positions)
-    @test isempty(result_diff_id.distances)
+    # Test with an incorrect index_id, which should also result in an empty array
+    wrong_sym = Symbol("InvalidIndex")
+    candidate_chunks_wrong_id = CandidateChunks(index_id = wrong_sym,
+        positions = [1, 2],
+        distances = [0.3, 0.4])
+    @test isempty(test_chunk_index[candidate_chunks_wrong_id])
 
-    # Intersecting positions
-    result_intersect = cc1 & cc3
-    @test result_intersect.index_id == :index1
-    @test result_intersect.positions == [3]
-    @test result_intersect.distances ≈ [0.4]
+    # Test when chunks are requested from a MultiIndex, only chunks from the corresponding ChunkIndex should be returned
+    another_chuck_index = ChunkIndex(chunks = chunks_data,
+        embeddings = nothing,
+        tags = nothing,
+        tags_vocab = nothing,
+        sources = repeat(["another_source"], 3),
+        id = Symbol("AnotherChunkIndex"))
+    test_multi_index = MultiIndex(indexes = [
+        test_chunk_index,
+        another_chuck_index,
+    ])
+    @test collect(test_multi_index[candidate_chunks]) == ["First chunk", "Third chunk"]
 
-    # Missing Distances
-    cc1 = CandidateChunks(index_id = :index1, positions = [1, 2], distances = Float32[])
-    cc2 = CandidateChunks(index_id = :index1, positions = [2, 3], distances = [0.2, 0.3])
+    # Test when wrong index_id is used with MultiIndex, resulting in an empty array
+    @test isempty(test_multi_index[candidate_chunks_wrong_id])
 
-    result = cc1 & cc2
-    @test result.index_id == :index1
-    @test result.positions == [2]
-    @test isempty(result.distances)
+    # Test error case when trying to use a non-chunks field, should assert error as only :chunks field is supported
+    @test_throws AssertionError test_chunk_index[candidate_chunks, :nonexistent_field]
 end

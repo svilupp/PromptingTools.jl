@@ -1,3 +1,6 @@
+using PromptingTools.Experimental.RAGTools: metadata_extract, MetadataItem
+using PromptingTools.Experimental.RAGTools: MaybeMetadataItems, build_tags, build_index
+
 @testset "metadata_extract" begin
     # MetadataItem Structure
     item = MetadataItem("value", "category")
@@ -65,4 +68,61 @@ end
     @test tags_vocab_ == ["tag1", "tag2", "tag3"]
     @test nnz(tags_) == 3
     @test all([tags_[1, 1], tags_[3, 2], tags_[3, 3]])
+end
+
+@testset "build_index" begin
+    # test with a mock server
+    PORT = rand(1000:2000)
+    PT.register_model!(; name = "mock-emb", schema = PT.CustomOpenAISchema())
+    PT.register_model!(; name = "mock-meta", schema = PT.CustomOpenAISchema())
+    PT.register_model!(; name = "mock-get", schema = PT.CustomOpenAISchema())
+
+    echo_server = HTTP.serve!(PORT; verbose = -1) do req
+        content = JSON3.read(req.body)
+
+        if content[:model] == "mock-gen"
+            user_msg = last(content[:messages])
+            response = Dict(:choices => [Dict(:message => user_msg)],
+                :model => content[:model],
+                :usage => Dict(:total_tokens => length(user_msg[:content]),
+                    :prompt_tokens => length(user_msg[:content]),
+                    :completion_tokens => 0))
+        elseif content[:model] == "mock-emb"
+            response = Dict(:data => [Dict(:embedding => ones(Float32, 128))
+                                      for i in 1:length(content[:input])],
+                :usage => Dict(:total_tokens => length(content[:input]),
+                    :prompt_tokens => length(content[:input]),
+                    :completion_tokens => 0))
+        elseif content[:model] == "mock-meta"
+            user_msg = last(content[:messages])
+            response = Dict(:choices => [
+                    Dict(:message => Dict(:function_call => Dict(:arguments => JSON3.write(MaybeMetadataItems([
+                        MetadataItem("yes", "category"),
+                    ]))))),
+                ],
+                :model => content[:model],
+                :usage => Dict(:total_tokens => length(user_msg[:content]),
+                    :prompt_tokens => length(user_msg[:content]),
+                    :completion_tokens => 0))
+        else
+            @info content
+        end
+        return HTTP.Response(200, JSON3.write(response))
+    end
+
+    text = "This is a long text that will be split into chunks.\n\n It will be split by the separator. And also by the separator '\n'."
+    tmp, _ = mktemp()
+    write(tmp, text)
+    mini_files = [tmp, tmp]
+    index = build_index(mini_files; max_length = 10, extract_metadata = true,
+        model_embedding = "mock-emb",
+        model_metadata = "mock-meta", api_kwargs = (; url = "http://localhost:$(PORT)"))
+    @test index.embeddings == hcat(fill(normalize(ones(Float32, 128)), 8)...)
+    @test index.chunks[1:4] == index.chunks[5:8]
+    @test index.sources == fill(tmp, 8)
+    @test index.tags == ones(8, 1)
+    @test index.tags_vocab == ["category:::yes"]
+
+    # clean up
+    close(echo_server)
 end

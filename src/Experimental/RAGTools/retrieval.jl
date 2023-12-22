@@ -30,7 +30,8 @@ function find_tags(index::AbstractChunkIndex,
 end
 function find_tags(index::AbstractChunkIndex,
         tags::Vector{<:AbstractString})
-    pos = Int[find_tags(index, tag).positions for tag in tags] |> unique
+    pos = [find_tags(index, tag).positions for tag in tags] |>
+          Base.Splat(vcat) |> unique |> x -> convert(Vector{Int}, x)
     return CandidateChunks(index.id, pos, ones(Float32, length(pos)))
 end
 
