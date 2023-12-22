@@ -122,6 +122,7 @@ A struct for debugging RAG answers. It contains the question, answer, context, a
     question::AbstractString
     answer::AbstractString
     context::Vector{<:AbstractString}
+    sources::Vector{<:AbstractString}
     emb_candidates::CandidateChunks
     tag_candidates::Union{Nothing, CandidateChunks}
     filtered_candidates::CandidateChunks
