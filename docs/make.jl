@@ -31,7 +31,11 @@ makedocs(;
             "Building RAG Application" => "examples/building_RAG.md",
         ],
         "F.A.Q." => "frequently_asked_questions.md",
-        "Reference" => "reference.md",
+        "Reference" => [
+            "PromptingTools.jl" => "reference.md",
+            "Experimental Modules" => "reference_experimental.md",
+            "RAGTools" => "reference_ragtools.md",
+        ],
     ])
 
 deploydocs(;
