@@ -144,8 +144,8 @@ end
 
 """
     run_qa_evals(qa_item::QAEvalItem, ctx::RAGContext; verbose::Bool = true,
-                 parameters_dict::Dict{Symbol, Any}, judge_template::Symbol = :RAGJudgeAnswerFromContext,
-                 model_judge::AbstractString,api_kwargs::NamedTuple = NamedTuple()) -> QAEvalResult
+                 parameters_dict::Dict{Symbol, <:Any}, judge_template::Symbol = :RAGJudgeAnswerFromContext,
+                 model_judge::AbstractString, api_kwargs::NamedTuple = NamedTuple()) -> QAEvalResult
 
 Evaluates a single `QAEvalItem` using a RAG context (`RAGContext`) and returns a `QAEvalResult` structure. This function assesses the relevance and accuracy of the answers generated in a QA evaluation context.
 
@@ -180,7 +180,7 @@ eval_result = run_qa_evals(qa_item, ctx, parameters_dict=parameters_dict, model_
 ```
 """
 function run_qa_evals(qa_item::QAEvalItem, ctx::RAGContext;
-        verbose::Bool = true, parameters_dict::Dict{Symbol, Any} = Dict{Symbol, Any}(),
+        verbose::Bool = true, parameters_dict::Dict{Symbol, <:Any} = Dict{Symbol, Any}(),
         judge_template::Symbol = :RAGJudgeAnswerFromContextShort,
         model_judge::AbstractString = PT.MODEL_CHAT,
         api_kwargs::NamedTuple = NamedTuple())
@@ -223,7 +223,7 @@ end
         api_kwargs::NamedTuple = NamedTuple(),
         airag_kwargs::NamedTuple = NamedTuple(),
         qa_evals_kwargs::NamedTuple = NamedTuple(),
-        verbose::Bool = true, parameters_dict::Dict{Symbol, Any} = Dict{Symbol, Any}())
+        verbose::Bool = true, parameters_dict::Dict{Symbol, <:Any} = Dict{Symbol, Any}())
 
 Evaluates a vector of `QAEvalItem`s and returns a vector `QAEvalResult`. 
 This function assesses the relevance and accuracy of the answers generated in a QA evaluation context.
@@ -262,7 +262,7 @@ function run_qa_evals(index::AbstractChunkIndex, qa_items::AbstractVector{<:QAEv
         api_kwargs::NamedTuple = NamedTuple(),
         airag_kwargs::NamedTuple = NamedTuple(),
         qa_evals_kwargs::NamedTuple = NamedTuple(),
-        verbose::Bool = true, parameters_dict::Dict{Symbol, Any} = Dict{Symbol, Any}())
+        verbose::Bool = true, parameters_dict::Dict{Symbol, <:Any} = Dict{Symbol, Any}())
     # Run evaluations in parallel
     results = asyncmap(qa_items) do qa_item
         # Generate an answer -- often you want the model_judge to be the highest quality possible, eg, "GPT-4 Turbo" (alias "gpt4t)
