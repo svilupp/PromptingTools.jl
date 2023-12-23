@@ -1,5 +1,6 @@
 using PromptingTools
 using OpenAI, HTTP, JSON3
+using SparseArrays, LinearAlgebra
 using Test
 using Aqua
 const PT = PromptingTools
@@ -33,4 +34,9 @@ let cb = AICode(; code = """
     @test !isnothing(cb.expression) # parsed
     @test occursin("Test Failed", cb.stdout) # capture details of the test failure
     @test isnothing(cb.output) # because it failed
+end
+
+## Run experimental
+@testset "Experimental" begin
+    include("Experimental/RAGTools/runtests.jl")
 end

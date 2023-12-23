@@ -180,7 +180,7 @@ end
 @testset "OpenAI.create_chat" begin
     # Test CustomOpenAISchema() with a mock server
     PORT = rand(1000:2000)
-    echo_server = HTTP.serve!(PORT) do req
+    echo_server = HTTP.serve!(PORT, verbose = -1) do req
         content = JSON3.read(req.body)
         user_msg = last(content[:messages])
         response = Dict(:choices => [Dict(:message => user_msg)],
@@ -206,7 +206,7 @@ end
 @testset "OpenAI.create_embeddings" begin
     # Test CustomOpenAISchema() with a mock server
     PORT = rand(1000:2000)
-    echo_server = HTTP.serve!(PORT) do req
+    echo_server = HTTP.serve!(PORT, verbose = -1) do req
         content = JSON3.read(req.body)
         response = Dict(:data => [Dict(:embedding => ones(128))],
             :usage => Dict(:total_tokens => length(content[:input]),
