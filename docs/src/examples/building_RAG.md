@@ -100,6 +100,7 @@ evals = JSON3.read("examples/evals.json", Vector{RT.QAEvalItem});
 ## Explore one Q&A pair
 
 Let's explore one evals item -- it's not the best quality but gives you the idea!
+
 ````julia
 evals[1]
 ````
