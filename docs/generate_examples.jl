@@ -9,3 +9,5 @@ filter!(endswith(".jl"), example_files)
 for fn in example_files
     Literate.markdown(fn, output_dir; execute = true)
 end
+
+# TODO: change meta fields at the top of each file!

@@ -139,19 +139,19 @@ end
 function aiembed(doc_or_docs, args...; model = MODEL_EMBEDDING, kwargs...)
     global MODEL_REGISTRY
     schema = get(MODEL_REGISTRY, model, (; schema = PROMPT_SCHEMA)).schema
-    aiembed(schema, doc_or_docs, args...; kwargs...)
+    aiembed(schema, doc_or_docs, args...; model, kwargs...)
 end
 function aiclassify(prompt; model = MODEL_CHAT, kwargs...)
     global MODEL_REGISTRY
     schema = get(MODEL_REGISTRY, model, (; schema = PROMPT_SCHEMA)).schema
-    aiclassify(schema, prompt; kwargs...)
+    aiclassify(schema, prompt; model, kwargs...)
 end
 function aiextract(prompt; model = MODEL_CHAT, kwargs...)
     global MODEL_REGISTRY
     schema = get(MODEL_REGISTRY, model, (; schema = PROMPT_SCHEMA)).schema
-    aiextract(schema, prompt; kwargs...)
+    aiextract(schema, prompt; model, kwargs...)
 end
 function aiscan(prompt; model = MODEL_CHAT, kwargs...)
     schema = get(MODEL_REGISTRY, model, (; schema = PROMPT_SCHEMA)).schema
-    aiscan(schema, prompt; kwargs...)
+    aiscan(schema, prompt; model, kwargs...)
 end
