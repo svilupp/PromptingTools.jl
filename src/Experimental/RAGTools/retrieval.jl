@@ -1,17 +1,35 @@
-"Finds the indices of chunks (represented by embeddings in `emb`) that are closest (cosine similarity) to query embedding (`query_emb`). Returns only `top_k` closest indices."
+"""
+    find_closest(emb::AbstractMatrix{<:Real},
+        query_emb::AbstractVector{<:Real};
+        top_k::Int = 100, minimum_similarity::AbstractFloat = -1.0)
+
+Finds the indices of chunks (represented by embeddings in `emb`) that are closest (cosine similarity) to query embedding (`query_emb`). 
+
+If `minimum_similarity` is provided, only indices with similarity greater than or equal to it are returned. 
+Similarity can be between -1 and 1 (-1 = completely opposite, 1 = exactly the same).
+
+Returns only `top_k` closest indices.
+"""
 function find_closest(emb::AbstractMatrix{<:Real},
         query_emb::AbstractVector{<:Real};
-        top_k::Int = 100)
+        top_k::Int = 100, minimum_similarity::AbstractFloat = -1.0)
     # emb is an embedding matrix where the first dimension is the embedding dimension
     distances = query_emb' * emb |> vec
     positions = distances |> sortperm |> reverse |> x -> first(x, top_k)
+    if minimum_similarity > -1.0
+        mask = distances[positions] .>= minimum_similarity
+        positions = positions[mask]
+    end
     return positions, distances[positions]
 end
 function find_closest(index::AbstractChunkIndex,
         query_emb::AbstractVector{<:Real};
-        top_k::Int = 100)
+        top_k::Int = 100, minimum_similarity::AbstractFloat = -1.0)
     isnothing(embeddings(index)) && CandidateChunks(; index_id = index.id)
-    positions, distances = find_closest(embeddings(index), query_emb; top_k)
+    positions, distances = find_closest(embeddings(index),
+        query_emb;
+        top_k,
+        minimum_similarity)
     return CandidateChunks(index.id, positions, Float32.(distances))
 end
 
