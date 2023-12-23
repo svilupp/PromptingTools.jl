@@ -4,32 +4,41 @@ EditURL = "../../../examples/building_RAG.jl"
 
 # Building a Simple Retrieval-Augmented Generation (RAG) System with RAGTools
 
-Note: RAGTools module is still experimental and will change in the future. Ideally, they will be cleaned up and moved to a dedicated package
+Let's build a Retrieval-Augmented Generation (RAG) chatbot, tailored to navigate and interact with the DataFrames.jl documentation. 
+"RAG" is probably the most common and valuable pattern in Generative AI at the moment.
+
+If you're not familiar with "RAG", start with this [article](https://towardsdatascience.com/add-your-own-data-to-an-llm-using-retrieval-augmented-generation-rag-b1958bf56a5a).
+
 
 ````julia
 using LinearAlgebra, SparseArrays
 using PromptingTools
-using PromptingTools.Experimental.RAGTools # Experimental! May change
+using PromptingTools.Experimental.RAGTools
+## Note: RAGTools module is still experimental and will change in the future. Ideally, they will be cleaned up and moved to a dedicated package
 using JSON3, Serialization, DataFramesMeta
 using Statistics: mean
 const PT = PromptingTools
 const RT = PromptingTools.Experimental.RAGTools
 ````
 
-## Ask questions E2E
-Let's put together a few copy&pasted text files from DataFrames.jl docs
+## RAG in Two Lines
+
+Let's put together a few text pages from DataFrames.jl docs. 
+Simply go to [DataFrames.jl docs](https://dataframes.juliadata.org/stable/) and copy&paste a few pages into separate text files. Save them in the `examples/data` folder (see some example pages provided). Ideally, delete all the noise (like headers, footers, etc.) and keep only the text you want to use for the chatbot. Remember, garbage in, garbage out!
 
 ````julia
 files = [
     joinpath("examples", "data", "database_style_joins.txt"),
     joinpath("examples", "data", "what_is_dataframes.txt"),
 ]
+# Build an index of chunks, embed them, and create a lookup index of metadata/tags for each chunk
 index = build_index(files; extract_metadata = false);
 ````
 
 Let's ask a question
 
 ````julia
+# Embeds the question, finds the closest chunks in the index, and generates an answer from the closest chunks
 answer = airag(index; question = "I like dplyr, what is the equivalent in Julia?")
 ````
 
@@ -40,16 +49,17 @@ AIMessage("The equivalent package in Julia to dplyr in R is DataFramesMeta.jl. I
 First RAG in two lines? Done!
 
 What does it do?
-- `build_index` will chunk the documents into smaller pieces, embed them into numbers (to be able to judge similarity of chunks) and, optionally, create a lookup index of metadata/tags for each chunk)
+- `build_index` will chunk the documents into smaller pieces, embed them into numbers (to be able to judge the similarity of chunks) and, optionally, create a lookup index of metadata/tags for each chunk)
   - `index` is the result of this step and it holds your chunks, embeddings, and other metadata! Just show it :)
 - `airag` will
   - embed your question
-  - find the closest chunks in the index
-  - [OPTIONAL] extract any potential tags/filters from the question and apply them to filter down the potential candidates
-  - [OPTIONAL] rerank the candidate chunks
-- generate an answer from the closest chunks
+  - find the closest chunks in the index (use parameters `top_k` and `minimum_similarity` to tweak the "relevant" chunks)
+  - [OPTIONAL] extracts any potential tags/filters from the question and applies them to filter down the potential candidates (use `extract_metadata=true` in `build_index`, you can also provide some filters explicitly via `tag_filter`)
+  - [OPTIONAL] re-ranks the candidate chunks (define and provide your own `rerank_strategy`, eg Cohere ReRank API)
+  - build a context from the closest chunks (use `chunks_window_margin` to tweak if we include preceding and succeeding chunks as well, see `?build_context` for more details)
+- generate an answer from the closest chunks (use `return_context=true` to see under the hood and debug your application)
 
-You should save the index for later!
+You should save the index for later to avoid re-embedding / re-extracting the document chunks!
 
 ````julia
 serialize("examples/index.jls", index)
@@ -109,8 +119,9 @@ julia> using DataFrames
 
 ## Evaluate this Q&A pair
 
+Let's evaluate this QA item with a "judge model" (often GPT-4 is used as a judge).
+
 ````julia
-# Let's answer and evaluate this QA item with the judge
 # Note: that we used the same question, but generated a different context and answer via `airag`
 msg, ctx = airag(index; evals[1].question, return_context = true);
 # ctx is a RAGContext object that keeps all intermediate states of the RAG pipeline for easy evaluation
@@ -132,7 +143,7 @@ Dict{Symbol, Any} with 6 entries:
   :helpfulness => 5
 ````
 
-We can also run the whole evaluation in a function (a few more metrics are available):
+We can also run the generation + evaluation in a function (a few more metrics are available, eg, retrieval score):
 ````julia
 x = run_qa_evals(evals[10], ctx;
     parameters_dict = Dict(:top_k => 3), verbose = true, model_judge = "gpt4t")
@@ -154,10 +165,9 @@ semijoin: Like an inner join, but output is restricted to columns from the first
 
 Fortunately, we don't have to do this one by one -- let's evaluate all our Q&A pairs at once.
 
-## Evaluate the whole set
+## Evaluate the Whole Set
 
-Let's run each question&answer through our eval loop in async (we do it only for the first 10)
-See the `?airag` for which parameters you can tweak, eg, top_k
+Let's run each question & answer through our eval loop in async (we do it only for the first 10 to save time). See the `?airag` for which parameters you can tweak, eg, `top_k`
 
 ````julia
 results = asyncmap(evals[1:10]) do qa_item
@@ -168,23 +178,26 @@ results = asyncmap(evals[1:10]) do qa_item
     # Note: you can log key parameters for easier analysis later
     run_qa_evals(qa_item, ctx; parameters_dict = Dict(:top_k => 3), verbose = false)
 end
-## Note that the "failed" evals can show as "nothing", so make sure to handle them.
-results = filter(!isnothing, results);
+## Note that the "failed" evals can show as "nothing" (failed as in there was some API error or parsing error), so make sure to handle them.
+results = filter(x->!isnothing(x.answer_score), results);
 ````
 
+Note: You could also use the vectorized version `results = run_qa_evals(evals)` to evaluate all items at once.
 
 ````julia
 
 # Let's take a simple average to calculate our score
-@info "RAG Evals: $(length(results)) results, Avg. score: $(round(mean(x->x.answer_score, results);digits=1)), Retrieval score: $(100*round(mean(x->x.retrieval_score,results);digits=1))%"
+@info "RAG Evals: $(length(results)) results, Avg. score: $(round(mean(x->x.answer_score, results);digits=1)), Retrieval score: $(100*round(Int,mean(x->x.retrieval_score,results)))%"
 ````
 
 ````
-[ Info: RAG Evals: 10 results, Avg. score: 4.6, Retrieval score: 100.0%
+[ Info: RAG Evals: 10 results, Avg. score: 4.6, Retrieval score: 100%
 
 ````
 
-or you can analyze it in a DataFrame
+Note: The retrieval score is 100% only because we have two small documents and running on 10 items only. In practice, you would have a much larger document set and a much larger eval set, which would result in a more representative retrieval score.
+
+You can also analyze the results in a DataFrame:
 
 ````julia
 df = DataFrame(results)

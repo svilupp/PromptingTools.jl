@@ -1,4 +1,32 @@
-using PromptingTools.Experimental.RAGTools: MaybeMetadataItems, MetadataItem
+using PromptingTools.Experimental.RAGTools: MaybeMetadataItems, MetadataItem, build_context
+
+@testset "build_context" begin
+    index = ChunkIndex(;
+        sources = [".", ".", "."],
+        chunks = ["a", "b", "c"],
+        embeddings = zeros(128, 3),
+        tags = vcat(trues(2, 2), falses(1, 2)),
+        tags_vocab = ["yes", "no"],)
+    candidates = CandidateChunks(index.id, [1, 2], [0.1, 0.2])
+
+    # Standard Case
+    context = build_context(index, candidates)
+    expected_output = ["1. a\nb",
+        "2. a\nb\nc"]
+    @test context == expected_output
+
+    # No Surrounding Chunks
+    context = build_context(index, candidates; chunks_window_margin = (0, 0))
+    expected_output = ["1. a",
+        "2. b"]
+    @test context == expected_output
+
+    # Wrong inputs
+    @test_throws AssertionError build_context(index,
+        candidates;
+        chunks_window_margin = (-1, 0))
+end
+
 @testset "airag" begin
     # test with a mock server
     PORT = rand(1000:2000)

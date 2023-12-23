@@ -2,7 +2,7 @@ using PromptingTools.Experimental.RAGTools: find_closest, find_tags
 using PromptingTools.Experimental.RAGTools: Passthrough, rerank
 
 @testset "find_closest" begin
-    test_embeddings = [1.0 2.0; 3.0 4.0; 5.0 6.0] |>
+    test_embeddings = [1.0 2.0 -1.0; 3.0 4.0 -3.0; 5.0 6.0 -6.0] |>
                       x -> mapreduce(normalize, hcat, eachcol(x))
     query_embedding = [0.1, 0.35, 0.5] |> normalize
     positions, distances = find_closest(test_embeddings, query_embedding, top_k = 2)
@@ -14,6 +14,11 @@ using PromptingTools.Experimental.RAGTools: Passthrough, rerank
     # Test when top_k is more than available embeddings
     positions, _ = find_closest(test_embeddings, query_embedding, top_k = 5)
     @test length(positions) == size(test_embeddings, 2)
+
+    # Test with minimum_similarity
+    positions, _ = find_closest(test_embeddings, query_embedding, top_k = 5,
+        minimum_similarity = 0.995)
+    @test length(positions) == 1
 
     # Test behavior with edge values (top_k == 0)
     @test find_closest(test_embeddings, query_embedding, top_k = 0) == ([], [])

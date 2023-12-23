@@ -20,7 +20,7 @@ end
     retrieval_score::Union{Number, Nothing} = nothing
     retrieval_rank::Union{Int, Nothing} = nothing
     answer_score::Union{Number, Nothing} = nothing
-    parameters::AbstractDict
+    parameters::Dict{Symbol, Any} = Dict{Symbol, Any}()
 end
 
 "Provide the `final_rating` between 1-5. Provide the rationale for it."
@@ -37,11 +37,17 @@ end
     consistency::Int
     helpfulness::Int
     rationale::Union{Nothing, String} = nothing
-    final_rating::Int
+    final_rating::Float64
 end
 
 function Base.isvalid(x::QAEvalItem)
     !isempty(x.question) && !isempty(x.answer) && !isempty(x.context)
+end
+# for equality tests
+function Base.var"=="(x::Union{QAItem, QAEvalItem, QAEvalResult},
+        y::Union{QAItem, QAEvalItem, QAEvalResult})
+    typeof(x) == typeof(y) &&
+        all([getfield(x, f) == getfield(y, f) for f in fieldnames(typeof(x))])
 end
 
 # Nicer show method with some colors!
@@ -58,7 +64,8 @@ JSON3.StructTypes.StructType(::Type{QAEvalResult}) = JSON3.StructTypes.Struct()
 
 """
     build_qa_evals(doc_chunks::Vector{<:AbstractString}, sources::Vector{<:AbstractString};
-                   model=PT.MODEL_CHAT, instructions="None.", qa_template::Symbol=:RAGCreateQAFromContext, verbose::Bool=true, kwargs...) -> Vector{QAEvalItem}
+                   model=PT.MODEL_CHAT, instructions="None.", qa_template::Symbol=:RAGCreateQAFromContext, 
+                   verbose::Bool=true, api_kwargs::NamedTuple = NamedTuple(), kwargs...) -> Vector{QAEvalItem}
 
 Create a collection of question and answer evaluations (`QAEvalItem`) from document chunks and sources. 
 This function generates Q&A pairs based on the provided document chunks, using a specified AI model and template.
@@ -69,6 +76,7 @@ This function generates Q&A pairs based on the provided document chunks, using a
 - `model`: The AI model used for generating Q&A pairs. Default is `PT.MODEL_CHAT`.
 - `instructions::String`: Additional instructions or context to provide to the model generating QA sets. Defaults to "None.".
 - `qa_template::Symbol`: A template symbol that dictates the AITemplate that will be used. It must have placeholder `context`. Default is `:CreateQAFromContext`.
+- `api_kwargs::NamedTuple`: Parameters that will be forwarded to the API endpoint.
 - `verbose::Bool`: If `true`, additional information like costs will be logged. Defaults to `true`.
 
 # Returns
@@ -93,7 +101,8 @@ qa_evals = build_qa_evals(doc_chunks, sources)
 function build_qa_evals(doc_chunks::Vector{<:AbstractString},
         sources::Vector{<:AbstractString};
         model = PT.MODEL_CHAT, instructions = "None.",
-        qa_template::Symbol = :RAGCreateQAFromContext, verbose::Bool = true, kwargs...)
+        qa_template::Symbol = :RAGCreateQAFromContext, verbose::Bool = true,
+        api_kwargs::NamedTuple = NamedTuple(), kwargs...)
     ##
     @assert length(doc_chunks)==length(sources) "Length of `doc_chunks` and `sources` must be the same."
     placeholders = only(aitemplates(qa_template)).variables # only one template should be found
@@ -107,10 +116,11 @@ function build_qa_evals(doc_chunks::Vector{<:AbstractString},
                 context,
                 instructions,
                 verbose,
-                model)
+                model, api_kwargs)
             Threads.atomic_add!(cost_tracker, PT.call_cost(msg, model)) # track costs
             QAEvalItem(; context, msg.content.question, msg.content.answer, source)
         catch e
+            verbose && @warn e
             QAEvalItem()
         end
     end
@@ -134,8 +144,8 @@ end
 
 """
     run_qa_evals(qa_item::QAEvalItem, ctx::RAGContext; verbose::Bool = true,
-                 parameters_dict::AbstractDict, judge_template::Symbol = :RAGJudgeAnswerFromContext,
-                 model_judge::AbstractString) -> QAEvalResult
+                 parameters_dict::Dict{Symbol, Any}, judge_template::Symbol = :RAGJudgeAnswerFromContext,
+                 model_judge::AbstractString,api_kwargs::NamedTuple = NamedTuple()) -> QAEvalResult
 
 Evaluates a single `QAEvalItem` using a RAG context (`RAGContext`) and returns a `QAEvalResult` structure. This function assesses the relevance and accuracy of the answers generated in a QA evaluation context.
 
@@ -144,10 +154,11 @@ Evaluates a single `QAEvalItem` using a RAG context (`RAGContext`) and returns a
 - `ctx::RAGContext`: The context used for generating the QA pair, including the original context and the answers.
   Comes from `airag(...; return_context=true)`
 - `verbose::Bool`: If `true`, enables verbose logging. Defaults to `true`.
-- `parameters_dict::AbstractDict`: Track any parameters used for later evaluations.
+- `parameters_dict::Dict{Symbol, Any}`: Track any parameters used for later evaluations. Keys must be Symbols.
 - `judge_template::Symbol`: The template symbol for the AI model used to judge the answer. Defaults to `:RAGJudgeAnswerFromContext`.
 - `model_judge::AbstractString`: The AI model used for judging the answer's quality. 
   Defaults to standard chat model, but it is advisable to use more powerful model GPT-4.
+- `api_kwargs::NamedTuple`: Parameters that will be forwarded to the API endpoint.
 
 # Returns
 `QAEvalResult`: An evaluation result that includes various scores and metadata related to the QA evaluation.
@@ -169,9 +180,10 @@ eval_result = run_qa_evals(qa_item, ctx, parameters_dict=parameters_dict, model_
 ```
 """
 function run_qa_evals(qa_item::QAEvalItem, ctx::RAGContext;
-        verbose::Bool = true, parameters_dict::AbstractDict,
+        verbose::Bool = true, parameters_dict::Dict{Symbol, Any} = Dict{Symbol, Any}(),
         judge_template::Symbol = :RAGJudgeAnswerFromContextShort,
-        model_judge::AbstractString = PT.MODEL_CHAT)
+        model_judge::AbstractString = PT.MODEL_CHAT,
+        api_kwargs::NamedTuple = NamedTuple())
     retrieval_score = score_retrieval_hit(qa_item.context, ctx.context)
     retrieval_rank = score_retrieval_rank(qa_item.context, ctx.context)
 
@@ -182,7 +194,7 @@ function run_qa_evals(qa_item::QAEvalItem, ctx::RAGContext;
             ctx.context,
             ctx.question,
             ctx.answer,
-            return_type = JudgeAllScores)
+            return_type = JudgeAllScores, api_kwargs)
         final_rating = if msg.content isa AbstractDict && haskey(msg.content, :final_rating)
             # if return type parsing failed
             msg.content[:final_rating]
@@ -204,4 +216,70 @@ function run_qa_evals(qa_item::QAEvalItem, ctx::RAGContext;
         retrieval_rank,
         answer_score,
         parameters = parameters_dict)
+end
+
+"""
+    run_qa_evals(index::AbstractChunkIndex, qa_items::AbstractVector{<:QAEvalItem};
+        api_kwargs::NamedTuple = NamedTuple(),
+        airag_kwargs::NamedTuple = NamedTuple(),
+        qa_evals_kwargs::NamedTuple = NamedTuple(),
+        verbose::Bool = true, parameters_dict::Dict{Symbol, Any} = Dict{Symbol, Any}())
+
+Evaluates a vector of `QAEvalItem`s and returns a vector `QAEvalResult`. 
+This function assesses the relevance and accuracy of the answers generated in a QA evaluation context.
+
+See `?run_qa_evals` for more details.
+
+# Arguments
+- `qa_items::AbstractVector{<:QAEvalItem}`: The vector of QA evaluation items containing the questions and their answers.
+- `verbose::Bool`: If `true`, enables verbose logging. Defaults to `true`.
+- `api_kwargs::NamedTuple`: Parameters that will be forwarded to the API calls. See `?aiextract` for details.
+- `airag_kwargs::NamedTuple`: Parameters that will be forwarded to `airag` calls. See `?airag` for details.
+- `qa_evals_kwargs::NamedTuple`: Parameters that will be forwarded to `run_qa_evals` calls. See `?run_qa_evals` for details.
+- `parameters_dict::Dict{Symbol, Any}`: Track any parameters used for later evaluations. Keys must be Symbols.
+
+# Returns
+`Vector{QAEvalResult}`: Vector of evaluation results that includes various scores and metadata related to the QA evaluation.
+
+# Example
+```julia
+index = "..." # Assuming a proper index is defined
+qa_items = [QAEvalItem(question="What is the capital of France?", answer="Paris", context="France is a country in Europe."),
+            QAEvalItem(question="What is the capital of Germany?", answer="Berlin", context="Germany is a country in Europe.")]
+
+# Let's run a test with `top_k=5`
+results = run_qa_evals(index, qa_items; airag_kwargs=(;top_k=5), parameters_dict=Dict(:top_k => 5))
+
+# Filter out the "failed" calls
+results = filter(x->!isnothing(x.answer_score), results);
+
+# See average judge score
+mean(x->x.answer_score, results)
+```
+
+"""
+function run_qa_evals(index::AbstractChunkIndex, qa_items::AbstractVector{<:QAEvalItem};
+        api_kwargs::NamedTuple = NamedTuple(),
+        airag_kwargs::NamedTuple = NamedTuple(),
+        qa_evals_kwargs::NamedTuple = NamedTuple(),
+        verbose::Bool = true, parameters_dict::Dict{Symbol, Any} = Dict{Symbol, Any}())
+    # Run evaluations in parallel
+    results = asyncmap(qa_items) do qa_item
+        # Generate an answer -- often you want the model_judge to be the highest quality possible, eg, "GPT-4 Turbo" (alias "gpt4t)
+        msg, ctx = airag(index; qa_item.question, return_context = true,
+            verbose, api_kwargs, airag_kwargs...)
+
+        # Evaluate the response
+        # Note: you can log key parameters for easier analysis later
+        run_qa_evals(qa_item,
+            ctx;
+            parameters_dict,
+            verbose,
+            api_kwargs,
+            qa_evals_kwargs...)
+    end
+    success_count = count(x -> !isnothing(x.answer_score), results)
+    verbose &&
+        @info "QA Evaluations complete ($((success_count)/length(qa_items)) evals successful)!"
+    return results
 end

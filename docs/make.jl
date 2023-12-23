@@ -1,5 +1,9 @@
 using PromptingTools
 using Documenter
+using SparseArrays, LinearAlgebra
+using PromptingTools.Experimental.RAGTools
+using JSON3, Serialization, DataFramesMeta
+using Statistics: mean
 
 DocMeta.setdocmeta!(PromptingTools,
     :DocTestSetup,
@@ -7,7 +11,7 @@ DocMeta.setdocmeta!(PromptingTools,
     recursive = true)
 
 makedocs(;
-    modules = [PromptingTools],
+    modules = [PromptingTools, PromptingTools.Experimental.RAGTools],
     authors = "J S <49557684+svilupp@users.noreply.github.com> and contributors",
     repo = "https://github.com/svilupp/PromptingTools.jl/blob/{commit}{path}#{line}",
     sitename = "PromptingTools.jl",

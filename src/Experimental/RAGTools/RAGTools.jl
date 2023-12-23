@@ -24,7 +24,7 @@ include("preparation.jl")
 export find_closest, find_tags, rerank
 include("retrieval.jl")
 
-export airag
+export airag, build_context
 include("generation.jl")
 
 export build_qa_evals, run_qa_evals
