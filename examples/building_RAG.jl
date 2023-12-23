@@ -141,7 +141,7 @@ first(df, 5)
 # - Add filtering for semantic similarity (embedding distance) to make sure we don't pick up irrelevant chunks in the context
 # - Use multiple indices or a hybrid index (add a simple BM25 lookup from TextAnalysis.jl)
 # - Data processing is the most important step - properly parsed and split text could make wonders
-# - Add re-ranking of context (see `rerank` function, you can use Cohere ReRank API)`)
+# - Add re-ranking of context (see `rerank` function, you can use Cohere ReRank API)
 # - Improve the question embedding (eg, rephrase it, generate hypothetical answers and use them to find better context)
 #
 # ... and much more! See some ideas in [Anyscale RAG tutorial](https://www.anyscale.com/blog/a-comprehensive-guide-for-building-rag-based-llm-applications-part-1)
