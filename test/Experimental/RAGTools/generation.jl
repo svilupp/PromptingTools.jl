@@ -95,7 +95,8 @@ end
         tag_filter = ["yes"],
         return_context = false)
     @test occursin("Time?", msg.content)
-    # different kwargs
+
+    ## Test different kwargs
     msg, ctx = airag(index; question = "Time?", model_embedding = "mock-emb",
         model_chat = "mock-gen",
         model_metadata = "mock-meta", api_kwargs = (; url = "http://localhost:$(PORT)"),
@@ -111,6 +112,19 @@ end
     @test ctx.filtered_candidates.distances == 0.5ones(2)
     @test ctx.reranked_candidates.positions == [2, 1] # no change
     @test ctx.reranked_candidates.distances == 0.5ones(2) # no change
+
+    ## Not tag filter
+    msg, ctx = airag(index; question = "Time?", model_embedding = "mock-emb",
+        model_chat = "mock-gen",
+        model_metadata = "mock-meta", api_kwargs = (; url = "http://localhost:$(PORT)"),
+        tag_filter = nothing,
+        return_context = true)
+    @test ctx.context == ["1. b\nc", "2. a\nb\nc", "3. a\nb"]
+    @test ctx.emb_candidates.positions == [3, 2, 1]
+    @test ctx.emb_candidates.distances == zeros(3)
+    @test ctx.tag_candidates == nothing
+    @test ctx.filtered_candidates.positions == [3, 2, 1] #re-sort
+    @test ctx.reranked_candidates.positions == [3, 2, 1] # no change
     # clean up
     close(echo_server)
 end
