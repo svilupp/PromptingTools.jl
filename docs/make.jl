@@ -28,6 +28,7 @@ makedocs(;
             "Various examples" => "examples/readme_examples.md",
             "Using AITemplates" => "examples/working_with_aitemplates.md",
             "Local models with Ollama.ai" => "examples/working_with_ollama.md",
+            "Custom APIs (Mistral, Llama.cpp)" => "examples/working_with_custom_apis.md",
             "Building RAG Application" => "examples/building_RAG.md",
         ],
         "F.A.Q." => "frequently_asked_questions.md",

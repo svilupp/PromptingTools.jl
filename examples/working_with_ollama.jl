@@ -70,6 +70,7 @@ tasks = asyncmap(docs) do doc
     msg = aiembed(schema, doc; model)
 end
 embedding = mapreduce(x -> x.content, hcat, tasks)
+size(embedding)
 
 # ### Using postprocessing function
 # Add normalization as postprocessing function to normalize embeddings on reception (for easy cosine similarity later)
