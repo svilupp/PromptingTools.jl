@@ -86,6 +86,28 @@ See `?PREFERENCES` for more details on how to set your API key permanently.
 """
 struct MistralOpenAISchema <: AbstractOpenAISchema end
 
+abstract type AbstractOllamaSchema <: AbstractPromptSchema end
+
+"""
+OllamaSchema is the default schema for Olama models.
+
+It uses the following conversation template:
+```
+[Dict(role="system",content="..."),Dict(role="user",content="..."),Dict(role="assistant",content="...")]
+```
+
+It's very similar to OpenAISchema, but it appends images differently.
+"""
+struct OllamaSchema <: AbstractOllamaSchema end
+
+"Echoes the user's input back to them. Used for testing the implementation"
+@kwdef mutable struct TestEchoOllamaSchema <: AbstractOllamaSchema
+    response::AbstractDict
+    status::Integer
+    model_id::String = ""
+    inputs::Any = nothing
+end
+
 abstract type AbstractChatMLSchema <: AbstractPromptSchema end
 """
 ChatMLSchema is used by many open-source chatbots, by OpenAI models (under the hood) and by several models and inferfaces (eg, Ollama, vLLM)

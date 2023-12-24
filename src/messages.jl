@@ -94,11 +94,13 @@ end
 "Construct `UserMessageWithImages` with 1 or more images. Images can be either URLs or local paths."
 function UserMessageWithImages(prompt::AbstractString;
         image_url::Union{Nothing, AbstractString, Vector{<:AbstractString}} = nothing,
-        image_path::Union{Nothing, AbstractString, Vector{<:AbstractString}} = nothing)
+        image_path::Union{Nothing, AbstractString, Vector{<:AbstractString}} = nothing,
+        base64_only::Bool = false)
     @assert !(isnothing(image_url) && isnothing(image_path)) "At least one of `image_url` and `image_path` must be provided."
     url1 = !isnothing(image_url) ? _string_to_vector(image_url) : String[]
     # Process local image
-    url2 = !isnothing(image_path) ? _string_to_vector(_encode_local_image(image_path)) :
+    url2 = !isnothing(image_path) ?
+           _string_to_vector(_encode_local_image(image_path; base64_only)) :
            String[]
     return UserMessageWithImages(;
         content = prompt,
@@ -111,8 +113,9 @@ end
 function attach_images_to_user_message(prompt::AbstractString;
         image_url::Union{Nothing, AbstractString, Vector{<:AbstractString}} = nothing,
         image_path::Union{Nothing, AbstractString, Vector{<:AbstractString}} = nothing,
+        base64_only::Bool = false,
         kwargs...)
-    UserMessageWithImages(prompt; image_url, image_path)
+    UserMessageWithImages(prompt; image_url, image_path, base64_only)
 end
 function attach_images_to_user_message(msg::UserMessageWithImages; kwargs...)
     throw(AssertionError("Cannot attach additional images to UserMessageWithImages."))
@@ -120,13 +123,15 @@ end
 function attach_images_to_user_message(msg::UserMessage;
         image_url::Union{Nothing, AbstractString, Vector{<:AbstractString}} = nothing,
         image_path::Union{Nothing, AbstractString, Vector{<:AbstractString}} = nothing,
+        base64_only::Bool = false,
         kwargs...)
-    UserMessageWithImages(msg.content; image_url, image_path)
+    UserMessageWithImages(msg.content; image_url, image_path, base64_only)
 end
 # automatically attach images to the latest user message, if not allowed, throw an error if more than 2 user messages provided
 function attach_images_to_user_message(msgs::Vector{T};
         image_url::Union{Nothing, AbstractString, Vector{<:AbstractString}} = nothing,
         image_path::Union{Nothing, AbstractString, Vector{<:AbstractString}} = nothing,
+        base64_only::Bool = false,
         attach_to_latest::Bool = true) where {T <: AbstractChatMessage}
     # Check how to add images to UserMessage
     count_user_msgs = count(isusermessage, msgs)
@@ -136,7 +141,7 @@ function attach_images_to_user_message(msgs::Vector{T};
     idx = findlast(isusermessage, msgs)
     # re-type to accept UserMessageWithImages type
     msgs = convert(Vector{typejoin(UserMessageWithImages, T)}, msgs)
-    msgs[idx] = attach_images_to_user_message(msgs[idx]; image_url, image_path)
+    msgs[idx] = attach_images_to_user_message(msgs[idx]; image_url, image_path, base64_only)
     return msgs
 end
 
@@ -171,11 +176,11 @@ function Base.show(io::IO, ::MIME"text/plain", m::AbstractDataMessage)
 end
 
 ## Dispatch for render
-function render(schema::AbstractPromptSchema,
-        messages::Vector{<:AbstractMessage};
-        kwargs...)
-    render(schema, messages; kwargs...)
-end
+# function render(schema::AbstractPromptSchema,
+#         messages::Vector{<:AbstractMessage};
+#         kwargs...)
+#     render(schema, messages; kwargs...)
+# end
 function render(schema::AbstractPromptSchema, msg::AbstractMessage; kwargs...)
     render(schema, [msg]; kwargs...)
 end
