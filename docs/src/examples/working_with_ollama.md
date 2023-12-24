@@ -115,11 +115,13 @@ Restart your session and run `aigenerate("Say hi!")` to test it.
 
 ## Providing Images with aiscan
 
-It's as simple as providing an image URL (keyword `image_url`) or a local path (keyword `image_path`). You can provide one or more images:
+It's as simple as providing a local image path (keyword `image_path`). You can provide one or more images:
 
 ````julia
 msg = aiscan("Describe the image"; image_path=["julia.png","python.png"] model="bakllava")
 ````
+
+`image_url` keyword is not supported at the moment (use `Downloads.download` to download the image locally).
 
 ## Embeddings with aiembed
 
