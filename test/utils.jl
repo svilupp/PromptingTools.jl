@@ -2,6 +2,7 @@ using PromptingTools: split_by_length, replace_words
 using PromptingTools: _extract_handlebar_variables, call_cost, _report_stats
 using PromptingTools: _string_to_vector, _encode_local_image
 using PromptingTools: DataMessage, AIMessage
+using PromptingTools: push_conversation!, resize_conversation!
 
 @testset "replace_words" begin
     words = ["Disney", "Snow White", "Mickey Mouse"]
@@ -141,4 +142,33 @@ end
     @test output2 isa Vector
     @test output2[1] == output2[2] == output
     @test_throws AssertionError _encode_local_image("not an path")
+end
+
+### Conversation Management
+@testset "push_conversation!,resize_conversation!" begin
+    # Test 1: Adding to Conversation History
+    conv_history = Vector{Vector{<:Any}}()
+    conversation = [AIMessage("Test message")]
+    push_conversation!(conv_history, conversation, 5)
+    @test length(conv_history) == 1
+    @test conv_history[end] === conversation
+
+    # Test 2: History Resize on Addition
+    max_history = 5
+    conv_history = [[AIMessage("Test message")] for i in 1:max_history]
+    new_conversation = [AIMessage("Test message")]
+    push_conversation!(conv_history, new_conversation, max_history)
+    @test length(conv_history) == max_history
+    @test conv_history[end] === new_conversation
+
+    # Test 3: Manual Resize
+    max_history = 5
+    conv_history = [[AIMessage("Test message")] for i in 1:(max_history + 2)]
+    resize_conversation!(conv_history, max_history)
+    @test length(conv_history) == max_history
+
+    # Test 4: No Resize with Nothing
+    conv_history = [[AIMessage("Test message")] for i in 1:7]
+    resize_conversation!(conv_history, nothing)
+    @test length(conv_history) == 7
 end

@@ -35,6 +35,12 @@ ai"What is the capital of France?"
 
 The returned object is a light wrapper with a generated message in the field `:content` (eg, `ans.content`) for additional downstream processing.
 
+> [!TIP]
+> If you want to reply to the previous message, or simply continue the conversation, use `@ai!_str` (notice the bang `!`):
+> ```julia
+> ai!"And what is the population of it?"
+> ```
+
 You can easily inject any variables with string interpolation:
 ```julia
 country = "Spain"
@@ -45,6 +51,7 @@ ai"What is the capital of \$(country)?"
 
 > [!TIP]
 > Use after-string-flags to select the model to be called, eg, `ai"What is the capital of France?"gpt4` (use `gpt4t` for the new GPT-4 Turbo model). Great for those extra hard questions!
+
 
 For more complex prompt templates, you can use handlebars-style templating and provide variables as keyword arguments:
 
@@ -58,7 +65,7 @@ msg = aigenerate("What is the capital of {{country}}? Is the population larger t
 > Use `asyncmap` to run multiple AI-powered tasks concurrently.
 
 > [!TIP]
-> If you use slow models (like GPT-4), you can use async version of `@ai_str` -> `@aai_str` to avoid blocking the REPL, eg, `aai"Say hi but slowly!"gpt4`
+> If you use slow models (like GPT-4), you can use async version of `@ai_str` -> `@aai_str` to avoid blocking the REPL, eg, `aai"Say hi but slowly!"gpt4` (similarly `@ai!_str` -> `@aai!_str` for multi-turn conversations).
 
 For more practical examples, see the `examples/` folder and the [Advanced Examples](#advanced-examples) section below.
 
