@@ -82,7 +82,7 @@ end
         endpoint = "wrong-endpoint")
 
     ## Run mock server
-    PORT = rand(1000:2000)
+    PORT = rand(2000:3000)
     echo_server = HTTP.serve!(PORT, verbose = -1) do req
         content = JSON3.read(req.body)
         response = Dict(:response => content[:prompt],
