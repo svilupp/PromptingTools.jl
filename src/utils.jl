@@ -252,3 +252,72 @@ _encode_local_image(::Nothing) = String[]
 # Used for image_url in aiscan to provided consistent output type
 _string_to_vector(s::AbstractString) = [s]
 _string_to_vector(v::Vector{<:AbstractString}) = v
+
+### Conversation Management
+
+"""
+    push_conversation!(conv_history, conversation::AbstractVector, max_history::Union{Int, Nothing})
+
+Add a new conversation to the conversation history and resize the history if necessary.
+
+This function appends a conversation to the `conv_history`, which is a vector of conversations. Each conversation is represented as a vector of `AbstractMessage` objects. After adding the new conversation, the history is resized according to the `max_history` parameter to ensure that the size of the history does not exceed the specified limit.
+
+## Arguments
+- `conv_history`: A vector that stores the history of conversations. Typically, this is `PT.CONV_HISTORY`.
+- `conversation`: The new conversation to be added. It should be a vector of `AbstractMessage` objects.
+- `max_history`: The maximum number of conversations to retain in the history. If `Nothing`, the history is not resized.
+
+## Returns
+The updated conversation history.
+
+## Example
+```julia
+new_conversation = aigenerate("Hello World"; return_all = true)
+push_conversation!(PT.CONV_HISTORY, new_conversation, 10)
+```
+
+This is done automatically by the ai"" macros.
+"""
+function push_conversation!(conv_history::Vector{<:Vector{<:Any}},
+        conversation::AbstractVector,
+        max_history::Union{Int, Nothing})
+    push!(conv_history, conversation)
+    resize_conversation!(conv_history, max_history)
+    return conv_history
+end
+
+"""
+    resize_conversation!(conv_history, max_history::Union{Int, Nothing})
+
+Resize the conversation history to a specified maximum length.
+
+This function trims the `conv_history` to ensure that its size does not exceed `max_history`. It removes the oldest conversations first if the length of `conv_history` is greater than `max_history`.
+
+## Arguments
+- `conv_history`: A vector that stores the history of conversations. Typically, this is `PT.CONV_HISTORY`.
+- `max_history`: The maximum number of conversations to retain in the history. If `Nothing`, the history is not resized.
+
+## Returns
+The resized conversation history.
+
+## Example
+```julia
+resize_conversation!(PT.CONV_HISTORY, PT.MAX_HISTORY_LENGTH)
+```
+
+After the function call, `conv_history` will contain only the 10 most recent conversations.
+
+This is done automatically by the ai"" macros.
+
+"""
+function resize_conversation!(conv_history,
+        max_history::Union{Int, Nothing})
+    if isnothing(max_history)
+        return
+    end
+
+    while length(conv_history) > max_history
+        popfirst!(conv_history)
+    end
+    return conv_history
+end
