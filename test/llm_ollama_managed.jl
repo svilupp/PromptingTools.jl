@@ -80,6 +80,32 @@ end
     @test_throws AssertionError ollama_api(OllamaManagedSchema(),
         "x";
         endpoint = "wrong-endpoint")
+
+    ## Run mock server
+    PORT = rand(1000:2000)
+    echo_server = HTTP.serve!(PORT, verbose = -1) do req
+        content = JSON3.read(req.body)
+        response = Dict(:response => content[:prompt],
+            :model => content[:model],
+            :prompt_eval_count => 1, :eval_count => 1)
+
+        return HTTP.Response(200, JSON3.write(response))
+    end
+
+    resp = ollama_api(OllamaManagedSchema(),
+        "test";
+        system = "-",
+        model = "xyz",
+        url = "localhost",
+        port = PORT)
+    @test resp.status == 200
+    @test resp.response == Dict(:response => "test",
+        :model => "xyz",
+        :prompt_eval_count => 1, :eval_count => 1)
+    prompt = "Say Hi!"
+
+    # clean up
+    close(echo_server)
 end
 
 @testset "aigenerate-ollama" begin
