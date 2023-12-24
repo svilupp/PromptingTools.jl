@@ -142,6 +142,10 @@ end
     @test output2 isa Vector
     @test output2[1] == output2[2] == output
     @test_throws AssertionError _encode_local_image("not an path")
+    ## Test with base64_only = true
+    output3 = _encode_local_image(image_path; base64_only = true)
+    @test !occursin("data:image/png;base64,", output3)
+    @test "data:image/png;base64," * output3 == output
 end
 
 ### Conversation Management
