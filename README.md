@@ -384,11 +384,17 @@ We can use it with the `aigenerate` function:
 
 ```julia
 const PT = PromptingTools
-schema = PT.OllamaManagedSchema() # notice the different schema!
+schema = PT.OllamaSchema() # notice the different schema!
 
 msg = aigenerate(schema, "Say hi!"; model="openhermes2.5-mistral")
 # [ Info: Tokens: 69 in 0.9 seconds
 # AIMessage("Hello! How can I assist you today?")
+```
+
+For common models that have been registered (see `?PT.MODEL_REGISTRY`), you do not need to provide the schema explicitly:
+
+```julia
+msg = aigenerate("Say hi!"; model="openhermes2.5-mistral")
 ```
 
 And we can also use the `aiembed` function:

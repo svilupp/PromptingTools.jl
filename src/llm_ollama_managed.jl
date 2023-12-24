@@ -1,3 +1,7 @@
+## Ollama Generation API
+# - llm_olama.jl works by providing messages format to /api/chat
+# - llm_managed_olama.jl works by providing 1 system prompt and 1 user prompt /api/generate
+#
 ## Schema dedicated to [Ollama's managed models](https://ollama.ai/), which also managed the prompts
 ## It's limited to 2 messages (system and user), because there are only two slots for `system` and `prompt`
 ##
@@ -51,9 +55,11 @@ end
 
 ## Model-calling
 """
-    ollama_api(prompt_schema::AbstractOllamaManagedSchema, prompt::AbstractString,
+    ollama_api(prompt_schema::Union{AbstractOllamaManagedSchema, AbstractOllamaSchema},
+        prompt::Union{AbstractString, Nothing} = nothing;
         system::Union{Nothing, AbstractString} = nothing,
-        endpoint::String = "generate";
+        messages::Vector{<:AbstractMessage} = AbstractMessage[],
+        endpoint::String = "generate",
         model::String = "llama2", http_kwargs::NamedTuple = NamedTuple(),
         stream::Bool = false,
         url::String = "localhost", port::Int = 11434,
@@ -73,16 +79,24 @@ Simple wrapper for a call to Ollama API.
 - `port`: The port of the Ollama API. Defaults to 11434.
 - `kwargs`: Prompt variables to be used to fill the prompt/template
 """
-function ollama_api(prompt_schema::AbstractOllamaManagedSchema, prompt::AbstractString;
+function ollama_api(prompt_schema::Union{AbstractOllamaManagedSchema, AbstractOllamaSchema},
+        prompt::Union{AbstractString, Nothing} = nothing;
         system::Union{Nothing, AbstractString} = nothing,
+        messages::Vector{<:AbstractDict{String, <:Any}} = Vector{Dict{String, Any}}(),
         endpoint::String = "generate",
         model::String = "llama2", http_kwargs::NamedTuple = NamedTuple(),
         stream::Bool = false,
         url::String = "localhost", port::Int = 11434,
         kwargs...)
-    @assert endpoint in ["generate", "embeddings"] "Only 'generate' and 'embeddings' Ollama endpoints are supported."
+    @assert endpoint in ["chat", "generate", "embeddings"] "Only 'chat', 'generate' and 'embeddings' Ollama endpoints are supported."
     ##
-    body = Dict("model" => model, "stream" => stream, "prompt" => prompt, kwargs...)
+    body = if !isnothing(prompt)
+        Dict("model" => model, "stream" => stream, "prompt" => prompt, kwargs...)
+    elseif !isempty(messages)
+        Dict("model" => model, "stream" => stream, "messages" => messages, kwargs...)
+    else
+        error("No prompt or messages provided! Stopping.")
+    end
     if !isnothing(system)
         body["system"] = system
     end
@@ -95,8 +109,11 @@ function ollama_api(prompt_schema::AbstractOllamaManagedSchema, prompt::Abstract
     return (; response = body, resp.status)
 end
 # For testing
-function ollama_api(prompt_schema::TestEchoOllamaManagedSchema, prompt::AbstractString;
-        system::Union{Nothing, AbstractString} = nothing, endpoint::String = "generate",
+function ollama_api(prompt_schema::TestEchoOllamaManagedSchema,
+        prompt::Union{AbstractString, Nothing} = nothing;
+        system::Union{Nothing, AbstractString} = nothing,
+        messages = [],
+        endpoint::String = "generate",
         model::String = "llama2", kwargs...)
     prompt_schema.model_id = model
     prompt_schema.inputs = (; system, prompt)
