@@ -58,6 +58,11 @@ AIMessage("The capital of France is Paris.")
 
 Returned object is a light wrapper with generated message in field `:content` (eg, `ans.content`) for additional downstream processing.
 
+If you want to reply to the previous message, or simply continue the conversation, use `@ai!_str` (notice the bang `!`):
+```julia
+ai!"And what is the population of it?"
+```
+
 You can easily inject any variables with string interpolation:
 ```julia
 country = "Spain"
@@ -86,6 +91,6 @@ AIMessage("The capital of Spain is Madrid. And yes, the population of Madrid is 
 
 Pro tip: Use `asyncmap` to run multiple AI-powered tasks concurrently.
 
-Pro tip: If you use slow models (like GPT-4), you can use async version of `@ai_str` -> `@aai_str` to avoid blocking the REPL, eg, `aai"Say hi but slowly!"gpt4`
+Pro tip: If you use slow models (like GPT-4), you can use the asynchronous version of `@ai_str` -> `@aai_str` to avoid blocking the REPL, eg, `aai"Say hi but slowly!"gpt4` (similarly `@ai!_str` -> `@aai!_str` for multi-turn conversations).
 
 For more practical examples, see the [Various Examples](@ref) section.
