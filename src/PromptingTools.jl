@@ -62,7 +62,7 @@ include("llm_openai.jl")
 include("llm_ollama_managed.jl")
 
 ## Convenience utils
-export @ai_str, @aai_str
+export @ai_str, @aai_str, @ai!_str, @aai!_str
 include("macros.jl")
 
 ## Experimental modules

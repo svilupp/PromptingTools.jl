@@ -19,6 +19,8 @@ Check your preferences by calling `get_preferences(key::String)`.
     See `PROMPT_SCHEMA` for more information.
 - `MODEL_ALIASES`: A dictionary of model aliases (`alias => full_model_name`). Aliases are used to refer to models by their aliases instead of their full names to make it more convenient to use them.
     See `MODEL_ALIASES` for more information.
+- `MAX_HISTORY_LENGTH`: The maximum length of the conversation history. Defaults to 5. Set to `nothing` to disable history.
+    See `CONV_HISTORY` for more information.
 
 At the moment it is not possible to persist changes to `MODEL_REGISTRY` across sessions. 
 Define your `register_model!()` calls in your `startup.jl` file to make them available across sessions or put them at the top of your script.
@@ -55,6 +57,7 @@ function set_preferences!(pairs::Pair{String, <:Any}...)
         "MODEL_EMBEDDING",
         "MODEL_ALIASES",
         "PROMPT_SCHEMA",
+        "MAX_HISTORY_LENGTH",
     ]
     for (key, value) in pairs
         @assert key in allowed_preferences "Unknown preference '$key'! (Allowed preferences: $(join(allowed_preferences,", "))"
@@ -109,6 +112,22 @@ isempty(OPENAI_API_KEY) &&
 
 const MISTRALAI_API_KEY::String = @load_preference("MISTRALAI_API_KEY",
     default=get(ENV, "MISTRALAI_API_KEY", ""));
+
+## CONVERSATION HISTORY
+"""
+    CONV_HISTORY
+
+Tracks the most recent conversations through the `ai_str macros`.
+
+Preference available: MAX_HISTORY_LENGTH, which sets how many last messages should be remembered.
+
+See also: `push_conversation!`, `resize_conversation!`
+
+"""
+const CONV_HISTORY = Vector{Vector{<:Any}}()
+const CONV_HISTORY_LOCK = ReentrantLock()
+const MAX_HISTORY_LENGTH = @load_preference("MAX_HISTORY_LENGTH",
+    default=5)::Union{Int, Nothing}
 
 ## Model registry
 # A dictionary of model names and their specs (ie, name, costs per token, etc.)
@@ -288,7 +307,16 @@ registry = Dict{String, ModelSpec}("gpt-3.5-turbo" => ModelSpec("gpt-3.5-turbo",
         MistralOpenAISchema(),
         1.08e-7,
         0.0,
-        "Mistral AI's hosted model for embeddings."))
+        "Mistral AI's hosted model for embeddings."),
+    "echo" => ModelSpec("echo",
+        TestEchoOpenAISchema(;
+            response = Dict(:choices => [Dict(:message => Dict(:content => "Hello!"))],
+                :usage => Dict(:total_tokens => 3,
+                    :prompt_tokens => 2,
+                    :completion_tokens => 1)), status = 200),
+        0.0,
+        0.0,
+        "Echo is only for testing. It always responds with 'Hello!'"))
 
 ### Model Registry Structure
 @kwdef mutable struct ModelRegistry

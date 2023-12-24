@@ -24,6 +24,11 @@ msg = aiextract(schema, "I want to ask {{it}}"; it = "Is this correct?", return_
 image_url = "some_mock_url"
 msg = aiscan(schema, "Describe the image"; image_url)
 
+# macro calls
+ai"Hello"echo
+ai!"Hello again"echo
+empty!(CONV_HISTORY)
+
 # Use of Templates
 template_name = :JudgeIsItTrue
 msg = aigenerate(schema, template_name; it = "Is this correct?")
