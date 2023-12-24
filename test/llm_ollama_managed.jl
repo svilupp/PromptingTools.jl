@@ -77,7 +77,9 @@ end
     @test schema.inputs == (; system, prompt)
     ## Assert
     @test_throws Exception ollama_api(OllamaManagedSchema(), nothing)
-    @test_throws ollama_api(OllamaManagedSchema(), "x"; endpoint = "wrong-endpoint")
+    @test_throws AssertionError ollama_api(OllamaManagedSchema(),
+        "x";
+        endpoint = "wrong-endpoint")
 end
 
 @testset "aigenerate-ollama" begin
