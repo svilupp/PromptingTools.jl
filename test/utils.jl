@@ -160,6 +160,11 @@ end
     push_conversation!(conv_history, new_conversation, max_history)
     @test length(conv_history) == max_history
     @test conv_history[end] === new_conversation
+    push_conversation!(conv_history, new_conversation, nothing)
+    push_conversation!(conv_history, new_conversation, nothing)
+    push_conversation!(conv_history, new_conversation, nothing)
+    @test length(conv_history) > max_history
+    @test conv_history[end] === new_conversation
 
     # Test 3: Manual Resize
     max_history = 5

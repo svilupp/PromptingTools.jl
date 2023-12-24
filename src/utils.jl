@@ -281,9 +281,6 @@ This is done automatically by the ai"" macros.
 function push_conversation!(conv_history::Vector{<:Vector{<:Any}},
         conversation::AbstractVector,
         max_history::Union{Int, Nothing})
-    if isnothing(max_history)
-        return
-    end
     push!(conv_history, conversation)
     resize_conversation!(conv_history, max_history)
     return conv_history
