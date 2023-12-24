@@ -156,7 +156,7 @@ function aigenerate(prompt_schema::AbstractOllamaSchema, prompt::ALLOWED_PROMPT_
             system = nothing, messages = conv_rendered, endpoint = "chat", model = model_id,
             http_kwargs,
             api_kwargs...)
-        @info resp.response
+
         msg = AIMessage(; content = resp.response[:message][:content] |> strip,
             status = Int(resp.status),
             tokens = (resp.response[:prompt_eval_count],
