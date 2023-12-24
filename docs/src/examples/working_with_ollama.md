@@ -25,7 +25,7 @@ Note: You must download these models prior to using them with `ollama pull <mode
 
 > [!TIP]
 > If you use Apple Mac M1-3, make sure to provide `api_kwargs=(; options=(; num_gpu=99))` to make sure the whole model is offloaded on your GPU. Current default is 1, which makes some models unusable. Example for running Mixtral:
-> `msg = aigenerate(PT.OllamaManagedSchema(), "Count from 1 to 5 and then say hi."; model="dolphin-mixtral:8x7b-v2.5-q4_K_M", api_kwargs=(; options=(; num_gpu=99)))`
+> `msg = aigenerate(PT.OllamaSchema(), "Count from 1 to 5 and then say hi."; model="dolphin-mixtral:8x7b-v2.5-q4_K_M", api_kwargs=(; options=(; num_gpu=99)))`
 
 ## Text Generation with aigenerate
 
@@ -86,7 +86,7 @@ If you're using some model that is not in the registry, you can either add it:
 ````julia
 PT.register_model!(;
     name = "llama123",
-    schema = PT.OllamaManagedSchema(),
+    schema = PT.OllamaSchema(),
     description = "Some model")
 PT.MODEL_ALIASES["l123"] = "llama123" # set an alias you like for it
 ````
@@ -98,7 +98,7 @@ PT.MODEL_ALIASES["l123"] = "llama123" # set an alias you like for it
 OR define the schema explicitly (to avoid dispatch on global `PT.PROMPT_SCHEMA`):
 
 ````julia
-schema = PT.OllamaManagedSchema()
+schema = PT.OllamaSchema()
 aigenerate(schema, "Say hi!"; model = "llama2")
 ````
 
@@ -106,10 +106,22 @@ aigenerate(schema, "Say hi!"; model = "llama2")
 AIMessage("Hello there! *smiling face* It's nice to meet you! I'm here to help you with any questions or tasks you may have, so feel free to ask me anything. Is there something specific you need assistance with today? 😊")
 ````
 
-Note: If you only use Ollama, you can change the default schema to `PT.OllamaManagedSchema()`
-via `PT.set_preferences!("PROMPT_SCHEMA" => "OllamaManagedSchema", "MODEL_CHAT"=>"llama2")`
+Note: If you only use Ollama, you can change the default schema to `PT.OllamaSchema()`
+via `PT.set_preferences!("PROMPT_SCHEMA" => "OllamaSchema", "MODEL_CHAT"=>"llama2")`
 
 Restart your session and run `aigenerate("Say hi!")` to test it.
+
+! Note that in version 0.6, we've introduced `OllamaSchema`, which superseded `OllamaManagedSchema` and allows multi-turn conversations and conversations with images (eg, with Llava and Bakllava models). `OllamaManagedSchema` has been kept for compatibility and as an example of a schema where one provides a prompt as a string (not dictionaries like OpenAI API).
+
+## Providing Images with aiscan
+
+It's as simple as providing a local image path (keyword `image_path`). You can provide one or more images:
+
+````julia
+msg = aiscan("Describe the image"; image_path=["julia.png","python.png"] model="bakllava")
+````
+
+`image_url` keyword is not supported at the moment (use `Downloads.download` to download the image locally).
 
 ## Embeddings with aiembed
 
@@ -165,7 +177,7 @@ Add normalization as postprocessing function to normalize embeddings on receptio
 
 ````julia
 using LinearAlgebra
-schema = PT.OllamaManagedSchema()
+schema = PT.OllamaSchema()
 
 msg = aiembed(schema,
     ["embed me", "and me too"],

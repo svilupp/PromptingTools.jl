@@ -235,17 +235,22 @@ function _report_stats(msg,
     return "Tokens: $(sum(msg.tokens))$(cost_str) in $(round(msg.elapsed;digits=1)) seconds"
 end
 # Loads and encodes the provided image path as a base64 string
-function _encode_local_image(image_path::AbstractString)
+function _encode_local_image(image_path::AbstractString; base64_only::Bool = false)
     @assert isfile(image_path) "`image_path` must be a valid path to an image file. File: $image_path not found."
     base64_image = open(image_path, "r") do image_bytes
         base64encode(image_bytes)
     end
-    image_suffix = split(image_path, ".")[end]
-    image_url = "data:image/$image_suffix;base64,$(base64_image)"
+    if base64_only
+        return base64_image
+    else
+        image_suffix = split(image_path, ".")[end]
+        image_url = "data:image/$image_suffix;base64,$(base64_image)"
+    end
     return image_url
 end
-function _encode_local_image(image_path::Vector{<:AbstractString})
-    return _encode_local_image.(image_path)
+function _encode_local_image(image_path::Vector{<:AbstractString};
+        base64_only::Bool = false)
+    return _encode_local_image.(image_path; base64_only)
 end
 _encode_local_image(::Nothing) = String[]
 

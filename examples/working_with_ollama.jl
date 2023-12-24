@@ -39,18 +39,26 @@ msg = aigenerate(conversation; model)
 # If you're using some model that is not in the registry, you can either add it:
 PT.register_model!(;
     name = "llama123",
-    schema = PT.OllamaManagedSchema(),
+    schema = PT.OllamaSchema(),
     description = "Some model")
 PT.MODEL_ALIASES["l123"] = "llama123" # set an alias you like for it
 
 # OR define the schema explicitly (to avoid dispatch on global `PT.PROMPT_SCHEMA`):
-schema = PT.OllamaManagedSchema()
+schema = PT.OllamaSchema()
 aigenerate(schema, "Say hi!"; model = "llama2")
 
-# Note: If you only use Ollama, you can change the default schema to `PT.OllamaManagedSchema()` 
-# via `PT.set_preferences!("PROMPT_SCHEMA" => "OllamaManagedSchema", "MODEL_CHAT"=>"llama2")`
+# Note: If you only use Ollama, you can change the default schema to `PT.OllamaSchema()` 
+# via `PT.set_preferences!("PROMPT_SCHEMA" => "OllamaSchema", "MODEL_CHAT"=>"llama2")`
 #
 # Restart your session and run `aigenerate("Say hi!")` to test it.
+
+# ! Note that in version 0.6, we've introduced `OllamaSchema`, which superseded `OllamaManagedSchema` and allows multi-turn conversations and conversations with images (eg, with Llava and Bakllava models). `OllamaManagedSchema` has been kept for compatibility and as an example of a schema where one provides a prompt as a string (not dictionaries like OpenAI API).
+
+# ## Providing Images with aiscan
+
+# It's as simple as providing an image URL (keyword `image_url`) or a local path (keyword `image_path`). You can provide one or more images:
+
+msg = aiscan("Describe the image"; image_path = ["/test/data/julia.png"]model = "bakllava")
 
 # ## Embeddings with aiembed
 
@@ -75,7 +83,7 @@ size(embedding)
 # ### Using postprocessing function
 # Add normalization as postprocessing function to normalize embeddings on reception (for easy cosine similarity later)
 using LinearAlgebra
-schema = PT.OllamaManagedSchema()
+schema = PT.OllamaSchema()
 
 msg = aiembed(schema,
     ["embed me", "and me too"],
