@@ -146,6 +146,8 @@ end
     output3 = _encode_local_image(image_path; base64_only = true)
     @test !occursin("data:image/png;base64,", output3)
     @test "data:image/png;base64," * output3 == output
+    # Nothing
+    @test _encode_local_image(nothing) == String[]
 end
 
 ### Conversation Management
