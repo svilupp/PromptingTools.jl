@@ -75,6 +75,9 @@ end
     @test msg.response == response
     @test msg.status == 200
     @test schema.inputs == (; system, prompt)
+    ## Assert
+    @test_throws Exception ollama_api(OllamaManagedSchema(), nothing)
+    @test_throws ollama_api(OllamaManagedSchema(), "x"; endpoint = "wrong-endpoint")
 end
 
 @testset "aigenerate-ollama" begin
