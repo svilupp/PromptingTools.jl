@@ -407,6 +407,8 @@ msg = aiembed(schema, ["Embed me", "Embed me"]; model="openhermes2.5-mistral")
 msg.content # 4096×2 Matrix{Float64}:
 ```
 
+You can now also use `aiscan` to provide images to Ollama models! See the docs for more information.
+
 If you're getting errors, check that Ollama is running - see the [Setup Guide for Ollama](#setup-guide-for-ollama) section below.
 
 ### Using MistralAI API and other OpenAI-compatible APIs

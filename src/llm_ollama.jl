@@ -256,17 +256,25 @@ You can use this function as a nice and quick OCR (transcribe text in the image)
 Let's transcribe some SQL code from a screenshot (no more re-typing!):
 
 ```julia
-# Screenshot of some SQL code
+using Downloads
+# Screenshot of some SQL code -- we cannot use image_url directly, so we need to download it first
 image_url = "https://www.sqlservercentral.com/wp-content/uploads/legacy/8755f69180b7ac7ee76a69ae68ec36872a116ad4/24622.png"
-msg = aiscan(:OCRTask; image_url, model="bakllava", task="Transcribe the SQL code in the image.", api_kwargs=(; max_tokens=2500))
+image_path = Downloads.download(image_url)
+msg = aiscan(:OCRTask; image_path, model="bakllava", task="Transcribe the SQL code in the image.", api_kwargs=(; max_tokens=2500))
 
-# [ Info: Tokens: 362 @ Cost: \$0.0045 in 2.5 seconds
 # AIMessage("```sql
 # update Orders <continue>
 
 # You can add syntax highlighting of the outputs via Markdown
 using Markdown
 msg.content |> Markdown.parse
+```
+
+Local models cannot handle image URLs directly (`image_url`), so you need to download the image first and provide it as `image_path`:
+
+```julia
+using Downloads
+image_path = Downloads.download(image_url)
 ```
 
 Notice that we set `max_tokens = 2500`. If your outputs seem truncated, it might be because the default maximum tokens on the server is set too low!
@@ -285,6 +293,8 @@ function aiscan(prompt_schema::AbstractOllamaSchema, prompt::ALLOWED_PROMPT_TYPE
             retries = 5,
             readtimeout = 120), api_kwargs::NamedTuple = (; max_tokens = 2500),
         kwargs...)
+    ## Checks
+    @assert isnothing(image_url) "Keyword `image_url` currently is not allowed for local models. Please download the file locally first with `image_path = Downloads.download(image_url)` and provide it as an `image_path`."
     ##
     global MODEL_ALIASES
     ## Find the unique ID for the model alias provided

@@ -134,6 +134,10 @@ end
                 _encode_local_image(joinpath(@__DIR__, "data", "julia.png"),
                     base64_only = true),
             ])]
+    @test_throws AssertionError aiscan(schema,
+        "hi";
+        return_all = true,
+        image_url = "not-allowed-url")
 end
 @testset "not implemented ai* functions" begin
     @test_throws ErrorException aiextract(OllamaSchema(), "prompt")
