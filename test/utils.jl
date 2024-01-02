@@ -2,7 +2,7 @@ using PromptingTools: split_by_length, replace_words
 using PromptingTools: _extract_handlebar_variables, call_cost, _report_stats
 using PromptingTools: _string_to_vector, _encode_local_image
 using PromptingTools: DataMessage, AIMessage
-using PromptingTools: push_conversation!, resize_conversation!
+using PromptingTools: push_conversation!, resize_conversation!, @timeout, preview
 
 @testset "replace_words" begin
     words = ["Disney", "Snow White", "Mickey Mouse"]
@@ -182,4 +182,37 @@ end
     conv_history = [[AIMessage("Test message")] for i in 1:7]
     resize_conversation!(conv_history, nothing)
     @test length(conv_history) == 7
+end
+
+@testset "@timeout" begin
+    #### Test 1: Successful Execution Within Timeout
+    result = @timeout 2 begin
+        sleep(1)
+        "success"
+    end "timeout"
+    @test result == "success"
+
+    #### Test 2: Execution Exceeds Timeout
+    result = @timeout 1 begin
+        sleep(2)
+        "success"
+    end "timeout"
+    @test result == "timeout"
+
+    #### Test 4: Negative Timeout
+    @test_throws ArgumentError @timeout -1 begin
+        "success"
+    end "timeout"
+end
+
+@testset "preview" begin
+    conversation = [
+        PT.SystemMessage("Welcome"),
+        PT.UserMessage("Hello"),
+        PT.AIMessage("World"),
+        PT.DataMessage(; content = ones(10)),
+    ]
+    preview_output = preview(conversation)
+    expected_output = Markdown.parse("# System Message\n\nWelcome\n\n---\n\n# User Message\n\nHello\n\n---\n\n# AI Message\n\nWorld\n\n---\n\n# Data Message\n\nData: Vector{Float64} (Size: (10,))\n")
+    @test preview_output == expected_output
 end

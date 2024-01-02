@@ -452,6 +452,15 @@ end
     @test cb.stdout == "Hello\n"
     @test cb.code == "println(\"Hello\")"
     @test isvalid(cb)
+
+    # Test execution_timeout
+    cb = AICode("sleep(1.1)", execution_timeout = 1)
+    @test cb.success == false
+    @test isnothing(cb.output)
+    @test cb.error isa InterruptException
+    cb = AICode("sleep(1.1)", execution_timeout = 2)
+    @test cb.success == true
+    @test isnothing(cb.error)
 end
 
 @testset "AICode constructors" begin
