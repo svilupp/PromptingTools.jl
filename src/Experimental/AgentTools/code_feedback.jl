@@ -79,7 +79,7 @@ function aicodefixer_feedback(::CodeSuccess, cb::AICode;
         ""
     else
         temp = string(cb.stdout)
-        end_idx = min(length(stdout_str), nextind(stdout_str, 0, max_length))
+        end_idx = min(length(temp), nextind(temp, 0, max_length))
         "\n\n**Output Captured:** $(temp[begin:end_idx])"
     end
     "Execution has been successful (no errors detected). Consider adding 1-2 challenging unit tests to improve the implementation - use @test macro, organize in a @testset block.$(stdout_str)"
