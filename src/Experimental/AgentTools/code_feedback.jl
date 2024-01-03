@@ -94,7 +94,7 @@ function aicodefixer_feedback(::CodeFailedParse,
     chunk_length = isnothing(cb.stdout) || isempty(cb.stdout) ? max_length :
                    max_length ÷ 2
     end_idx = min(length(error_), nextind(error_, 0, chunk_length))
-    "**Pasing Error Detected:** $(error_[begin:end_idx])"
+    "**Parsing Error Detected:** $(error_[begin:end_idx])"
 end
 
 function aicodefixer_feedback(::CodeFailedEval,

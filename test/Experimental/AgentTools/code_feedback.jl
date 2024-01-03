@@ -13,7 +13,7 @@ using PromptingTools.Experimental.AgentTools: CodeEmpty,
     # CodeFailedParse
     cb = AICode("println(\"a\"")
     feedback = aicodefixer_feedback(CodeFailedParse(), cb)
-    @test occursin("**Pasing Error Detected:** Base.Meta.ParseError", feedback)
+    @test occursin("**Parsing Error Detected:**", feedback)
 
     # CodeFailedEval
     cb = AICode("error(\"xx\")")
