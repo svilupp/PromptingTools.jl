@@ -57,7 +57,7 @@ This can be used to "reply" to previous message / continue the stored conversati
 @kwdef mutable struct AICall{F <: Function} <: AICallBlock
     func::F
     schema::Union{Nothing, PT.AbstractPromptSchema} = nothing
-    conversation::Vector{PT.AbstractMessage} = Vector{PT.AbstractMessage}()
+    conversation::Vector{<:PT.AbstractMessage} = Vector{PT.AbstractMessage}()
     kwargs::NamedTuple = NamedTuple()
     success::Union{Nothing, Bool} = nothing
     error::Union{Nothing, Exception} = nothing
@@ -70,15 +70,15 @@ function AICall(func::F, args...; kwargs...) where {F <: Function}
     for arg in args
         if isa(arg, PT.AbstractPromptSchema)
             schema = arg
-        elseif isa(arg, Vector{PT.AbstractMessage})
+        elseif isa(arg, Vector{<:PT.AbstractMessage})
             conversation = arg
-        elseif isa(arg, AbstractString) && !isempty(conversation)
+        elseif isa(arg, AbstractString) && isempty(conversation)
             ## User Prompt -- create a UserMessage
-            push!(UserMessage(arg))
+            push!(conversation, PT.UserMessage(arg))
         elseif isa(arg, Symbol) && isempty(conversation)
             conversation = PT.render(schema, AITemplate(arg))
         elseif isa(arg, AITemplate) && isempty(conversation)
-            conversation = render(schema, arg)
+            conversation = PT.render(schema, arg)
         else
             error("Invalid argument type: $(typeof(arg))")
         end
@@ -87,14 +87,69 @@ function AICall(func::F, args...; kwargs...) where {F <: Function}
     return AICall{F}(; func, schema, conversation, kwargs = NamedTuple(kwargs))
 end
 
+"""
+    AIGenerate(args...; kwargs...)
+
+Creates a lazy instance of `aigenerate`.
+It is an instance of `AICall` with `aigenerate` as the function.
+
+Use exactly the same arguments and keyword arguments as `aigenerate` (see `?aigenerate` for details).
+
+"""
 function AIGenerate(args...; kwargs...)
     return AICall(aigenerate, args...; kwargs...)
 end
+
+"""
+    AIExtract(args...; kwargs...)
+
+Creates a lazy instance of `aiextract`.
+It is an instance of `AICall` with `aiextract` as the function.
+
+Use exactly the same arguments and keyword arguments as `aiextract` (see `?aiextract` for details).
+
+"""
 function AIExtract(args...; kwargs...)
     return AICall(aiextract, args...; kwargs...)
 end
+
+"""
+    AIEmbed(args...; kwargs...)
+
+Creates a lazy instance of `aiembed`.
+It is an instance of `AICall` with `aiembed` as the function.
+
+Use exactly the same arguments and keyword arguments as `aiembed` (see `?aiembed` for details).
+
+"""
 function AIEmbed(args...; kwargs...)
     return AICall(aiembed, args...; kwargs...)
+end
+
+"""
+    AIClassify(args...; kwargs...)
+
+Creates a lazy instance of `aiclassify`.
+It is an instance of `AICall` with `aiclassify` as the function.
+
+Use exactly the same arguments and keyword arguments as `aiclassify` (see `?aiclassify` for details).
+
+"""
+function AIClassify(args...; kwargs...)
+    return AICall(aiclassify, args...; kwargs...)
+end
+
+"""
+    AIScan(args...; kwargs...)
+
+Creates a lazy instance of `aiscan`.
+It is an instance of `AICall` with `aiscan` as the function.
+
+Use exactly the same arguments and keyword arguments as `aiscan` (see `?aiscan` for details).
+
+"""
+function AIScan(args...; kwargs...)
+    return AICall(aiscan, args...; kwargs...)
 end
 
 """
@@ -269,11 +324,11 @@ end
 function AICodeFixer(aicall::AICall,
         template::Union{AITemplate, Symbol} = :CodeFixerRCI;
         kwargs...)
-    @assert haskey(PT.TEMPLATE_STORE, template) "Template $(template) not found in TEMPLATE_STORE"
     # Prepare template -- we expect two messages: the first is the intro, the second is the iteration steps
     template_rendered = if template isa AITemplate
-        template
+        PT.render(aicall.schema, template)
     else
+        @assert haskey(PT.TEMPLATE_STORE, template) "Template $(template) not found in TEMPLATE_STORE"
         PT.render(aicall.schema, AITemplate(template))
     end
     user_messages = filter(msg -> isa(msg, PT.UserMessage), template_rendered)

@@ -13,6 +13,30 @@
     custom_call = AICall(custom_func)
     @test custom_call.func === custom_func
 
+    # Different conversation types
+    aicall = AICall(identity, [PT.UserMessage("Hi")])
+    @test aicall.conversation == [PT.UserMessage("Hi")]
+    aicall = AICall(identity, "Hi")
+    @test aicall.conversation == [PT.UserMessage("Hi")]
+    aicall = AICall(identity, :BlankSystemUser)
+    @test aicall.conversation == [PT.SystemMessage("{{system}}")
+        PT.UserMessage("{{user}}")]
+    aicall = AICall(identity, AITemplate(:BlankSystemUser))
+    @test aicall.conversation == [PT.SystemMessage("{{system}}")
+        PT.UserMessage("{{user}}")]
+
+    # derived methods
+    aicall = AIGenerate()
+    @test aicall.func == aigenerate
+    aicall = AIExtract()
+    @test aicall.func == aiextract
+    aicall = AIEmbed()
+    @test aicall.func == aiembed
+    aicall = AIScan()
+    @test aicall.func == aiscan
+    aicall = AIClassify()
+    @test aicall.func == aiclassify
+
     # Wrong arguments
     @test_throws AssertionError AICall(identity, "arg1", "arg2", "arg3")
 
@@ -109,6 +133,9 @@ end
     @test codefixer.round_counter == codefixer.num_rounds
     @test codefixer.call.success == true
     @test codefixer.call.conversation[end].content == PT.AIMessage("Hello!").content
+    # AITemplate template
+    codefixer = AICodeFixer(aicall, AITemplate(:CodeFixerShort))
+    @test length(codefixer.templates) == 1
 
     # Zero Rounds
     response = Dict(:choices => [Dict(:message => Dict(:content => "Hello!"))],
@@ -125,4 +152,14 @@ end
     # Invalid Template
     aicall = AICall(identity)
     @test_throws AssertionError AICodeFixer(aicall, :InvalidSymbol; num_rounds = 0)
+
+    # Show method
+    aicall = AICall(identity)
+    codefixer = AICodeFixer(aicall, [PT.UserMessage("Fix this")], num_rounds = 5)
+
+    # Capture the output of show
+    io = IOBuffer()
+    show(io, codefixer)
+    output = String(take!(io))
+    @test output == "AICodeFixer(Rounds: 0/5)"
 end

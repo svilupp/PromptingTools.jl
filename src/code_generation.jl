@@ -18,11 +18,11 @@ abstract type AbstractCodeBlock end
 """
     AICode(code::AbstractString; auto_eval::Bool=true, safe_eval::Bool=false, 
     skip_unsafe::Bool=false, capture_stdout::Bool=true, verbose::Bool=false,
-    prefix::AbstractString="", suffix::AbstractString="", execution_timeout::Int = 60)
+    prefix::AbstractString="", suffix::AbstractString="", remove_tests::Bool=false, execution_timeout::Int = 60)
 
     AICode(msg::AIMessage; auto_eval::Bool=true, safe_eval::Bool=false, 
     skip_unsafe::Bool=false, skip_invalid::Bool=false, capture_stdout::Bool=true,
-    verbose::Bool=false, prefix::AbstractString="", suffix::AbstractString="", execution_timeout::Int = 60)
+    verbose::Bool=false, prefix::AbstractString="", suffix::AbstractString="", remove_tests::Bool=false, execution_timeout::Int = 60)
 
 A mutable structure representing a code block (received from the AI model) with automatic parsing, execution, and output/error capturing capabilities.
 
@@ -60,6 +60,7 @@ See also: `PromptingTools.extract_code_blocks`, `PromptingTools.eval!`
   Useful to add some additional code definition or necessary imports. Defaults to an empty string.
 - `suffix::AbstractString`: A string to be appended to the code block before parsing and evaluation. 
   Useful to check that tests pass or that an example executes. Defaults to an empty string.
+- `remove_tests::Bool`: If set to `true`, we remove any `@test` or `@testset` macros from the code block before parsing and evaluation. Defaults to `false`.
 - `execution_timeout::Int`: The maximum time (in seconds) allowed for the code block to execute. Defaults to 60 seconds.
 
 # Methods
@@ -119,6 +120,7 @@ function (CB::Type{T})(md::AbstractString;
         verbose::Bool = false,
         prefix::AbstractString = "",
         suffix::AbstractString = "",
+        remove_tests::Bool = false,
         execution_timeout::Int = 60) where {T <: AbstractCodeBlock}
     ##
     @assert execution_timeout>0 "execution_timeout must be positive"
@@ -131,7 +133,8 @@ function (CB::Type{T})(md::AbstractString;
                 safe_eval,
                 capture_stdout,
                 prefix,
-                suffix)
+                suffix,
+                remove_tests)
         end nothing # set to nothing if it fails
         # Check if we timed out
         if isnothing(result)
@@ -224,6 +227,40 @@ function is_julia_expr(ex::Expr)
     end
     ## Nothing found...
     return false
+end
+
+# Remove any given macro expression from the expression tree, used to remove tests
+function remove_macro_expr!(expr, sym::Symbol = Symbol("@testset"))
+    if expr isa Expr
+        expr.args = filter(x -> !(x isa Expr && x.head == :macrocall && !isempty(x.args) &&
+                                  x.args[1] == sym),
+            expr.args)
+        foreach(x -> remove_macro_expr!(x, sym), expr.args)
+    end
+    expr
+end
+
+# Remove testsets and sets from the expression tree
+function remove_tests_from_expr!(expr)
+    # Focus only on the three most common test macros 
+    remove_macro_expr!(expr, Symbol("@testset"))
+    remove_macro_expr!(expr, Symbol("@test"))
+    remove_macro_expr!(expr, Symbol("@test_throws"))
+end
+
+# Utility to identify the module name in a given expression (to evaluate subsequent calls in it)
+function extract_module_name(expr)
+    if isa(expr, Expr) && expr.head == :module
+        return expr.args[2] # The second argument is typically the module name
+    elseif isa(expr, Expr) && !isempty(expr.args)
+        output = extract_module_name.(expr.args)
+        for item in output
+            if !isnothing(item)
+                return item
+            end
+        end
+    end
+    nothing
 end
 
 ## Check if a given String seems to be a valid Julia expression (simple heuristics)
@@ -651,7 +688,8 @@ function eval!(cb::AbstractCodeBlock;
         safe_eval::Bool = true,
         capture_stdout::Bool = true,
         prefix::AbstractString = "",
-        suffix::AbstractString = "")
+        suffix::AbstractString = "",
+        remove_tests::Bool = false)
     (; code) = cb
     # reset
     cb.success = nothing
@@ -668,7 +706,7 @@ function eval!(cb::AbstractCodeBlock;
             code,
             "\n",
             suffix,
-            "\nend # end safe module")
+            "\nend")
     else
         string(prefix, "\n", code, "\n", suffix)
     end
@@ -700,13 +738,26 @@ function eval!(cb::AbstractCodeBlock;
         return cb
     end
 
+    ## Remove any tests
+    if remove_tests
+        ex = remove_tests_from_expr!(ex)
+    end
+
     ## Eval
+    eval!(cb, cb.expression; capture_stdout, eval_module = Main)
+    return cb
+end
+
+# Evaluation of any arbitrary expression with result recorded in `cb`
+function eval!(cb::AbstractCodeBlock, expr::Expr;
+        capture_stdout::Bool = true,
+        eval_module::Module = Main)
     # Prepare to catch any stdout
     if capture_stdout
         pipe = Pipe()
         redirect_stdout(pipe) do
             try
-                cb.output = @eval(Main, $(cb.expression))
+                cb.output = @eval(eval_module, $(expr))
                 cb.success = true
             catch e
                 cb.error = e
@@ -718,7 +769,7 @@ function eval!(cb::AbstractCodeBlock;
     else
         # Ignore stdout, just eval
         try
-            cb.output = @eval(Main, $(cb.expression))
+            cb.output = @eval(eval_module, $(expr))
             cb.success = true
         catch e
             cb.error = e

@@ -14,21 +14,56 @@ using PromptingTools.Experimental.AgentTools: CodeEmpty,
     cb = AICode("println(\"a\"")
     feedback = aicodefixer_feedback(CodeFailedParse(), cb)
     @test occursin("**Parsing Error Detected:**", feedback)
+    conv = [PT.AIMessage("""
+    ```julia
+    println(\"a\"
+    ```
+    """)]
+    feedback = aicodefixer_feedback(conv).feedback
+    @test occursin("**Parsing Error Detected:**", feedback)
 
-    # CodeFailedEval
+    # CodeFailedEval -- for failed tasks and normal errors
+    cb = AICode("""
+    tsk=@task error("xx")
+    schedule(tsk)
+    fetch(tsk)
+    """)
+    cb.stdout = "STDOUT"
+    feedback = aicodefixer_feedback(CodeFailedEval(), cb)
+    @test feedback ==
+          "**Error Detected:** ErrorException(\"xx\")\n\n**Output Captured:** STDOUT"
     cb = AICode("error(\"xx\")")
     cb.stdout = "STDOUT"
     feedback = aicodefixer_feedback(CodeFailedEval(), cb)
     @test feedback ==
           "**Error Detected:** ErrorException(\"xx\")\n\n**Output Captured:** STDOUT"
+    conv = [PT.AIMessage("""
+    ```julia
+    error(\"xx\")
+    ```
+    """)]
+    feedback = aicodefixer_feedback(conv).feedback
+    @test feedback ==
+          "**Error Detected:** ErrorException(\"xx\")"
 
     # CodeFailedTimeout
     cb = AICode("InterruptException()")
     feedback = aicodefixer_feedback(CodeFailedTimeout(), cb)
     @test feedback ==
           "**Error Detected**: Evaluation timed out. Please check your code for infinite loops or other issues."
+    conv = [PT.AIMessage("""
+    ```julia
+    throw(InterruptException())
+    ```
+    """)]
+    feedback = aicodefixer_feedback(conv).feedback
+    @test feedback ==
+          "**Error Detected**: Evaluation timed out. Please check your code for infinite loops or other issues."
 
     # CodeSuccess
+    cb = AICode("1")
+    cb.stdout = "STDOUT"
     feedback = aicodefixer_feedback(CodeSuccess(), cb)
     @test occursin("Execution has been successful", feedback)
+    @test occursin("**Output Captured:**", feedback)
 end

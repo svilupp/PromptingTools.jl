@@ -15,7 +15,7 @@ include("utils.jl")
 export aicodefixer_feedback
 include("code_feedback.jl")
 
-export AICall, AIGenerate, AIExtract, AIEmbed
+export AICall, AIGenerate, AIExtract, AIEmbed, AIClassify, AIScan
 export AICodeFixer, run!
 include("lazy_types.jl")
 

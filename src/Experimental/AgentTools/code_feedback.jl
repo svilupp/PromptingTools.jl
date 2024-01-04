@@ -82,7 +82,7 @@ function aicodefixer_feedback(::CodeSuccess, cb::AICode;
         end_idx = min(length(temp), nextind(temp, 0, max_length))
         "\n\n**Output Captured:** $(temp[begin:end_idx])"
     end
-    "Execution has been successful (no errors detected). Consider adding 1-2 challenging unit tests to improve the implementation - use @test macro, organize in a @testset block.$(stdout_str)"
+    "Execution has been successful (no errors detected). Consider adding 1-2 challenging unit tests to improve the main function - use `@test` macro, organize them in `@testset begin .. end` block.$(stdout_str)"
 end
 function aicodefixer_feedback(::CodeFailedParse,
         cb::AICode;
@@ -103,12 +103,16 @@ function aicodefixer_feedback(::CodeFailedEval,
         kwargs...)
     feedback = AbstractString[]
     ## Grab the error message
-    error_ = split(string(cb.error), "JuliaSyntax.SourceFile")[begin]
+    error_str = if cb.error isa TaskFailedException
+        string(cb.error.task.result)
+    else
+        split(string(cb.error), "JuliaSyntax.SourceFile")[begin]
+    end
     ## Decide how much space can be dedicated for this error (ie, do we have stdout as well?)
     chunk_length = isnothing(cb.stdout) || isempty(cb.stdout) ? max_length :
                    max_length ÷ 2
-    end_idx = min(length(error_), nextind(error_, 0, chunk_length))
-    push!(feedback, "**Error Detected:** $(error_[begin:end_idx])")
+    end_idx = min(length(error_str), nextind(error_str, 0, chunk_length))
+    push!(feedback, "**Error Detected:** $(error_str[begin:end_idx])")
 
     if !isnothing(cb.stdout) && !isempty(string(cb.stdout))
         ## Add the optional STDOUT (for test failures)
