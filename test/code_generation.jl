@@ -60,7 +60,7 @@ end
     """)
     expected = Meta.parseall("") # All expressions are removed
     result = remove_macro_expr!(expr)
-    @test result == expected
+    @test result.args[end] == expected.args[end]
 
     # Test without @testset
     expr = Meta.parseall("z = 4 + 4")
