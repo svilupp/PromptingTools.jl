@@ -181,3 +181,10 @@ struct MaybeExtract{T <: Any}
     error::Bool
     message::Union{Nothing, String}
 end
+
+"""
+Extract zero, one or more specified items from the provided data.
+"""
+struct ItemsExtract{T <: Any}
+    items::Vector{T}
+end

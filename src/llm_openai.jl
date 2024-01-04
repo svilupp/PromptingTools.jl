@@ -503,7 +503,7 @@ If `return_all=true`:
 - `conversation`: A vector of `AbstractMessage` objects representing the full conversation history, including the response from the AI model (`DataMessage`).
 
 
-See also: `function_call_signature`, `MaybeExtract`, `aigenerate`
+See also: `function_call_signature`, `MaybeExtract`, `ItemsExtract`, `aigenerate`
 
 # Example
 
@@ -541,6 +541,16 @@ msg.content.measurements
 # 2-element Vector{MyMeasurement}:
 #  MyMeasurement(30, 180, 80.0)
 #  MyMeasurement(19, 190, nothing)
+```
+
+Or you can use the convenience wrapper `ItemsExtract` to extract multiple measurements (zero, one or more):
+```julia
+using PromptingTools: ItemsExtract
+
+return_type = ItemsExtract{MyMeasurement}
+msg = aiextract("James is 30, weighs 80kg. He's 180cm tall. Then Jack is 19 but really tall - over 190!"; return_type)
+
+msg.content.items # see the extracted items
 ```
 
 Or if you want your extraction to fail gracefully when data isn't found, use `MaybeExtract{T}` wrapper

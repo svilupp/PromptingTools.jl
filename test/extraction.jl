@@ -1,4 +1,4 @@
-using PromptingTools: MaybeExtract, extract_docstring
+using PromptingTools: MaybeExtract, extract_docstring, ItemsExtract
 using PromptingTools: has_null_type, is_required_field, remove_null_types, to_json_schema
 using PromptingTools: function_call_signature
 
@@ -169,7 +169,7 @@ end
     @test_broken haskey(schema, "description")
 end
 
-@testset "to_json_schema" begin
+@testset "to_json_schema-MaybeExtract" begin
     "Represents person's age, height, and weight"
     struct MyMeasurement1
         age::Int
@@ -193,7 +193,29 @@ end
     @test schema_measurement["description"] ==
           "Represents person's age, height, and weight\n"
 end
-
+@testset "to_json_schema-ItemsExtract" begin
+    "Represents person's age, height, and weight"
+    struct MyMeasurement1
+        age::Int
+        height::Union{Int, Nothing}
+        weight::Union{Nothing, Float64}
+    end
+    schema = to_json_schema(ItemsExtract{MyMeasurement1})
+    @test schema["type"] == "object"
+    @test schema["properties"]["items"]["type"] == "array"
+    @test schema["required"] == ["items"]
+    @test haskey(schema, "description")
+    ## Check that the nested struct is extracted correctly
+    schema_measurement = schema["properties"]["items"]["items"]
+    @test schema_measurement["type"] == "object"
+    @test schema_measurement["properties"]["age"]["type"] == "integer"
+    @test schema_measurement["properties"]["height"]["type"] == "integer"
+    @test schema_measurement["properties"]["weight"]["type"] == "number"
+    @test schema_measurement["required"] == ["age"]
+    ## Check that the nested docstring is extracted correctly
+    @test schema_measurement["description"] ==
+          "Represents person's age, height, and weight\n"
+end
 @testset "function_call_signature" begin
     "Some docstring"
     struct MyMeasurement2
