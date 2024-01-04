@@ -61,7 +61,7 @@ end
     expected = Meta.parseall("") # All expressions are removed
     result = remove_macro_expr!(expr)
     # 1.9 parser eats the empty row, 1.10 retains it
-    @test isempty(result.args) || result == expected
+    @test length(result.args) == 1 || result == expected
 
     # Test without @testset
     expr = Meta.parseall("z = 4 + 4")
