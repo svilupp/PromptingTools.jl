@@ -326,3 +326,36 @@ function resize_conversation!(conv_history,
     end
     return conv_history
 end
+
+"""
+    @timeout(seconds, expr_to_run, expr_when_fails)
+
+Simple macro to run an expression with a timeout of `seconds`. If the `expr_to_run` fails to finish in `seconds` seconds, `expr_when_fails` is returned.
+
+# Example
+```julia
+x = @timeout 1 begin
+    sleep(1.1)
+    println("done")
+    1
+end "failed"
+
+```
+"""
+macro timeout(seconds, expr_to_run, expr_when_fails)
+    quote
+        tsk = @task $(esc(expr_to_run))
+        schedule(tsk)
+        Timer($(esc(seconds))) do timer
+            istaskdone(tsk) || Base.throwto(tsk, InterruptException())
+        end
+        try
+            fetch(tsk)
+        catch _
+            $(esc(expr_when_fails))
+        end
+    end
+end
+
+"Utility for rendering the conversation (vector of messages) as markdown. REQUIRES the Markdown package to load the extension!"
+function preview end

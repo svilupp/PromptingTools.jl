@@ -5,6 +5,7 @@ using PromptingTools: has_julia_prompt,
     remove_julia_prompt, extract_code_blocks, extract_code_blocks_fallback, eval!
 using PromptingTools: escape_interpolation, find_subsequence_positions
 using PromptingTools: AICode, isparsed, isparseerror, is_julia_code, is_julia_expr
+using PromptingTools: remove_tests_from_expr!, remove_macro_expr!, extract_module_name
 
 @testset "is_julia_expr" begin
     # Valid Julia Expressions
@@ -33,6 +34,80 @@ using PromptingTools: AICode, isparsed, isparseerror, is_julia_code, is_julia_ex
     @test is_julia_expr(42) == false
     @test is_julia_expr("string") == false
     @test is_julia_expr([1, 2, 3]) == false
+end
+
+@testset "remove_macro_expr!" begin
+    # Test with @testset macro
+    expr = Meta.parseall("""
+    @testset "Example Tests" begin
+        x = 1 + 1
+        @test x == 2
+    end
+    y = 3 + 3
+    """)
+    expected = Meta.parseall("y = 3 + 3")
+    result = remove_macro_expr!(expr)
+    @test result.args[end] == expected.args[end]
+
+    # Test with nested @testset
+    expr = Meta.parseall("""
+    @testset "Outer Test" begin
+        @testset "Inner Test" begin
+            x = 1 + 1
+        end
+        y = 2 + 2
+    end
+    """)
+    expected = Meta.parseall("") # All expressions are removed
+    result = remove_macro_expr!(expr)
+    # 1.9 parser eats the empty row, 1.10 retains it
+    @test length(result.args) == 1 || result == expected
+
+    # Test without @testset
+    expr = Meta.parseall("z = 4 + 4")
+    expected = Meta.parseall("z = 4 + 4")
+    result = remove_macro_expr!(expr)
+    @test result == expected
+
+    # Test with different macro
+    expr = Meta.parseall("@chain x begin; end")
+    expected = Meta.parseall("@chain x begin; end")
+    result = remove_macro_expr!(expr, Symbol("@test"))
+    @test result == expected
+end
+
+@testset "remove_tests_from_expr!" begin
+    # Test with both @testset and @test macros
+    expr = Meta.parseall("""
+    @testset "Example Tests" begin
+        x = 1 + 1
+        @test x == 2
+    end
+    @test x == 2
+    @test_throws AssertionError func(1)
+    y = 3 + 3
+    """)
+    expected = Meta.parseall("y = 3 + 3")
+    result = remove_tests_from_expr!(expr)
+    @test result.args[end] == expected.args[end]
+end
+
+@testset "extract_module_name" begin
+    # Test with a valid module expression
+    module_expr = Meta.parse("module MyTestModule\nend")
+    @test extract_module_name(module_expr) == :MyTestModule
+
+    # Test with an expression that is not a module
+    non_module_expr = Meta.parse("x = 1 + 1")
+    @test extract_module_name(non_module_expr) === nothing
+
+    # In a nested expression tree
+    module_expr = Meta.parseall("module MyTestModule\nfoo()=\"hello\"\nend")
+    @test extract_module_name(module_expr) == :MyTestModule
+
+    # Test with an empty expression
+    empty_expr = Meta.parse("")
+    @test extract_module_name(empty_expr) === nothing
 end
 
 @testset "is_julia_code" begin
@@ -452,6 +527,28 @@ end
     @test cb.stdout == "Hello\n"
     @test cb.code == "println(\"Hello\")"
     @test isvalid(cb)
+
+    # Test execution_timeout
+    cb = AICode("sleep(1.1)", execution_timeout = 1)
+    @test cb.success == false
+    @test isnothing(cb.output)
+    @test cb.error isa InterruptException
+    cb = AICode("sleep(1.1)", execution_timeout = 2)
+    @test cb.success == true
+    @test isnothing(cb.error)
+
+    # expression-only method
+    cb = AICode("""
+  module MyModule
+      function foo()
+          println("Hello")
+      end
+  end
+  """; safe_eval = false)
+    eval_module = getfield(Main, extract_module_name(cb.expression))
+    eval!(cb, Meta.parseall("foo()"); eval_module)
+    @test isnothing(cb.error)
+    @test cb.stdout == "Hello\n"
 end
 
 @testset "AICode constructors" begin

@@ -1,6 +1,6 @@
 using PromptingTools
 using OpenAI, HTTP, JSON3
-using SparseArrays, LinearAlgebra
+using SparseArrays, LinearAlgebra, Markdown
 using Test
 using Aqua
 const PT = PromptingTools
@@ -41,4 +41,5 @@ end
 ## Run experimental
 @testset "Experimental" begin
     include("Experimental/RAGTools/runtests.jl")
+    include("Experimental/AgentTools/runtests.jl")
 end

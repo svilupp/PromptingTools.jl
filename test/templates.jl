@@ -9,6 +9,7 @@ using PromptingTools: TestEchoOpenAISchema
         UserMessage("# Statement\n\n{{it}}")]
     @test expected_output == render(PT.PROMPT_SCHEMA, template)
     @test expected_output == render(template)
+    @test expected_output == render(nothing, template)
 end
 
 @testset "Templates - search" begin

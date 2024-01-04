@@ -1,7 +1,8 @@
 using PromptingTools
 using Documenter
-using SparseArrays, LinearAlgebra
+using SparseArrays, LinearAlgebra, Markdown
 using PromptingTools.Experimental.RAGTools
+using PromptingTools.Experimental.AgentTools
 using JSON3, Serialization, DataFramesMeta
 using Statistics: mean
 
@@ -11,7 +12,11 @@ DocMeta.setdocmeta!(PromptingTools,
     recursive = true)
 
 makedocs(;
-    modules = [PromptingTools, PromptingTools.Experimental.RAGTools],
+    modules = [
+        PromptingTools,
+        PromptingTools.Experimental.RAGTools,
+        PromptingTools.Experimental.AgentTools,
+    ],
     authors = "J S <49557684+svilupp@users.noreply.github.com> and contributors",
     repo = "https://github.com/svilupp/PromptingTools.jl/blob/{commit}{path}#{line}",
     sitename = "PromptingTools.jl",
@@ -36,6 +41,7 @@ makedocs(;
             "PromptingTools.jl" => "reference.md",
             "Experimental Modules" => "reference_experimental.md",
             "RAGTools" => "reference_ragtools.md",
+            "AgentTools" => "reference_agenttools.md",
         ],
     ])
 
