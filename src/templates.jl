@@ -112,6 +112,11 @@ function render(template::AITemplate; kwargs...)
     global PROMPT_SCHEMA
     render(PROMPT_SCHEMA, template; kwargs...)
 end
+# Since we don't distinguish between schema, support schema=nothing as well
+function render(schema::Nothing, template::AITemplate; kwargs...)
+    global PROMPT_SCHEMA
+    render(PROMPT_SCHEMA, template; kwargs...)
+end
 
 ## Loading/saving -- see src/serialization.jl
 
