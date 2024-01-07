@@ -300,4 +300,14 @@ end
     @test msg == expected_output
     @test schema2.inputs == ["Hello World", "Hello back"]
     @test schema2.model_id == "gpt-4" # not possible - just an example
+    msg = aiembed(schema2, view(["Hello World", "Hello back"], :),
+        model = "gpt4", http_kwargs = (; verbose = 3), api_kwargs = (; temperature = 0))
+    expected_output = DataMessage(;
+        content = ones(128, 2),
+        status = 200,
+        tokens = (4, 0),
+        elapsed = msg.elapsed)
+    @test msg == expected_output
+    @test schema2.inputs == ["Hello World", "Hello back"]
+    @test schema2.model_id == "gpt-4" # not possible - just an example
 end
