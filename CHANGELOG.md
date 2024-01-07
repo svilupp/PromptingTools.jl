@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `ItemsExtract` convenience wrapper for `aiextract` when you want to extract one or more of a specific `return_type` (eg, `return_type = ItemsExtract{MyMeasurement}`)
 
 ### Fixed
+- Fixed `aiembed` to accept any AbstractVector of documents (eg, a view of a vector of documents)
 
 ## [0.6.0]
 

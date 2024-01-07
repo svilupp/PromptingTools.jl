@@ -318,7 +318,7 @@ end
 
 """
     aiembed(prompt_schema::AbstractOpenAISchema,
-            doc_or_docs::Union{AbstractString, Vector{<:AbstractString}},
+            doc_or_docs::Union{AbstractString, AbstractVector{<:AbstractString}},
             postprocess::F = identity;
             verbose::Bool = true,
             api_key::String = OPENAI_API_KEY,
@@ -333,7 +333,7 @@ The `aiembed` function generates embeddings for the given input using a specifie
 
 ## Arguments
 - `prompt_schema::AbstractOpenAISchema`: The schema for the prompt.
-- `doc_or_docs::Union{AbstractString, Vector{<:AbstractString}}`: The document or list of documents to generate embeddings for.
+- `doc_or_docs::Union{AbstractString, AbstractVector{<:AbstractString}}`: The document or list of documents to generate embeddings for.
 - `postprocess::F`: The post-processing function to apply to each embedding. Defaults to the identity function.
 - `verbose::Bool`: A flag indicating whether to print verbose information. Defaults to `true`.
 - `api_key::String`: The API key to use for the OpenAI API. Defaults to `OPENAI_API_KEY`.
@@ -370,7 +370,7 @@ msg.content' * msg.content[:, 1] # [1.0, 0.787]
 
 """
 function aiembed(prompt_schema::AbstractOpenAISchema,
-        doc_or_docs::Union{AbstractString, Vector{<:AbstractString}},
+        doc_or_docs::Union{AbstractString, AbstractVector{<:AbstractString}},
         postprocess::F = identity; verbose::Bool = true,
         api_key::String = OPENAI_API_KEY,
         model::String = MODEL_EMBEDDING,

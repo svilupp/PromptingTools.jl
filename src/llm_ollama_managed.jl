@@ -238,7 +238,7 @@ end
 
 """
     aiembed(prompt_schema::AbstractOllamaManagedSchema,
-            doc_or_docs::Union{AbstractString, Vector{<:AbstractString}},
+            doc_or_docs::Union{AbstractString, AbstractVector{<:AbstractString}},
             postprocess::F = identity;
             verbose::Bool = true,
             api_key::String = "",
@@ -253,7 +253,7 @@ The `aiembed` function generates embeddings for the given input using a specifie
 
 ## Arguments
 - `prompt_schema::AbstractOllamaManagedSchema`: The schema for the prompt.
-- `doc_or_docs::Union{AbstractString, Vector{<:AbstractString}}`: The document or list of documents to generate embeddings for. The list of documents is processed sequentially, 
+- `doc_or_docs::Union{AbstractString, AbstractVector{<:AbstractString}}`: The document or list of documents to generate embeddings for. The list of documents is processed sequentially, 
   so users should consider implementing an async version with with `Threads.@spawn`
 - `postprocess::F`: The post-processing function to apply to each embedding. Defaults to the identity function, but could be `LinearAlgebra.normalize`.
 - `verbose::Bool`: A flag indicating whether to print verbose information. Defaults to `true`.
@@ -334,7 +334,7 @@ function aiembed(prompt_schema::AbstractOllamaManagedSchema,
     return msg
 end
 function aiembed(prompt_schema::AbstractOllamaManagedSchema,
-        docs::Vector{<:AbstractString},
+        docs::AbstractVector{<:AbstractString},
         postprocess::F = identity; verbose::Bool = true,
         api_key::String = "",
         model::String = MODEL_EMBEDDING,
