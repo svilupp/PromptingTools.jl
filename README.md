@@ -110,7 +110,7 @@ Some features:
 - **`aigenerate` Function**: Simplify prompt templates with handlebars (eg, `{{variable}}`) and keyword arguments
 - **`@ai_str` String Macro**: Save keystrokes with a string macro for simple prompts
 - **Easy to Remember**: All exported functions start with `ai...` for better discoverability
-- **Light Wraper Types**: Benefit from Julia's multiple dispatch by having AI outputs wrapped in specific types
+- **Light Wrapper Types**: Benefit from Julia's multiple dispatch by having AI outputs wrapped in specific types
 - **Minimal Dependencies**: Enjoy an easy addition to your global environment with very light dependencies
 - **No Context Switching**: Access cutting-edge LLMs with no context switching and minimum extra keystrokes directly in your REPL
 
