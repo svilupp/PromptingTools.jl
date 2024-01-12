@@ -121,6 +121,26 @@ function OpenAI.create_chat(schema::CustomOpenAISchema,
 end
 
 """
+    OpenAI.create_chat(schema::LocalServerOpenAISchema,
+        api_key::AbstractString,
+        model::AbstractString,
+        conversation;
+        url::String = "http://localhost:8080",
+        kwargs...)
+
+Dispatch to the OpenAI.create_chat function, but with the LocalServer API parameters, ie, defaults to `url` specified by the `LOCAL_SERVER` preference. See `?PREFERENCES`
+
+"""
+function OpenAI.create_chat(schema::LocalServerOpenAISchema,
+        api_key::AbstractString,
+        model::AbstractString,
+        conversation;
+        url::String = LOCAL_SERVER,
+        kwargs...)
+    OpenAI.create_chat(CustomOpenAISchema(), api_key, model, conversation; url, kwargs...)
+end
+
+"""
     OpenAI.create_chat(schema::MistralOpenAISchema,
   api_key::AbstractString,
   model::AbstractString,
@@ -171,6 +191,22 @@ function OpenAI.create_embeddings(schema::CustomOpenAISchema,
     # Create chat will automatically pass our data to endpoint `/embeddings`
     provider = CustomProvider(; api_key, base_url = url)
     OpenAI.create_embeddings(provider, docs, model; kwargs...)
+end
+# Set url and just forward to CustomOpenAISchema otherwise
+# Note: Llama.cpp and hence Llama.jl DO NOT support the embeddings endpoint !! (they use `/embedding`)
+function OpenAI.create_embeddings(schema::LocalServerOpenAISchema,
+        api_key::AbstractString,
+        docs,
+        model::AbstractString;
+        ## Strip the "v1" from the end of the url
+        url::String = LOCAL_SERVER,
+        kwargs...)
+    OpenAI.create_embeddings(CustomOpenAISchema(),
+        api_key,
+        docs,
+        model;
+        url,
+        kwargs...)
 end
 function OpenAI.create_embeddings(schema::MistralOpenAISchema,
         api_key::AbstractString,
