@@ -21,6 +21,8 @@ Check your preferences by calling `get_preferences(key::String)`.
     See `MODEL_ALIASES` for more information.
 - `MAX_HISTORY_LENGTH`: The maximum length of the conversation history. Defaults to 5. Set to `nothing` to disable history.
     See `CONV_HISTORY` for more information.
+- `LOCAL_SERVER`: The URL of the local server to use for `ai*` calls. Defaults to `http://localhost:10897/v1`. This server is called when you call `model="local"`
+    See `?LocalServerOpenAISchema` for more information and examples.
 
 At the moment it is not possible to persist changes to `MODEL_REGISTRY` across sessions. 
 Define your `register_model!()` calls in your `startup.jl` file to make them available across sessions or put them at the top of your script.
@@ -28,6 +30,7 @@ Define your `register_model!()` calls in your `startup.jl` file to make them ava
 # Available ENV Variables
 - `OPENAI_API_KEY`: The API key for the OpenAI API. 
 - `MISTRALAI_API_KEY`: The API key for the Mistral AI API.
+- `LOCAL_SERVER`: The URL of the local server to use for `ai*` calls. Defaults to `http://localhost:10897/v1`. This server is called when you call `model="local"`
 
 Preferences.jl takes priority over ENV variables, so if you set a preference, it will override the ENV variable.
 
@@ -58,6 +61,7 @@ function set_preferences!(pairs::Pair{String, <:Any}...)
         "MODEL_ALIASES",
         "PROMPT_SCHEMA",
         "MAX_HISTORY_LENGTH",
+        "LOCAL_SERVER",
     ]
     for (key, value) in pairs
         @assert key in allowed_preferences "Unknown preference '$key'! (Allowed preferences: $(join(allowed_preferences,", "))"
@@ -91,6 +95,8 @@ function get_preferences(key::String)
         "MODEL_EMBEDDING",
         "MODEL_ALIASES",
         "PROMPT_SCHEMA",
+        "MAX_HISTORY_LENGTH",
+        "LOCAL_SERVER",
     ]
     @assert key in allowed_preferences "Unknown preference '$key'! (Allowed preferences: $(join(allowed_preferences,", "))"
     getproperty(@__MODULE__, Symbol(key))
@@ -112,6 +118,10 @@ isempty(OPENAI_API_KEY) &&
 
 const MISTRALAI_API_KEY::String = @load_preference("MISTRALAI_API_KEY",
     default=get(ENV, "MISTRALAI_API_KEY", ""));
+
+## Address of the local server
+const LOCAL_SERVER::String = @load_preference("LOCAL_SERVER",
+    default=get(ENV, "LOCAL_SERVER", "http://127.0.0.1:10897/v1"));
 
 ## CONVERSATION HISTORY
 """
@@ -234,7 +244,8 @@ aliases = merge(Dict("gpt3" => "gpt-3.5-turbo",
         "ada" => "text-embedding-ada-002",
         "yi34c" => "yi:34b-chat",
         "oh25" => "openhermes2.5-mistral",
-        "starling" => "starling-lm"),
+        "starling" => "starling-lm",
+        "local" => "local-server"),
     ## Load aliases from preferences as well
     @load_preference("MODEL_ALIASES", default=Dict{String, String}()))
 
@@ -325,7 +336,12 @@ registry = Dict{String, ModelSpec}("gpt-3.5-turbo" => ModelSpec("gpt-3.5-turbo",
                     :completion_tokens => 1)), status = 200),
         0.0,
         0.0,
-        "Echo is only for testing. It always responds with 'Hello!'"))
+        "Echo is only for testing. It always responds with 'Hello!'"),
+    "local-server" => ModelSpec("local-server",
+        LocalServerOpenAISchema(),
+        0.0,
+        0.0,
+        "Local server, eg, powered by [Llama.jl](https://github.com/marcom/Llama.jl). Model is specified when instantiating the server itself."))
 
 ### Model Registry Structure
 @kwdef mutable struct ModelRegistry
