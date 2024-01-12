@@ -53,16 +53,65 @@ All user needs to do is to pass this schema as the first argument and provide th
 
 # Example
 
-Assumes that we have a local server running at `http://localhost:8081`:
+Assumes that we have a local server running at `http://127.0.0.1:8081`:
 
 ```julia
 api_key = "..."
 prompt = "Say hi!"
-msg = aigenerate(CustomOpenAISchema(), prompt; model="my_model", api_key, api_kwargs=(; url="http://localhost:8081"))
+msg = aigenerate(CustomOpenAISchema(), prompt; model="my_model", api_key, api_kwargs=(; url="http://127.0.0.1:8081"))
 ```
 
 """
 struct CustomOpenAISchema <: AbstractOpenAISchema end
+
+"""
+    LocalServerOpenAISchema
+
+Designed to be used with local servers. It's automatically called with model alias "local" (see `MODEL_REGISTRY`).
+
+This schema is a flavor of CustomOpenAISchema with a `url` key` preset by global Preference key `LOCAL_SERVER`. See `?PREFERENCES` for more details on how to change it.
+It assumes that the server follows OpenAI API conventions (eg, `POST /v1/chat/completions`).
+
+Note: Llama.cpp (and hence Llama.jl built on top of it) do NOT support embeddings endpoint! You'll get an address error.
+
+# Example
+
+Assumes that we have a local server running at `http://127.0.0.1:10897/v1` (port and address used by Llama.jl, "v1" at the end is needed for OpenAI endpoint compatibility):
+
+Three ways to call it:
+```julia
+
+# Use @ai_str with "local" alias
+ai"Say hi!"local
+
+# model="local"
+aigenerate("Say hi!"; model="local")
+
+# Or set schema explicitly
+const PT = PromptingTools
+msg = aigenerate(PT.LocalServerOpenAISchema(), "Say hi!")
+```
+
+How to start a LLM local server? You can use `run_server` function from [Llama.jl](https://github.com/marcom/Llama.jl). Use a separate Julia session.
+```julia
+using Llama
+model = "...path..." # see Llama.jl README how to download one
+run_server(; model)
+```
+
+To change the default port and address:
+```julia
+# For a permanent change, set the preference:
+using Preferences
+set_preferences!("LOCAL_SERVER"=>"http://127.0.0.1:10897/v1")
+
+# Or if it's a temporary fix, just change the variable `LOCAL_SERVER`:
+const PT = PromptingTools
+PT.LOCAL_SERVER = "http://127.0.0.1:10897/v1"
+```
+
+"""
+struct LocalServerOpenAISchema <: AbstractOpenAISchema end
 
 """
     MistralOpenAISchema
