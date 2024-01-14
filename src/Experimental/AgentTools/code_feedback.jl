@@ -136,6 +136,28 @@ function aicodefixer_feedback(::CodeFailedEval,
     return isempty(feedback) ? "No feedback provided." : join(feedback, "\n\n")
 end
 
+function testset_feedback(msg::AIMessage;
+        prefix::AbstractString = "",
+        suffix::AbstractString = "", kwargs...)
+    code = join(PT.extract_code_blocks(msg.content), "\n")
+    test_f = PT.extract_testset_name(code)
+    if !isnothing(test_f)
+        test_f_mock = "$(replace(test_f, r"[\s\(\)]" => ""))(args...; kwargs...) = nothing"
+        prefix = prefix * "\n" * test_f_mock
+    end
+    # Insert mock function, remove test items -- good test suite should pass
+    cb = AICode(msg;
+        skip_unsafe = true,
+        prefix, suffix,
+        expression_transform = :remove_test_items, kwargs...)
+    feedback = if !isnothing(cb.error)
+        aicodefixer_feedback(CodeFailedEval(), cb)
+    else
+        nothing
+    end
+    return feedback
+end
+
 ### Feedback for individual errors
 error_feedback(e::Any; max_length::Int = 512) = "No error found. Ignore."
 function error_feedback(e::Exception; max_length::Int = 512)
@@ -231,3 +253,63 @@ function score_feedback(cb::AICode, expr_to_run::Expr = Expr(:block))
     end
     return score
 end
+
+function extract_test_counts(test_summary::String)
+    # Split the test summary into lines
+    lines = split(test_summary, '\n')
+    length_ = length(lines)
+    counts = Dict{String, Int}()
+
+    # Find the line containing the column headers
+    for i in eachindex(lines)
+        # iterate only until penultimate, since we look ahead one line
+        i == length_ && break
+        m = match(r"Test Summary:\s*\|\s*([^|]*?)\s*Total", lines[i])
+        if !isnothing(m) && !isnothing(m.captures)
+            headers = [
+                [lowercase(strip(col))
+                 for col in split(m.captures[1], " ") if !isempty(col)]..., "total"]
+            next_line = lines[i + 1]
+            digits = [tryparse(Int, m.match)
+                      for m in eachmatch(r"\b\d+\b", next_line)]
+            for (header, score) in zip(headers, digits)
+                if !isnothing(score)
+                    counts[header] = get(counts, header, 0) + score
+                end
+            end
+        end
+    end
+    return counts
+end
+
+# test_summary1 = """
+# Test Summary: | Pass  Broken  Total  Time
+# a             |    1       1      2  0.0s
+# """
+# extract_test_counts(test_summary1) == Dict("pass" => 1, "broken" => 1, "total" => 2)
+
+# test_summary2 = """
+# Test Summary: | Pass  Fail  Error  Total  Time
+# b             |    1     1      1      3  0.0s
+# """
+# extract_test_counts(test_summary2) ==
+# Dict("pass" => 1, "fail" => 1, "error" => 1, "total" => 3)
+
+# test_summary3 = """
+# Test Summary: | Pass  Fail  Error  Broken  Total  Time
+# two           |    2     1      1       1      5  0.0s
+#   a           |    1                    1      2  0.0s
+#   b           |    1     1      1              3  0.0s
+# """
+# extract_test_counts(test_summary3) ==
+# Dict("fail" => 1, "error" => 1, "total" => 5, "broken" => 1, "pass" => 2)
+
+# test_summary4 = """
+# Test Summary: | Pass  Broken  Total  Time
+# a             |    1       1      2  0.0s
+
+# Test Summary: | Pass  Fail  Error  Total  Time
+# b             |    1     1      1      3  0.0s
+# """
+# extract_test_counts(test_summary4) ==
+# Dict("pass" => 2, "broken" => 1, "fail" => 1, "error" => 1, "total" => 5)
