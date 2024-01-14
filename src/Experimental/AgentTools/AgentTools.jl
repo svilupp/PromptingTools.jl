@@ -9,10 +9,11 @@ module AgentTools
 
 using PromptingTools
 const PT = PromptingTools
+using Test
 
 include("utils.jl")
 
-export aicodefixer_feedback
+export aicodefixer_feedback, error_feedback, score_feedback
 include("code_feedback.jl")
 
 export AICall, AIGenerate, AIExtract, AIEmbed, AIClassify, AIScan

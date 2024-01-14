@@ -103,23 +103,131 @@ function aicodefixer_feedback(::CodeFailedEval,
         kwargs...)
     feedback = AbstractString[]
     ## Grab the error message
-    error_str = if cb.error isa TaskFailedException
-        string(cb.error.task.result)
-    else
-        split(string(cb.error), "JuliaSyntax.SourceFile")[begin]
-    end
     ## Decide how much space can be dedicated for this error (ie, do we have stdout as well?)
     chunk_length = isnothing(cb.stdout) || isempty(cb.stdout) ? max_length :
                    max_length ÷ 2
-    end_idx = min(length(error_str), nextind(error_str, 0, chunk_length))
-    push!(feedback, "**Error Detected:** $(error_str[begin:end_idx])")
+    error_str = error_feedback(cb.error; max_length = chunk_length)
+    push!(feedback, "**Error Detected:**\n$(error_str)")
+
+    ## Add the lines that caused it
+    if !isempty(cb.error_lines)
+        feedback_lines = String[]
+        max_lines = 2 # max lines to send
+        logged_lines = Set{Int}()
+        code_lines = split(cb.code, "\n")
+        for line in cb.error_lines
+            if line ∉ logged_lines && line ≤ length(code_lines) &&
+               length(logged_lines) <= max_lines
+                push!(feedback_lines, "- " * code_lines[line])
+                push!(logged_lines, line)
+            end
+        end
+        push!(feedback,
+            "\n\n**Lines that caused the error:**\n" * join(feedback_lines, "\n"))
+    end
 
     if !isnothing(cb.stdout) && !isempty(string(cb.stdout))
         ## Add the optional STDOUT (for test failures)
         chunk_length = max_length - sum(length, feedback)
         end_idx = min(length(cb.stdout), nextind(cb.stdout, 0, chunk_length))
-        push!(feedback, "**Output Captured:** $(cb.stdout[begin:end_idx])")
+        push!(feedback, "**Output Captured:**\n $(cb.stdout[begin:end_idx])")
     end
 
     return isempty(feedback) ? "No feedback provided." : join(feedback, "\n\n")
+end
+
+### Feedback for individual errors
+error_feedback(e::Any; max_length::Int = 512) = "No error found. Ignore."
+function error_feedback(e::Exception; max_length::Int = 512)
+    io = IOBuffer()
+    name_ = typeof(e) |> nameof |> string
+    write(io, "**", name_, "**:\n")
+    showerror(io, e)
+    first(String(take!(io)), max_length)
+end
+# FallbackTestSetException will take the default path
+function error_feedback(e::Test.TestSetException; max_length::Int = 512)
+    io = IOBuffer()
+    name_ = typeof(e) |> nameof |> string
+    write(io, "**", name_, "**:\n")
+    showerror(io, e)
+    ## Unpack the results in
+    write(io, "\n")
+    for error_ in e.errors_and_fails
+        io_ = IOBuffer()
+        showerror(io_, error_)
+        out = split(String(take!(io_)), "Stacktrace")[begin]
+        write(io, "\n", out)
+    end
+
+    first(String(take!(io)), max_length)
+end
+function error_feedback(e::TaskFailedException; max_length::Int = 512)
+    error_feedback(e.task.result; max_length)
+end
+function error_feedback(e::Base.Meta.ParseError; max_length::Int = 512)
+    io = IOBuffer()
+    name_ = typeof(e) |> nameof |> string
+    write(io, "**", name_, "**:\n")
+    showerror(io, e)
+    first(String(take!(io)), max_length)
+end
+function error_feedback(e::UndefVarError; max_length::Int = 512)
+    io = IOBuffer()
+    showerror(io, e)
+    # Simple heurisic - if's available in Main/Base
+    found = false
+    for mod in [Base, Main]
+        if hasproperty(mod, e.var)
+            write(io,
+                "\nExpert Tip: I know that the variable $(e.var) is defined in $(nameof(mod)) module. Use `import $(mod).$(e.var)` to use it.")
+            found = true
+            break
+        end
+    end
+    !found && write(io,
+        "\nTip: Does it even exist? Does it need to be imported? Or is it a typo?")
+    first(String(take!(io)), max_length)
+end
+# e = UndefVarError(:Threads)
+# code_feedback(e)
+# UndefVarError: `Threads` not defined
+# Expert Tip: I know that the variable Threads is defined in Base module. Use `import Base.Threads` to use it.
+function error_feedback(e::ArgumentError; max_length::Int = 512)
+    io = IOBuffer()
+    showerror(io, e)
+    # Simple heurisic - if's available in Main/Base
+    pkg = PT.extract_package_name_from_argerror(e.msg)
+    if !isnothing(pkg)
+        for mod in [Base, Main]
+            hasproperty(mod, Symbol(pkg)) && (write(io,
+                "\nExpert Tip: I know that the package $pkg is defined in $(nameof(mod)) module. You MUST use `import $(mod).$(pkg)` to use it.");
+            break)
+        end
+    end
+    first(String(take!(io)), max_length)
+end
+# e = ArgumentError("Package Threads not found in current path, maybe you meant `import/using .Threads`.\n- Otherwise, run `import Pkg; Pkg.add(\"Threads\")` to install the Threads package.")
+# code_feedback(e)
+# ArgumentError: Package Threads not found in current path, maybe you meant `import/using .Threads`.
+# - Otherwise, run `import Pkg; Pkg.add("Threads")` to install the Threads package.
+# Expert Tip: Package Threads is defined in Base module. You MUST use `import Base.Threads` to use it.
+
+## 
+function score_feedback(cb::AICode, expr_to_run::Expr = Expr(:block))
+    score = if isempty(cb.code)
+        0
+    elseif !PT.isparsed(cb)
+        1
+    elseif isa(cb.error, Test.TestSetException)
+        # error outside of test is twice as bad
+        10 + cb.error.pass - cb.error.fail - 2cb.error.error # ignore broken
+    elseif isa(cb.error, Exception)
+        2
+    elseif isvalid(cb)
+        10
+    else
+        throw(ArgumentError("Invalid code feedback path?"))
+    end
+    return score
 end
