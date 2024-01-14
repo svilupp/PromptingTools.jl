@@ -110,6 +110,7 @@ eval(code.expression)
     output = nothing
     success::Union{Nothing, Bool} = nothing
     error::Union{Nothing, Exception} = nothing
+    error_lines::Vector{Int} = Int[]
 end
 # Eager evaluation if instantiated with a string
 function (CB::Type{T})(md::AbstractString;
@@ -120,26 +121,47 @@ function (CB::Type{T})(md::AbstractString;
         verbose::Bool = false,
         prefix::AbstractString = "",
         suffix::AbstractString = "",
-        remove_tests::Bool = false,
+        expression_transform::Symbol = :nothing,
         execution_timeout::Int = 60) where {T <: AbstractCodeBlock}
     ##
     @assert execution_timeout>0 "execution_timeout must be positive"
-    skip_unsafe && (md = remove_unsafe_lines(md; verbose))
+    if skip_unsafe
+        md, removed = remove_unsafe_lines(md; verbose)
+    else
+        removed = ""
+    end
     cb = CB(; code = md)
     if auto_eval
+        eval!(cb;
+            safe_eval,
+            capture_stdout,
+            prefix,
+            suffix,
+            expression_transform)
         # set to timeout in `execution_timeout` seconds
-        result = @timeout execution_timeout begin
-            eval!(cb;
-                safe_eval,
-                capture_stdout,
-                prefix,
-                suffix,
-                remove_tests)
-        end nothing # set to nothing if it fails
-        # Check if we timed out
-        if isnothing(result)
-            cb.success = false
-            cb.error = InterruptException()
+        # result = @timeout execution_timeout begin
+        #     eval!(cb;
+        #         safe_eval,
+        #         capture_stdout,
+        #         prefix,
+        #         suffix,
+        #         expression_transform)
+        # end nothing # set to nothing if it fails
+        # # Check if we timed out
+        # if isnothing(result)
+        #     cb.success = false
+        #     cb.error = InterruptException()
+        # end
+    end
+    if !isempty(removed)
+        ## Add to STDOUT what we removed
+        warning = string("!!! IMPORTANT: Unsafe lines blocked from execution (eg, Pkg operations or imports of non-existent packages):",
+            "\n$removed\n",
+            "Fix or find a workaround!")
+        if isnothing(cb.stdout)
+            cb.stdout = warning
+        else
+            cb.stdout = "$(cb.stdout)\n\n$warning"
         end
     end
     return cb
@@ -231,7 +253,10 @@ end
 
 # Remove any given macro expression from the expression tree, used to remove tests
 function remove_macro_expr!(expr, sym::Symbol = Symbol("@testset"))
-    if expr isa Expr
+    if expr isa Expr && expr.head == :macrocall && !isempty(expr.args) &&
+       expr.args[1] == sym
+        return Expr(:block)
+    elseif expr isa Expr && !isempty(expr.args)
         expr.args = filter(x -> !(x isa Expr && x.head == :macrocall && !isempty(x.args) &&
                                   x.args[1] == sym),
             expr.args)
@@ -241,11 +266,17 @@ function remove_macro_expr!(expr, sym::Symbol = Symbol("@testset"))
 end
 
 # Remove testsets and sets from the expression tree
-function remove_tests_from_expr!(expr)
+function remove_test_items_from_expr!(expr)
     # Focus only on the three most common test macros 
-    remove_macro_expr!(expr, Symbol("@testset"))
-    remove_macro_expr!(expr, Symbol("@test"))
-    remove_macro_expr!(expr, Symbol("@test_throws"))
+    expr = remove_macro_expr!(expr, Symbol("@test"))
+    expr = remove_macro_expr!(expr, Symbol("@test_throws"))
+    return expr
+end
+function remove_all_tests_from_expr!(expr)
+    # Focus only on the three most common test macros 
+    expr = remove_macro_expr!(expr, Symbol("@testset"))
+    expr = remove_test_items_from_expr!(expr)
+    return expr
 end
 
 # Utility to identify the module name in a given expression (to evaluate subsequent calls in it)
@@ -282,7 +313,6 @@ end
 ## Overload for AIMessage - simply extracts the code blocks and concatenates them
 function AICode(msg::AIMessage;
         verbose::Bool = false,
-        skip_unsafe::Bool = false,
         skip_invalid::Bool = false,
         kwargs...)
     code = extract_code_blocks(msg.content)
@@ -296,15 +326,14 @@ function AICode(msg::AIMessage;
         filter!(is_julia_code, code)
     end
     code = join(code, "\n")
-    skip_unsafe && (code = remove_unsafe_lines(code; verbose))
-    return AICode(code; kwargs...)
+    return AICode(code; verbose, kwargs...)
 end
 
 ## # Functions
 
 # Utility to detect if Pkg.* is called in a string (for `safe` code evaluation)
 function detect_pkg_operation(input::AbstractString)
-    m = match(r"\bPkg.[a-z]", input)
+    m = match(r"^\s*\bPkg.[a-z]"ms, input)
     return !isnothing(m)
 end
 # Utility to detect dependencies in a string (for `safe` code evaluation / understand when we don't have a necessary package)
@@ -332,26 +361,35 @@ function detect_missing_packages(imports_required::AbstractVector{<:Symbol})
     isempty(imports_required) && return false, Symbol[]
     #
     available_packages = Base.loaded_modules |> values .|> Symbol
-    missing_packages = filter(pkg -> !in(pkg, available_packages), imports_required)
+    dependencies = Symbol[Symbol(p.name) for p in values(Pkg.dependencies())]
+    missing_packages = Symbol[]
+    for pkg in imports_required
+        if !(pkg in available_packages || pkg in dependencies || hasproperty(Base, pkg) ||
+             hasproperty(Main, pkg))
+            push!(missing_packages, pkg)
+        end
+    end
+
     if length(missing_packages) > 0
         return true, missing_packages
     else
-        return false, Symbol[]
+        return false, missing_packages
     end
 end
 
 "Iterates over the lines of a string and removes those that contain a package operation or a missing import."
 function remove_unsafe_lines(code::AbstractString; verbose::Bool = false)
-    io = IOBuffer()
+    io_keep, io_remove = IOBuffer(), IOBuffer()
     for line in readlines(IOBuffer(code))
         if !detect_pkg_operation(line) &&
            !detect_missing_packages(extract_julia_imports(line))[1]
-            println(io, line)
+            println(io_keep, line)
         else
             verbose && @info "Unsafe line removed: $line"
+            println(io_remove, line)
         end
     end
-    return String(take!(io))
+    return String(take!(io_keep)), String(take!(io_remove))
 end
 
 "Checks if a given string has a Julia prompt (`julia> `) at the beginning of a line."
@@ -654,6 +692,43 @@ function extract_function_name(code_block::AbstractString)
     return nothing
 end
 
+function extract_testset_name(testset_str::AbstractString)
+    # Define a regex pattern to match the function name
+    pattern = r"^\s*@testset\s*\"([^\"]+)\"\s* begin"ms
+
+    # Search for the pattern in the test set string
+    match_result = match(pattern, testset_str)
+
+    # Check if a match was found and return the captured group
+    result = if match_result !== nothing
+        match_result.captures[1]
+    else
+        nothing
+    end
+    return result
+end
+# testset_str = """
+# @testset "pig_latinify" begin
+#     output = pig_latinify("hello")
+#     expected = "ellohay"
+#     @test output == expected
+# end
+# """
+# @test extract_testset_name(testset_str) == "pig_latinify"
+
+function extract_package_name_from_argerror(error_msg::AbstractString)
+    # Define a regex pattern to match the package name
+    pattern = r"^Package\s+([^\s]+)\s+not found"
+
+    # Search for the pattern in the error message
+    match_result = match(pattern, error_msg)
+
+    # Check if a match was found and return the captured group
+    !isnothing(match_result) ? match_result.captures[1] : nothing
+end
+# error_msg = "Package Threads not found in current path, maybe you meant `import/using .Threads`.\n- Otherwise, run `import Pkg; Pkg.add(\"Threads\")` to install the Threads package."
+# extract_package_name_from_argerror(error_msg) == "Threads"
+
 """
     eval!(cb::AbstractCodeBlock;
         safe_eval::Bool = true,
@@ -689,27 +764,14 @@ function eval!(cb::AbstractCodeBlock;
         capture_stdout::Bool = true,
         prefix::AbstractString = "",
         suffix::AbstractString = "",
-        remove_tests::Bool = false)
+        expression_transform::Symbol = :nothing)
+    @assert expression_transform in (:nothing, :remove_all_tests, :remove_test_items) "expression_transform must be one of :nothing, :remove_all_tests, :remove_test_items"
     (; code) = cb
     # reset
-    cb.success = nothing
-    cb.error = nothing
     cb.expression = nothing
     cb.output = nothing
+    cb.stdout = nothing
 
-    code_extra = if safe_eval
-        safe_module = string(gensym("SafeCustomModule")) |>
-                      x -> replace(x, "#" => "")
-        string("module $safe_module \nusing Test\n",
-            prefix,
-            "\n",
-            code,
-            "\n",
-            suffix,
-            "\nend")
-    else
-        string(prefix, "\n", code, "\n", suffix)
-    end
     ## Safety checks on `code` only -- treat it as a parsing failure
     if safe_eval
         detected, missing_packages = detect_missing_packages(extract_julia_imports(code))
@@ -728,22 +790,45 @@ function eval!(cb::AbstractCodeBlock;
         cb.success = false
         return cb
     end
-    ## Parse into an expression
+
+    ## Parsing test, if it fails, we skip the evaluation
     try
-        ex = Meta.parseall(code_extra)
+        ex = Meta.parseall(code)
         cb.expression = ex
+        if !isparsed(ex)
+            cb.error = @eval(Main, $(ex)) # show the error
+            cb.success = false
+            return cb
+        end
     catch e
         cb.error = e
         cb.success = false
         return cb
     end
 
-    ## Remove any tests
-    if remove_tests
-        ex = remove_tests_from_expr!(ex)
+    ## Pick the right expression transform (if any)
+    _transform = if expression_transform == :nothing
+        "identity"
+    elseif expression_transform == :remove_all_tests
+        "PromptingTools.remove_all_tests_from_expr!"
+    elseif expression_transform == :remove_test_items
+        "PromptingTools.remove_test_items_from_expr!"
     end
 
-    ## Eval
+    io = IOBuffer()
+    module_name = safe_eval ? replace(string(gensym("SafeMod")), "#" => "") : "Main"
+    safe_eval && write(io, "module $module_name\n")
+    write(io, "using Test\nimport PromptingTools\n")
+    write(io, prefix, "\n")
+    write(io,
+        "include_string($_transform, $module_name,\"\"\"$(escape_string(code))\"\"\", \"__code_string_eval\")\n")
+    write(io, suffix, "\n")
+    safe_eval && write(io, "end")
+    code_full = String(take!(io))
+
+    ## Eval (we parse the full code now, including the prefix and suffix)
+    # TODO: can fail if prefix/suffix are invalid
+    cb.expression = Meta.parseall(code_full)
     eval!(cb, cb.expression; capture_stdout, eval_module = Main)
     return cb
 end
@@ -752,6 +837,13 @@ end
 function eval!(cb::AbstractCodeBlock, expr::Expr;
         capture_stdout::Bool = true,
         eval_module::Module = Main)
+    ## Reset
+    cb.success = nothing
+    cb.error = nothing
+    cb.output = nothing
+    cb.stdout = nothing
+    empty!(cb.error_lines)
+
     # Prepare to catch any stdout
     if capture_stdout
         pipe = Pipe()
@@ -776,5 +868,25 @@ function eval!(cb::AbstractCodeBlock, expr::Expr;
             cb.success = false
         end
     end
+    ## unwrap load error
+    if cb.error isa LoadError
+        push!(cb.error_lines, cb.error.line)
+        append!(cb.error_lines, extract_stacktrace_lines(cb.error.file, cb.stdout))
+        cb.error = cb.error.error
+    elseif !isnothing(cb.error)
+        append!(cb.error_lines, extract_stacktrace_lines("__code_string_eval", cb.stdout))
+    end
     return cb
+end
+
+# overload for missing stdout
+extract_stacktrace_lines(filename::String, stacktrace::Nothing) = Int[]
+function extract_stacktrace_lines(filename::String, stacktrace::String)
+    # Pattern to match the filename and line numbers
+    pattern = Regex(escape_string(filename) * ":(\\d+)")
+
+    # Extracting line numbers from the matches
+    line_numbers = Int[parse(Int, m.captures[1]) for m in eachmatch(pattern, stacktrace)]
+
+    return line_numbers
 end

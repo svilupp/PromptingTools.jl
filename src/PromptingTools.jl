@@ -9,6 +9,7 @@ using HTTP
 import Preferences
 using Preferences: @load_preference, @set_preferences!
 using PrecompileTools
+using Test, Pkg
 
 # GLOBALS and Preferences are managed by Preferences.jl - see src/preferences.jl for details
 
