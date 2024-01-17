@@ -7,7 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
+### Fixed
+
+## [0.8.0]
+
+### Added
 - Initial support for [Llama.jl](https://github.com/marcom/Llama.jl) and other local servers. Once your server is started, simply use `model="local"` to route your queries to the local server, eg, `ai"Say hi!"local`. Option to permanently set the `LOCAL_SERVER` (URL) added to preference management. See `?LocalServerOpenAISchema` for more information.
+- Added a new template `StorytellerExplainSHAP` (see the metadata)
 
 ### Fixed
 - Repeated calls to Ollama models were failing due to missing `prompt_eval_count` key in subsequent calls.
