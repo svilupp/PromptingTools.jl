@@ -159,8 +159,8 @@ function aigenerate(prompt_schema::AbstractOllamaSchema, prompt::ALLOWED_PROMPT_
 
         msg = AIMessage(; content = resp.response[:message][:content] |> strip,
             status = Int(resp.status),
-            tokens = (resp.response[:prompt_eval_count],
-                resp.response[:eval_count]),
+            tokens = (get(resp.response, :prompt_eval_count, 0),
+                get(resp.response, :eval_count, 0)),
             elapsed = time)
         ## Reporting
         verbose && @info _report_stats(msg, model_id)
@@ -316,8 +316,8 @@ function aiscan(prompt_schema::AbstractOllamaSchema, prompt::ALLOWED_PROMPT_TYPE
             api_kwargs...)
         msg = AIMessage(; content = resp.response[:message][:content] |> strip,
             status = Int(resp.status),
-            tokens = (resp.response[:prompt_eval_count],
-                resp.response[:eval_count]),
+            tokens = (get(resp.response, :prompt_eval_count, 0),
+                get(resp.response, :eval_count, 0)),
             elapsed = time)
         ## Reporting
         verbose && @info _report_stats(msg, model_id)
