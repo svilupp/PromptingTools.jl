@@ -151,12 +151,13 @@ chunks = split_by_length(text, [","], max_length=10000)
 """
 function split_by_length(text, separators::Vector{String}; max_length)
     @assert !isempty(separators) "`separators` can't be empty"
-    separator = popfirst!(separators)
+    separators_ = copy(separators)
+    separator = popfirst!(separators_)
     chunks = split_by_length(text; separator, max_length)
 
-    isempty(separators) && return chunks
+    isempty(separators_) && return chunks
     ## Iteratively split by separators
-    for separator in separators
+    for separator in separators_
         chunks = mapreduce(text_ -> split_by_length(text_; max_length, separator),
             vcat,
             chunks)

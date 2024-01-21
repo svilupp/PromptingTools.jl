@@ -67,12 +67,22 @@ end
     # empty separators
     text = "Some text without separators."
     @test_throws AssertionError split_by_length(text, String[], max_length = 10)
+
     # edge cases
     text = "Short text"
     separators = ["\n\n", ". ", "\n"]
     chunks = split_by_length(text, separators, max_length = 50)
     @test length(chunks) == 1
     @test chunks[1] == text
+
+    # do not mutate separators input
+    text = "Paragraph 1\n\nParagraph 2. Sentence 1. Sentence 2.\nParagraph 3"
+    separators = ["\n\n", ". ", "\n"]
+    sep_length = length(separators)
+    chunks = split_by_length(text, separators, max_length = 20)
+    chunks = split_by_length(text, separators, max_length = 20)
+    chunks = split_by_length(text, separators, max_length = 20)
+    @test length(separators) == sep_length
 end
 
 @testset "extract_handlebar_variables" begin
