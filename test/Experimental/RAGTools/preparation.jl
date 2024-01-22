@@ -123,6 +123,20 @@ end
     @test index.tags == ones(8, 1)
     @test index.tags_vocab == ["category:::yes"]
 
+    ## Test docs reader
+    index = build_index([text, text]; reader = :docs, sources = ["x", "x"], max_length = 10,
+        extract_metadata = true,
+        model_embedding = "mock-emb",
+        model_metadata = "mock-meta", api_kwargs = (; url = "http://localhost:$(PORT)"))
+    @test index.embeddings == hcat(fill(normalize(ones(Float32, 128)), 8)...)
+    @test index.chunks[1:4] == index.chunks[5:8]
+    @test index.sources == fill("x", 8)
+    @test index.tags == ones(8, 1)
+    @test index.tags_vocab == ["category:::yes"]
+
+    # Assertion if sources is missing
+    @test_throws AssertionError build_index([text, text]; reader = :docs)
+
     # clean up
     close(echo_server)
 end
