@@ -32,25 +32,25 @@ function find_closest(index::AbstractChunkIndex,
         minimum_similarity)
     return CandidateChunks(index.id, positions, Float32.(distances))
 end
-function find_closest(index::AbstractMultiIndex,
-        query_emb::AbstractVector{<:Real};
-        top_k::Int = 100, minimum_similarity::AbstractFloat = -1.0)
-    all_candidates = CandidateChunks[]
-    for idxs in indexes(index)
-        candidates = find_closest(idxs, query_emb;
-            top_k,
-            minimum_similarity)
-        if !isempty(candidates.positions)
-            push!(all_candidates, candidates)
-        end
-    end
-    ## build vector of all distances and pick top_k
-    all_distances = mapreduce(x -> x.distances, vcat, all_candidates)
-    top_k_order = all_distances |> sortperm |> x -> last(x, top_k)
-    return CandidateChunks(index.id,
-        all_candidates[top_k_order],
-        all_distances[top_k_order])
-end
+## function find_closest(index::AbstractMultiIndex,
+##         query_emb::AbstractVector{<:Real};
+##         top_k::Int = 100, minimum_similarity::AbstractFloat = -1.0)
+##     all_candidates = CandidateChunks[]
+##     for idxs in indexes(index)
+##         candidates = find_closest(idxs, query_emb;
+##             top_k,
+##             minimum_similarity)
+##         if !isempty(candidates.positions)
+##             push!(all_candidates, candidates)
+##         end
+##     end
+##     ## build vector of all distances and pick top_k
+##     all_distances = mapreduce(x -> x.distances, vcat, all_candidates)
+##     top_k_order = all_distances |> sortperm |> x -> last(x, top_k)
+##     return CandidateChunks(index.id,
+##         all_candidates[top_k_order],
+##         all_distances[top_k_order])
+## end
 
 function find_tags(index::AbstractChunkIndex,
         tag::Union{AbstractString, Regex})

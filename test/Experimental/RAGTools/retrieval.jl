@@ -1,5 +1,5 @@
 using PromptingTools.Experimental.RAGTools: find_closest, find_tags
-using PromptingTools.Experimental.RAGTools: Passthrough, rerank
+using PromptingTools.Experimental.RAGTools: Passthrough, rerank, CohereRerank
 
 @testset "find_closest" begin
     test_embeddings = [1.0 2.0 -1.0; 3.0 4.0 -3.0; 5.0 6.0 -6.0] |>
@@ -22,6 +22,34 @@ using PromptingTools.Experimental.RAGTools: Passthrough, rerank
 
     # Test behavior with edge values (top_k == 0)
     @test find_closest(test_embeddings, query_embedding, top_k = 0) == ([], [])
+
+    ## Test with ChunkIndex
+    embeddings1 = ones(Float32, 2, 2)
+    embeddings1[2, 2] = 5.0
+    embeddings1 = mapreduce(normalize, hcat, eachcol(embeddings1))
+    ci1 = ChunkIndex(id = :TestChunkIndex1,
+        chunks = ["chunk1", "chunk2"],
+        sources = ["source1", "source2"],
+        embeddings = embeddings1)
+    ci2 = ChunkIndex(id = :TestChunkIndex2,
+        chunks = ["chunk1", "chunk2"],
+        sources = ["source1", "source2"],
+        embeddings = ones(Float32, 2, 2))
+    mi = MultiIndex(id = :multi, indexes = [ci1, ci2])
+
+    ## find_closest with ChunkIndex
+    query_emb = [0.5, 0.5] # Example query embedding vector
+    result = find_closest(ci1, query_emb)
+    @test result isa CandidateChunks
+    @test result.positions == [1, 2]
+    @test all(1.0 .>= result.distances .>= -1.0)   # Assuming default minimum_similarity
+
+    ## find_closest with MultiIndex
+    ## query_emb = [0.5, 0.5] # Example query embedding vector
+    ## result = find_closest(mi, query_emb)
+    ## @test result isa CandidateChunks
+    ## @test result.positions == [1, 2]
+    ## @test all(1.0 .>= result.distances .>= -1.0)   # Assuming default minimum_similarity
 end
 
 @testset "find_tags" begin
@@ -62,4 +90,32 @@ end
     strategy = Passthrough()
     @test rerank(strategy, index, question, candidate_chunks) ==
           candidate_chunks
+
+    # Cohere assertion
+    ci1 = ChunkIndex(id = :TestChunkIndex1,
+        chunks = ["chunk1", "chunk2"],
+        sources = ["source1", "source2"])
+    ci2 = ChunkIndex(id = :TestChunkIndex2,
+        chunks = ["chunk1", "chunk2"],
+        sources = ["source1", "source2"])
+    mi = MultiIndex(; id = :multi, indexes = [ci1, ci2])
+    @test_throws ArgumentError rerank(CohereRerank(),
+        mi,
+        question,
+        candidate_chunks)
+
+    # Bad top_n
+    @test_throws AssertionError rerank(CohereRerank(),
+        ci1,
+        question,
+        candidate_chunks; top_n = 0)
+
+    # Bad index_id
+    cc2 = CandidateChunks(index_id = :TestChunkIndex2,
+        positions = [1, 2],
+        distances = [0.3, 0.4])
+    @test_throws AssertionError rerank(CohereRerank(),
+        ci1,
+        question,
+        cc2; top_n = 1)
 end
