@@ -13,6 +13,7 @@ Check your preferences by calling `get_preferences(key::String)`.
 # Available Preferences (for `set_preferences!`)
 - `OPENAI_API_KEY`: The API key for the OpenAI API. See [OpenAI's documentation](https://platform.openai.com/docs/quickstart?context=python) for more information.
 - `MISTRALAI_API_KEY`: The API key for the Mistral AI API. See [Mistral AI's documentation](https://docs.mistral.ai/) for more information.
+- `COHERE_API_KEY`: The API key for the Cohere API. See [Cohere's documentation](https://docs.cohere.com/docs/the-cohere-platform) for more information.
 - `MODEL_CHAT`: The default model to use for aigenerate and most ai* calls. See `MODEL_REGISTRY` for a list of available models or define your own.
 - `MODEL_EMBEDDING`: The default model to use for aiembed (embedding documents). See `MODEL_REGISTRY` for a list of available models or define your own.
 - `PROMPT_SCHEMA`: The default prompt schema to use for aigenerate and most ai* calls (if not specified in `MODEL_REGISTRY`). Set as a string, eg, `"OpenAISchema"`.
@@ -30,6 +31,7 @@ Define your `register_model!()` calls in your `startup.jl` file to make them ava
 # Available ENV Variables
 - `OPENAI_API_KEY`: The API key for the OpenAI API. 
 - `MISTRALAI_API_KEY`: The API key for the Mistral AI API.
+- `COHERE_API_KEY`: The API key for the Cohere API.
 - `LOCAL_SERVER`: The URL of the local server to use for `ai*` calls. Defaults to `http://localhost:10897/v1`. This server is called when you call `model="local"`
 
 Preferences.jl takes priority over ENV variables, so if you set a preference, it will override the ENV variable.
@@ -56,6 +58,7 @@ function set_preferences!(pairs::Pair{String, <:Any}...)
     allowed_preferences = [
         "MISTRALAI_API_KEY",
         "OPENAI_API_KEY",
+        "COHERE_API_KEY",
         "MODEL_CHAT",
         "MODEL_EMBEDDING",
         "MODEL_ALIASES",
@@ -91,6 +94,7 @@ function get_preferences(key::String)
     allowed_preferences = [
         "MISTRALAI_API_KEY",
         "OPENAI_API_KEY",
+        "COHERE_API_KEY",
         "MODEL_CHAT",
         "MODEL_EMBEDDING",
         "MODEL_ALIASES",
@@ -118,6 +122,9 @@ isempty(OPENAI_API_KEY) &&
 
 const MISTRALAI_API_KEY::String = @load_preference("MISTRALAI_API_KEY",
     default=get(ENV, "MISTRALAI_API_KEY", ""));
+
+const COHERE_API_KEY::String = @load_preference("COHERE_API_KEY",
+    default=get(ENV, "COHERE_API_KEY", ""));
 
 ## Address of the local server
 const LOCAL_SERVER::String = @load_preference("LOCAL_SERVER",

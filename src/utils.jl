@@ -360,3 +360,17 @@ end
 
 "Utility for rendering the conversation (vector of messages) as markdown. REQUIRES the Markdown package to load the extension!"
 function preview end
+
+"""
+    auth_header(api_key::String)
+
+Builds an authorization header for API calls with the given API key.
+"""
+function auth_header(api_key::String)
+    isempty(api_key) && throw(ArgumentError("api_key cannot be empty"))
+    [
+        "Authorization" => "Bearer $api_key",
+        "Content-Type" => "application/json",
+        "Accept" => "application/json",
+    ]
+end

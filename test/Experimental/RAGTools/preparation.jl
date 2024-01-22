@@ -72,7 +72,7 @@ end
 
 @testset "build_index" begin
     # test with a mock server
-    PORT = rand(1000:2000)
+    PORT = rand(9000:11000)
     PT.register_model!(; name = "mock-emb", schema = PT.CustomOpenAISchema())
     PT.register_model!(; name = "mock-meta", schema = PT.CustomOpenAISchema())
     PT.register_model!(; name = "mock-get", schema = PT.CustomOpenAISchema())

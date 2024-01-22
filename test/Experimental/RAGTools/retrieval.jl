@@ -60,5 +60,6 @@ end
 
     # Passthrough Strategy
     strategy = Passthrough()
-    @test rerank(strategy, index, question, candidate_chunks) === candidate_chunks
+    @test rerank(strategy, index, question, candidate_chunks) ==
+          candidate_chunks
 end

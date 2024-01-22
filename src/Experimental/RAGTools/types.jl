@@ -3,6 +3,7 @@
 # In addition, RAGContext is defined for debugging purposes
 
 abstract type AbstractDocumentIndex end
+abstract type AbstractMultiIndex <: AbstractDocumentIndex end
 abstract type AbstractChunkIndex <: AbstractDocumentIndex end
 # More advanced index would be: HybridChunkIndex
 
@@ -35,6 +36,10 @@ function Base.var"=="(i1::ChunkIndex, i2::ChunkIndex)
      (i1.embeddings == i2.embeddings) && (i1.chunks == i2.chunks) && (i1.tags == i2.tags))
 end
 
+function Base.vcat(i1::AbstractDocumentIndex, i2::AbstractDocumentIndex)
+    throw(ArgumentError("Not implemented"))
+end
+
 function Base.vcat(i1::ChunkIndex, i2::ChunkIndex)
     tags_, tags_vocab_ = if (isnothing(tags(i1)) || isnothing(tags(i2)))
         nothing, nothing
@@ -54,9 +59,9 @@ function Base.vcat(i1::ChunkIndex, i2::ChunkIndex)
 end
 
 "Composite index that stores multiple ChunkIndex objects and their embeddings"
-@kwdef struct MultiIndex <: AbstractDocumentIndex
+@kwdef struct MultiIndex <: AbstractMultiIndex
     id::Symbol = gensym("MultiIndex")
-    indexes::Vector{<:ChunkIndex}
+    indexes::Vector{<:AbstractChunkIndex}
 end
 indexes(index::MultiIndex) = index.indexes
 # check that each index has a counterpart in the other MultiIndex
@@ -76,13 +81,27 @@ function Base.var"=="(i1::MultiIndex, i2::MultiIndex)
 end
 
 abstract type AbstractCandidateChunks end
-@kwdef struct CandidateChunks{T <: Real} <: AbstractCandidateChunks
+@kwdef struct CandidateChunks{TP <: Union{Integer, AbstractCandidateChunks}, TD <: Real} <:
+              AbstractCandidateChunks
     index_id::Symbol
-    positions::Vector{Int} = Int[]
-    distances::Vector{T} = Float32[]
+    ## if TP is Int, then positions are indices into the index
+    ## if TP is CandidateChunks, then positions are indices into the positions of the child index in MultiIndex
+    positions::Vector{TP} = Int[]
+    distances::Vector{TD} = Float32[]
+end
+Base.length(cc::CandidateChunks) = length(cc.positions)
+function Base.first(cc::CandidateChunks, k::Integer)
+    CandidateChunks(cc.index_id, first(cc.positions, k), first(cc.distances, k))
 end
 # combine/intersect two candidate chunks. average the score if available
-function Base.var"&"(cc1::CandidateChunks, cc2::CandidateChunks)
+function Base.var"&"(cc1::AbstractCandidateChunks,
+        cc2::AbstractCandidateChunks)
+    throw(ArgumentError("Not implemented"))
+end
+function Base.var"&"(cc1::CandidateChunks{TP1, TD1},
+        cc2::CandidateChunks{TP2, TD2}) where
+        {TP1 <: Integer, TP2 <: Integer, TD1 <: Real, TD2 <: Real}
+    ##
     cc1.index_id != cc2.index_id && return CandidateChunks(; index_id = cc1.index_id)
 
     positions = intersect(cc1.positions, cc2.positions)
@@ -93,17 +112,39 @@ function Base.var"&"(cc1::CandidateChunks, cc2::CandidateChunks)
     end
     CandidateChunks(cc1.index_id, positions, distances)
 end
-function Base.getindex(ci::ChunkIndex, candidate::CandidateChunks, field::Symbol = :chunks)
-    @assert field==:chunks "Only `chunks` field is supported for now"
+
+function Base.getindex(ci::AbstractDocumentIndex,
+        candidate::AbstractCandidateChunks,
+        field::Symbol)
+    throw(ArgumentError("Not implemented"))
+end
+function Base.getindex(ci::ChunkIndex,
+        candidate::CandidateChunks{TP, TD},
+        field::Symbol = :chunks) where {TP <: Integer, TD <: Real}
+    @assert field in [:chunks, :embeddings, :sources] "Only `chunks`, `embeddings`, `sources` fields are supported for now"
     len_ = length(chunks(ci))
     @assert all(1 .<= candidate.positions .<= len_) "Some positions are out of bounds"
     if ci.id == candidate.index_id
-        chunks(ci)[candidate.positions]
+        if field == :chunks
+            @views chunks(ci)[candidate.positions]
+        elseif field == :embeddings
+            @views embeddings(ci)[:, candidate.positions]
+        elseif field == :sources
+            @views sources(ci)[candidate.positions]
+        end
     else
-        eltype(chunks(ci))[]
+        if field == :chunks
+            eltype(chunks(ci))[]
+        elseif field == :embeddings
+            eltype(embeddings(ci))[]
+        elseif field == :sources
+            eltype(sources(ci))[]
+        end
     end
 end
-function Base.getindex(mi::MultiIndex, candidate::CandidateChunks, field::Symbol = :chunks)
+function Base.getindex(mi::MultiIndex,
+        candidate::CandidateChunks{TP, TD},
+        field::Symbol = :chunks) where {TP <: Integer, TD <: Real}
     @assert field==:chunks "Only `chunks` field is supported for now"
     valid_index = findfirst(x -> x.id == candidate.index_id, indexes(mi))
     if isnothing(valid_index)
@@ -111,6 +152,27 @@ function Base.getindex(mi::MultiIndex, candidate::CandidateChunks, field::Symbol
     else
         getindex(indexes(mi)[valid_index], candidate)
     end
+end
+# Dispatch for multi-candidate chunks
+function Base.getindex(ci::ChunkIndex,
+        candidate::CandidateChunks{TP, TD},
+        field::Symbol = :chunks) where {TP <: AbstractCandidateChunks, TD <: Real}
+    @assert field==:chunks "Only `chunks` field is supported for now"
+    len_ = length(chunks(ci))
+
+    @assert all(1 .<= candidate.positions .<= len_) "Some positions are out of bounds"
+    index_pos = findfirst(x -> x.id == candidate.index_id, candidate.positions)
+    if isnothing(index_pos)
+        eltype(chunks(ci))[]
+    else
+        getindex(chunks(ci), candidate.positions[index_pos])
+    end
+end
+function Base.getindex(mi::MultiIndex,
+        candidate::CandidateChunks{TP, TD},
+        field::Symbol = :chunks) where {TP <: AbstractCandidateChunks, TD <: Real}
+    @assert field==:chunks "Only `chunks` field is supported for now"
+    mapreduce(idxs -> Base.getindex(idxs, candidate, field), vcat, indexes(mi))
 end
 
 """
