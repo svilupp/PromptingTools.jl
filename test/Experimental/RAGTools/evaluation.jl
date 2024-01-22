@@ -75,7 +75,7 @@ end
 
 @testset "build_qa_evals" begin
     # test with a mock server
-    PORT = rand(1000:2000)
+    PORT = rand(9000:11000)
     PT.register_model!(; name = "mock-emb", schema = PT.CustomOpenAISchema())
     PT.register_model!(; name = "mock-meta", schema = PT.CustomOpenAISchema())
     PT.register_model!(; name = "mock-gen", schema = PT.CustomOpenAISchema())
