@@ -158,14 +158,13 @@ function Base.getindex(ci::ChunkIndex,
         candidate::CandidateChunks{TP, TD},
         field::Symbol = :chunks) where {TP <: AbstractCandidateChunks, TD <: Real}
     @assert field==:chunks "Only `chunks` field is supported for now"
-    len_ = length(chunks(ci))
 
-    @assert all(1 .<= candidate.positions .<= len_) "Some positions are out of bounds"
-    index_pos = findfirst(x -> x.id == candidate.index_id, candidate.positions)
+    index_pos = findfirst(x -> x.index_id == ci.id, candidate.positions)
+    @info index_pos
     if isnothing(index_pos)
         eltype(chunks(ci))[]
     else
-        getindex(chunks(ci), candidate.positions[index_pos])
+        getindex(chunks(ci), candidate.positions[index_pos].positions)
     end
 end
 function Base.getindex(mi::MultiIndex,
