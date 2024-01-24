@@ -145,7 +145,7 @@ end
 # - make it accessible in the scope with `:var` (needed if there is uninterruptible chain of * * * * without any form etc)
 # - ensure aicall accumulates memory properly
 #
-## Desired syntax (notice the `-->` it informs)
+## Desired syntax (notice the `-->` it informs the macro to capture the variable name and make it referenceable)
 @aimodel function tip_suggestion()
     s = "Here are two tips for staying healthy: 1. Balanced Diet. 2. Regular Exercise.\n\n"
 
@@ -158,6 +158,17 @@ end
 
     s *= "Tip 1:" * forks[1][:detailed_tip] * "\n"
     s *= "Tip 2:" * forks[2][:detailed_tip] * "\n"
+    s *= "In summary" * gen("summary")
+end
+
+## How to support sth like this? temp vars?
+@aimodel function tip_suggestion()
+    s = "Here are two tips for staying healthy: 1. Balanced Diet. 2. Regular Exercise.\n\n"
+    s *= "Now, expand tip 1 into a paragraph:\n"
+    ## generate text
+    x = copy(s) * gen(max_tokens = 256, stop = "\n\n") --> detailed_tip
+    ## reference later by a symbol
+    s *= "Tip 1:" * :detailed_tip * "\n"
     s *= "In summary" * gen("summary")
 end
 
