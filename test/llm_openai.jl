@@ -1,7 +1,8 @@
 using PromptingTools: TestEchoOpenAISchema, render, OpenAISchema
 using PromptingTools: AIMessage, SystemMessage, AbstractMessage
 using PromptingTools: UserMessage, UserMessageWithImages, DataMessage
-using PromptingTools: CustomProvider, CustomOpenAISchema, MistralOpenAISchema
+using PromptingTools: CustomProvider,
+    CustomOpenAISchema, MistralOpenAISchema, MODEL_EMBEDDING
 
 @testset "render-OpenAI" begin
     schema = OpenAISchema()
@@ -284,7 +285,7 @@ end
         elapsed = msg.elapsed)
     @test msg == expected_output
     @test schema1.inputs == "Hello World"
-    @test schema1.model_id == "text-embedding-ada-002"
+    @test schema1.model_id == MODEL_EMBEDDING
 
     # Test different input combinations and multiple strings
     response2 = Dict(:data => [Dict(:embedding => ones(128, 2))],
