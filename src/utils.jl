@@ -55,7 +55,7 @@ This is particularly useful for splitting larger documents or texts into smaller
 Splitting text with the default separator (" "):
 ```julia
 text = "Hello world. How are you?"
-chunks = splitbysize(text; max_length=13)
+chunks = split_by_length(text; max_length=13)
 length(chunks) # Output: 2
 ```
 
