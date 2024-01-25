@@ -113,12 +113,12 @@ end
     msg = AIMessage(; content = "", tokens = (1000, 2000))
     cost = call_cost(msg, "unknown_model")
     @test cost == 0.0
-    @test call_cost(msg, "gpt-3.5-turbo") ≈ 1000 * 1.5e-6 + 2e-6 * 2000
+    @test call_cost(msg, "gpt-3.5-turbo") ≈ 1000 * 0.5e-6 + 1.5e-6 * 2000
 
     msg = DataMessage(; content = nothing, tokens = (1000, 1000))
     cost = call_cost(msg, "unknown_model")
     @test cost == 0.0
-    @test call_cost(msg, "gpt-3.5-turbo") ≈ 1000 * 1.5e-6 + 2e-6 * 1000
+    @test call_cost(msg, "gpt-3.5-turbo") ≈ 1000 * 0.5e-6 + 1.5e-6 * 1000
 
     @test call_cost(msg,
         "gpt-3.5-turbo";
@@ -135,7 +135,7 @@ end
 
     # Returns a string with a cost
     msg = AIMessage(; content = "", tokens = (1000, 5000), elapsed = 5.0)
-    expected_output = "Tokens: 6000 @ Cost: \$0.0115 in 5.0 seconds"
+    expected_output = "Tokens: 6000 @ Cost: \$0.008 in 5.0 seconds"
     @test _report_stats(msg, "gpt-3.5-turbo") == expected_output
 end
 
