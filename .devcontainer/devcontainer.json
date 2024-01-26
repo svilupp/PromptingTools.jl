@@ -1,0 +1,20 @@
+{
+  "image": "mcr.microsoft.com/devcontainers/universal:2",
+  "features": {
+        "ghcr.io/julialang/devcontainer-features/julia:1": {
+          "channel":"1.10"
+        }
+
+  },
+  "customizations": {
+		"vscode": {
+			"settings": {
+				"editor.formatOnSave": true,
+			},
+			"extensions": [
+			  "GitHub.copilot",
+        "GitHub.copilot-chat"
+			]
+		}
+	},
+}
