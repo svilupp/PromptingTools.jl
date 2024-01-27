@@ -115,20 +115,20 @@ const MODEL_EMBEDDING::String = @load_preference("MODEL_EMBEDDING",
 
 # First, load from preferences, then from environment variables
 const OPENAI_API_KEY::String = @load_preference("OPENAI_API_KEY",
-    default=get(ENV, "OPENAI_API_KEY", ""));
+    default=@noinline get(ENV, "OPENAI_API_KEY", ""));
 # Note: Disable this warning by setting OPENAI_API_KEY to anything
 isempty(OPENAI_API_KEY) &&
     @warn "OPENAI_API_KEY variable not set! OpenAI models will not be available - set API key directly via `PromptingTools.OPENAI_API_KEY=<api-key>`!"
 
 const MISTRALAI_API_KEY::String = @load_preference("MISTRALAI_API_KEY",
-    default=get(ENV, "MISTRALAI_API_KEY", ""));
+    default=@noinline get(ENV, "MISTRALAI_API_KEY", ""));
 
 const COHERE_API_KEY::String = @load_preference("COHERE_API_KEY",
-    default=get(ENV, "COHERE_API_KEY", ""));
+    default=@noinline get(ENV, "COHERE_API_KEY", ""));
 
 ## Address of the local server
 const LOCAL_SERVER::String = @load_preference("LOCAL_SERVER",
-    default=get(ENV, "LOCAL_SERVER", "http://127.0.0.1:10897/v1"));
+    default=@noinline get(ENV, "LOCAL_SERVER", "http://127.0.0.1:10897/v1"));
 
 ## CONVERSATION HISTORY
 """
