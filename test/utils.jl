@@ -2,7 +2,8 @@ using PromptingTools: split_by_length, replace_words
 using PromptingTools: _extract_handlebar_variables, call_cost, _report_stats
 using PromptingTools: _string_to_vector, _encode_local_image
 using PromptingTools: DataMessage, AIMessage
-using PromptingTools: push_conversation!, resize_conversation!, @timeout, preview
+using PromptingTools: push_conversation!,
+    resize_conversation!, @timeout, preview, auth_header
 
 @testset "replace_words" begin
     words = ["Disney", "Snow White", "Mickey Mouse"]
@@ -67,12 +68,22 @@ end
     # empty separators
     text = "Some text without separators."
     @test_throws AssertionError split_by_length(text, String[], max_length = 10)
+
     # edge cases
     text = "Short text"
     separators = ["\n\n", ". ", "\n"]
     chunks = split_by_length(text, separators, max_length = 50)
     @test length(chunks) == 1
     @test chunks[1] == text
+
+    # do not mutate separators input
+    text = "Paragraph 1\n\nParagraph 2. Sentence 1. Sentence 2.\nParagraph 3"
+    separators = ["\n\n", ". ", "\n"]
+    sep_length = length(separators)
+    chunks = split_by_length(text, separators, max_length = 20)
+    chunks = split_by_length(text, separators, max_length = 20)
+    chunks = split_by_length(text, separators, max_length = 20)
+    @test length(separators) == sep_length
 end
 
 @testset "extract_handlebar_variables" begin
@@ -102,12 +113,12 @@ end
     msg = AIMessage(; content = "", tokens = (1000, 2000))
     cost = call_cost(msg, "unknown_model")
     @test cost == 0.0
-    @test call_cost(msg, "gpt-3.5-turbo") ≈ 1000 * 1.5e-6 + 2e-6 * 2000
+    @test call_cost(msg, "gpt-3.5-turbo") ≈ 1000 * 0.5e-6 + 1.5e-6 * 2000
 
     msg = DataMessage(; content = nothing, tokens = (1000, 1000))
     cost = call_cost(msg, "unknown_model")
     @test cost == 0.0
-    @test call_cost(msg, "gpt-3.5-turbo") ≈ 1000 * 1.5e-6 + 2e-6 * 1000
+    @test call_cost(msg, "gpt-3.5-turbo") ≈ 1000 * 0.5e-6 + 1.5e-6 * 1000
 
     @test call_cost(msg,
         "gpt-3.5-turbo";
@@ -124,7 +135,7 @@ end
 
     # Returns a string with a cost
     msg = AIMessage(; content = "", tokens = (1000, 5000), elapsed = 5.0)
-    expected_output = "Tokens: 6000 @ Cost: \$0.0115 in 5.0 seconds"
+    expected_output = "Tokens: 6000 @ Cost: \$0.008 in 5.0 seconds"
     @test _report_stats(msg, "gpt-3.5-turbo") == expected_output
 end
 
@@ -215,4 +226,14 @@ end
     preview_output = preview(conversation)
     expected_output = Markdown.parse("# System Message\n\nWelcome\n\n---\n\n# User Message\n\nHello\n\n---\n\n# AI Message\n\nWorld\n\n---\n\n# Data Message\n\nData: Vector{Float64} (Size: (10,))\n")
     @test preview_output == expected_output
+end
+
+@testset "auth_header" begin
+    headers = auth_header("<my-api-key>")
+    @test headers == [
+        "Authorization" => "Bearer <my-api-key>",
+        "Content-Type" => "application/json",
+        "Accept" => "application/json",
+    ]
+    @test_throws ArgumentError auth_header("")
 end

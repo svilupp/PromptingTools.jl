@@ -10,10 +10,13 @@ This module is experimental and may change at any time. It is intended to be mov
 module RAGTools
 
 using PromptingTools
-using JSON3
+using HTTP, JSON3
 const PT = PromptingTools
 
 include("utils.jl")
+
+# eg, cohere_api
+include("api_services.jl")
 
 export ChunkIndex, CandidateChunks # MultiIndex
 include("types.jl")
