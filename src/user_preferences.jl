@@ -13,6 +13,7 @@ Check your preferences by calling `get_preferences(key::String)`.
 # Available Preferences (for `set_preferences!`)
 - `OPENAI_API_KEY`: The API key for the OpenAI API. See [OpenAI's documentation](https://platform.openai.com/docs/quickstart?context=python) for more information.
 - `MISTRALAI_API_KEY`: The API key for the Mistral AI API. See [Mistral AI's documentation](https://docs.mistral.ai/) for more information.
+- `COHERE_API_KEY`: The API key for the Cohere API. See [Cohere's documentation](https://docs.cohere.com/docs/the-cohere-platform) for more information.
 - `MODEL_CHAT`: The default model to use for aigenerate and most ai* calls. See `MODEL_REGISTRY` for a list of available models or define your own.
 - `MODEL_EMBEDDING`: The default model to use for aiembed (embedding documents). See `MODEL_REGISTRY` for a list of available models or define your own.
 - `PROMPT_SCHEMA`: The default prompt schema to use for aigenerate and most ai* calls (if not specified in `MODEL_REGISTRY`). Set as a string, eg, `"OpenAISchema"`.
@@ -30,6 +31,7 @@ Define your `register_model!()` calls in your `startup.jl` file to make them ava
 # Available ENV Variables
 - `OPENAI_API_KEY`: The API key for the OpenAI API. 
 - `MISTRALAI_API_KEY`: The API key for the Mistral AI API.
+- `COHERE_API_KEY`: The API key for the Cohere API.
 - `LOCAL_SERVER`: The URL of the local server to use for `ai*` calls. Defaults to `http://localhost:10897/v1`. This server is called when you call `model="local"`
 
 Preferences.jl takes priority over ENV variables, so if you set a preference, it will override the ENV variable.
@@ -56,6 +58,7 @@ function set_preferences!(pairs::Pair{String, <:Any}...)
     allowed_preferences = [
         "MISTRALAI_API_KEY",
         "OPENAI_API_KEY",
+        "COHERE_API_KEY",
         "MODEL_CHAT",
         "MODEL_EMBEDDING",
         "MODEL_ALIASES",
@@ -91,6 +94,7 @@ function get_preferences(key::String)
     allowed_preferences = [
         "MISTRALAI_API_KEY",
         "OPENAI_API_KEY",
+        "COHERE_API_KEY",
         "MODEL_CHAT",
         "MODEL_EMBEDDING",
         "MODEL_ALIASES",
@@ -105,23 +109,26 @@ end
 ## Load up GLOBALS
 const MODEL_CHAT::String = @load_preference("MODEL_CHAT", default="gpt-3.5-turbo")
 const MODEL_EMBEDDING::String = @load_preference("MODEL_EMBEDDING",
-    default="text-embedding-ada-002")
+    default="text-embedding-3-small")
 # the prompt schema default is defined in llm_interace.jl !
 # const PROMPT_SCHEMA = OpenAISchema()
 
 # First, load from preferences, then from environment variables
 const OPENAI_API_KEY::String = @load_preference("OPENAI_API_KEY",
-    default=get(ENV, "OPENAI_API_KEY", ""));
+    default=@noinline get(ENV, "OPENAI_API_KEY", ""));
 # Note: Disable this warning by setting OPENAI_API_KEY to anything
 isempty(OPENAI_API_KEY) &&
     @warn "OPENAI_API_KEY variable not set! OpenAI models will not be available - set API key directly via `PromptingTools.OPENAI_API_KEY=<api-key>`!"
 
 const MISTRALAI_API_KEY::String = @load_preference("MISTRALAI_API_KEY",
-    default=get(ENV, "MISTRALAI_API_KEY", ""));
+    default=@noinline get(ENV, "MISTRALAI_API_KEY", ""));
+
+const COHERE_API_KEY::String = @load_preference("COHERE_API_KEY",
+    default=@noinline get(ENV, "COHERE_API_KEY", ""));
 
 ## Address of the local server
 const LOCAL_SERVER::String = @load_preference("LOCAL_SERVER",
-    default=get(ENV, "LOCAL_SERVER", "http://127.0.0.1:10897/v1"));
+    default=@noinline get(ENV, "LOCAL_SERVER", "http://127.0.0.1:10897/v1"));
 
 ## CONVERSATION HISTORY
 """
@@ -239,9 +246,11 @@ end
 aliases = merge(Dict("gpt3" => "gpt-3.5-turbo",
         "gpt4" => "gpt-4",
         "gpt4v" => "gpt-4-vision-preview", # 4v is for "4 vision"
-        "gpt4t" => "gpt-4-1106-preview", # 4t is for "4 turbo"
-        "gpt3t" => "gpt-3.5-turbo-1106", # 3t is for "3 turbo"
+        "gpt4t" => "gpt-4-turbo-preview", # 4t is for "4 turbo"
+        "gpt3t" => "gpt-3.5-turbo-0125", # 3t is for "3 turbo"
         "ada" => "text-embedding-ada-002",
+        "emb3small" => "text-embedding-3-small",
+        "emb3large" => "text-embedding-3-large",
         "yi34c" => "yi:34b-chat",
         "oh25" => "openhermes2.5-mistral",
         "starling" => "starling-lm",
@@ -251,14 +260,19 @@ aliases = merge(Dict("gpt3" => "gpt-3.5-turbo",
 
 registry = Dict{String, ModelSpec}("gpt-3.5-turbo" => ModelSpec("gpt-3.5-turbo",
         OpenAISchema(),
+        0.5e-6,
         1.5e-6,
-        2e-6,
-        "GPT-3.5 Turbo is a 175B parameter model and a common default on the OpenAI API."),
+        "GPT-3.5 Turbo is a 175B parameter model and a common default on the OpenAI API. From mid-Feb 2024, it will be using the new GPT-3.5 Turbo 0125 version (pricing is set assuming the 0125 version)."),
     "gpt-3.5-turbo-1106" => ModelSpec("gpt-3.5-turbo-1106",
         OpenAISchema(),
         1e-6,
         2e-6,
-        "GPT-3.5 Turbo is the latest version of GPT3.5 and the cheapest to use."),
+        "GPT-3.5 Turbo is an updated version of GPT3.5 that is much faster and cheaper to use. 1106 refers to the release date of November 6, 2023."),
+    "gpt-3.5-turbo-0125" => ModelSpec("gpt-3.5-turbo-0125",
+        OpenAISchema(),
+        0.5e-6,
+        1.5e-6,
+        "GPT-3.5 Turbo is an updated version of GPT3.5 that is much faster and cheaper to use. This is the cheapest GPT-3.5 Turbo model. 0125 refers to the release date of January 25, 2024."),
     "gpt-4" => ModelSpec("gpt-4",
         OpenAISchema(),
         3e-5,
@@ -268,7 +282,17 @@ registry = Dict{String, ModelSpec}("gpt-3.5-turbo" => ModelSpec("gpt-3.5-turbo",
         OpenAISchema(),
         1e-5,
         3e-5,
-        "GPT-4 Turbo is the latest version of GPT4 that is much faster and the cheapest to use."),
+        "GPT-4 Turbo 1106 is an updated version of GPT4 that is much faster and the cheaper to use. 1106 refers to the release date of November 6, 2023."),
+    "gpt-4-0125-preview" => ModelSpec("gpt-4-0125-preview",
+        OpenAISchema(),
+        1e-5,
+        3e-5,
+        "GPT-4 Turbo is an updated version of GPT4 that is much faster and the cheaper to use. 0125 refers to the release date of January 25, 2024."),
+    "gpt-4-turbo-preview" => ModelSpec("gpt-4-turbo-preview",
+        OpenAISchema(),
+        1e-5,
+        3e-5,
+        "GPT-4 Turbo is an updated version of GPT4 that is much faster and the cheaper to use. This is the general name for whatever is the latest GPT4 Turbo preview release. Right now it is 0125."),
     "gpt-4-vision-preview" => ModelSpec("gpt-4-vision-preview",
         OpenAISchema(),
         1e-5,
@@ -278,7 +302,17 @@ registry = Dict{String, ModelSpec}("gpt-3.5-turbo" => ModelSpec("gpt-3.5-turbo",
         OpenAISchema(),
         1e-7,
         0.0,
-        "Text Embedding Ada is a 1.75T parameter model and the largest model available on the OpenAI API."),
+        "Classic text embedding endpoint Ada from 2022 with 1536 dimensions."),
+    "text-embedding-3-small" => ModelSpec("text-embedding-3-small",
+        OpenAISchema(),
+        0.2e-7,
+        0.0,
+        "New text embedding endpoint with 1536 dimensions, but 5x cheaper than Ada and more performant."),
+    "text-embedding-3-large" => ModelSpec("text-embedding-3-large",
+        OpenAISchema(),
+        1.3e-7,
+        0.0,
+        "New text embedding endpoint with 3072 dimensions, c. 30% more expensive than Ada but more performant."),
     "llama2" => ModelSpec("llama2",
         OllamaSchema(),
         0.0,

@@ -878,7 +878,6 @@ function eval!(cb::AbstractCodeBlock, expr::Expr;
     end
     return cb
 end
-
 # overload for missing stdout
 extract_stacktrace_lines(filename::String, stacktrace::Nothing) = Int[]
 function extract_stacktrace_lines(filename::String, stacktrace::String)

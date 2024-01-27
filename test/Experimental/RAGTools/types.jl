@@ -92,6 +92,29 @@ end
     mi1 = MultiIndex(indexes = [cin1])
     mi2 = MultiIndex(indexes = [cin2])
     @test mi1 != mi2
+
+    ## not implemented
+    @test_throws ArgumentError vcat(mi1, mi2)
+end
+
+@testset "CandidateChunks" begin
+    chunk_sym = Symbol("TestChunkIndex")
+    cc1 = CandidateChunks(index_id = chunk_sym,
+        positions = [1, 3],
+        distances = [0.1, 0.2])
+    @test Base.length(cc1) == 2
+
+    # Test intersection &
+    cc2 = CandidateChunks(index_id = chunk_sym,
+        positions = [2, 4],
+        distances = [0.3, 0.4])
+    @test isempty((cc1 & cc2).positions)
+    cc3 = CandidateChunks(index_id = chunk_sym,
+        positions = [1, 4],
+        distances = [0.3, 0.4])
+    joint = (cc1 & cc3)
+    @test joint.positions == [1]
+    @test joint.distances == [0.2]
 end
 
 @testset "getindex with CandidateChunks" begin
@@ -113,12 +136,21 @@ end
         positions = [1, 3],
         distances = [0.1, 0.2])
     @test collect(test_chunk_index[candidate_chunks]) == ["First chunk", "Third chunk"]
+    @test collect(test_chunk_index[candidate_chunks, :chunks]) ==
+          ["First chunk", "Third chunk"]
+    @test collect(test_chunk_index[candidate_chunks, :sources]) ==
+          ["test_source", "test_source"]
+    @test collect(test_chunk_index[candidate_chunks, :embeddings]) ==
+          embeddings_data[:, [1, 3]]
 
     # Test with empty positions, which should result in an empty array
     candidate_chunks_empty = CandidateChunks(index_id = chunk_sym,
         positions = Int[],
         distances = Float32[])
     @test isempty(test_chunk_index[candidate_chunks_empty])
+    @test isempty(test_chunk_index[candidate_chunks_empty, :chunks])
+    @test isempty(test_chunk_index[candidate_chunks_empty, :embeddings])
+    @test isempty(test_chunk_index[candidate_chunks_empty, :sources])
 
     # Test with positions out of bounds, should handle gracefully without errors
     candidate_chunks_oob = CandidateChunks(index_id = chunk_sym,
@@ -151,4 +183,25 @@ end
 
     # Test error case when trying to use a non-chunks field, should assert error as only :chunks field is supported
     @test_throws AssertionError test_chunk_index[candidate_chunks, :nonexistent_field]
+
+    # Multi-Candidate CandidateChunks
+    cc1 = CandidateChunks(index_id = :TestChunkIndex1,
+        positions = [1, 2],
+        distances = [0.3, 0.4])
+    cc2 = CandidateChunks(index_id = :TestChunkIndex2,
+        positions = [2],
+        distances = [0.1])
+    cc = CandidateChunks(; index_id = :multi, positions = [cc1, cc2], distances = zeros(2))
+    ci1 = ChunkIndex(id = :TestChunkIndex1,
+        chunks = ["chunk1", "chunk2"],
+        sources = ["source1", "source2"])
+    ci2 = ChunkIndex(id = :TestChunkIndex2,
+        chunks = ["chunk1", "chunk2"],
+        sources = ["source1", "source2"])
+    @test ci1[cc] == ["chunk1", "chunk2"]
+    @test ci2[cc] == ["chunk2"]
+
+    # with MultiIndex
+    mi = MultiIndex(; id = :multi, indexes = [ci1, ci2])
+    @test mi[cc] == ["chunk1", "chunk2", "chunk2"]
 end

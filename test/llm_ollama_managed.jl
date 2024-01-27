@@ -154,7 +154,16 @@ end
         @test_throws ErrorException aigenerate(schema,
             UserMessageWithImages("abc"; image_url = "https://example.com"))
     end
+
+    # Test if subsequent eval misses the prompt_eval_count key
+    response = Dict(:response => "Hello John")
+    # :prompt_eval_count => 2,
+    # :eval_count => 1)
+    schema = TestEchoOllamaManagedSchema(; response, status = 200)
+    msg = [aigenerate(schema, "hi") for i in 1:3] |> last
+    @test msg.tokens == (0, 0)
 end
+
 @testset "aiembed-ollama" begin
     @testset "single doc" begin
         response = Dict(:embedding => ones(16))

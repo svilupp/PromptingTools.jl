@@ -12,7 +12,7 @@ PromptingTools.Experimental.RAGTools._normalize(arr::AbstractArray) = normalize(
 # "Builds a sparse matrix of tags and a vocabulary from the given vector of chunk metadata. Requires SparseArrays.jl to be loaded."
 function PromptingTools.Experimental.RAGTools.build_tags(chunk_metadata::Vector{
         Vector{String},
-    })
+})
     tags_vocab_ = vcat(chunk_metadata...) |> unique |> sort
     tags_vocab_index = Dict{String, Int}(t => i for (i, t) in enumerate(tags_vocab_))
     Is, Js = Int[], Int[]

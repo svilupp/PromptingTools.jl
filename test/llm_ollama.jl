@@ -109,6 +109,14 @@ end
         conversation;
         weather = "sunny",
         return_all = true)[1] == expected_convo_output[1]
+
+    # Test if subsequent eval misses the prompt_eval_count key
+    response = Dict(:message => Dict(:content => "Prompt message"))
+    # :prompt_eval_count => 2,
+    # :eval_count => 1)
+    schema = TestEchoOllamaSchema(; response, status = 200)
+    msg = [aigenerate(schema, "hi") for i in 1:3] |> last
+    @test msg.tokens == (0, 0)
 end
 
 # @testset "aiembed-ollama" begin

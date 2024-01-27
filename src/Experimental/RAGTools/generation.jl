@@ -39,7 +39,7 @@ end
 """
     airag(index::AbstractChunkIndex, rag_template::Symbol = :RAGAnswerFromContext;
         question::AbstractString,
-        top_k::Int = 3, `minimum_similarity::AbstractFloat`= -1.0,
+        top_k::Int = 100, top_n::Int = 5, minimum_similarity::AbstractFloat = -1.0,
         tag_filter::Union{Symbol, Vector{String}, Regex, Nothing} = :auto,
         rerank_strategy::RerankingStrategy = Passthrough(),
         model_embedding::String = PT.MODEL_EMBEDDING, model_chat::String = PT.MODEL_CHAT,
@@ -47,6 +47,7 @@ end
         metadata_template::Symbol = :RAGExtractMetadataShort,
         chunks_window_margin::Tuple{Int, Int} = (1, 1),
         return_context::Bool = false, verbose::Bool = true,
+        rerank_kwargs::NamedTuple = NamedTuple(),
         api_kwargs::NamedTuple = NamedTuple(),
         kwargs...)
 
@@ -59,9 +60,10 @@ The function selects relevant chunks from an `ChunkIndex`, optionally filters th
 - `rag_template::Symbol`: Template for the RAG model, defaults to `:RAGAnswerFromContext`.
 - `question::AbstractString`: The question to be answered.
 - `top_k::Int`: Number of top candidates to retrieve based on embedding similarity.
+- `top_n::Int`: Number of candidates to return after reranking.
 - `minimum_similarity::AbstractFloat`: Minimum similarity threshold (between -1 and 1) for filtering chunks based on embedding similarity. Defaults to -1.0.
 - `tag_filter::Union{Symbol, Vector{String}, Regex}`: Mechanism for filtering chunks based on tags (either automatically detected, specific tags, or a regex pattern). Disabled by setting to `nothing`.
-- `rerank_strategy::RerankingStrategy`: Strategy for reranking the retrieved chunks.
+- `rerank_strategy::RerankingStrategy`: Strategy for reranking the retrieved chunks. Defaults to `Passthrough()`. Use `CohereRerank` for better results (requires `COHERE_API_KEY` to be set)
 - `model_embedding::String`: Model used for embedding the question, default is `PT.MODEL_EMBEDDING`.
 - `model_chat::String`: Model used for generating the final response, default is `PT.MODEL_CHAT`.
 - `model_metadata::String`: Model used for extracting metadata, default is `PT.MODEL_CHAT`.
@@ -97,7 +99,7 @@ See also `build_index`, `build_context`, `CandidateChunks`, `find_closest`, `fin
 """
 function airag(index::AbstractChunkIndex, rag_template::Symbol = :RAGAnswerFromContext;
         question::AbstractString,
-        top_k::Int = 3, minimum_similarity::AbstractFloat = -1.0,
+        top_k::Int = 100, top_n::Int = 5, minimum_similarity::AbstractFloat = -1.0,
         tag_filter::Union{Symbol, Vector{String}, Regex, Nothing} = :auto,
         rerank_strategy::RerankingStrategy = Passthrough(),
         model_embedding::String = PT.MODEL_EMBEDDING, model_chat::String = PT.MODEL_CHAT,
@@ -105,6 +107,7 @@ function airag(index::AbstractChunkIndex, rag_template::Symbol = :RAGAnswerFromC
         metadata_template::Symbol = :RAGExtractMetadataShort,
         chunks_window_margin::Tuple{Int, Int} = (1, 1),
         return_context::Bool = false, verbose::Bool = true,
+        rerank_kwargs::NamedTuple = NamedTuple(),
         api_kwargs::NamedTuple = NamedTuple(),
         kwargs...)
     ## Note: Supports only single ChunkIndex for now
@@ -148,7 +151,12 @@ function airag(index::AbstractChunkIndex, rag_template::Symbol = :RAGAnswerFromC
 
     filtered_candidates = isnothing(tag_candidates) ? emb_candidates :
                           (emb_candidates & tag_candidates)
-    reranked_candidates = rerank(rerank_strategy, index, question, filtered_candidates)
+    reranked_candidates = rerank(rerank_strategy,
+        index,
+        question,
+        filtered_candidates;
+        top_n,
+        verbose = false, rerank_kwargs...)
 
     ## Build the context
     context = build_context(index, reranked_candidates; chunks_window_margin)
