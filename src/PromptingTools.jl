@@ -54,9 +54,11 @@ include("serialization.jl")
 include("extraction.jl")
 
 ## Utilities to support code generation
-export AICode
 # Not export extract_code_blocks, extract_function_name
-include("code_generation.jl")
+include("code_parsing.jl")
+include("code_expressions.jl")
+export AICode
+include("code_eval.jl")
 
 ## Individual interfaces
 include("llm_shared.jl")

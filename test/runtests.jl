@@ -1,7 +1,7 @@
 using PromptingTools
 using OpenAI, HTTP, JSON3
 using SparseArrays, LinearAlgebra, Markdown
-using Test
+using Test, Pkg
 using Aqua
 const PT = PromptingTools
 
@@ -22,7 +22,9 @@ end
     include("macros.jl")
     include("templates.jl")
     include("serialization.jl")
-    include("code_generation.jl")
+    include("code_parsing.jl")
+    include("code_expressions.jl")
+    include("code_eval.jl")
 end
 
 # Part of code_generation.jl / @testset "eval!" begin
