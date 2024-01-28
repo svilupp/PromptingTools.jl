@@ -103,23 +103,181 @@ function aicodefixer_feedback(::CodeFailedEval,
         kwargs...)
     feedback = AbstractString[]
     ## Grab the error message
-    error_str = if cb.error isa TaskFailedException
-        string(cb.error.task.result)
-    else
-        split(string(cb.error), "JuliaSyntax.SourceFile")[begin]
-    end
     ## Decide how much space can be dedicated for this error (ie, do we have stdout as well?)
     chunk_length = isnothing(cb.stdout) || isempty(cb.stdout) ? max_length :
                    max_length ÷ 2
-    end_idx = min(length(error_str), nextind(error_str, 0, chunk_length))
-    push!(feedback, "**Error Detected:** $(error_str[begin:end_idx])")
+    error_str = error_feedback(cb.error; max_length = chunk_length)
+    push!(feedback, "**Error Detected:**\n$(error_str)")
+
+    ## Add the lines that caused it
+    if !isempty(cb.error_lines)
+        feedback_lines = String[]
+        max_lines = 2 # max lines to send
+        logged_lines = Set{Int}()
+        code_lines = split(cb.code, "\n")
+        for line in cb.error_lines
+            if line ∉ logged_lines && line ≤ length(code_lines) &&
+               length(logged_lines) <= max_lines
+                push!(feedback_lines, "- " * code_lines[line])
+                push!(logged_lines, line)
+            end
+        end
+        push!(feedback,
+            "\n\n**Lines that caused the error:**\n" * join(feedback_lines, "\n"))
+    end
 
     if !isnothing(cb.stdout) && !isempty(string(cb.stdout))
         ## Add the optional STDOUT (for test failures)
         chunk_length = max_length - sum(length, feedback)
         end_idx = min(length(cb.stdout), nextind(cb.stdout, 0, chunk_length))
-        push!(feedback, "**Output Captured:** $(cb.stdout[begin:end_idx])")
+        push!(feedback, "**Output Captured:**\n $(cb.stdout[begin:end_idx])")
     end
 
     return isempty(feedback) ? "No feedback provided." : join(feedback, "\n\n")
+end
+
+function testset_feedback(msg::AIMessage;
+        prefix::AbstractString = "",
+        suffix::AbstractString = "", kwargs...)
+    code = join(PT.extract_code_blocks(msg.content), "\n")
+    test_f = PT.extract_testset_name(code)
+    if !isnothing(test_f)
+        test_f_mock = "$(replace(test_f, r"[\s\(\)]" => ""))(args...; kwargs...) = nothing"
+        prefix = prefix * "\n" * test_f_mock
+    end
+    # Insert mock function, remove test items -- good test suite should pass
+    cb = AICode(msg;
+        skip_unsafe = true,
+        prefix, suffix,
+        expression_transform = :remove_test_items, kwargs...)
+    feedback = if !isnothing(cb.error)
+        aicodefixer_feedback(CodeFailedEval(), cb)
+    else
+        nothing
+    end
+    return feedback
+end
+
+### Feedback for individual errors
+error_feedback(e::Any; max_length::Int = 512) = "No error found. Ignore."
+function error_feedback(e::Exception; max_length::Int = 512)
+    io = IOBuffer()
+    name_ = typeof(e) |> nameof |> string
+    write(io, "**", name_, "**:\n")
+    showerror(io, e)
+    first(String(take!(io)), max_length)
+end
+# FallbackTestSetException will take the default path
+# TODO: add with x==1; @test x==2
+function error_feedback(e::Test.TestSetException; max_length::Int = 512)
+    io = IOBuffer()
+    name_ = typeof(e) |> nameof |> string
+    write(io, "**", name_, "**:\n")
+    showerror(io, e)
+    ## Unpack the results in
+    write(io, "\n")
+    for error_ in e.errors_and_fails
+        io_ = IOBuffer()
+        showerror(io_, error_)
+        out = split(String(take!(io_)), "Stacktrace")[begin]
+        write(io, "\n", out)
+    end
+
+    first(String(take!(io)), max_length)
+end
+function error_feedback(e::Task; max_length::Int = 512)
+    out = try
+        fetch(e)
+    catch e
+        e
+    end
+    error_feedback(out; max_length)
+end
+function error_feedback(e::TaskFailedException; max_length::Int = 512)
+    error_feedback(e.task.result; max_length)
+end
+function error_feedback(e::Base.Meta.ParseError; max_length::Int = 512)
+    io = IOBuffer()
+    name_ = typeof(e) |> nameof |> string
+    write(io, "**", name_, "**:\n")
+    showerror(io, e)
+    first(String(take!(io)), max_length)
+end
+function error_feedback(e::UndefVarError; max_length::Int = 512)
+    io = IOBuffer()
+    showerror(io, e)
+    # Simple heurisic - if's available in Main/Base
+    found = false
+    for mod in [Base, Main]
+        if hasproperty(mod, e.var)
+            write(io,
+                "\nExpert Tip: I know that the variable $(e.var) is defined in $(nameof(mod)) module. Use `import $(mod).$(e.var)` to use it.")
+            found = true
+            break
+        end
+    end
+    !found && write(io,
+        "\nTip: Does it even exist? Does it need to be imported? Or is it a typo?")
+    first(String(take!(io)), max_length)
+end
+function error_feedback(e::ArgumentError; max_length::Int = 512)
+    io = IOBuffer()
+    showerror(io, e)
+    # Simple heurisic - if's available in Main/Base
+    pkg = PT.extract_package_name_from_argerror(e.msg)
+    if !isnothing(pkg)
+        for mod in [Base, Main]
+            hasproperty(mod, Symbol(pkg)) && (write(io,
+                "\nExpert Tip: I know that the package $pkg is defined in $(nameof(mod)) module. You MUST use `import $(mod).$(pkg)` to use it.");
+            break)
+        end
+    end
+    first(String(take!(io)), max_length)
+end
+
+## 
+function score_feedback(cb::AICode, expr_to_run::Expr = Expr(:block))
+    score = if isempty(cb.code)
+        0
+    elseif !PT.isparsed(cb)
+        1
+    elseif isa(cb.error, Test.TestSetException)
+        # error outside of test is twice as bad
+        10 + cb.error.pass - cb.error.fail - 2cb.error.error # ignore broken
+    elseif isa(cb.error, Exception)
+        2
+    elseif isvalid(cb)
+        10
+    else
+        throw(ArgumentError("Invalid code feedback path?"))
+    end
+    return score
+end
+
+function extract_test_counts(test_summary::String)
+    # Split the test summary into lines
+    lines = split(test_summary, '\n')
+    length_ = length(lines)
+    counts = Dict{String, Int}()
+
+    # Find the line containing the column headers
+    for i in eachindex(lines)
+        # iterate only until penultimate, since we look ahead one line
+        i == length_ && break
+        m = match(r"Test Summary:\s*\|\s*([^|]*?)\s*Total", lines[i])
+        if !isnothing(m) && !isnothing(m.captures)
+            headers = [
+                [lowercase(strip(col))
+                 for col in split(m.captures[1], " ") if !isempty(col)]..., "total"]
+            next_line = lines[i + 1]
+            digits = [tryparse(Int, m.match)
+                      for m in eachmatch(r"\b\d+\b", next_line)]
+            for (header, score) in zip(headers, digits)
+                if !isnothing(score)
+                    counts[header] = get(counts, header, 0) + score
+                end
+            end
+        end
+    end
+    return counts
 end

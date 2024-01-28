@@ -1,7 +1,7 @@
 name = "PromptingTools"
 uuid = "670122d1-24a8-4d70-bfce-740807c42192"
 authors = ["J S @svilupp and contributors"]
-version = "0.10.0"
+version = "0.10.0-DEV"
 
 [deps]
 Base64 = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
@@ -9,8 +9,10 @@ HTTP = "cd3eb016-35fb-5094-929b-558a96fad6f3"
 JSON3 = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
 Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
 OpenAI = "e9f21f70-7185-4079-aca2-91159181367c"
+Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 PrecompileTools = "aea7be01-6a6a-4083-8856-8a6e6704d82a"
 Preferences = "21216c6a-2e73-6563-6e65-726566657250"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [weakdeps]
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
@@ -30,6 +32,7 @@ LinearAlgebra = "<0.0.1, 1"
 Logging = "<0.0.1, 1"
 Markdown = "<0.0.1, 1"
 OpenAI = "0.8.7"
+Pkg = "<0.0.1, 1"
 PrecompileTools = "1"
 Preferences = "1"
 SparseArrays = "<0.0.1, 1"
@@ -40,7 +43,6 @@ julia = "1.9,1.10"
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
-Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Aqua", "Test", "SparseArrays", "LinearAlgebra", "Markdown"]
+test = ["Aqua", "SparseArrays", "LinearAlgebra", "Markdown"]
