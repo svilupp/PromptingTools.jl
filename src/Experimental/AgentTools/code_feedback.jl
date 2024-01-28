@@ -281,35 +281,3 @@ function extract_test_counts(test_summary::String)
     end
     return counts
 end
-
-# test_summary1 = """
-# Test Summary: | Pass  Broken  Total  Time
-# a             |    1       1      2  0.0s
-# """
-# extract_test_counts(test_summary1) == Dict("pass" => 1, "broken" => 1, "total" => 2)
-
-# test_summary2 = """
-# Test Summary: | Pass  Fail  Error  Total  Time
-# b             |    1     1      1      3  0.0s
-# """
-# extract_test_counts(test_summary2) ==
-# Dict("pass" => 1, "fail" => 1, "error" => 1, "total" => 3)
-
-# test_summary3 = """
-# Test Summary: | Pass  Fail  Error  Broken  Total  Time
-# two           |    2     1      1       1      5  0.0s
-#   a           |    1                    1      2  0.0s
-#   b           |    1     1      1              3  0.0s
-# """
-# extract_test_counts(test_summary3) ==
-# Dict("fail" => 1, "error" => 1, "total" => 5, "broken" => 1, "pass" => 2)
-
-# test_summary4 = """
-# Test Summary: | Pass  Broken  Total  Time
-# a             |    1       1      2  0.0s
-
-# Test Summary: | Pass  Fail  Error  Total  Time
-# b             |    1     1      1      3  0.0s
-# """
-# extract_test_counts(test_summary4) ==
-# Dict("pass" => 2, "broken" => 1, "fail" => 1, "error" => 1, "total" => 5)

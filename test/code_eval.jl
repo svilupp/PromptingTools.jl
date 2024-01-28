@@ -36,7 +36,19 @@ using PromptingTools: extract_module_name
         @test cb.error == UndefVarError(:b)
         @test !isnothing(cb.expression) # parsed
     end
+
+    # expression-based eval!
+    cb = AICode(; code = """
+        a=1 + b # b not defined yet
+        b=2
+        """)
+    cb = eval!(cb)
+    eval!(cb, cb.expression; capture_stdout = false)
+    @test cb.success == false
+    @test cb.error == UndefVarError(:b)
+    @test cb.error_lines == [1]
 end
+
 ## Addition, needs to be outside of @testset
 # Test that it captures test failures, we need to move it to the main file as it as it doesn't work inside a testset
 # let cb = AICode(; code = """
