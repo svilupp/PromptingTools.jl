@@ -168,6 +168,7 @@ function error_feedback(e::Exception; max_length::Int = 512)
     first(String(take!(io)), max_length)
 end
 # FallbackTestSetException will take the default path
+# TODO: add with x==1; @test x==2
 function error_feedback(e::Test.TestSetException; max_length::Int = 512)
     io = IOBuffer()
     name_ = typeof(e) |> nameof |> string
@@ -183,6 +184,14 @@ function error_feedback(e::Test.TestSetException; max_length::Int = 512)
     end
 
     first(String(take!(io)), max_length)
+end
+function error_feedback(e::Task; max_length::Int = 512)
+    out = try
+        fetch(e)
+    catch e
+        e
+    end
+    error_feedback(out; max_length)
 end
 function error_feedback(e::TaskFailedException; max_length::Int = 512)
     error_feedback(e.task.result; max_length)
@@ -211,10 +220,6 @@ function error_feedback(e::UndefVarError; max_length::Int = 512)
         "\nTip: Does it even exist? Does it need to be imported? Or is it a typo?")
     first(String(take!(io)), max_length)
 end
-# e = UndefVarError(:Threads)
-# code_feedback(e)
-# UndefVarError: `Threads` not defined
-# Expert Tip: I know that the variable Threads is defined in Base module. Use `import Base.Threads` to use it.
 function error_feedback(e::ArgumentError; max_length::Int = 512)
     io = IOBuffer()
     showerror(io, e)
@@ -229,11 +234,6 @@ function error_feedback(e::ArgumentError; max_length::Int = 512)
     end
     first(String(take!(io)), max_length)
 end
-# e = ArgumentError("Package Threads not found in current path, maybe you meant `import/using .Threads`.\n- Otherwise, run `import Pkg; Pkg.add(\"Threads\")` to install the Threads package.")
-# code_feedback(e)
-# ArgumentError: Package Threads not found in current path, maybe you meant `import/using .Threads`.
-# - Otherwise, run `import Pkg; Pkg.add("Threads")` to install the Threads package.
-# Expert Tip: Package Threads is defined in Base module. You MUST use `import Base.Threads` to use it.
 
 ## 
 function score_feedback(cb::AICode, expr_to_run::Expr = Expr(:block))

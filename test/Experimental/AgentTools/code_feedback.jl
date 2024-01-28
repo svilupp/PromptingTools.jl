@@ -70,6 +70,146 @@ using PromptingTools.Experimental.AgentTools: testset_feedback,
     @test occursin("**Output Captured:**", feedback)
 end
 
+@testset "testset_feedback" begin
+    # Test case 1: Test testset_feedback with valid test set name
+    msg = AIMessage("""
+    ```julia
+    @testset "tester" begin
+        @test 1 == 1
+    end
+    ```
+    """)
+    expected_feedback = nothing
+    @test testset_feedback(msg) == expected_feedback
+    # Test case 2: Test testset_feedback with invalid test set name
+    msg = AIMessage("""
+    ```julia
+    @testset "tester" begin
+          func(
+        @test 1 == 1
+    end
+    ```
+    """)
+    expected_feedback = CodeFailedEval()
+    feedback = testset_feedback(msg)
+    @test occursin("**Error Detected:**\n**ParseError**", feedback)
+    # Mock some function
+    msg = AIMessage("""
+    ```julia
+    @testset "tester" begin
+          tester()
+        @test 1 == 1
+    end
+    ```
+    """)
+    @test testset_feedback(msg) == nothing
+end
+
+@testset "error_feedback" begin
+    # Test case 1: Test error feedback with package name
+    e = ArgumentError("Package Threads not found in current path, maybe you meant `import/using .Threads`.\n- Otherwise, run `import Pkg; Pkg.add(\"Threads\")` to install the Threads package.")
+    expected_feedback = "ArgumentError: Package Threads not found in current path, maybe you meant `import/using .Threads`.\n- Otherwise, run `import Pkg; Pkg.add(\"Threads\")` to install the Threads package.\nExpert Tip: I know that the package Threads is defined in Base module. You MUST use `import Base.Threads` to use it."
+    @test error_feedback(e) == expected_feedback
+
+    # Test case 2: Test error feedback without package name
+    e = ArgumentError("Invalid argument")
+    expected_feedback = "ArgumentError: Invalid argument"
+    @test error_feedback(e) == expected_feedback
+
+    # Test case 1: Test error_feedback with defined variable
+    e = UndefVarError(:Threads)
+    expected_output = "UndefVarError: `Threads` not defined\nExpert Tip: I know that the variable Threads is defined in Base module. Use `import Base.Threads` to use it."
+    @test error_feedback(e) == expected_output
+
+    # Test case 2: Test error_feedback with undefined variable
+    e = UndefVarError(:SomeVariable)
+    expected_output = "UndefVarError: `SomeVariable` not defined\nTip: Does it even exist? Does it need to be imported? Or is it a typo?"
+    @test error_feedback(e) == expected_output
+
+    # Test case 1: Test error_feedback with valid input
+    e = Base.Meta.ParseError("SyntaxError: unexpected symbol \"(\"")
+    expected_output = "**ParseError**:\nParseError(\"SyntaxError: unexpected symbol \\\"(\\\"\")"
+    @test error_feedback(e) == expected_output
+
+    # Test case 2: Test error_feedback with custom max_length
+    e = Base.Meta.ParseError("SyntaxError: unexpected symbol \"(\"")
+    expected_output = "**ParseError**:\nParseError(\"SyntaxError: unexpected symbol \\\"(\\\"\")"
+    @test error_feedback(e, max_length = 15) == expected_output[1:15]
+
+    # Test case 4: Test error_feedback function
+    e = @task error("Error message")
+    schedule(e)
+    expected_output = "**ErrorException**:\nError message"
+    @test error_feedback(e) == expected_output
+
+    # No error
+    e = @task a = 1
+    schedule(e)
+    @test error_feedback(e) == "No error found. Ignore."
+
+    ## Testsetexception
+    cb = AICode("""
+    @testset "x" begin
+          a + a
+          @test x == 2
+    end
+    """)
+    output = error_feedback(cb.error)
+    @test occursin("**TestSetException**:\nSome tests did not pass", output)
+    @test occursin("UndefVarError: `a` not defined", output)
+
+    # Test case 1: Test error_feedback with no error
+    expected_output = "No error found. Ignore."
+    @test error_feedback(expected_output) == expected_output
+
+    # Test case 2: Test error_feedback with Exception
+    e = ErrorException("Test exception")
+    expected_output = "**ErrorException**:\nTest exception"
+    @test error_feedback(e) == expected_output
+
+    # Test case 3: Test error_feedback with Exception and max_length
+    e = ErrorException("Test exception")
+    expected_output = "**ErrorException**:\nTest exception"
+    max_length = 10
+    @test error_feedback(e; max_length) == expected_output[1:10]
+end
+
+@testset "score_feedback" begin
+    # Test case 1: Test score_feedback with empty code
+    cb = AICode("")
+    @test score_feedback(cb) == 0
+
+    # Test case 2: Test score_feedback with unparsed code
+    cb = AICode("x ===== 1")
+    @test score_feedback(cb) == 1
+
+    # Test case 3: Test score_feedback with TestSetException error
+    cb = AICode("""
+    @testset "x" begin
+          x = 1
+          @test x == 2
+    end
+    """)
+    @test score_feedback(cb) == 9
+
+    # Test case 6: Test score_feedback with invalid code feedback path
+    cb = AICode("""
+    @testset "x" begin
+          x = 1
+          @test x == 2
+          @test x == 1
+          error("a")
+    end
+    """)
+    @test score_feedback(cb) == 8
+
+    # normal exception
+    cb = AICode("""
+          error("a")
+    """)
+    @test score_feedback(cb) == 2
+end
+
 @testset "extract_test_counts" begin
     test_summary1 = """
     Test Summary: | Pass  Broken  Total  Time
@@ -104,151 +244,3 @@ end
     @test extract_test_counts(test_summary4) ==
           Dict("pass" => 2, "broken" => 1, "fail" => 1, "error" => 1, "total" => 5)
 end
-
-## TODO: Add tests for: testset_feedback, error_feedback, score_feedback, extract_test_counts
-
-## # Test case 1: Test score_feedback with empty code
-## @testset "score_feedback" begin
-##     cb = AICode("")
-##     @test score_feedback(cb) == 0
-## end
-
-## # Test case 2: Test score_feedback with unparsed code
-## @testset "score_feedback" begin
-##     cb = AICode("x = 1")
-##     @test score_feedback(cb) == 1
-## end
-
-## # Test case 3: Test score_feedback with TestSetException error
-## @testset "score_feedback" begin
-##     cb = AICode("x = 1; @test x == 2")
-##     error = Test.TestSetException(1, 0, 1, 0)
-##     cb.error = error
-##     @test score_feedback(cb) == 9
-## end
-
-## # Test case 4: Test score_feedback with generic Exception error
-## @testset "score_feedback" begin
-##     cb = AICode("x = 1; y = 2; z = x + y")
-##     error = Exception()
-##     cb.error = error
-##     @test score_feedback(cb) == 2
-## end
-
-## # Test case 5: Test score_feedback with valid code
-## @testset "score_feedback" begin
-##     cb = AICode("x = 1; y = 2; z = x + y; @test z == 3")
-##     @test score_feedback(cb) == 10
-## end
-
-## # Test case 6: Test score_feedback with invalid code feedback path
-## @testset "score_feedback" begin
-##     cb = AICode("x = 1; y = 2; z = x + y; @test z == 3")
-##     cb.code = ""
-##     @test_throws ArgumentError score_feedback(cb)
-## endusing Test
-
-## # Test case 1: Test error feedback with package name
-## @testset "error_feedback" begin
-##     e = ArgumentError("Package Threads not found in current path, maybe you meant `import/using .Threads`.\n- Otherwise, run `import Pkg; Pkg.add(\"Threads\")` to install the Threads package.")
-##     expected_feedback = "ArgumentError: Package Threads not found in current path, maybe you meant `import/using .Threads`.\n- Otherwise, run `import Pkg; Pkg.add(\"Threads\")` to install the Threads package.\nExpert Tip: I know that the package Threads is defined in Base module. You MUST use `import Base.Threads` to use it."
-##     @test error_feedback(e) == expected_feedback
-## end
-
-## # Test case 2: Test error feedback without package name
-## @testset "error_feedback" begin
-##     e = ArgumentError("Invalid argument")
-##     expected_feedback = "ArgumentError: Invalid argument"
-##     @test error_feedback(e) == expected_feedback
-## endusing Test
-
-## # Test case 1: Test error_feedback with defined variable
-## @testset "error_feedback" begin
-##     e = UndefVarError(:Threads)
-##     expected_output = "UndefVarError: `Threads` not defined\nExpert Tip: I know that the variable Threads is defined in Base module. Use `import Base.Threads` to use it."
-##     @test error_feedback(e) == expected_output
-## end
-
-## # Test case 2: Test error_feedback with undefined variable
-## @testset "error_feedback" begin
-##     e = UndefVarError(:SomeVariable)
-##     expected_output = "UndefVarError: `SomeVariable` not defined\nTip: Does it even exist? Does it need to be imported? Or is it a typo?"
-##     @test error_feedback(e) == expected_output
-## endusing Test
-
-## # Test case 1: Test error_feedback with valid input
-## @testset "error_feedback" begin
-##     e = Base.Meta.ParseError("SyntaxError: unexpected symbol \"(\"")
-##     expected_output = "**ParseError**:\nSyntaxError: unexpected symbol \"(\""
-##     @test error_feedback(e) == expected_output
-## end
-
-## # Test case 2: Test error_feedback with custom max_length
-## @testset "error_feedback" begin
-##     e = Base.Meta.ParseError("SyntaxError: unexpected symbol \"(\"")
-##     expected_output = "**ParseError**:\nSyntaxError: unexpected symbol \"(\""
-##     @test error_feedback(e, max_length = 20) == expected_output[1:20]
-## endusing Test
-
-## # Test case 4: Test error_feedback function
-## @testset "error_feedback" begin
-##     # Test case 4.1: Test error_feedback with valid input
-##     @testset "valid input" begin
-##         e = TaskFailedException(1, "Error message")
-##         expected_output = "Error message"
-##         @test error_feedback(e) == expected_output
-##     end
-
-##     # Test case 4.2: Test error_feedback with long error message
-##     @testset "long error message" begin
-##         e = TaskFailedException(1, "This is a very long error message that exceeds the maximum length")
-##         expected_output = "This is a very long error message that exceeds the maximum length"
-##         @test error_feedback(e, max_length = 50) == expected_output
-##     end
-## endusing Test
-
-## # Test case 1: Test error_feedback function
-## @testset "error_feedback" begin
-##     # Test input
-##     e = TestSetException("Test error")
-##     expected_output = "Test error"
-
-##     # Test function
-##     @test error_feedback(e) == expected_output
-## endusing Test
-
-## # Test case 1: Test error_feedback with no error
-## @testset "error_feedback" begin
-##     e = "No error found. Ignore."
-##     expected_output = "No error found. Ignore."
-##     @test error_feedback(e) == expected_output
-## end
-
-## # Test case 2: Test error_feedback with Exception
-## @testset "error_feedback" begin
-##     e = Exception("Test exception")
-##     expected_output = "**Exception**:\nTest exception"
-##     @test error_feedback(e) == expected_output
-## end
-
-## # Test case 3: Test error_feedback with Exception and max_length
-## @testset "error_feedback" begin
-##     e = Exception("Test exception")
-##     max_length = 10
-##     expected_output = "**Exception**:\nTest exce..."
-##     @test error_feedback(e, max_length) == expected_output
-## endusing Test
-
-## # Test case 1: Test testset_feedback with valid test set name
-## @testset "testset_feedback" begin
-##     msg = AIMessage(content="function testset_feedback(msg::AIMessage; prefix::AbstractString = \"\", suffix::AbstractString = \"\", kwargs...)\n    code = join(PT.extract_code_blocks(msg.content), \"\\n\")\n    test_f = PT.extract_testset_name(code)\n    if !isnothing(test_f)\n        test_f_mock = \"$(replace(test_f, r\"[\\s\\(\\)]\" => \"\"))(args...; kwargs...) = nothing\"\n        prefix = prefix * \"\\n\" * test_f_mock\n    end\n    # Insert mock function, remove test items -- good test suite should pass\n    cb = AICode(msg;\n        skip_unsafe = true,\n        prefix, suffix,\n        expression_transform = :remove_test_items, kwargs...)\n    feedback = if !isnothing(cb.error)\n        aicodefixer_feedback(CodeFailedEval(), cb)\n    else\n        nothing\n    end\n    return feedback\nend")
-##     expected_feedback = nothing
-##     @test testset_feedback(msg) == expected_feedback
-## end
-
-## # Test case 2: Test testset_feedback with invalid test set name
-## @testset "testset_feedback" begin
-##     msg = AIMessage(content="function testset_feedback(msg::AIMessage; prefix::AbstractString = \"\", suffix::AbstractString = \"\", kwargs...)\n    code = join(PT.extract_code_blocks(msg.content), \"\\n\")\n    test_f = PT.extract_testset_name(code)\n    if !isnothing(test_f)\n        test_f_mock = \"$(replace(test_f, r\"[\\s\\(\\)]\" => \"\"))(args...; kwargs...) = nothing\"\n        prefix = prefix * \"\\n\" * test_f_mock\n    end\n    # Insert mock function, remove test items -- good test suite should pass\n    cb = AICode(msg;\n        skip_unsafe = true,\n        prefix, suffix,\n        expression_transform = :remove_test_items, kwargs...)\n    feedback = if !isnothing(cb.error)\n        aicodefixer_feedback(CodeFailedEval(), cb)\n    else\n        nothing\n    end\n    return feedback\nend")
-##     expected_feedback = CodeFailedEval()
-##     @test testset_feedback(msg) == expected_feedback
-## end
