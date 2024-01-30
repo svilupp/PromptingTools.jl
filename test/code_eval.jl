@@ -47,6 +47,18 @@ using PromptingTools: extract_module_name
     @test cb.success == false
     @test cb.error == UndefVarError(:b)
     @test cb.error_lines == [1]
+    # despite not capturing stdout, we always unwrap the error to be able to detect error lines
+    @test occursin("UndefVarError", cb.stdout)
+
+    # provide expression directly
+    cb = AICode("""
+    bad_func()=1
+    """)
+    expr = Meta.parseall("bad_func(1)")
+    eval!(cb, expr; capture_stdout = false, eval_module = cb.output)
+    @test cb.success == false
+    @test cb.error isa MethodError
+    @test cb.error_lines == [1]
 end
 
 ## Addition, needs to be outside of @testset
