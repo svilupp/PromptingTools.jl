@@ -51,11 +51,14 @@ using PromptingTools: extract_module_name
     @test occursin("UndefVarError", cb.stdout)
 
     # provide expression directly
-    expr = Meta.parseall("error(\"test\")")
-    eval!(cb, expr; capture_stdout = false)
+    cb = AICode("""
+    bad_func()=1
+    """)
+    expr = Meta.parseall("bad_func(1)")
+    eval!(cb, expr; capture_stdout = false, eval_module = cb.output)
     @test cb.success == false
-    @test cb.error == ErrorException("test")
-    @test cb.error_lines == Int[]
+    @test cb.error isa MethodError
+    @test cb.error_lines == [1]
 end
 
 ## Addition, needs to be outside of @testset
