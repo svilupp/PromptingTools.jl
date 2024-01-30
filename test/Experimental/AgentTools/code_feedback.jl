@@ -30,15 +30,14 @@ using PromptingTools.Experimental.AgentTools: testset_feedback,
     schedule(tsk)
     fetch(tsk)
     """)
-    cb.stdout = "STDOUT"
     feedback = aicodefixer_feedback(CodeFailedEval(), cb)
-    @test feedback ==
-          "**Error Detected:**\n**ErrorException**:\nxx\n\n\n\n**Lines that caused the error:**\n- fetch(tsk)\n\n**Output Captured:**\n STDOUT"
+    @test occursin("**Error Detected:**\n**ErrorException**:\nxx\n\n\n\n**Lines that caused the error:**\n- fetch(tsk)\n- tsk=@task error(\"xx\")\n\n**Output Captured:**\n TaskFailedException\n\n",
+        feedback)
+
     cb = AICode("error(\"xx\")")
-    cb.stdout = "STDOUT"
     feedback = aicodefixer_feedback(CodeFailedEval(), cb)
     @test feedback ==
-          "**Error Detected:**\n**ErrorException**:\nxx\n\n\n\n**Lines that caused the error:**\n- error(\"xx\")\n\n**Output Captured:**\n STDOUT"
+          "**Error Detected:**\n**ErrorException**:\nxx\n\n\n\n**Lines that caused the error:**\n- error(\"xx\")\n\n**Output Captured:**\n xx"
     conv = [PT.AIMessage("""
     ```julia
     error(\"xx\")
@@ -46,7 +45,7 @@ using PromptingTools.Experimental.AgentTools: testset_feedback,
     """)]
     feedback = aicodefixer_feedback(conv).feedback
     @test feedback ==
-          "**Error Detected:**\n**ErrorException**:\nxx\n\n\n\n**Lines that caused the error:**\n- error(\"xx\")"
+          "**Error Detected:**\n**ErrorException**:\nxx\n\n\n\n**Lines that caused the error:**\n- error(\"xx\")\n\n**Output Captured:**\n xx"
 
     # CodeFailedTimeout
     cb = AICode("InterruptException()")

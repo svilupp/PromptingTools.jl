@@ -47,6 +47,8 @@ using PromptingTools: extract_module_name
     @test cb.success == false
     @test cb.error == UndefVarError(:b)
     @test cb.error_lines == [1]
+    # despite not capturing stdout, we always unwrap the error to be able to detect error lines
+    @test occursin("UndefVarError", cb.stdout)
 end
 
 ## Addition, needs to be outside of @testset

@@ -352,13 +352,25 @@ function eval!(cb::AbstractCodeBlock, expr::Expr;
             cb.success = false
         end
     end
+    ## showerror if stdout capture failed
+    if (isnothing(cb.stdout) || isempty(cb.stdout)) && !isnothing(cb.error)
+        io = IOBuffer()
+        showerror(io, cb.error isa LoadError ? cb.error.error : cb.error)
+        cb.stdout = String(take!(io))
+    end
     ## unwrap load error
     if cb.error isa LoadError
         push!(cb.error_lines, cb.error.line)
-        append!(cb.error_lines, extract_stacktrace_lines(cb.error.file, cb.stdout))
+        for line in extract_stacktrace_lines(cb.error.file, cb.stdout)
+            (line ∉ cb.error_lines) && push!(cb.error_lines, line)
+        end
         cb.error = cb.error.error
     elseif !isnothing(cb.error)
-        append!(cb.error_lines, extract_stacktrace_lines("__code_string_eval", cb.stdout))
+        ## fallback, looks for errors only in the original code (cb.code)
+        lines = extract_stacktrace_lines("__code_string_eval", cb.stdout)
+        for line in lines
+            (line ∉ cb.error_lines) && push!(cb.error_lines, line)
+        end
     end
     return cb
 end
