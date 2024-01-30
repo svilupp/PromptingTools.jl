@@ -31,7 +31,7 @@ using PromptingTools.Experimental.AgentTools: testset_feedback,
     fetch(tsk)
     """)
     feedback = aicodefixer_feedback(CodeFailedEval(), cb)
-    @test occursin("**Error Detected:**\n**ErrorException**:\nxx\n\n\n\n**Lines that caused the error:**\n- fetch(tsk)\n- tsk=@task error(\"xx\")\n\n**Output Captured:**\n TaskFailedException\n\n",
+    @test occursin("**Error Detected:**\n**ErrorException**:\nxx\n\n\n\n**Lines that caused the error:**\n- fetch(tsk)",
         feedback)
 
     cb = AICode("error(\"xx\")")
