@@ -49,6 +49,13 @@ using PromptingTools: extract_module_name
     @test cb.error_lines == [1]
     # despite not capturing stdout, we always unwrap the error to be able to detect error lines
     @test occursin("UndefVarError", cb.stdout)
+
+    # provide expression directly
+    expr = Meta.parseall("error(\"test\")")
+    eval!(cb, expr; capture_stdout = false)
+    @test cb.success == false
+    @test cb.error == ErrorException("test")
+    @test cb.error_lines == Int[]
 end
 
 ## Addition, needs to be outside of @testset
