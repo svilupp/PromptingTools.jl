@@ -1,6 +1,7 @@
 using PromptingTools: extract_julia_imports
 using PromptingTools: detect_pkg_operation,
-    detect_missing_packages, extract_function_name, remove_unsafe_lines
+    detect_missing_packages, extract_function_name, extract_function_names,
+    remove_unsafe_lines, detect_base_main_overrides
 using PromptingTools: has_julia_prompt,
     remove_julia_prompt, extract_code_blocks, extract_code_blocks_fallback, eval!
 using PromptingTools: escape_interpolation, find_subsequence_positions
@@ -42,6 +43,8 @@ end
           Symbol.(["PackageA.PackageB", "PackageC"])
     @test extract_julia_imports("using Base.Threads\nusing Main.MyPkg") ==
           Symbol[]
+    @test extract_julia_imports("using Base.Threads\nusing Main.MyPkg";
+        base_or_main = true) == Symbol[Symbol("Base.Threads"), Symbol("Main.MyPkg")]
 end
 
 @testset "detect_missing_packages" begin
@@ -295,9 +298,9 @@ end
 @testset "extract_function_name" begin
     # Test 1: Test an explicit function declaration
     @test extract_function_name("function testFunction1()\nend") == "testFunction1"
-
     # Test 2: Test a concise function declaration
     @test extract_function_name("testFunction2() = 42") == "testFunction2"
+    @test extract_function_name("  test_Function_2() = 42") == "test_Function_2"
 
     # Test 3: Test a code block with no function
     @test extract_function_name("let a = 10\nb = 20\nend") === nothing
@@ -319,6 +322,67 @@ end
     function secondFunction()
     end
     """) == "firstFunction"
+end
+
+@testset "extract_function_names" begin
+    code_block = """
+        function add(x, y)
+            return x + y
+        end
+
+        subtract(x, y) = x - y
+    """
+    expected_result = ["add", "subtract"]
+    @test extract_function_names(code_block) == expected_result
+
+    s = """
+    import Base.splitx
+
+    Base.splitx()=1
+
+    splitx(aaa) = 2
+    """
+    @test extract_function_names(s) == ["Base.splitx", "splitx"]
+    @test extract_function_names("") == String[]
+end
+
+@testset "detect_base_main_overrides" begin
+    # Test case 1: No overrides detected
+    code_block_1 = """
+    function foo()
+        println("Hello, World!")
+    end
+    """
+    @test detect_base_main_overrides(code_block_1) == (false, [])
+
+    # Test case 2: Overrides detected
+    code_block_2 = """
+    function Base.bar()
+        println("Override Base.bar()")
+    end
+
+    function Main.baz()
+        println("Override Main.baz()")
+    end
+    """
+    @test detect_base_main_overrides(code_block_2) == (true, ["Base.bar", "Main.baz"])
+
+    # Test case 3: Overrides with base imports
+    code_block_3 = """
+    using Base: sin
+
+    function Main.qux()
+        println("Override Main.qux()")
+    end
+    """
+    @test detect_base_main_overrides(code_block_3) == (true, ["Main.qux"])
+
+    s4 = """
+    import Base.splitx
+
+    splitx(aaa) = 2
+    """
+    @test detect_base_main_overrides(s4) == (true, ["splitx"])
 end
 
 @testset "extract_testset_name" begin

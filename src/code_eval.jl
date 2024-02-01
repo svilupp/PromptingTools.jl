@@ -264,6 +264,11 @@ function eval!(cb::AbstractCodeBlock;
                 (cb.error = ErrorException("Safety Error: Failed package import. Missing packages: $(join(string.(missing_packages),", ")). Please add them or disable the safety check (`safe_eval=false`)"))
             return cb
         end
+        detected, overrides = detect_base_main_overrides(code)
+        if detected
+            ## DO NOT THROW ERROR
+            @warn "Safety Warning: Base / Main overrides detected (functions: $(join(overrides,",")))! Please verify the safety of the code or disable the safety check (`safe_eval=false`)"
+        end
     end
     ## Catch bad code extraction
     if isempty(code)

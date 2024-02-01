@@ -96,6 +96,15 @@ end
     @test cb.error isa Exception
     @test occursin("Safety Error", cb.error.msg)
     @test occursin("Use of package manager ", cb.error.msg)
+    ## Base / Main overrides
+    cb = AICode(; code = """
+import Base.splitx
+
+splitx(aaa) = 2
+""")
+    @test_logs (:warn,
+        r"Safety Warning: Base / Main overrides detected \(functions: splitx\)") match_mode=:any eval!(cb;
+        safe_eval = true)
 
     # Evaluate inside a gensym'd module
     cb = AICode(; code = "a=1") |> eval!
