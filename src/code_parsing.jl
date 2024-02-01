@@ -20,7 +20,14 @@ function detect_pkg_operation(input::AbstractString)
     return !isnothing(m)
 end
 # Utility to detect dependencies in a string (for `safe` code evaluation / understand when we don't have a necessary package)
-function extract_julia_imports(input::AbstractString)
+"""
+    extract_julia_imports(input::AbstractString; base_or_main::Bool = false)
+
+Detects any `using` or `import` statements in a given string and returns the package names as a vector of symbols. 
+
+`base_or_main` is a boolean that determines whether to isolate only `Base` and `Main` OR whether to exclude them in the returned vector.
+"""
+function extract_julia_imports(input::AbstractString; base_or_main::Bool = false)
     package_names = Symbol[]
     for line in split(input, "\n")
         if occursin(r"(^using |^import )"m, line)
@@ -29,9 +36,16 @@ function extract_julia_imports(input::AbstractString)
             subparts = map(x -> contains(x, ':') ? split(x, ':')[1] : x,
                 split(subparts, ","))
             subparts = replace(join(subparts, ' '), ',' => ' ')
-            packages = filter(x -> !isempty(x) && !startswith(x, "Base") &&
-                                       !startswith(x, "Main"),
-                split(subparts, " "))
+            packages = filter(x -> !isempty(x), split(subparts, " "))
+            if base_or_main
+                ## keep only them
+                packages = filter(x -> startswith(x, "Base") ||
+                        startswith(x, "Main"), packages)
+            else
+                ## exclude them
+                packages = filter(x -> !startswith(x, "Base") &&
+                        !startswith(x, "Main"), packages)
+            end
             append!(package_names, Symbol.(packages))
         end
     end
@@ -336,6 +350,8 @@ Extract the name of a function from a given Julia code block. The function searc
 
 If a function name is found, it is returned as a string. If no function name is found, the function returns `nothing`.
 
+To capture all function names in the block, use `extract_function_names`.
+
 # Arguments
 - `code_block::String`: A string containing Julia code.
 
@@ -355,9 +371,9 @@ extract_function_name(code)
 """
 function extract_function_name(code_block::AbstractString)
     # Regular expression for the explicit function declaration
-    pattern_explicit = r"function\s+(\w+)\("
+    pattern_explicit = r"^\s*function\s+([\w\.\_]+)\("m
     # Regular expression for the concise function declaration
-    pattern_concise = r"^(\w+)\(.*\)\s*="
+    pattern_concise = r"^\s*([\w\.\_]+)\(.*\)\s*="m
 
     # Searching for the explicit function declaration
     match_explicit = match(pattern_explicit, code_block)
@@ -373,6 +389,56 @@ function extract_function_name(code_block::AbstractString)
 
     # Return nothing if no function name is found
     return nothing
+end
+
+"""
+    extract_function_names(code_block::AbstractString)
+
+Extract one or more names of functions defined in a given Julia code block. The function searches for two patterns:
+    - The explicit function declaration pattern: `function name(...) ... end`
+    - The concise function declaration pattern: `name(...) = ...`
+
+It always returns a vector of strings, even if only one function name is found (it will be empty).
+
+For only one function name match, use `extract_function_name`.
+"""
+function extract_function_names(code_block::AbstractString)
+    # Regular expression for the explicit function declaration
+    pattern_explicit = r"^\s*function\s+([\w\.\_]+)\("m
+    # Regular expression for the concise function declaration
+    pattern_concise = r"^\s*([\w\.\_]+)\(.*\)\s*="m
+
+    matches = String[]
+
+    # Searching for the explicit function declaration
+    for m in eachmatch(pattern_explicit, code_block)
+        push!(matches, m.captures[1])
+    end
+    # Searching for the concise function declaration
+    for m in eachmatch(pattern_concise, code_block)
+        push!(matches, m.captures[1])
+    end
+
+    return matches
+end
+
+"""
+    detect_base_main_overrides(code_block::AbstractString)
+
+Detects if a given code block overrides any Base or Main methods. 
+    
+Returns a tuple of a boolean and a vector of the overriden methods.
+"""
+function detect_base_main_overrides(code_block::AbstractString)
+    funcs = extract_function_names(code_block)
+    base_imports = extract_julia_imports(code_block; base_or_main = true) .|>
+                   x -> split(string(x), ".")[end]
+    ## check Base/Main method overrides
+    overriden_methods = filter(f -> occursin("Base.", f) || occursin("Main.", f) ||
+                                        in(f, base_imports),
+        funcs)
+    detected = !isempty(overriden_methods)
+    return detected, overriden_methods
 end
 
 function extract_testset_name(testset_str::AbstractString)
