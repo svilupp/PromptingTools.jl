@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Fixed typos in the documentation
 - Fixed a bug when API keys set in ENV would not be picked up by the package (caused by inlining of the `get(ENV,...)` during precompilation)
+- Fixed string interpolation to be correctly escaped when evaluating `AICode`
 
 ## [0.9.0]
 

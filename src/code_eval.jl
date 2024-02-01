@@ -304,7 +304,7 @@ function eval!(cb::AbstractCodeBlock;
     write(io, "using Test\nimport PromptingTools\n")
     write(io, prefix, "\n")
     write(io,
-        "include_string($_transform, $module_name,\"\"\"$(escape_string(code))\"\"\", \"__code_string_eval\")\n")
+        "include_string($_transform, $module_name,\"\"\"$(escape_string(code,'$'))\"\"\", \"__code_string_eval\")\n")
     write(io, suffix, "\n")
     safe_eval && write(io, "end")
     code_full = String(take!(io))

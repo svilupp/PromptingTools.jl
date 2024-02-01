@@ -59,6 +59,15 @@ using PromptingTools: extract_module_name
     @test cb.success == false
     @test cb.error isa MethodError
     @test cb.error_lines == [1]
+
+    # test correct escaping of \$
+    cb = AICode("""
+        greet(s)="hi \$s"
+        """)
+    expr = Meta.parseall("greet(\"jan\")|>print")
+    eval!(cb, expr; capture_stdout = true, eval_module = cb.output)
+    @test cb.success == true
+    @test cb.stdout == "hi jan"
 end
 
 ## Addition, needs to be outside of @testset
