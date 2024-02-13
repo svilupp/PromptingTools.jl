@@ -102,34 +102,51 @@ end
     get_embeddings(docs::Vector{<:AbstractString};
         verbose::Bool = true,
         cost_tracker = Threads.Atomic{Float64}(0.0),
+        target_batch_size_length::Int = 80_000,
+        ntasks::Int = 4 * Threads.nthreads(),
         kwargs...)
 
 Embeds a vector of `docs` using the provided model (kwarg `model`). 
 
 Tries to batch embedding calls for roughly 80K characters per call (to avoid exceeding the API limit) but reduce network latency.
 
-Note: `docs` are assumed to be already chunked to the reasonable sizes that fit within the embedding context limit.
+# Notes
+- `docs` are assumed to be already chunked to the reasonable sizes that fit within the embedding context limit.
+- If you get errors about exceeding input sizes, first check the `max_length` in your chunks. 
+  If that does NOT resolve the issue, try reducing the `target_batch_size_length` parameter (eg, 10_000) and number of tasks `ntasks=1`. 
+  Some providers cannot handle large batch sizes.
 
 # Arguments
 - `docs`: A vector of strings to be embedded.
 - `verbose`: A boolean flag for verbose output. Default is `true`.
 - `model`: The model to use for embedding. Default is `PT.MODEL_EMBEDDING`.
 - `cost_tracker`: A `Threads.Atomic{Float64}` object to track the total cost of the API calls. Useful to pass the total cost to the parent call.
+- `target_batch_size_length`: The target length (in characters) of each batch of document chunks sent for embedding. Default is 80_000 characters. Speeds up embedding process.
+- `ntasks`: The number of tasks to use for asyncmap. Default is 4 * Threads.nthreads().
 
 """
 function get_embeddings(docs::Vector{<:AbstractString};
         verbose::Bool = true,
         cost_tracker = Threads.Atomic{Float64}(0.0),
+        target_batch_size_length::Int = 80_000,
+        ntasks::Int = 4 * Threads.nthreads(),
         kwargs...)
+    ## check if extension is available
+    ext = Base.get_extension(PromptingTools, :RAGToolsExperimentalExt)
+    if isnothing(ext)
+        error("you need to also import LinearAlgebra and SparseArrays to use this function")
+    end
     verbose && @info "Embedding $(length(docs)) documents..."
     model = hasproperty(kwargs, :model) ? kwargs.model : PT.MODEL_EMBEDDING
     # Notice that we embed multiple docs at once, not one by one
     # OpenAI supports embedding multiple documents to reduce the number of API calls/network latency time
     # We do batch them just in case the documents are too large (targeting at most 80K characters per call)
     avg_length = sum(length.(docs)) / length(docs)
-    embedding_batch_size = floor(Int, 80_000 / avg_length)
-    embeddings = asyncmap(Iterators.partition(docs, embedding_batch_size)) do docs_chunk
+    embedding_batch_size = floor(Int, target_batch_size_length / avg_length)
+    embeddings = asyncmap(Iterators.partition(docs, embedding_batch_size);
+        ntasks) do docs_chunk
         msg = aiembed(docs_chunk,
+            # LinearAlgebra.normalize but imported in RAGToolsExperimentalExt
             _normalize;
             verbose = false,
             kwargs...)
@@ -186,13 +203,15 @@ end
 
 """
     build_index(files_or_docs::Vector{<:AbstractString}; reader::Symbol = :files,
-        separators = ["\\n\\n", ". ", "\\n"], max_length::Int = 256,
+        separators = ["\n\n", ". ", "\n"], max_length::Int = 256,
         sources::Vector{<:AbstractString} = files_or_docs,
-        extract_metadata::Bool = false, verbose::Int = 1,
+        extract_metadata::Bool = false, verbose::Integer = 1,
         index_id = gensym("ChunkIndex"),
         metadata_template::Symbol = :RAGExtractMetadataShort,
         model_embedding::String = PT.MODEL_EMBEDDING,
         model_metadata::String = PT.MODEL_CHAT,
+        embedding_kwargs::NamedTuple = NamedTuple(),
+        metadata_kwargs::NamedTuple = NamedTuple(),
         api_kwargs::NamedTuple = NamedTuple(),
         cost_tracker = Threads.Atomic{Float64}(0.0))
 
@@ -203,7 +222,7 @@ optionally extracts metadata, and then compiles this information into a retrieva
 # Arguments
 - `files_or_docs`: A vector of valid file paths OR string documents to be indexed (chunked and embedded).
 - `reader`: A symbol indicating the type of input, can be either `:files` or `:docs`. Default is `:files`.
-- `separators`: A list of strings used as separators for splitting the text in each file into chunks. Default is `[\\n\\n", ". ", "\\n"]`.
+- `separators`: A list of strings used as separators for splitting the text in each file into chunks. Default is `[\n\n", ". ", "\n"]`.
 - `max_length`: The maximum length of each chunk (if possible with provided separators). Default is 256.
 - `sources`: A vector of strings indicating the source of each chunk. Default is equal to `files_or_docs` (for `reader=:files`)
 - `extract_metadata`: A boolean flag indicating whether to extract metadata from each chunk (to build filter `tags` in the index). Default is `false`.
@@ -212,7 +231,9 @@ optionally extracts metadata, and then compiles this information into a retrieva
 - `metadata_template`: A symbol indicating the template to be used for metadata extraction. Default is `:RAGExtractMetadataShort`.
 - `model_embedding`: The model to use for embedding.
 - `model_metadata`: The model to use for metadata extraction.
-- `api_kwargs`: Parameters to be provided to the API endpoint.
+- `api_kwargs`: Parameters to be provided to the API endpoint. Shared across all API calls.
+- `embedding_kwargs`: Parameters to be provided to the `get_embedding` function. Useful to change the batch sizes (`target_batch_size_length`) or reduce asyncmap tasks (`ntasks`).
+- `metadata_kwargs`: Parameters to be provided to the `get_metadata` function.
 
 # Returns
 - `ChunkIndex`: An object containing the compiled index of chunks, embeddings, tags, vocabulary, and sources.
@@ -230,6 +251,13 @@ index = build_index(["file1.txt", "file2.txt"];
                     extract_metadata=true, 
                     verbose=true)
 ```
+
+# Notes
+- If you get errors about exceeding embedding input sizes, first check the `max_length` in your chunks. 
+  If that does NOT resolve the issue, try changing the `embedding_kwargs`. 
+  In particular, reducing the `target_batch_size_length` parameter (eg, 10_000) and number of tasks `ntasks=1`. 
+  Some providers cannot handle large batch sizes (eg, Databricks).
+
 """
 function build_index(files_or_docs::Vector{<:AbstractString}; reader::Symbol = :files,
         separators = ["\n\n", ". ", "\n"], max_length::Int = 256,
@@ -239,6 +267,8 @@ function build_index(files_or_docs::Vector{<:AbstractString}; reader::Symbol = :
         metadata_template::Symbol = :RAGExtractMetadataShort,
         model_embedding::String = PT.MODEL_EMBEDDING,
         model_metadata::String = PT.MODEL_CHAT,
+        embedding_kwargs::NamedTuple = NamedTuple(),
+        metadata_kwargs::NamedTuple = NamedTuple(),
         api_kwargs::NamedTuple = NamedTuple(),
         cost_tracker = Threads.Atomic{Float64}(0.0))
 
@@ -251,7 +281,7 @@ function build_index(files_or_docs::Vector{<:AbstractString}; reader::Symbol = :
         verbose = (verbose > 1),
         cost_tracker,
         model = model_embedding,
-        api_kwargs)
+        api_kwargs, embedding_kwargs...)
 
     ## Extract metadata
     tags, tags_vocab = if extract_metadata
@@ -260,7 +290,7 @@ function build_index(files_or_docs::Vector{<:AbstractString}; reader::Symbol = :
             cost_tracker,
             model = model_metadata,
             metadata_template,
-            api_kwargs)
+            api_kwargs, metadata_kwargs...)
         # Requires SparseArrays.jl to be loaded
         build_tags(output_metadata)
     else
