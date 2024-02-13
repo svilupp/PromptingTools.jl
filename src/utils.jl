@@ -362,15 +362,24 @@ end
 function preview end
 
 """
-    auth_header(api_key::String)
+    auth_header(api_key::Union{Nothing, AbstractString};
+        extra_headers::AbstractVector{Pair{String, String}} = Vector{Pair{String, String}}[],
+        kwargs...)
 
-Builds an authorization header for API calls with the given API key.
+Creates the authentication headers for any API request. Assumes that the communication is done in JSON format.
 """
-function auth_header(api_key::String)
-    isempty(api_key) && throw(ArgumentError("api_key cannot be empty"))
-    [
-        "Authorization" => "Bearer $api_key",
+function auth_header(api_key::Union{Nothing, AbstractString};
+        extra_headers::AbstractVector = Vector{
+            Pair{String, String},
+        }[],
+        kwargs...)
+    !isnothing(api_key) && isempty(api_key) &&
+        throw(ArgumentError("`api_key` cannot be empty"))
+    headers = [
         "Content-Type" => "application/json",
         "Accept" => "application/json",
+        extra_headers...,
     ]
+    !isnothing(api_key) && pushfirst!(headers, "Authorization" => "Bearer $api_key")
+    return headers
 end

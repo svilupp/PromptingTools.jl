@@ -42,6 +42,7 @@ makedocs(;
             "Experimental Modules" => "reference_experimental.md",
             "RAGTools" => "reference_ragtools.md",
             "AgentTools" => "reference_agenttools.md",
+            "APITools" => "reference_apitools.md",
         ],
     ])
 
