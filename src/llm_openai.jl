@@ -165,6 +165,24 @@ function OpenAI.create_chat(schema::MistralOpenAISchema,
         base_url = url)
     OpenAI.create_chat(provider, model, conversation; kwargs...)
 end
+function OpenAI.create_chat(schema::DatabricksOpenAISchema,
+        api_key::AbstractString,
+        model::AbstractString,
+        conversation;
+        url::String = "https://<workspace_host>.databricks.com",
+        kwargs...)
+    # Build the corresponding provider object
+    provider = CustomProvider(;
+        api_key = isempty(DATABRICKS_API_KEY) ? api_key : DATABRICKS_API_KEY,
+        base_url = isempty(DATABRICKS_HOST) ? url : DATABRICKS_HOST)
+    # Override standard OpenAI request endpoint
+    OpenAI.openai_request("serving-endpoints/$model/invocations",
+        provider;
+        method = "POST",
+        model,
+        messages = conversation,
+        kwargs...)
+end
 
 # Extend OpenAI create_embeddings to allow for testing
 function OpenAI.create_embeddings(schema::AbstractOpenAISchema,
@@ -220,6 +238,24 @@ function OpenAI.create_embeddings(schema::MistralOpenAISchema,
         api_key = isempty(MISTRALAI_API_KEY) ? api_key : MISTRALAI_API_KEY,
         base_url = url)
     OpenAI.create_embeddings(provider, docs, model; kwargs...)
+end
+function OpenAI.create_embeddings(schema::DatabricksOpenAISchema,
+        api_key::AbstractString,
+        docs,
+        model::AbstractString;
+        url::String = "https://<workspace_host>.databricks.com",
+        kwargs...)
+    # Build the corresponding provider object
+    provider = CustomProvider(;
+        api_key = isempty(DATABRICKS_API_KEY) ? api_key : DATABRICKS_API_KEY,
+        base_url = isempty(DATABRICKS_HOST) ? url : DATABRICKS_HOST)
+    # Override standard OpenAI request endpoint
+    OpenAI.openai_request("serving-endpoints/$model/invocations",
+        provider;
+        method = "POST",
+        model,
+        input = docs,
+        kwargs...)
 end
 
 ## Temporary fix -- it will be moved upstream

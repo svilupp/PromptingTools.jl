@@ -14,6 +14,8 @@ Check your preferences by calling `get_preferences(key::String)`.
 - `OPENAI_API_KEY`: The API key for the OpenAI API. See [OpenAI's documentation](https://platform.openai.com/docs/quickstart?context=python) for more information.
 - `MISTRALAI_API_KEY`: The API key for the Mistral AI API. See [Mistral AI's documentation](https://docs.mistral.ai/) for more information.
 - `COHERE_API_KEY`: The API key for the Cohere API. See [Cohere's documentation](https://docs.cohere.com/docs/the-cohere-platform) for more information.
+- `DATABRICKS_API_KEY`: The API key for the Databricks Foundation Model API. See [Databricks' documentation](https://docs.databricks.com/en/machine-learning/foundation-models/api-reference.html) for more information.
+- `DATABRICKS_HOST`: The host for the Databricks API. See [Databricks' documentation](https://docs.databricks.com/en/machine-learning/foundation-models/api-reference.html) for more information.
 - `MODEL_CHAT`: The default model to use for aigenerate and most ai* calls. See `MODEL_REGISTRY` for a list of available models or define your own.
 - `MODEL_EMBEDDING`: The default model to use for aiembed (embedding documents). See `MODEL_REGISTRY` for a list of available models or define your own.
 - `PROMPT_SCHEMA`: The default prompt schema to use for aigenerate and most ai* calls (if not specified in `MODEL_REGISTRY`). Set as a string, eg, `"OpenAISchema"`.
@@ -33,6 +35,8 @@ Define your `register_model!()` calls in your `startup.jl` file to make them ava
 - `MISTRALAI_API_KEY`: The API key for the Mistral AI API.
 - `COHERE_API_KEY`: The API key for the Cohere API.
 - `LOCAL_SERVER`: The URL of the local server to use for `ai*` calls. Defaults to `http://localhost:10897/v1`. This server is called when you call `model="local"`
+- `DATABRICKS_API_KEY`: The API key for the Databricks Foundation Model API.
+- `DATABRICKS_HOST`: The host for the Databricks API.
 
 Preferences.jl takes priority over ENV variables, so if you set a preference, it will override the ENV variable.
 
@@ -59,6 +63,8 @@ function set_preferences!(pairs::Pair{String, <:Any}...)
         "MISTRALAI_API_KEY",
         "OPENAI_API_KEY",
         "COHERE_API_KEY",
+        "DATABRICKS_API_KEY",
+        "DATABRICKS_HOST",
         "MODEL_CHAT",
         "MODEL_EMBEDDING",
         "MODEL_ALIASES",
@@ -95,6 +101,8 @@ function get_preferences(key::String)
         "MISTRALAI_API_KEY",
         "OPENAI_API_KEY",
         "COHERE_API_KEY",
+        "DATABRICKS_API_KEY",
+        "DATABRICKS_HOST",
         "MODEL_CHAT",
         "MODEL_EMBEDDING",
         "MODEL_ALIASES",
@@ -114,20 +122,26 @@ const MODEL_EMBEDDING::String = @load_preference("MODEL_EMBEDDING",
 # const PROMPT_SCHEMA = OpenAISchema()
 
 # First, load from preferences, then from environment variables
-const OPENAI_API_KEY::String = @load_preference("OPENAI_API_KEY",
+const OPENAI_API_KEY::String = @noinline @load_preference("OPENAI_API_KEY",
     default=@noinline get(ENV, "OPENAI_API_KEY", ""));
 # Note: Disable this warning by setting OPENAI_API_KEY to anything
 isempty(OPENAI_API_KEY) &&
     @warn "OPENAI_API_KEY variable not set! OpenAI models will not be available - set API key directly via `PromptingTools.OPENAI_API_KEY=<api-key>`!"
 
-const MISTRALAI_API_KEY::String = @load_preference("MISTRALAI_API_KEY",
+const MISTRALAI_API_KEY::String = @noinline @load_preference("MISTRALAI_API_KEY",
     default=@noinline get(ENV, "MISTRALAI_API_KEY", ""));
 
-const COHERE_API_KEY::String = @load_preference("COHERE_API_KEY",
+const COHERE_API_KEY::String = @noinline @load_preference("COHERE_API_KEY",
     default=@noinline get(ENV, "COHERE_API_KEY", ""));
 
+const DATABRICKS_API_KEY::String = @noinline @load_preference("DATABRICKS_API_KEY",
+    default=@noinline get(ENV, "DATABRICKS_API_KEY", ""));
+
+const DATABRICKS_HOST::String = @noinline @load_preference("DATABRICKS_HOST",
+    default=@noinline get(ENV, "DATABRICKS_HOST", ""));
+
 ## Address of the local server
-const LOCAL_SERVER::String = @load_preference("LOCAL_SERVER",
+const LOCAL_SERVER::String = @noinline @load_preference("LOCAL_SERVER",
     default=@noinline get(ENV, "LOCAL_SERVER", "http://127.0.0.1:10897/v1"));
 
 ## CONVERSATION HISTORY

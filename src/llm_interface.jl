@@ -135,6 +135,17 @@ See `?PREFERENCES` for more details on how to set your API key permanently.
 """
 struct MistralOpenAISchema <: AbstractOpenAISchema end
 
+"""
+    DatabricksOpenAISchema
+
+DatabricksOpenAISchema() allows user to call Databricks Foundation Model API. [API Reference](https://docs.databricks.com/en/machine-learning/foundation-models/api-reference.html)
+
+Requires two environment variables to be set:
+- `DATABRICKS_API_KEY`: Databricks token
+- `DATABRICKS_HOST`: Address of the Databricks workspace (`https://<workspace_host>.databricks.com`)
+"""
+struct DatabricksOpenAISchema <: AbstractOpenAISchema end
+
 abstract type AbstractOllamaSchema <: AbstractPromptSchema end
 
 """
