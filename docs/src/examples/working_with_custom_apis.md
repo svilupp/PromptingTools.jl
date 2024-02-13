@@ -67,3 +67,34 @@ msg = aigenerate(PT.CustomOpenAISchema(), "Count to 5 and say hi!"; api_kwargs=(
 
 > [!TIP]
 > If you register the model names with `PT.register_model!`, you won't have to keep providing the `schema` manually. It can be any `model` name, because the model is actually selected when you start the server in the terminal.
+
+## Using Databricks Foundation Models
+
+You can also use the Databricks Foundation Models API with PromptingTools.jl. 
+It requires you to set ENV variables `DATABRICKS_API_KEY` (often referred to as "DATABRICKS TOKEN") and `DATABRICKS_HOST`.
+
+The long way to use it is:
+```julia
+msg = aigenerate(PT.DatabricksOpenAISchema(),
+    "Say hi to the llama!";
+    model = "databricks-llama-2-70b-chat",
+    api_key = ENV["DATABRICKS_API_KEY"], api_kwargs = (; url=ENV["DATABRICKS_HOST"]))
+```
+
+But you can also register the models you're hosting and use it as usual:
+```julia
+# Quick registration of a model
+PT.register_model!(;
+        name = "databricks-llama-2-70b-chat",
+        schema = PT.DatabricksOpenAISchema())
+PT.MODEL_ALIASES["dllama"] = "databricks-llama-2-70b-chat" # set alias to make your life easier
+
+# Simply call:
+msg = aigenerate("Say hi to the llama!"; model = "dllama")
+# Or even shorter
+ai"Say hi to the llama!"dllama
+```
+
+You can use `aiembed` as well.
+
+Find more information [here](https://docs.databricks.com/en/machine-learning/foundation-models/api-reference.html).
