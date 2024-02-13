@@ -16,6 +16,7 @@ Check your preferences by calling `get_preferences(key::String)`.
 - `COHERE_API_KEY`: The API key for the Cohere API. See [Cohere's documentation](https://docs.cohere.com/docs/the-cohere-platform) for more information.
 - `DATABRICKS_API_KEY`: The API key for the Databricks Foundation Model API. See [Databricks' documentation](https://docs.databricks.com/en/machine-learning/foundation-models/api-reference.html) for more information.
 - `DATABRICKS_HOST`: The host for the Databricks API. See [Databricks' documentation](https://docs.databricks.com/en/machine-learning/foundation-models/api-reference.html) for more information.
+- `TAVILY_API_KEY`: The API key for the Tavily Search API. Register [here](https://tavily.com/). See more information [here](https://docs.tavily.com/docs/tavily-api/rest_api).
 - `MODEL_CHAT`: The default model to use for aigenerate and most ai* calls. See `MODEL_REGISTRY` for a list of available models or define your own.
 - `MODEL_EMBEDDING`: The default model to use for aiembed (embedding documents). See `MODEL_REGISTRY` for a list of available models or define your own.
 - `PROMPT_SCHEMA`: The default prompt schema to use for aigenerate and most ai* calls (if not specified in `MODEL_REGISTRY`). Set as a string, eg, `"OpenAISchema"`.
@@ -37,6 +38,7 @@ Define your `register_model!()` calls in your `startup.jl` file to make them ava
 - `LOCAL_SERVER`: The URL of the local server to use for `ai*` calls. Defaults to `http://localhost:10897/v1`. This server is called when you call `model="local"`
 - `DATABRICKS_API_KEY`: The API key for the Databricks Foundation Model API.
 - `DATABRICKS_HOST`: The host for the Databricks API.
+- `TAVILY_API_KEY`: The API key for the Tavily Search API. Register [here](https://tavily.com/). See more information [here](https://docs.tavily.com/docs/tavily-api/rest_api).
 
 Preferences.jl takes priority over ENV variables, so if you set a preference, it will override the ENV variable.
 
@@ -65,6 +67,7 @@ function set_preferences!(pairs::Pair{String, <:Any}...)
         "COHERE_API_KEY",
         "DATABRICKS_API_KEY",
         "DATABRICKS_HOST",
+        "TAVILY_API_KEY",
         "MODEL_CHAT",
         "MODEL_EMBEDDING",
         "MODEL_ALIASES",
@@ -103,6 +106,7 @@ function get_preferences(key::String)
         "COHERE_API_KEY",
         "DATABRICKS_API_KEY",
         "DATABRICKS_HOST",
+        "TAVILY_API_KEY",
         "MODEL_CHAT",
         "MODEL_EMBEDDING",
         "MODEL_ALIASES",
@@ -139,6 +143,9 @@ const DATABRICKS_API_KEY::String = @noinline @load_preference("DATABRICKS_API_KE
 
 const DATABRICKS_HOST::String = @noinline @load_preference("DATABRICKS_HOST",
     default=@noinline get(ENV, "DATABRICKS_HOST", ""));
+
+const TAVILY_API_KEY::String = @noinline @load_preference("TAVILY_API_KEY",
+    default=@noinline get(ENV, "TAVILY_API_KEY", ""));
 
 ## Address of the local server
 const LOCAL_SERVER::String = @noinline @load_preference("LOCAL_SERVER",

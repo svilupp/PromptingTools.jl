@@ -236,4 +236,5 @@ end
         "Accept" => "application/json",
     ]
     @test_throws ArgumentError auth_header("")
+    @test length(auth_header(nothing)) == 2
 end
