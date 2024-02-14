@@ -49,6 +49,9 @@ end
         return_context::Bool = false, verbose::Bool = true,
         rerank_kwargs::NamedTuple = NamedTuple(),
         api_kwargs::NamedTuple = NamedTuple(),
+        aiembed_kwargs::NamedTuple = NamedTuple(),
+        aigenerate_kwargs::NamedTuple = NamedTuple(),
+        aiextract_kwargs::NamedTuple = NamedTuple(),
         kwargs...)
 
 Generates a response for a given question using a Retrieval-Augmented Generation (RAG) approach. 
@@ -71,7 +74,10 @@ The function selects relevant chunks from an `ChunkIndex`, optionally filters th
 - `chunks_window_margin::Tuple{Int,Int}`: The window size around each chunk to consider for context building. See `?build_context` for more information.
 - `return_context::Bool`: If `true`, returns the context used for RAG along with the response.
 - `verbose::Bool`: If `true`, enables verbose logging.
-- `api_kwargs`: API parameters that will be forwarded to the API calls
+- `api_kwargs`: API parameters that will be forwarded to ALL of the API calls (`aiembed`, `aigenerate`, and `aiextract`).
+- `aiembed_kwargs`: API parameters that will be forwarded to the `aiembed` call. If you need to provide `api_kwargs` only to this function, simply add them as a keyword argument, eg, `aiembed_kwargs = (; api_kwargs = (; x=1))`.
+- `aigenerate_kwargs`: API parameters that will be forwarded to the `aigenerate` call. If you need to provide `api_kwargs` only to this function, simply add them as a keyword argument, eg, `aigenerate_kwargs = (; api_kwargs = (; temperature=0.3))`.
+- `aiextract_kwargs`: API parameters that will be forwarded to the `aiextract` call for the metadata extraction.
 
 # Returns
 - If `return_context` is `false`, returns the generated message (`msg`).
@@ -109,6 +115,9 @@ function airag(index::AbstractChunkIndex, rag_template::Symbol = :RAGAnswerFromC
         return_context::Bool = false, verbose::Bool = true,
         rerank_kwargs::NamedTuple = NamedTuple(),
         api_kwargs::NamedTuple = NamedTuple(),
+        aiembed_kwargs::NamedTuple = NamedTuple(),
+        aigenerate_kwargs::NamedTuple = NamedTuple(),
+        aiextract_kwargs::NamedTuple = NamedTuple(),
         kwargs...)
     ## Note: Supports only single ChunkIndex for now
     ## Checks
@@ -117,21 +126,26 @@ function airag(index::AbstractChunkIndex, rag_template::Symbol = :RAGAnswerFromC
     placeholders = only(aitemplates(rag_template)).variables # only one template should be found
     @assert (:question in placeholders)&&(:context in placeholders) "Provided RAG Template $(rag_template) is not suitable. It must have placeholders: `question` and `context`."
 
+    ## Embedding
+    joined_kwargs = isempty(api_kwargs) ? aiembed_kwargs :
+                    merge(aiembed_kwargs, (; api_kwargs))
     question_emb = aiembed(question,
         _normalize;
         model = model_embedding,
-        verbose, api_kwargs).content .|> Float32 # no need for Float64
+        verbose, joined_kwargs...).content .|> Float32 # no need for Float64
     emb_candidates = find_closest(index, question_emb; top_k, minimum_similarity)
 
     tag_candidates = if tag_filter == :auto && !isnothing(tags(index)) &&
                         !isempty(model_metadata)
         _check_aiextract_capability(model_metadata)
+        joined_kwargs = isempty(api_kwargs) ? aiextract_kwargs :
+                        merge(aiextract_kwargs, (; api_kwargs))
         # extract metadata via LLM call
         metadata_ = try
             msg = aiextract(metadata_template; return_type = MaybeMetadataItems,
                 text = question,
                 instructions = "In addition to extracted items, suggest 2-3 filter keywords that could be relevant to answer this question.",
-                verbose, model = model_metadata, api_kwargs)
+                verbose, model = model_metadata, joined_kwargs...)
             ## eg, ["software:::pandas", "language:::python", "julia_package:::dataframes"]
             ## we split it and take only the keyword, not the category
             metadata_extract(msg.content.items) |>
@@ -162,10 +176,11 @@ function airag(index::AbstractChunkIndex, rag_template::Symbol = :RAGAnswerFromC
     context = build_context(index, reranked_candidates; chunks_window_margin)
 
     ## LLM call
+    joined_kwargs = isempty(api_kwargs) ? aigenerate_kwargs :
+                    merge(aigenerate_kwargs, (; api_kwargs))
     msg = aigenerate(rag_template; question,
         context = join(context, "\n\n"), model = model_chat, verbose,
-        api_kwargs,
-        kwargs...)
+        joined_kwargs...)
 
     if return_context # for evaluation
         rag_context = RAGContext(;
