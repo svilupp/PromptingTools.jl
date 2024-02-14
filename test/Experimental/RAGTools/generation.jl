@@ -96,6 +96,16 @@ end
         return_context = false)
     @test occursin("Time?", msg.content)
 
+    # test kwargs passing
+    api_kwargs = (; url = "http://localhost:$(PORT)")
+    msg = airag(index; question = "Time?", model_embedding = "mock-emb",
+        model_chat = "mock-gen",
+        model_metadata = "mock-meta",
+        tag_filter = ["yes"],
+        return_context = false, aiembed_kwargs = (; api_kwargs),
+        aigenerate_kwargs = (; api_kwargs), aiextract_kwargs = (; api_kwargs))
+    @test occursin("Time?", msg.content)
+
     ## Test different kwargs
     msg, ctx = airag(index; question = "Time?", model_embedding = "mock-emb",
         model_chat = "mock-gen",

@@ -126,30 +126,38 @@ const MODEL_EMBEDDING::String = @load_preference("MODEL_EMBEDDING",
 # const PROMPT_SCHEMA = OpenAISchema()
 
 # First, load from preferences, then from environment variables
-const OPENAI_API_KEY::String = @noinline @load_preference("OPENAI_API_KEY",
-    default=@noinline get(ENV, "OPENAI_API_KEY", ""));
+# Note: We load first into a variable `temp_` to avoid inlining of the get(ENV...) call
+_temp = get(ENV, "OPENAI_API_KEY", "")
+const OPENAI_API_KEY::String = @load_preference("OPENAI_API_KEY",
+    default=_temp);
 # Note: Disable this warning by setting OPENAI_API_KEY to anything
 isempty(OPENAI_API_KEY) &&
     @warn "OPENAI_API_KEY variable not set! OpenAI models will not be available - set API key directly via `PromptingTools.OPENAI_API_KEY=<api-key>`!"
 
-const MISTRALAI_API_KEY::String = @noinline @load_preference("MISTRALAI_API_KEY",
-    default=@noinline get(ENV, "MISTRALAI_API_KEY", ""));
+_temp = get(ENV, "MISTRALAI_API_KEY", "")
+const MISTRALAI_API_KEY::String = @load_preference("MISTRALAI_API_KEY",
+    default=_temp);
 
-const COHERE_API_KEY::String = @noinline @load_preference("COHERE_API_KEY",
-    default=@noinline get(ENV, "COHERE_API_KEY", ""));
+_temp = get(ENV, "COHERE_API_KEY", "")
+const COHERE_API_KEY::String = @load_preference("COHERE_API_KEY",
+    default=_temp);
 
+_temp = get(ENV, "DATABRICKS_API_KEY", "")
 const DATABRICKS_API_KEY::String = @noinline @load_preference("DATABRICKS_API_KEY",
-    default=@noinline get(ENV, "DATABRICKS_API_KEY", ""));
+    default=_temp);
 
+_temp = get(ENV, "DATABRICKS_HOST", "")
 const DATABRICKS_HOST::String = @noinline @load_preference("DATABRICKS_HOST",
-    default=@noinline get(ENV, "DATABRICKS_HOST", ""));
+    default=_temp);
 
+_temp = get(ENV, "TAVILY_API_KEY", "")
 const TAVILY_API_KEY::String = @noinline @load_preference("TAVILY_API_KEY",
-    default=@noinline get(ENV, "TAVILY_API_KEY", ""));
+    default=_temp);
 
+_temp = get(ENV, "LOCAL_SERVER", "")
 ## Address of the local server
 const LOCAL_SERVER::String = @noinline @load_preference("LOCAL_SERVER",
-    default=@noinline get(ENV, "LOCAL_SERVER", "http://127.0.0.1:10897/v1"));
+    default=_temp);
 
 ## CONVERSATION HISTORY
 """
