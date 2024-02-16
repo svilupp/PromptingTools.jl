@@ -19,6 +19,7 @@ end
     include("llm_openai.jl")
     include("llm_ollama_managed.jl")
     include("llm_ollama.jl")
+    include("llm_google.jl")
     include("macros.jl")
     include("templates.jl")
     include("serialization.jl")

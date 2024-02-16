@@ -48,6 +48,21 @@ WARNING: NEVER EVER sync your `LocalPreferences.toml` file! It contains your API
 """
 const PREFERENCES = nothing
 
+"Keys that are allowed to be set via `set_preferences!`"
+const ALLOWED_PREFERENCES = ["MISTRALAI_API_KEY",
+    "OPENAI_API_KEY",
+    "COHERE_API_KEY",
+    "DATABRICKS_API_KEY",
+    "DATABRICKS_HOST",
+    "TAVILY_API_KEY",
+    "GOOGLE_API_KEY",
+    "MODEL_CHAT",
+    "MODEL_EMBEDDING",
+    "MODEL_ALIASES",
+    "PROMPT_SCHEMA",
+    "MAX_HISTORY_LENGTH",
+    "LOCAL_SERVER"]
+
 """
     set_preferences!(pairs::Pair{String, <:Any}...)
 
@@ -63,23 +78,9 @@ PromptingTools.set_preferences!("OPENAI_API_KEY" => "key1", "MODEL_CHAT" => "cha
 ```
 """
 function set_preferences!(pairs::Pair{String, <:Any}...)
-    allowed_preferences = [
-        "MISTRALAI_API_KEY",
-        "OPENAI_API_KEY",
-        "COHERE_API_KEY",
-        "DATABRICKS_API_KEY",
-        "DATABRICKS_HOST",
-        "TAVILY_API_KEY",
-        "GOOGLE_API_KEY"
-        "MODEL_CHAT",
-        "MODEL_EMBEDDING",
-        "MODEL_ALIASES",
-        "PROMPT_SCHEMA",
-        "MAX_HISTORY_LENGTH",
-        "LOCAL_SERVER",
-    ]
+    global ALLOWED_PREFERENCES
     for (key, value) in pairs
-        @assert key in allowed_preferences "Unknown preference '$key'! (Allowed preferences: $(join(allowed_preferences,", "))"
+        @assert key in ALLOWED_PREFERENCES "Unknown preference '$key'! (Allowed preferences: $(join(ALLOWED_PREFERENCES,", "))"
         @set_preferences!(key=>value)
         if key == "MODEL_ALIASES" || key == "PROMPT_SCHEMA"
             # cannot change in the same session
@@ -103,21 +104,8 @@ PromptingTools.get_preferences("MODEL_CHAT")
 ```
 """
 function get_preferences(key::String)
-    allowed_preferences = [
-        "MISTRALAI_API_KEY",
-        "OPENAI_API_KEY",
-        "COHERE_API_KEY",
-        "DATABRICKS_API_KEY",
-        "DATABRICKS_HOST",
-        "TAVILY_API_KEY",
-        "MODEL_CHAT",
-        "MODEL_EMBEDDING",
-        "MODEL_ALIASES",
-        "PROMPT_SCHEMA",
-        "MAX_HISTORY_LENGTH",
-        "LOCAL_SERVER",
-    ]
-    @assert key in allowed_preferences "Unknown preference '$key'! (Allowed preferences: $(join(allowed_preferences,", "))"
+    global ALLOWED_PREFERENCES
+    @assert key in ALLOWED_PREFERENCES "Unknown preference '$key'! (Allowed preferences: $(join(ALLOWED_PREFERENCES,", "))"
     getproperty(@__MODULE__, Symbol(key))
 end
 
@@ -290,7 +278,8 @@ aliases = merge(Dict("gpt3" => "gpt-3.5-turbo",
         "yi34c" => "yi:34b-chat",
         "oh25" => "openhermes2.5-mistral",
         "starling" => "starling-lm",
-        "local" => "local-server"),
+        "local" => "local-server",
+        "gemini" => "gemini-pro"),
     ## Load aliases from preferences as well
     @load_preference("MODEL_ALIASES", default=Dict{String, String}()))
 
@@ -411,7 +400,12 @@ registry = Dict{String, ModelSpec}("gpt-3.5-turbo" => ModelSpec("gpt-3.5-turbo",
         LocalServerOpenAISchema(),
         0.0,
         0.0,
-        "Local server, eg, powered by [Llama.jl](https://github.com/marcom/Llama.jl). Model is specified when instantiating the server itself."))
+        "Local server, eg, powered by [Llama.jl](https://github.com/marcom/Llama.jl). Model is specified when instantiating the server itself."),
+    "gemini-pro" => ModelSpec("gemini-pro",
+        GoogleSchema(),
+        0.0, #unknown
+        0.0, #unknown
+        "Gemini Pro is a LLM from Google. For more information, see [models](https://ai.google.dev/models/gemini)."))
 
 ### Model Registry Structure
 @kwdef mutable struct ModelRegistry

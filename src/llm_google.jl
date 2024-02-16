@@ -25,35 +25,47 @@ function render(schema::AbstractGoogleSchema,
     # replace any handlebar variables in the messages
     for msg in messages_replaced
         role = if msg isa SystemMessage
-            "system"
-        elseif msg isa UserMessage || msg isa UserMessageWithImages
+            ## No system message, we need to merge with UserMessage, see below
+            "user"
+        elseif msg isa UserMessage
             "user"
         elseif msg isa AIMessage
-            "assistant"
+            "model"
         end
-        ## Special case for images
-        if msg isa UserMessageWithImages
-            # Build message content
-            content = Dict{String, Any}[Dict("type" => "text",
-                "text" => msg.content)]
-            # Add images
-            for img in msg.image_url
-                push!(content,
-                    Dict("type" => "image_url",
-                        "image_url" => Dict("url" => img,
-                            "detail" => image_detail)))
-            end
-        else
-            content = msg.content
-        end
-        push!(conversation, Dict("role" => role, "content" => content))
+        push!(conversation, Dict("role" => role, "parts" => [Dict("text" => msg.content)]))
     end
-
-    return conversation
+    ## Merge any subsequent UserMessages
+    merged_conversation = Dict{String, Any}[]
+    # run n-1 times, look at the current item and the next one
+    i = 1
+    while i <= (length(conversation) - 1)
+        next_i = i + 1
+        if conversation[i]["role"] == "user" && conversation[next_i]["role"] == "user"
+            ## Concat the user messages to together, put two newlines
+            txt1 = conversation[i]["parts"][1]["text"]
+            txt2 = conversation[next_i]["parts"][1]["text"]
+            merged_text = isempty(txt1) || isempty(txt2) ? txt1 * txt2 :
+                          txt1 * "\n\n" * txt2
+            new_msg = Dict("role" => "user", "parts" => [Dict("text" => merged_text)])
+            push!(merged_conversation, new_msg)
+            i += 2
+        else
+            push!(merged_conversation, conversation[i])
+            i += 1
+        end
+    end
+    return merged_conversation
 end
 
-# Stub - to be extended in extension: GoogleGenAIPromptingToolsExt
-function generate_content end
+"Stub - to be extended in extension: GoogleGenAIPromptingToolsExt. `ggi` stands for GoogleGenAI"
+function ggi_generate_content end
+function ggi_generate_content(schema::TestEchoGoogleSchema, api_key::AbstractString,
+        model::AbstractString,
+        conversation; kwargs...)
+    schema.model_id = model
+    schema.inputs = conversation
+    return schema
+end
 
 ## User-Facing API
 """
@@ -149,16 +161,15 @@ function aigenerate(prompt_schema::AbstractGoogleSchema, prompt::ALLOWED_PROMPT_
     conv_rendered = render(prompt_schema, prompt; conversation, kwargs...)
 
     if !dry_run
-        time = @elapsed r = generate_content(prompt_schema, api_key,
+        time = @elapsed r = ggi_generate_content(prompt_schema, api_key,
             model_id,
             conv_rendered;
             http_kwargs,
             api_kwargs...)
         msg = AIMessage(;
-            content = r.response[:choices][begin][:message][:content] |> strip,
-            status = Int(r.status),
-            tokens = (r.response[:usage][:prompt_tokens],
-                r.response[:usage][:completion_tokens]),
+            content = r.text |> strip,
+            status = 200,
+            tokens = (0, 0),
             elapsed = time)
         ## Reporting
         verbose && @info _report_stats(msg, model_id)
