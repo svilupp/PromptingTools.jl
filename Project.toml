@@ -1,7 +1,7 @@
 name = "PromptingTools"
 uuid = "670122d1-24a8-4d70-bfce-740807c42192"
 authors = ["J S @svilupp and contributors"]
-version = "0.12.0"
+version = "0.13.0-DEV"
 
 [deps]
 Base64 = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
@@ -15,11 +15,13 @@ Preferences = "21216c6a-2e73-6563-6e65-726566657250"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [weakdeps]
+GoogleGenAI = "903d41d1-eaca-47dd-943b-fee3930375ab"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Markdown = "d6f4376e-aef5-505a-96c1-9c027394607a"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
 [extensions]
+GoogleGenAIPromptingToolsExt = ["GoogleGenAI"]
 MarkdownPromptingToolsExt = ["Markdown"]
 RAGToolsExperimentalExt = ["SparseArrays", "LinearAlgebra"]
 

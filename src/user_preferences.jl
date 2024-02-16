@@ -17,6 +17,7 @@ Check your preferences by calling `get_preferences(key::String)`.
 - `DATABRICKS_API_KEY`: The API key for the Databricks Foundation Model API. See [Databricks' documentation](https://docs.databricks.com/en/machine-learning/foundation-models/api-reference.html) for more information.
 - `DATABRICKS_HOST`: The host for the Databricks API. See [Databricks' documentation](https://docs.databricks.com/en/machine-learning/foundation-models/api-reference.html) for more information.
 - `TAVILY_API_KEY`: The API key for the Tavily Search API. Register [here](https://tavily.com/). See more information [here](https://docs.tavily.com/docs/tavily-api/rest_api).
+- `GOOGLE_API_KEY`: The API key for Google Gemini models. Get yours from [here](https://ai.google.dev/). If you see a documentation page ("Available languages and regions for Google AI Studio and Gemini API"), it means that it's not yet available in your region.
 - `MODEL_CHAT`: The default model to use for aigenerate and most ai* calls. See `MODEL_REGISTRY` for a list of available models or define your own.
 - `MODEL_EMBEDDING`: The default model to use for aiembed (embedding documents). See `MODEL_REGISTRY` for a list of available models or define your own.
 - `PROMPT_SCHEMA`: The default prompt schema to use for aigenerate and most ai* calls (if not specified in `MODEL_REGISTRY`). Set as a string, eg, `"OpenAISchema"`.
@@ -39,8 +40,9 @@ Define your `register_model!()` calls in your `startup.jl` file to make them ava
 - `DATABRICKS_API_KEY`: The API key for the Databricks Foundation Model API.
 - `DATABRICKS_HOST`: The host for the Databricks API.
 - `TAVILY_API_KEY`: The API key for the Tavily Search API. Register [here](https://tavily.com/). See more information [here](https://docs.tavily.com/docs/tavily-api/rest_api).
+- `GOOGLE_API_KEY`: The API key for Google Gemini models. Get yours from [here](https://ai.google.dev/). If you see a documentation page ("Available languages and regions for Google AI Studio and Gemini API"), it means that it's not yet available in your region.
 
-Preferences.jl takes priority over ENV variables, so if you set a preference, it will override the ENV variable.
+Preferences.jl takes priority over ENV variables, so if you set a preference, it will take precedence over the ENV variable.
 
 WARNING: NEVER EVER sync your `LocalPreferences.toml` file! It contains your API key and other sensitive information!!!
 """
@@ -68,6 +70,7 @@ function set_preferences!(pairs::Pair{String, <:Any}...)
         "DATABRICKS_API_KEY",
         "DATABRICKS_HOST",
         "TAVILY_API_KEY",
+        "GOOGLE_API_KEY"
         "MODEL_CHAT",
         "MODEL_EMBEDDING",
         "MODEL_ALIASES",
@@ -143,20 +146,24 @@ const COHERE_API_KEY::String = @load_preference("COHERE_API_KEY",
     default=_temp);
 
 _temp = get(ENV, "DATABRICKS_API_KEY", "")
-const DATABRICKS_API_KEY::String = @noinline @load_preference("DATABRICKS_API_KEY",
+const DATABRICKS_API_KEY::String = @load_preference("DATABRICKS_API_KEY",
     default=_temp);
 
 _temp = get(ENV, "DATABRICKS_HOST", "")
-const DATABRICKS_HOST::String = @noinline @load_preference("DATABRICKS_HOST",
+const DATABRICKS_HOST::String = @load_preference("DATABRICKS_HOST",
     default=_temp);
 
 _temp = get(ENV, "TAVILY_API_KEY", "")
-const TAVILY_API_KEY::String = @noinline @load_preference("TAVILY_API_KEY",
+const TAVILY_API_KEY::String = @load_preference("TAVILY_API_KEY",
+    default=_temp);
+
+_temp = get(ENV, "GOOGLE_API_KEY", "")
+const GOOGLE_API_KEY::String = @load_preference("GOOGLE_API_KEY",
     default=_temp);
 
 _temp = get(ENV, "LOCAL_SERVER", "")
 ## Address of the local server
-const LOCAL_SERVER::String = @noinline @load_preference("LOCAL_SERVER",
+const LOCAL_SERVER::String = @load_preference("LOCAL_SERVER",
     default=_temp);
 
 ## CONVERSATION HISTORY

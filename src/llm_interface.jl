@@ -207,6 +207,9 @@ struct OllamaManagedSchema <: AbstractOllamaManagedSchema end
     inputs::Any = nothing
 end
 
+abstract type AbstractGoogleSchema <: AbstractPromptSchema end
+struct GoogleSchema <: AbstractGoogleSchema end
+
 ## Dispatch into a default schema (can be set by Preferences.jl)
 # Since we load it as strings, we need to convert it to a symbol and instantiate it
 global PROMPT_SCHEMA::AbstractPromptSchema = @load_preference("PROMPT_SCHEMA",
