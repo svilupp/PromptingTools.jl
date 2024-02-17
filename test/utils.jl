@@ -1,4 +1,4 @@
-using PromptingTools: split_by_length, replace_words
+using PromptingTools: split_by_length, replace_words, length_longest_common_subsequence
 using PromptingTools: _extract_handlebar_variables, call_cost, _report_stats
 using PromptingTools: _string_to_vector, _encode_local_image
 using PromptingTools: DataMessage, AIMessage
@@ -84,6 +84,25 @@ end
     chunks = split_by_length(text, separators, max_length = 20)
     chunks = split_by_length(text, separators, max_length = 20)
     @test length(separators) == sep_length
+end
+
+@testset "length_longest_common_subsequence" begin
+    # Test for equal strings
+    @test length_longest_common_subsequence("abcde", "abcde") == 5
+    # flip the order of the strings -> abcd only
+    @test length_longest_common_subsequence("abcde", "abced") == 4
+
+    # Test for empty string
+    @test length_longest_common_subsequence("", "") == 0
+
+    # Test for no common subsequence
+    @test length_longest_common_subsequence("abcde", "xyz") == 0
+
+    # Test for partial common subsequence
+    @test length_longest_common_subsequence("abcde", "ace") == 3
+
+    # Test for common subsequence with repeated characters
+    @test length_longest_common_subsequence("abc-abc----", "___ab_c__abc") == 6
 end
 
 @testset "extract_handlebar_variables" begin

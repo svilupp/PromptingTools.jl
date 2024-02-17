@@ -27,6 +27,7 @@ const RESERVED_KWARGS = [
 ]
 
 # export replace_words, split_by_length, call_cost, auth_header # for debugging only
+# export length_longest_common_subsequence
 include("utils.jl")
 
 export aigenerate, aiembed, aiclassify, aiextract, aiscan
