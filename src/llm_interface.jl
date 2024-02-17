@@ -207,6 +207,19 @@ struct OllamaManagedSchema <: AbstractOllamaManagedSchema end
     inputs::Any = nothing
 end
 
+abstract type AbstractGoogleSchema <: AbstractPromptSchema end
+
+"Calls Google's Gemini API. See more information [here](https://aistudio.google.com/). It's available only for _some_ regions."
+struct GoogleSchema <: AbstractGoogleSchema end
+
+"Echoes the user's input back to them. Used for testing the implementation"
+@kwdef mutable struct TestEchoGoogleSchema <: AbstractGoogleSchema
+    text::Any
+    status::Integer
+    model_id::String = ""
+    inputs::Any = nothing
+end
+
 ## Dispatch into a default schema (can be set by Preferences.jl)
 # Since we load it as strings, we need to convert it to a symbol and instantiate it
 global PROMPT_SCHEMA::AbstractPromptSchema = @load_preference("PROMPT_SCHEMA",

@@ -65,6 +65,7 @@ include("llm_shared.jl")
 include("llm_openai.jl")
 include("llm_ollama_managed.jl")
 include("llm_ollama.jl")
+include("llm_google.jl")
 
 ## Convenience utils
 export @ai_str, @aai_str, @ai!_str, @aai!_str
