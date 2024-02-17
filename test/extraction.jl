@@ -195,12 +195,12 @@ end
 end
 @testset "to_json_schema-ItemsExtract" begin
     "Represents person's age, height, and weight"
-    struct MyMeasurement1
+    struct MyMeasurement11
         age::Int
         height::Union{Int, Nothing}
         weight::Union{Nothing, Float64}
     end
-    schema = to_json_schema(ItemsExtract{MyMeasurement1})
+    schema = to_json_schema(ItemsExtract{MyMeasurement11})
     @test schema["type"] == "object"
     @test schema["properties"]["items"]["type"] == "array"
     @test schema["required"] == ["items"]
