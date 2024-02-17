@@ -403,8 +403,8 @@ registry = Dict{String, ModelSpec}("gpt-3.5-turbo" => ModelSpec("gpt-3.5-turbo",
         "Local server, eg, powered by [Llama.jl](https://github.com/marcom/Llama.jl). Model is specified when instantiating the server itself."),
     "gemini-pro" => ModelSpec("gemini-pro",
         GoogleSchema(),
-        0.0, #unknown
-        0.0, #unknown
+        0.0, #unknown, expected 1.25e-7
+        0.0, #unknown, expected 3.75e-7
         "Gemini Pro is a LLM from Google. For more information, see [models](https://ai.google.dev/models/gemini)."))
 
 ### Model Registry Structure

@@ -166,6 +166,73 @@ function split_by_length(text, separators::Vector{String}; max_length)
     return chunks
 end
 
+"""
+    length_longest_common_subsequence(itr1, itr2)
+
+Compute the length of the longest common subsequence between two sequences (ie, the higher the number, the better the match).
+
+Source: https://cn.julialang.org/LeetCode.jl/dev/democards/problems/problems/1143.longest-common-subsequence/
+
+# Arguments
+- `itr1`: The first sequence, eg, a String.
+- `itr2`: The second sequence, eg, a String.
+
+# Returns
+The length of the longest common subsequence.
+
+# Examples
+```julia
+text1 = "abc-abc----"
+text2 = "___ab_c__abc"
+longest_common_subsequence(text1, text2)
+# Output: 6 (-> "abcabc")
+```
+
+It can be used to fuzzy match strings and find the similarity between them (Tip: normalize the match)
+```julia
+commands = ["product recommendation", "emotions", "specific product advice", "checkout advice"]
+query = "Which product can you recommend for me?"
+let pos = argmax(length_longest_common_subsequence.(Ref(query), commands))
+    dist = length_longest_common_subsequence(query, commands[pos])
+    norm = dist / min(length(query), length(commands[pos]))
+    @info "The closest command to the query: \"\$(query)\" is: \"\$(commands[pos])\" (distance: \$(dist), normalized: \$(norm))"
+end
+```
+
+You can also use it to find the closest context for some AI generated summary/story:
+
+```julia
+context = ["The enigmatic stranger vanished as swiftly as a wisp of smoke, leaving behind a trail of unanswered questions.",
+    "Beneath the shimmering moonlight, the ocean whispered secrets only the stars could hear.",
+    "The ancient tree stood as a silent guardian, its gnarled branches reaching for the heavens.",
+    "The melody danced through the air, painting a vibrant tapestry of emotions.",
+    "Time flowed like a relentless river, carrying away memories and leaving imprints in its wake."]
+
+story = \"\"\"
+  Beneath the shimmering moonlight, the ocean whispered secrets only the stars could hear.
+
+  Under the celestial tapestry, the vast ocean whispered its secrets to the indifferent stars. Each ripple, a murmured confidence, each wave, a whispered lament. The glittering celestial bodies listened in silent complicity, their enigmatic gaze reflecting the ocean's unspoken truths. The cosmic dance between the sea and the sky, a symphony of shared secrets, forever echoing in the ethereal expanse.
+  \"\"\"
+
+let pos = argmax(length_longest_common_subsequence.(Ref(story), context))
+    dist = length_longest_common_subsequence(story, context[pos])
+    norm = dist / min(length(story), length(context[pos]))
+    @info "The closest context to the query: \"\$(first(story,20))...\" is: \"\$(context[pos])\" (distance: \$(dist), normalized: \$(norm))"
+end
+```
+"""
+function length_longest_common_subsequence(itr1, itr2)
+    m, n = length(itr1) + 1, length(itr2) + 1
+    dp = fill(0, m, n)
+
+    for i in 2:m, j in 2:n
+        dp[i, j] = (itr1[i - 1] == itr2[j - 1]) ? (dp[i - 1, j - 1] + 1) :
+                   max(dp[i - 1, j], dp[i, j - 1])
+    end
+
+    return dp[m, n]
+end
+
 ### INTERNAL FUNCTIONS - DO NOT USE DIRECTLY
 # helper to extract handlebar variables (eg, `{{var}}`) from a prompt string
 function _extract_handlebar_variables(s::AbstractString)
