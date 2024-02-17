@@ -7,8 +7,8 @@ const PT = PromptingTools
 
 "Wrapper for GoogleGenAI.generate_content."
 function PromptingTools.ggi_generate_content(prompt_schema::PT.AbstractGoogleSchema,
-        api_key::AbstractString, model_name::String,
-        conversation::AbstractVector{<:AbstractDict}; http_kwargs, api_kwargs...)
+        api_key::AbstractString, model_name::AbstractString,
+        conversation; http_kwargs, api_kwargs...)
     ## Build the provider
     provider = GoogleGenAI.GoogleProvider(; api_key)
     url = "$(provider.base_url)/models/$model_name:generateContent?key=$(provider.api_key)"

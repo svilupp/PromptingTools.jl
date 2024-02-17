@@ -2,8 +2,8 @@ using PromptingTools
 using OpenAI, HTTP, JSON3
 using SparseArrays, LinearAlgebra, Markdown
 using Test, Pkg
-using Aqua
 const PT = PromptingTools
+using Aqua
 
 @testset "Code quality (Aqua.jl)" begin
     # Skipping unbound_args check because we need our `MaybeExtract` type to be unboard

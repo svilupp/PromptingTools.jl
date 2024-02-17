@@ -54,6 +54,10 @@ function render(schema::AbstractGoogleSchema,
             i += 1
         end
     end
+    ## Add last message
+    if i == length(conversation)
+        push!(merged_conversation, conversation[end])
+    end
     return merged_conversation
 end
 
@@ -152,8 +156,8 @@ function aigenerate(prompt_schema::AbstractGoogleSchema, prompt::ALLOWED_PROMPT_
 
     ## Check that package GoogleGenAI is loaded
     ext = Base.get_extension(PromptingTools, :GoogleGenAIPromptingToolsExt)
-    if isnothing(ext)
-        error("you need to also import GoogleGenAI package to use this function")
+    if isnothing(ext) && !(prompt_schema isa TestEchoGoogleSchema)
+        throw(ArgumentError("You need to also import GoogleGenAI package to use this function"))
     end
 
     ## Find the unique ID for the model alias provided
