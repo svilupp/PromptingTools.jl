@@ -101,3 +101,13 @@ function finalize_outputs(prompt::ALLOWED_PROMPT_TYPE, conv_rendered::Any,
         return msg
     end
 end
+
+## Helpers for aiclassify -> they encode the choice list to create the prompt and then extract the original choice category
+function encode_choices(schema::AbstractPromptSchema,
+        choices;
+        kwargs...)
+    throw(ArgumentError("Function `encode_choices` is not implemented for the provided schema ($schema) and $(choices)."))
+end
+function decode_choices(schema::AbstractPromptSchema, choices, conv)
+    throw(ArgumentError("Function `decode_choices` is not implemented for the provided schema ($schema) and $(choices)."))
+end

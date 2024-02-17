@@ -471,15 +471,125 @@ function aiembed(prompt_schema::AbstractOpenAISchema,
     return msg
 end
 
+"Token IDs for GPT3.5 and GPT4 from https://platform.openai.com/tokenizer"
+const OPENAI_TOKEN_IDS = Dict("true" => 837,
+    "false" => 905,
+    "unknown" => 9987,
+    "other" => 1023,
+    "1" => 16,
+    "2" => 17,
+    "3" => 18,
+    "4" => 19,
+    "5" => 20,
+    "6" => 21,
+    "7" => 22,
+    "8" => 23,
+    "9" => 24,
+    "10" => 605,
+    "11" => 806,
+    "12" => 717,
+    "13" => 1032,
+    "14" => 975,
+    "15" => 868,
+    "16" => 845,
+    "17" => 1114,
+    "18" => 972,
+    "19" => 777,
+    "20" => 508)
+
+"""
+    encode_choices(schema::OpenAISchema, choices::AbstractVector{<:Tuple{<:AbstractString, <:AbstractString}}; kwargs...)
+
+Encode the choices into an enumerated list that can be interpolated into the prompt and creates the corresponding logit biases (to choose only from the selected tokens).
+
+# Arguments
+- `schema::OpenAISchema`: The OpenAISchema object.
+- `choices::AbstractVector{<:Tuple{<:AbstractString, <:AbstractString}}`: The choices to be encoded, represented as a vector of tuples where each tuple contains a choice and its description.
+- `kwargs...`: Additional keyword arguments.
+
+# Returns
+- `choices_prompt::AbstractString`: The encoded choices as a single string, separated by newlines.
+- `logit_bias::Dict`: The logit bias dictionary, where the keys are the token IDs and the values are the bias values.
+- `decode_ids::AbstractVector{<:AbstractString}`: The decoded IDs of the choices.
+
+# Examples
+```julia
+choices_prompt, logit_bias, _ = PT.encode_choices(PT.OpenAISchema(), ["true", "false"])
+choices_prompt # Output: "true for \"true\"\nfalse for \"false\"
+logit_bias # Output: Dict(837 => 100, 905 => 100)
+
+choices_prompt, logit_bias, _ = PT.encode_choices(PT.OpenAISchema(), ["animal", "plant"])
+choices_prompt # Output: "1. \"animal\"\n2. \"plant\""
+logit_bias # Output: Dict(16 => 100, 17 => 100)
+```
+"""
+function encode_choices(schema::OpenAISchema,
+        choices::AbstractVector{<:AbstractString};
+        kwargs...)
+    global OPENAI_TOKEN_IDS
+    ## if all choices are in the dictionary, use the dictionary
+    if all(x -> haskey(OPENAI_TOKEN_IDS, x), choices)
+        choices_prompt = ["$c for \"$c\"" for c in choices]
+        logit_bias = Dict(OPENAI_TOKEN_IDS[c] => 100 for c in choices)
+    elseif length(choices) <= 20
+        ## encode choices to IDs 1..20
+        choices_prompt = ["$(i). \"$c\"" for (i, c) in enumerate(choices)]
+        logit_bias = Dict(OPENAI_TOKEN_IDS[string(i)] => 100 for i in 1:length(choices))
+    else
+        ArgumentError("The number of choices must be less than or equal to 20.")
+    end
+
+    return join(choices_prompt, "\n"), logit_bias, choices
+end
+
+function decode_choices(schema::OpenAISchema, choices, conv::AbstractVector)
+    if length(conv) > 0 && last(conv) isa AIMessage
+        conv[end] = decode_choices(schema, choices, last(conv))
+    end
+    return conv
+end
+
+"""
+    decode_choices(schema::OpenAISchema,
+        choices::AbstractVector{<:AbstractString},
+        msg::AIMessage)
+
+Decodes the underlying AIMessage against the original choices to lookup what the category name was.
+
+If it fails, it will return `msg.content == nothing`
+"""
+function decode_choices(schema::OpenAISchema,
+        choices::AbstractVector{<:AbstractString},
+        msg::AIMessage)
+    global OPENAI_TOKEN_IDS
+    parsed_digit = tryparse(Int, strip(msg.content))
+    if !isnothing(parsed_digit) && haskey(OPENAI_TOKEN_IDS, strip(msg.content))
+        ## It's encoded
+        content = choices[parsed_digit]
+    elseif haskey(OPENAI_TOKEN_IDS, strip(msg.content))
+        ## if it's NOT a digit, but direct mapping (eg, true/false), no changes!
+        content = strip(msg.content)
+    else
+        ## failed decoding
+        content = nothing
+    end
+    return AIMessage(; content, msg.status, msg.tokens, msg.elapsed)
+end
+
 """
     aiclassify(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE;
-    api_kwargs::NamedTuple = (logit_bias = Dict(837 => 100, 905 => 100, 9987 => 100),
-        max_tokens = 1, temperature = 0),
-    kwargs...)
+        choices::AbstractVector{T} = ["true", "false", "unknown"],
+        api_kwargs::NamedTuple = NamedTuple(),
+        kwargs...) where {T <: Union{AbstractString, Tuple{<:AbstractString, <:AbstractString}}}
 
-Classifies the given prompt/statement as true/false/unknown.
+Classifies the given prompt/statement into an arbitrary list of `choices`, which must be only the choices (vector of strings) or choices and descriptions are provided (vector of tuples, ie, `("choice","description")`).
 
-Note: this is a very simple classifier, it is not meant to be used in production. Credit goes to [AAAzzam](https://twitter.com/AAAzzam/status/1669753721574633473).
+It's quick and easy option for "routing" and similar use cases, as it exploits the logit bias trick and outputs only 1 token.
+classify into an arbitrary list of categories (including with descriptions). It's quick and easy option for "routing" and similar use cases, as it exploits the logit bias trick, so it outputs only 1 token.
+
+Choices are rewritten into an enumerated list and mapped to a few known OpenAI tokens (maximum of 20 choices supported).
+
+Note: Credit goes to [AAAzzam](https://twitter.com/AAAzzam/status/1669753721574633473) for the original logit bias trick.
 
 It uses Logit bias trick and limits the output to 1 token to force the model to output only true/false/unknown.
 
@@ -494,6 +604,19 @@ Output tokens used (via `api_kwargs`):
 
 # Example
 
+```julia
+choices = ["animal", "plant"]
+input = "Palm tree"
+aiclassify(tpl; choices, input)
+
+choices = [("A", "any animal or creature"), ("P", "for any plant or tree"), ("O", "for everything else")]
+input = "spider"
+input = "daphodil"
+input = "castle"
+aiclassify(tpl; choices, input)
+```
+
+You can still use a simple true/false classification:
 ```julia
 aiclassify("Is two plus two four?") # true
 aiclassify("Is two plus three a vegetable on Mars?") # false
@@ -520,15 +643,20 @@ aiclassify(:JudgeIsItTrue;
 
 """
 function aiclassify(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE;
-        api_kwargs::NamedTuple = (logit_bias = Dict(837 => 100, 905 => 100, 9987 => 100),
-            max_tokens = 1, temperature = 0),
-        kwargs...)
-    ##
-    msg = aigenerate(prompt_schema,
+        choices::AbstractVector{T} = ["true", "false", "unknown"],
+        api_kwargs::NamedTuple = NamedTuple(),
+        kwargs...) where {T <: Union{AbstractString, Tuple{<:AbstractString, <:AbstractString}}}
+    ## Encode the choices and the corresponding prompt 
+    ## TODO: maybe check the model provided as well?
+    choices_prompt, logit_bias, decode_ids = encode_choices(prompt_schema, choices)
+    ## We want only 1 token
+    api_kwargs = merge(api_kwargs, (; logit_bias, max_tokens = 1, temperature = 0))
+    msg_or_conv = aigenerate(prompt_schema,
         prompt;
+        choices = choices_prompt,
         api_kwargs,
         kwargs...)
-    return msg
+    return decode_choices(prompt_schema, decode_ids, msg_or_conv)
 end
 
 """
