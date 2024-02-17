@@ -153,7 +153,7 @@ end
     expected_output = AIMessage(;
         content = "Hello!" |> strip,
         status = 200,
-        tokens = (0, 0),
+        tokens = (83, 6),
         elapsed = msg.elapsed)
     @test msg == expected_output
     @test schema1.inputs == Dict{String, Any}[Dict("role" => "user",
@@ -168,7 +168,7 @@ end
     expected_output = AIMessage(;
         content = "World!" |> strip,
         status = 200,
-        tokens = (0, 0),
+        tokens = (83, 6),
         elapsed = msg.elapsed)
     @test msg == expected_output
     @test schema1.inputs == Dict{String, Any}[Dict("role" => "user",

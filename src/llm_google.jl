@@ -82,14 +82,18 @@ end
             readtimeout = 120), api_kwargs::NamedTuple = NamedTuple(),
         kwargs...)
 
-Generate an AI response based on a given prompt using the OpenAI API.
+Generate an AI response based on a given prompt using the Google Gemini API. Get the API key [here](https://ai.google.dev/).
+
+Note: 
+- There is no "cost" reported as of February 2024, as all access seems to be free-of-charge. See the details [here](https://ai.google.dev/pricing).
+- `tokens` in the returned AIMessage are actually characters, not tokens. We use a _conservative_ estimate as they are not provided by the API yet.
 
 # Arguments
 - `prompt_schema`: An optional object to specify which prompt template should be applied (Default to `PROMPT_SCHEMA = OpenAISchema`)
 - `prompt`: Can be a string representing the prompt for the AI conversation, a `UserMessage`, a vector of `AbstractMessage` or an `AITemplate`
 - `verbose`: A boolean indicating whether to print additional information.
 - `api_key`: A string representing the API key for accessing the OpenAI API.
-- `model`: A string representing the model to use for generating the response. Can be an alias corresponding to a model ID defined in `MODEL_ALIASES`.
+- `model`: A string representing the model to use for generating the response. Can be an alias corresponding to a model ID defined in `MODEL_ALIASES`. Defaults to 
 - `return_all::Bool=false`: If `true`, returns the entire conversation history, otherwise returns only the last message (the `AIMessage`).
 - `dry_run::Bool=false`: If `true`, skips sending the messages to the model (for debugging, often used with `return_all=true`).
 - `conversation`: An optional vector of `AbstractMessage` objects representing the conversation history. If not provided, it is initialized as an empty vector.
@@ -112,23 +116,22 @@ See also: `ai_str`, `aai_str`, `aiembed`, `aiclassify`, `aiextract`, `aiscan`, `
 
 Simple hello world to test the API:
 ```julia
-result = aigenerate("Say Hi!")
-# [ Info: Tokens: 29 @ Cost: \$0.0 in 1.0 seconds
-# AIMessage("Hello! How can I assist you today?")
+result = aigenerate("Say Hi!"; model="gemini-pro")
+# AIMessage("Hi there! 👋 I'm here to help you with any questions or tasks you may have. Just let me know what you need, and I'll do my best to assist you.")
 ```
 
 `result` is an `AIMessage` object. Access the generated string via `content` property:
 ```julia
 typeof(result) # AIMessage{SubString{String}}
 propertynames(result) # (:content, :status, :tokens, :elapsed
-result.content # "Hello! How can I assist you today?"
+result.content # "Hi there! ...
 ```
 ___
-You can use string interpolation:
+You can use string interpolation and alias "gemini":
 ```julia
 a = 1
-msg=aigenerate("What is `\$a+\$a`?")
-msg.content # "The sum of `1+1` is `2`."
+msg=aigenerate("What is `\$a+\$a`?"; model="gemini")
+msg.content # "1+1 is 2."
 ```
 ___
 You can provide the whole conversation or more intricate prompts as a `Vector{AbstractMessage}`:
@@ -138,8 +141,8 @@ const PT = PromptingTools
 conversation = [
     PT.SystemMessage("You're master Yoda from Star Wars trying to help the user become a Yedi."),
     PT.UserMessage("I have feelings for my iPhone. What should I do?")]
-msg=aigenerate(conversation)
-# AIMessage("Ah, strong feelings you have for your iPhone. A Jedi's path, this is not... <continues>")
+msg=aigenerate(conversation; model="gemini")
+# AIMessage("Young Padawan, you have stumbled into a dangerous path.... <continues>")
 ```
 """
 function aigenerate(prompt_schema::AbstractGoogleSchema, prompt::ALLOWED_PROMPT_TYPE;
@@ -170,10 +173,14 @@ function aigenerate(prompt_schema::AbstractGoogleSchema, prompt::ALLOWED_PROMPT_
             conv_rendered;
             http_kwargs,
             api_kwargs...)
+        ## Big overestimate
+        input_token_estimate = length(JSON3.write(conv_rendered))
+        output_token_estimate = length(r.text)
         msg = AIMessage(;
             content = r.text |> strip,
             status = 200,
-            tokens = (0, 0),
+            ## for google it's CHARACTERS, not tokens
+            tokens = (input_token_estimate, output_token_estimate),
             elapsed = time)
         ## Reporting
         verbose && @info _report_stats(msg, model_id)
