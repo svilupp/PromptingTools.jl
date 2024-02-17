@@ -25,6 +25,7 @@ makedocs(;
         repolink = "https://github.com/svilupp/PromptingTools.jl",
         canonical = "https://svilupp.github.io/PromptingTools.jl",
         edit_link = "main",
+        size_threshold = nothing,
         assets = String[]),
     pages = [
         "Home" => "index.md",
