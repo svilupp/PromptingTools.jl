@@ -548,7 +548,7 @@ function encode_choices(schema::OpenAISchema,
         choices_prompt = ["$(i). \"$c\"" for (i, c) in enumerate(choices)]
         logit_bias = Dict(OPENAI_TOKEN_IDS[string(i)] => 100 for i in 1:length(choices))
     else
-        ArgumentError("The number of choices must be less than or equal to 20.")
+        throw(ArgumentError("The number of choices must be less than or equal to 20."))
     end
 
     return join(choices_prompt, "\n"), logit_bias, choices
@@ -558,7 +558,7 @@ function encode_choices(schema::OpenAISchema,
         kwargs...) where {T <: Tuple{<:AbstractString, <:AbstractString}}
     global OPENAI_TOKEN_IDS
     ## if all choices are in the dictionary, use the dictionary
-    if all(x -> haskey(OPENAI_TOKEN_IDS, x), choices)
+    if all(x -> haskey(OPENAI_TOKEN_IDS, first(x)), choices)
         choices_prompt = ["$c for \"$desc\"" for (c, desc) in choices]
         logit_bias = Dict(OPENAI_TOKEN_IDS[c] => 100 for (c, desc) in choices)
     elseif length(choices) <= 20
@@ -566,7 +566,7 @@ function encode_choices(schema::OpenAISchema,
         choices_prompt = ["$(i). \"$c\" for $desc" for (i, (c, desc)) in enumerate(choices)]
         logit_bias = Dict(OPENAI_TOKEN_IDS[string(i)] => 100 for i in 1:length(choices))
     else
-        ArgumentError("The number of choices must be less than or equal to 20.")
+        throw(ArgumentError("The number of choices must be less than or equal to 20."))
     end
 
     return join(choices_prompt, "\n"), logit_bias, first.(choices)
@@ -628,6 +628,8 @@ Classifies the given prompt/statement into an arbitrary list of `choices`, which
 
 It's quick and easy option for "routing" and similar use cases, as it exploits the logit bias trick and outputs only 1 token.
 classify into an arbitrary list of categories (including with descriptions). It's quick and easy option for "routing" and similar use cases, as it exploits the logit bias trick, so it outputs only 1 token.
+
+!!! Note: The prompt/AITemplate must have a placeholder `choices` (ie, `{{choices}}`) that will be replaced with the encoded choices
 
 Choices are rewritten into an enumerated list and mapped to a few known OpenAI tokens (maximum of 20 choices supported). Mapping of token IDs for GPT3.5/4 are saved in variable `OPENAI_TOKEN_IDS`.
 

@@ -347,14 +347,15 @@ end
             ("true", "If the statement is true"),
             ("false", "If the statement is false"),
         ])
-    expected_prompt = "1. \"true\" for If the statement is true\n2. \"false\" for If the statement is false"
-    expected_logit_bias = Dict(16 => 100, 17 => 100)
+    expected_prompt = "true for \"If the statement is true\"\nfalse for \"If the statement is false\""
+    expected_logit_bias = Dict(837 => 100, 905 => 100)
     @test choices_prompt == expected_prompt
     @test logit_bias == expected_logit_bias
     @test ids == ["true", "false"]
 
     # Test encoding with an invalid number of choices
-    @test_throws ArgumentError encode_choices(OpenAISchema(), collect(1:100))
+    @test_throws ArgumentError encode_choices(OpenAISchema(), string.(collect(1:100)))
+    @test_throws ArgumentError encode_choices(OpenAISchema(), [("$i", "$i") for i in 1:50])
 
     @test_throws ArgumentError encode_choices(PT.OllamaSchema(), ["true", "false"])
 end
