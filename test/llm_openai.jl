@@ -3,6 +3,7 @@ using PromptingTools: AIMessage, SystemMessage, AbstractMessage
 using PromptingTools: UserMessage, UserMessageWithImages, DataMessage
 using PromptingTools: CustomProvider,
     CustomOpenAISchema, MistralOpenAISchema, MODEL_EMBEDDING
+using PromptingTools: encode_choices, decode_choices
 
 @testset "render-OpenAI" begin
     schema = OpenAISchema()
@@ -311,4 +312,105 @@ end
     @test msg == expected_output
     @test schema2.inputs == ["Hello World", "Hello back"]
     @test schema2.model_id == "gpt-4" # not possible - just an example
+end
+
+@testset "encode_choices" begin
+    # Test encoding simple string choices
+    choices_prompt, logit_bias, ids = encode_choices(OpenAISchema(), ["true", "false"])
+    # Checks if the encoded choices format and logit_bias are correct
+    @test choices_prompt == "true for \"true\"\nfalse for \"false\""
+    @test logit_bias == Dict(837 => 100, 905 => 100)
+    @test ids == ["true", "false"]
+
+    # Test encoding more than two choices
+    choices_prompt, logit_bias, ids = encode_choices(OpenAISchema(), ["animal", "plant"])
+    # Checks the format for multiple choices and correct logit_bias mapping
+    @test choices_prompt == "1. \"animal\"\n2. \"plant\""
+    @test logit_bias == Dict(16 => 100, 17 => 100)
+    @test ids == ["animal", "plant"]
+
+    # with descriptions
+    choices_prompt, logit_bias, ids = encode_choices(OpenAISchema(),
+        [
+            ("A", "any animal or creature"),
+            ("P", "for any plant or tree"),
+            ("O", "for everything else"),
+        ])
+    expected_prompt = "1. \"A\" for any animal or creature\n2. \"P\" for for any plant or tree\n3. \"O\" for for everything else"
+    expected_logit_bias = Dict(16 => 100, 17 => 100, 18 => 100)
+    @test choices_prompt == expected_prompt
+    @test logit_bias == expected_logit_bias
+    @test ids == ["A", "P", "O"]
+
+    choices_prompt, logit_bias, ids = encode_choices(OpenAISchema(),
+        [
+            ("true", "If the statement is true"),
+            ("false", "If the statement is false"),
+        ])
+    expected_prompt = "true for \"If the statement is true\"\nfalse for \"If the statement is false\""
+    expected_logit_bias = Dict(837 => 100, 905 => 100)
+    @test choices_prompt == expected_prompt
+    @test logit_bias == expected_logit_bias
+    @test ids == ["true", "false"]
+
+    # Test encoding with an invalid number of choices
+    @test_throws ArgumentError encode_choices(OpenAISchema(), string.(collect(1:100)))
+    @test_throws ArgumentError encode_choices(OpenAISchema(), [("$i", "$i") for i in 1:50])
+
+    @test_throws ArgumentError encode_choices(PT.OllamaSchema(), ["true", "false"])
+end
+
+@testset "decode_choices" begin
+    # Test decoding a choice based on its ID
+    msg = AIMessage("1")
+    decoded_msg = decode_choices(OpenAISchema(), ["true", "false"], msg)
+    @test decoded_msg.content == "true"
+
+    # Test decoding with a direct mapping (e.g., true/false)
+    msg = AIMessage("false")
+    decoded_msg = decode_choices(OpenAISchema(), ["true", "false"], msg)
+    @test decoded_msg.content == "false"
+
+    # Test decoding failure (invalid content)
+    msg = AIMessage("invalid")
+    decoded_msg = decode_choices(OpenAISchema(), ["true", "false"], msg)
+    @test isnothing(decoded_msg.content)
+
+    # Decode from conversation
+    conv = [AIMessage("1")]
+    decoded_conv = decode_choices(OpenAISchema(), ["true", "false"], conv)
+    @test decoded_conv[end].content == "true"
+
+    # Nothing (when dry_run=true)
+    @test isnothing(decode_choices(OpenAISchema(), ["true", "false"], nothing))
+
+    # unimplemented
+    @test_throws ArgumentError decode_choices(PT.OllamaSchema(),
+        ["true", "false"],
+        AIMessage("invalid"))
+end
+
+@testset "aiclassify-OpenAI" begin
+    # corresponds to OpenAI API v1
+    response = Dict(:choices => [Dict(:message => Dict(:content => "1"))],
+        :usage => Dict(:total_tokens => 3, :prompt_tokens => 2, :completion_tokens => 1))
+
+    # Real generation API
+    schema1 = TestEchoOpenAISchema(; response, status = 200)
+    choices = [
+        ("A", "any animal or creature"),
+        ("P", "for any plant or tree"),
+        ("O", "for everything else"),
+    ]
+    msg = aiclassify(schema1, :InputClassifier; input = "pelican", choices)
+    expected_output = AIMessage(;
+        content = "A",
+        status = 200,
+        tokens = (2, 1),
+        elapsed = msg.elapsed)
+    @test msg == expected_output
+    @test schema1.inputs ==
+          Dict{String, Any}[Dict("role" => "system",
+            "content" => "You are a world-class classification specialist. \n\nYour task is to select the most appropriate label from the given choices for the given user input.\n\n**Available Choices:**\n---\n1. \"A\" for any animal or creature\n2. \"P\" for for any plant or tree\n3. \"O\" for for everything else\n---\n\n**Instructions:**\n- You must respond in one word. \n- You must respond only with the label ID (e.g., \"1\", \"2\", ...) that best fits the input.\n"),
+        Dict("role" => "user", "content" => "User Input: pelican\n\nLabel:\n")]
 end
