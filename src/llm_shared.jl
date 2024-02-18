@@ -108,6 +108,9 @@ function encode_choices(schema::AbstractPromptSchema,
         kwargs...)
     throw(ArgumentError("Function `encode_choices` is not implemented for the provided schema ($schema) and $(choices)."))
 end
-function decode_choices(schema::AbstractPromptSchema, choices, conv)
+function decode_choices(schema::AbstractPromptSchema, choices, conv; kwargs...)
     throw(ArgumentError("Function `decode_choices` is not implemented for the provided schema ($schema) and $(choices)."))
+end
+function decode_choices(schema::AbstractPromptSchema, choices, conv::Nothing; kwargs...)
+    nothing
 end

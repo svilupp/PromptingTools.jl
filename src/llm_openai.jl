@@ -573,12 +573,15 @@ function encode_choices(schema::OpenAISchema,
 end
 
 # For testing
-function encode_choices(schema::TestEchoOpenAISchema, args...; kwargs...)
-    return encode_choices(OpenAISchema(), args...; kwargs...)
+function encode_choices(schema::TestEchoOpenAISchema, choices; kwargs...)
+    return encode_choices(OpenAISchema(), choices; kwargs...)
 end
 # For testing
-function decode_choices(schema::TestEchoOpenAISchema, args...; kwargs...)
-    return decode_choices(OpenAISchema(), args...; kwargs...)
+function decode_choices(schema::TestEchoOpenAISchema,
+        choices,
+        conv::Union{AbstractVector, AIMessage};
+        kwargs...)
+    return decode_choices(OpenAISchema(), choices, conv; kwargs...)
 end
 
 function decode_choices(schema::OpenAISchema, choices, conv::AbstractVector; kwargs...)

@@ -366,6 +366,9 @@ end
     conv = [AIMessage("1")]
     decoded_conv = decode_choices(OpenAISchema(), ["true", "false"], conv)
     @test decoded_conv[end].content == "true"
+
+    # Nothing (when dry_run=true)
+    @test isnothing(decode_choices(OpenAISchema(), ["true", "false"], nothing))
 end
 
 @testset "aiclassify-OpenAI" begin
