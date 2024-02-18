@@ -20,9 +20,9 @@ using PromptingTools: UserMessage, UserMessageWithImages, DataMessage
     @test msg == expected_output
 
     ### AIClassify
-    msg = aiclassify("Hello World"; model = "xyz")
+    msg = aiclassify("Hello World"; choices = ["true", "false", "unknown"], model = "xyz")
     expected_output = AIMessage(;
-        content = "Hello!" |> strip,
+        content = nothing,
         status = 200,
         tokens = (2, 1),
         elapsed = msg.elapsed)

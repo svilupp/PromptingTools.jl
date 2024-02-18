@@ -140,3 +140,13 @@ Download new models with `ollama pull <model_name>` (eg, `ollama pull openhermes
 Show currently available models with `ollama list`.
 
 See [Ollama.ai](https://ollama.ai/) for more information.
+
+## Changing the Default Model or Schema
+
+If you tend to use non-default options, it can get tedious to specify `PT.*` every time.
+
+There are three ways how you can customize your workflows (especially when you use Ollama or other local models):
+
+1) Import the functions/types you need explicitly at the top (eg, `using PromptingTools: OllamaSchema`)
+2) Register your model and its associated schema  (`PT.register_model!(; name="123", schema=PT.OllamaSchema())`). You won't have to specify the schema anymore only the model name. See [Working with Ollama](#working-with-ollama) for more information.
+3) Override your default model (`PT.MODEL_CHAT`) and schema (`PT.PROMPT_SCHEMA`). It can be done persistently with Preferences, eg, `PT.set_preferences!("PROMPT_SCHEMA" => "OllamaSchema", "MODEL_CHAT"=>"llama2")`.
