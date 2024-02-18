@@ -342,8 +342,21 @@ end
     @test logit_bias == expected_logit_bias
     @test ids == ["A", "P", "O"]
 
+    choices_prompt, logit_bias, ids = encode_choices(OpenAISchema(),
+        [
+            ("true", "If the statement is true"),
+            ("false", "If the statement is false"),
+        ])
+    expected_prompt = "1. \"true\" for If the statement is true\n2. \"false\" for If the statement is false"
+    expected_logit_bias = Dict(16 => 100, 17 => 100)
+    @test choices_prompt == expected_prompt
+    @test logit_bias == expected_logit_bias
+    @test ids == ["true", "false"]
+
     # Test encoding with an invalid number of choices
-    @test_throws ArgumentError encode_choices(OpenAISchema(), collect(1:21))
+    @test_throws ArgumentError encode_choices(OpenAISchema(), collect(1:100))
+
+    @test_throws ArgumentError encode_choices(PT.OllamaSchema(), ["true", "false"])
 end
 
 @testset "decode_choices" begin
@@ -369,6 +382,11 @@ end
 
     # Nothing (when dry_run=true)
     @test isnothing(decode_choices(OpenAISchema(), ["true", "false"], nothing))
+
+    # unimplemented
+    @test_throws ArgumentError decode_choices(PT.OllamaSchema(),
+        ["true", "false"],
+        AIMessage("invalid"))
 end
 
 @testset "aiclassify-OpenAI" begin
