@@ -63,9 +63,21 @@ function render(schema::NoSchema,
     return conversation
 end
 
+"Utility to facilitate unwrapping of HTTP response to a message type `MSG` provided"
+function response_to_message(schema::AbstractPromptSchema,
+        MSG::Type{AbstractMessage},
+        choice,
+        resp;
+        model_id::AbstractString = "",
+        time::Float64 = 0.0,
+        run_id::Integer = rand(Int16),
+        sample_id::Union{Nothing, Integer} = nothing)
+    throw(ArgumentError("Response unwrapping not implemented for $(typeof(schema)) and $MSG"))
+end
+
 """
     finalize_outputs(prompt::ALLOWED_PROMPT_TYPE, conv_rendered::Any,
-        msg::Union{Nothing, AbstractMessage};
+        msg::Union{Nothing, AbstractMessage, AbstractVector{<:AbstractMessage}};
         return_all::Bool = false,
         dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
@@ -81,7 +93,7 @@ Finalizes the outputs of the ai* functions by either returning the conversation 
 - `kwargs...`: Variables to replace in the prompt template.
 """
 function finalize_outputs(prompt::ALLOWED_PROMPT_TYPE, conv_rendered::Any,
-        msg::Union{Nothing, AbstractMessage};
+        msg::Union{Nothing, AbstractMessage, AbstractVector{<:AbstractMessage}};
         return_all::Bool = false,
         dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
@@ -92,7 +104,12 @@ function finalize_outputs(prompt::ALLOWED_PROMPT_TYPE, conv_rendered::Any,
             # This is a duplication of work, as we already have the rendered messages in conv_rendered,
             # but we prioritize the user's experience over performance here (ie, render(OpenAISchema,msgs) does everything under the hood)
             output = render(NoSchema(), prompt; conversation, kwargs...)
-            push!(output, msg)
+            if msg isa AbstractVector
+                ## handle multiple messages (multi-sample)
+                append!(output, msg)
+            else
+                push!(output, msg)
+            end
         else
             output = conv_rendered
         end

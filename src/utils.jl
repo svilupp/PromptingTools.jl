@@ -244,15 +244,20 @@ function _extract_handlebar_variables(vect::Vector{Dict{String, <:AbstractString
 end
 
 """
-    call_cost(msg, model::String;
-              cost_of_token_prompt::Number = default_prompt_cost,
-              cost_of_token_generation::Number = default_generation_cost) -> Number
+    call_cost(prompt_tokens::Int, completion_tokens::Int, model::String;
+        cost_of_token_prompt::Number = get(MODEL_REGISTRY,
+            model,
+            (; cost_of_token_prompt = 0.0)).cost_of_token_prompt,
+        cost_of_token_generation::Number = get(MODEL_REGISTRY, model,
+            (; cost_of_token_generation = 0.0)).cost_of_token_generation)
+
+    call_cost(msg, model::String)
 
 Calculate the cost of a call based on the number of tokens in the message and the cost per token.
 
 # Arguments
-- `msg`: The message object, which should contain a `tokens` field
-  with two elements: [number_of_prompt_tokens, number_of_generation_tokens].
+- `prompt_tokens::Int`: The number of tokens used in the prompt.
+- `completion_tokens::Int`: The number of tokens used in the completion.
 - `model::String`: The name of the model to use for determining token costs. If the model
   is not found in `MODEL_REGISTRY`, default costs are used.
 - `cost_of_token_prompt::Number`: The cost per prompt token. Defaults to the cost in `MODEL_REGISTRY`
@@ -271,36 +276,52 @@ MODEL_REGISTRY = Dict(
     "model2" => (cost_of_token_prompt = 0.07, cost_of_token_generation = 0.02)
 )
 
-msg1 = AIMessage([10, 20])  # 10 prompt tokens, 20 generation tokens
+cost1 = call_cost(10, 20, "model1")
+
+# from message
+msg1 = AIMessage(;tokens=[10, 20])  # 10 prompt tokens, 20 generation tokens
 cost1 = call_cost(msg1, "model1")
 # cost1 = 10 * 0.05 + 20 * 0.10 = 2.5
 
-msg2 = DataMessage([15, 30])  # 15 prompt tokens, 30 generation tokens
-cost2 = call_cost(msg2, "model2")
-# cost2 = 15 * 0.07 + 30 * 0.02 = 1.35
-
 # Using custom token costs
-msg3 = AIMessage([5, 10])
-cost3 = call_cost(msg3, "model3", cost_of_token_prompt = 0.08, cost_of_token_generation = 0.12)
-# cost3 = 5 * 0.08 + 10 * 0.12 = 1.6
+cost2 = call_cost(10, 20, "model3"; cost_of_token_prompt = 0.08, cost_of_token_generation = 0.12)
+# cost2 = 10 * 0.08 + 20 * 0.12 = 3.2
 ```
 """
-function call_cost(msg, model::String;
+function call_cost(prompt_tokens::Int, completion_tokens::Int, model::String;
         cost_of_token_prompt::Number = get(MODEL_REGISTRY,
             model,
             (; cost_of_token_prompt = 0.0)).cost_of_token_prompt,
         cost_of_token_generation::Number = get(MODEL_REGISTRY, model,
             (; cost_of_token_generation = 0.0)).cost_of_token_generation)
-    cost = msg.tokens[1] * cost_of_token_prompt +
-           msg.tokens[2] * cost_of_token_generation
+    cost = prompt_tokens * cost_of_token_prompt +
+           completion_tokens * cost_of_token_generation
     return cost
 end
+function call_cost(msg, model::String)
+    cost = if !isnothing(msg.cost)
+        msg.cost
+    else
+        call_cost(msg.tokens[1], msg.tokens[2], model)
+    end
+    return cost
+end
+## dispatch for array -> take last message
+function call_cost(msg::AbstractVector, model::String)
+    call_cost(last(msg), model)
+end
+
 # helper to produce summary message of how many tokens were used and for how much
 function _report_stats(msg,
         model::String)
     cost = call_cost(msg, model)
     cost_str = iszero(cost) ? "" : " @ Cost: \$$(round(cost; digits=4))"
     return "Tokens: $(sum(msg.tokens))$(cost_str) in $(round(msg.elapsed;digits=1)) seconds"
+end
+## dispatch for array -> take last message
+function _report_stats(msg::AbstractVector,
+        model::String)
+    _report_stats(last(msg), model)
 end
 # Loads and encodes the provided image path as a base64 string
 function _encode_local_image(image_path::AbstractString; base64_only::Bool = false)

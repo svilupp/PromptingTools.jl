@@ -8,7 +8,8 @@ load_templates!();
 # API Calls prep
 mock_response = Dict(:choices => [
         Dict(:message => Dict(:content => "Hello!",
-            :function_call => Dict(:arguments => JSON3.write(Dict(:x => 1))))),
+                :function_call => Dict(:arguments => JSON3.write(Dict(:x => 1)))),
+            :finish_reason => "stop"),
     ],
     :usage => Dict(:total_tokens => 3, :prompt_tokens => 2, :completion_tokens => 1))
 schema = TestEchoOpenAISchema(; response = mock_response, status = 200)

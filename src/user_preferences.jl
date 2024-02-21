@@ -389,7 +389,10 @@ registry = Dict{String, ModelSpec}("gpt-3.5-turbo" => ModelSpec("gpt-3.5-turbo",
         "Mistral AI's hosted model for embeddings."),
     "echo" => ModelSpec("echo",
         TestEchoOpenAISchema(;
-            response = Dict(:choices => [Dict(:message => Dict(:content => "Hello!"))],
+            response = Dict(:choices => [
+                    Dict(:message => Dict(:content => "Hello!"),
+                        :finish_reason => "stop"),
+                ],
                 :usage => Dict(:total_tokens => 3,
                     :prompt_tokens => 2,
                     :completion_tokens => 1)), status = 200),
