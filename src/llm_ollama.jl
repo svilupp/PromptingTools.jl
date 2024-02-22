@@ -2,6 +2,8 @@
 # - llm_olama.jl works by providing messages format to /api/chat
 # - llm_managed_olama.jl works by providing 1 system prompt and 1 user prompt /api/generate
 #
+# TODO: switch to OpenAI-compatible endpoint!
+#
 ## Schema dedicated to [Ollama's models](https://ollama.ai/), which also managed the prompt templates
 #
 ## Rendering of converation history for the Ollama API (similar to OpenAI but not for the images)
@@ -157,10 +159,14 @@ function aigenerate(prompt_schema::AbstractOllamaSchema, prompt::ALLOWED_PROMPT_
             http_kwargs,
             api_kwargs...)
 
+        tokens_prompt = get(resp.response, :prompt_eval_count, 0)
+        tokens_completion = get(resp.response, :eval_count, 0)
         msg = AIMessage(; content = resp.response[:message][:content] |> strip,
             status = Int(resp.status),
-            tokens = (get(resp.response, :prompt_eval_count, 0),
-                get(resp.response, :eval_count, 0)),
+            cost = call_cost(tokens_prompt, tokens_completion, model_id),
+            ## not coming through yet anyway
+            ## finish_reason = get(resp.response, :finish_reason, nothing),
+            tokens = (tokens_prompt, tokens_completion),
             elapsed = time)
         ## Reporting
         verbose && @info _report_stats(msg, model_id)
@@ -184,7 +190,7 @@ function aiembed(prompt_schema::AbstractOllamaSchema, args...; kwargs...)
 end
 
 """
-aiscan([prompt_schema::AbstractOllamaSchema,] prompt::ALLOWED_PROMPT_TYPE; 
+    aiscan([prompt_schema::AbstractOllamaSchema,] prompt::ALLOWED_PROMPT_TYPE; 
     image_url::Union{Nothing, AbstractString, Vector{<:AbstractString}} = nothing,
     image_path::Union{Nothing, AbstractString, Vector{<:AbstractString}} = nothing,
     attach_to_latest::Bool = true,
@@ -314,10 +320,12 @@ function aiscan(prompt_schema::AbstractOllamaSchema, prompt::ALLOWED_PROMPT_TYPE
             system = nothing, messages = conv_rendered, endpoint = "chat", model = model_id,
             http_kwargs,
             api_kwargs...)
+        tokens_prompt = get(resp.response, :prompt_eval_count, 0)
+        tokens_completion = get(resp.response, :eval_count, 0)
         msg = AIMessage(; content = resp.response[:message][:content] |> strip,
             status = Int(resp.status),
-            tokens = (get(resp.response, :prompt_eval_count, 0),
-                get(resp.response, :eval_count, 0)),
+            cost = call_cost(tokens_prompt, tokens_completion, model_id),
+            tokens = (tokens_prompt, tokens_completion),
             elapsed = time)
         ## Reporting
         verbose && @info _report_stats(msg, model_id)

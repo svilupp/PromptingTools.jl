@@ -267,4 +267,32 @@ end
         conversation,
         return_all = true)
     @test output == expected_output
+
+    ## With multiple samples
+    conversation = [
+        SystemMessage("System message 1"),
+        UserMessage("User message {{name}}"),
+        AIMessage("AI message"),
+    ]
+    messages = [
+        UserMessage("User message {{name}}"),
+        AIMessage("AI message 2"),
+    ]
+    msg = AIMessage("AI message 3")
+    expected_output = [
+        SystemMessage("System message 1"),
+        UserMessage("User message {{name}}"),
+        AIMessage("AI message"),
+        UserMessage("User message John", [:name], :usermessage),
+        AIMessage("AI message 2"),
+        msg,
+        msg,
+    ]
+    output = finalize_outputs(messages,
+        [],
+        [msg, msg];
+        name = "John",
+        conversation,
+        return_all = true)
+    @test output == expected_output
 end
