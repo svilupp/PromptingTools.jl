@@ -129,6 +129,9 @@ end
 end
 
 @testset "call_cost" begin
+    @test cost = call_cost(1000, 100, "unknown_model";
+        cost_of_token_prompt = 1,
+        cost_of_token_generation = 1) ≈ 1100
     msg = AIMessage(; content = "", tokens = (1000, 2000))
     cost = call_cost(msg, "unknown_model")
     @test cost == 0.0
@@ -138,11 +141,6 @@ end
     cost = call_cost(msg, "unknown_model")
     @test cost == 0.0
     @test call_cost(msg, "gpt-3.5-turbo") ≈ 1000 * 0.5e-6 + 1.5e-6 * 1000
-
-    @test call_cost(msg,
-        "gpt-3.5-turbo";
-        cost_of_token_prompt = 1,
-        cost_of_token_generation = 1) ≈ 1000 + 1000
 end
 
 @testset "report_stats" begin

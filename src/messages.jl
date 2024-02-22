@@ -134,7 +134,8 @@ isaimessage(m::AbstractMessage) = m isa AIMessage
 # equality check for testing, only equal if all fields are equal and type is the same
 Base.var"=="(m1::AbstractMessage, m2::AbstractMessage) = false
 function Base.var"=="(m1::T, m2::T) where {T <: AbstractMessage}
-    all([getproperty(m1, f) == getproperty(m2, f) for f in fieldnames(T)])
+    ## except for run_id, that's random and not important for content comparison
+    all([getproperty(m1, f) == getproperty(m2, f) for f in fieldnames(T) if f != :run_id])
 end
 
 ## Vision Models -- Constructor and Conversion

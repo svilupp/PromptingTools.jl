@@ -63,18 +63,6 @@ function render(schema::NoSchema,
     return conversation
 end
 
-"Utility to facilitate unwrapping of HTTP response to a message type `MSG` provided"
-function response_to_message(schema::AbstractPromptSchema,
-        MSG::Type{AbstractMessage},
-        choice,
-        resp;
-        model_id::AbstractString = "",
-        time::Float64 = 0.0,
-        run_id::Integer = rand(Int16),
-        sample_id::Union{Nothing, Integer} = nothing)
-    throw(ArgumentError("Response unwrapping not implemented for $(typeof(schema)) and $MSG"))
-end
-
 """
     finalize_outputs(prompt::ALLOWED_PROMPT_TYPE, conv_rendered::Any,
         msg::Union{Nothing, AbstractMessage, AbstractVector{<:AbstractMessage}};

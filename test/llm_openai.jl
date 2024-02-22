@@ -3,7 +3,7 @@ using PromptingTools: AIMessage, SystemMessage, AbstractMessage
 using PromptingTools: UserMessage, UserMessageWithImages, DataMessage
 using PromptingTools: CustomProvider,
     CustomOpenAISchema, MistralOpenAISchema, MODEL_EMBEDDING
-using PromptingTools: encode_choices, decode_choices
+using PromptingTools: encode_choices, decode_choices, response_to_message, call_cost
 
 @testset "render-OpenAI" begin
     schema = OpenAISchema()
@@ -181,11 +181,18 @@ end
 
 @testset "OpenAI.create_chat" begin
     # Test CustomOpenAISchema() with a mock server
-    PORT = rand(1000:2000)
+    PORT = rand(10000:20000)
     echo_server = HTTP.serve!(PORT, verbose = -1) do req
         content = JSON3.read(req.body)
         user_msg = last(content[:messages])
-        response = Dict(:choices => [Dict(:message => user_msg)],
+        response = Dict(:choices => [
+                Dict(:message => user_msg,
+                    :logprobs => Dict(:content => [
+                        Dict(:logprob => -0.1),
+                        Dict(:logprob => -0.2),
+                    ]),
+                    :finish_reason => "stop"),
+            ],
             :model => content[:model],
             :usage => Dict(:total_tokens => length(user_msg[:content]),
                 :prompt_tokens => length(user_msg[:content]),
@@ -201,13 +208,18 @@ end
         return_all = false)
     @test msg.content == prompt
     @test msg.tokens == (length(prompt), 0)
+    @test msg.finish_reason == "stop"
+    ## single message, must be nothing
+    @test msg.sample_id |> isnothing
+    ## sum up log probs when provided
+    @test msg.log_prob ≈ -0.3
 
     # clean up
     close(echo_server)
 end
 @testset "OpenAI.create_embeddings" begin
     # Test CustomOpenAISchema() with a mock server
-    PORT = rand(1000:2000)
+    PORT = rand(10000:20000)
     echo_server = HTTP.serve!(PORT, verbose = -1) do req
         content = JSON3.read(req.body)
         response = Dict(:data => [Dict(:embedding => ones(128))],
@@ -230,9 +242,116 @@ end
     close(echo_server)
 end
 
+@testset "response_to_message" begin
+    # Mock the response and choice data
+    mock_choice = Dict(:message => Dict(:content => "Hello!"),
+        :logprobs => Dict(:content => [Dict(:logprob => -0.5), Dict(:logprob => -0.4)]),
+        :finish_reason => "stop")
+    mock_response = (;
+        response = Dict(:choices => [mock_choice],
+            :usage => Dict(:total_tokens => 3, :prompt_tokens => 2, :completion_tokens => 1)),
+        status = 200)
+
+    # Test with valid logprobs
+    msg = response_to_message(OpenAISchema(),
+        AIMessage,
+        mock_choice,
+        mock_response;
+        model_id = "gpt4t")
+    @test msg isa AIMessage
+    @test msg.content == "Hello!"
+    @test msg.tokens == (2, 1)
+    @test msg.log_prob ≈ -0.9
+    @test msg.finish_reason == "stop"
+    @test msg.sample_id == nothing
+    @test msg.cost == call_cost(2, 1, "gpt4t")
+
+    # Test without logprobs
+    choice = deepcopy(mock_choice)
+    delete!(choice, :logprobs)
+    msg = response_to_message(OpenAISchema(), AIMessage, choice, mock_response)
+    @test isnothing(msg.log_prob)
+
+    # with sample_id and run_id
+    msg = response_to_message(OpenAISchema(),
+        AIMessage,
+        mock_choice,
+        mock_response;
+        run_id = 1,
+        sample_id = 2,
+        time = 2.0)
+    @test msg.run_id == 1
+    @test msg.sample_id == 2
+    @test msg.elapsed == 2.0
+
+    #### With DataMessage
+    # Mock the response and choice data
+    mock_choice = Dict(:message => Dict(:content => "Hello!",
+            :tool_calls => [
+                Dict(:function => Dict(:arguments => JSON3.write(Dict(:x => 1)))),
+            ]),
+        :logprobs => Dict(:content => [Dict(:logprob => -0.5), Dict(:logprob => -0.4)]),
+        :finish_reason => "stop")
+    mock_response = (;
+        response = Dict(:choices => [mock_choice],
+            :usage => Dict(:total_tokens => 3, :prompt_tokens => 2, :completion_tokens => 1)),
+        status = 200)
+    struct RandomType1235
+        x::Int
+    end
+    return_type = RandomType1235
+    # Catch missing return_type
+    @test_throws AssertionError response_to_message(OpenAISchema(),
+        DataMessage,
+        mock_choice,
+        mock_response;
+        model_id = "gpt4t")
+
+    # Test with valid logprobs
+    msg = response_to_message(OpenAISchema(),
+        DataMessage,
+        mock_choice,
+        mock_response;
+        return_type,
+        model_id = "gpt4t")
+    @test msg isa DataMessage
+    @test msg.content == RandomType1235(1)
+    @test msg.tokens == (2, 1)
+    @test msg.log_prob ≈ -0.9
+    @test msg.finish_reason == "stop"
+    @test msg.sample_id == nothing
+    @test msg.cost == call_cost(2, 1, "gpt4t")
+
+    # Test without logprobs
+    choice = deepcopy(mock_choice)
+    delete!(choice, :logprobs)
+    msg = response_to_message(OpenAISchema(),
+        DataMessage,
+        choice,
+        mock_response;
+        return_type)
+    @test isnothing(msg.log_prob)
+
+    # with sample_id and run_id
+    msg = response_to_message(OpenAISchema(),
+        DataMessage,
+        mock_choice,
+        mock_response;
+        return_type,
+        run_id = 1,
+        sample_id = 2,
+        time = 2.0)
+    @test msg.run_id == 1
+    @test msg.sample_id == 2
+    @test msg.elapsed == 2.0
+end
+
 @testset "aigenerate-OpenAI" begin
     # corresponds to OpenAI API v1
-    response = Dict(:choices => [Dict(:message => Dict(:content => "Hello!"))],
+    response = Dict(:choices => [
+            Dict(:message => Dict(:content => "Hello!"),
+                :finish_reason => "stop"),
+        ],
         :usage => Dict(:total_tokens => 3, :prompt_tokens => 2, :completion_tokens => 1))
 
     # Test the monkey patch
@@ -247,6 +366,8 @@ end
         content = "Hello!" |> strip,
         status = 200,
         tokens = (2, 1),
+        finish_reason = "stop",
+        cost = msg.cost,
         elapsed = msg.elapsed)
     @test msg == expected_output
     @test schema1.inputs ==
@@ -263,12 +384,30 @@ end
         content = "Hello!" |> strip,
         status = 200,
         tokens = (2, 1),
+        finish_reason = "stop",
+        cost = msg.cost,
         elapsed = msg.elapsed)
     @test msg == expected_output
     @test schema1.inputs ==
           [Dict("role" => "system", "content" => "Act as a helpful AI assistant")
         Dict("role" => "user", "content" => "Hello World")]
     @test schema2.model_id == "gpt-4"
+
+    ## Test multiple samples
+    response = Dict(:choices => [
+            Dict(:message => Dict(:content => "Hello1!"),
+                :finish_reason => "stop"),
+            Dict(:message => Dict(:content => "Hello2!"),
+                :finish_reason => "stop"),
+        ],
+        :usage => Dict(:total_tokens => 3, :prompt_tokens => 2, :completion_tokens => 1))
+    schema3 = TestEchoOpenAISchema(; response, status = 200)
+    conv = aigenerate(schema3, UserMessage("Hello {{name}}"),
+        model = "gpt4", http_kwargs = (; verbose = 3),
+        api_kwargs = (; temperature = 0, n = 2),
+        name = "World")
+    @test conv[end - 1].content == "Hello1!"
+    @test conv[end].content == "Hello2!"
 end
 
 @testset "aiembed-OpenAI" begin
@@ -283,6 +422,7 @@ end
         content = ones(128),
         status = 200,
         tokens = (2, 0),
+        cost = msg.cost,
         elapsed = msg.elapsed)
     @test msg == expected_output
     @test schema1.inputs == "Hello World"
@@ -298,6 +438,7 @@ end
         content = ones(128, 2),
         status = 200,
         tokens = (4, 0),
+        cost = msg.cost,
         elapsed = msg.elapsed)
     @test msg == expected_output
     @test schema2.inputs == ["Hello World", "Hello back"]
@@ -307,6 +448,7 @@ end
     expected_output = DataMessage(;
         content = ones(128, 2),
         status = 200,
+        cost = msg.cost,
         tokens = (4, 0),
         elapsed = msg.elapsed)
     @test msg == expected_output
@@ -381,6 +523,17 @@ end
     decoded_conv = decode_choices(OpenAISchema(), ["true", "false"], conv)
     @test decoded_conv[end].content == "true"
 
+    # Decode with multiple samples
+    conv = [
+        AIMessage("1"), # do not touch, different run
+        AIMessage(; content = "1", run_id = 1, sample_id = 1),
+        AIMessage(; content = "1", run_id = 1, sample_id = 2),
+    ]
+    decoded_conv = decode_choices(OpenAISchema(), ["true", "false"], conv)
+    @test decoded_conv[1].content == "1"
+    @test decoded_conv[2].content == "true"
+    @test decoded_conv[3].content == "true"
+
     # Nothing (when dry_run=true)
     @test isnothing(decode_choices(OpenAISchema(), ["true", "false"], nothing))
 
@@ -392,7 +545,10 @@ end
 
 @testset "aiclassify-OpenAI" begin
     # corresponds to OpenAI API v1
-    response = Dict(:choices => [Dict(:message => Dict(:content => "1"))],
+    response = Dict(:choices => [
+            Dict(:message => Dict(:content => "1"),
+                :finish_reason => "stop"),
+        ],
         :usage => Dict(:total_tokens => 3, :prompt_tokens => 2, :completion_tokens => 1))
 
     # Real generation API
@@ -407,10 +563,84 @@ end
         content = "A",
         status = 200,
         tokens = (2, 1),
+        finish_reason = "stop",
+        cost = msg.cost,
         elapsed = msg.elapsed)
     @test msg == expected_output
     @test schema1.inputs ==
           Dict{String, Any}[Dict("role" => "system",
             "content" => "You are a world-class classification specialist. \n\nYour task is to select the most appropriate label from the given choices for the given user input.\n\n**Available Choices:**\n---\n1. \"A\" for any animal or creature\n2. \"P\" for for any plant or tree\n3. \"O\" for for everything else\n---\n\n**Instructions:**\n- You must respond in one word. \n- You must respond only with the label ID (e.g., \"1\", \"2\", ...) that best fits the input.\n"),
         Dict("role" => "user", "content" => "User Input: pelican\n\nLabel:\n")]
+end
+
+@testset "aiextract-OpenAI" begin
+    # mock return type
+    struct RandomType1235
+        x::Int
+    end
+    return_type = RandomType1235
+
+    mock_choice = Dict(:message => Dict(:content => "Hello!",
+            :tool_calls => [
+                Dict(:function => Dict(:arguments => JSON3.write(Dict(:x => 1)))),
+            ]),
+        :logprobs => Dict(:content => [Dict(:logprob => -0.5), Dict(:logprob => -0.4)]),
+        :finish_reason => "stop")
+    ## Test with a single sample
+    response = Dict(:choices => [mock_choice],
+        :usage => Dict(:total_tokens => 3, :prompt_tokens => 2, :completion_tokens => 1))
+    schema1 = TestEchoOpenAISchema(; response, status = 200)
+    msg = aiextract(schema1, "Extract number 1"; return_type,
+        model = "gpt4",
+        api_kwargs = (; temperature = 0, n = 2))
+    @test msg.content == RandomType1235(1)
+    @test msg.log_prob ≈ -0.9
+
+    ## Test multiple samples
+    response = Dict(:choices => [mock_choice, mock_choice],
+        :usage => Dict(:total_tokens => 3, :prompt_tokens => 2, :completion_tokens => 1))
+    schema2 = TestEchoOpenAISchema(; response, status = 200)
+    conv = aiextract(schema2, "Extract number 1"; return_type,
+        model = "gpt4",
+        api_kwargs = (; temperature = 0, n = 2))
+    @test conv[1].content == RandomType1235(1)
+    @test conv[1].log_prob ≈ -0.9
+    @test conv[2].content == RandomType1235(1)
+    @test conv[2].log_prob ≈ -0.9
+end
+
+@testset "aiscan-OpenAI" begin
+    ## Test with single sample and log_probs samples
+    response = Dict(:choices => [
+            Dict(:message => Dict(:content => "Hello1!"),
+                :finish_reason => "stop",
+                :logprobs => Dict(:content => [
+                    Dict(:logprob => -0.1),
+                    Dict(:logprob => -0.2),
+                ])),
+        ],
+        :usage => Dict(:total_tokens => 3, :prompt_tokens => 2, :completion_tokens => 1))
+    schema1 = TestEchoOpenAISchema(; response, status = 200)
+    msg = aiscan(schema1, "Describe the image";
+        image_url = "https://example.com/image.png",
+        model = "gpt4", http_kwargs = (; verbose = 3),
+        api_kwargs = (; temperature = 0))
+    @test msg.content == "Hello1!"
+    @test msg.log_prob ≈ -0.3
+
+    ## Test multiple samples
+    response = Dict(:choices => [
+            Dict(:message => Dict(:content => "Hello1!"),
+                :finish_reason => "stop"),
+            Dict(:message => Dict(:content => "Hello2!"),
+                :finish_reason => "stop"),
+        ],
+        :usage => Dict(:total_tokens => 3, :prompt_tokens => 2, :completion_tokens => 1))
+    schema1 = TestEchoOpenAISchema(; response, status = 200)
+    conv = aiscan(schema1, "Describe the image";
+        image_url = "https://example.com/image.png",
+        model = "gpt4", http_kwargs = (; verbose = 3),
+        api_kwargs = (; temperature = 0, n = 2))
+    @test conv[end - 1].content == "Hello1!"
+    @test conv[end].content == "Hello2!"
 end

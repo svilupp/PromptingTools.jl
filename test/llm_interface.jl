@@ -1,12 +1,15 @@
 using PromptingTools: TestEchoOpenAISchema, render, OpenAISchema
 using PromptingTools: AIMessage, SystemMessage, AbstractMessage
 using PromptingTools: UserMessage, UserMessageWithImages, DataMessage
+using PromptingTools: response_to_message, AbstractPromptSchema
 
 @testset "ai* default schema" begin
     OLD_PROMPT_SCHEMA = PromptingTools.PROMPT_SCHEMA
     ### AIGenerate
     # corresponds to OpenAI API v1
-    response = Dict(:choices => [Dict(:message => Dict(:content => "Hello!"))],
+    response = Dict(:choices => [
+            Dict(:message => Dict(:content => "Hello!"), :finish_reason => "stop"),
+        ],
         :usage => Dict(:total_tokens => 3, :prompt_tokens => 2, :completion_tokens => 1))
 
     schema = TestEchoOpenAISchema(; response, status = 200)
@@ -16,6 +19,9 @@ using PromptingTools: UserMessage, UserMessageWithImages, DataMessage
         content = "Hello!" |> strip,
         status = 200,
         tokens = (2, 1),
+        run_id = msg.run_id,
+        finish_reason = "stop",
+        cost = 0.0,
         elapsed = msg.elapsed)
     @test msg == expected_output
 
@@ -25,13 +31,18 @@ using PromptingTools: UserMessage, UserMessageWithImages, DataMessage
         content = nothing,
         status = 200,
         tokens = (2, 1),
+        run_id = msg.run_id,
+        cost = 0.0,
+        finish_reason = "stop",
         elapsed = msg.elapsed)
     @test msg == expected_output
 
     ### AIExtract
     response1 = Dict(:choices => [
-            Dict(:message => Dict(:function_call => Dict(:arguments => "{\"content\": \"x\"}"))),
-        ],
+            Dict(:message => Dict(:tool_calls => [
+                    Dict(:function => Dict(:arguments => "{\"content\": \"x\"}")),
+                ]),
+                :finish_reason => "stop")],
         :usage => Dict(:total_tokens => 3, :prompt_tokens => 2, :completion_tokens => 1))
 
     schema = TestEchoOpenAISchema(; response = response1, status = 200)
@@ -44,6 +55,9 @@ using PromptingTools: UserMessage, UserMessageWithImages, DataMessage
         content = MyType("x"),
         status = 200,
         tokens = (2, 1),
+        run_id = msg.run_id,
+        cost = 0.0,
+        finish_reason = "stop",
         elapsed = msg.elapsed)
     @test msg == expected_output
 
@@ -59,9 +73,18 @@ using PromptingTools: UserMessage, UserMessageWithImages, DataMessage
         content = ones(128),
         status = 200,
         tokens = (2, 0),
+        run_id = msg.run_id,
+        cost = 0.0,
         elapsed = msg.elapsed)
     @test msg == expected_output
 
     ## Return things to previous
     PromptingTools.PROMPT_SCHEMA = OLD_PROMPT_SCHEMA
+
+    ## Check response_to_message throws by default
+    struct Random123Schema <: AbstractPromptSchema end
+    @test_throws ArgumentError response_to_message(Random123Schema(),
+        AIMessage,
+        nothing,
+        nothing)
 end

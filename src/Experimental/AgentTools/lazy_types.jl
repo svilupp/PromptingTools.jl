@@ -62,6 +62,8 @@ This can be used to "reply" to previous message / continue the stored conversati
     success::Union{Nothing, Bool} = nothing
     error::Union{Nothing, Exception} = nothing
 end
+## main sample
+## samples
 
 function AICall(func::F, args...; kwargs...) where {F <: Function}
     @assert length(args)<=2 "AICall takes at most 2 positional arguments (provided: $(length(args)))"
