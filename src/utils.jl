@@ -306,9 +306,17 @@ function call_cost(msg, model::String)
     end
     return cost
 end
-## dispatch for array -> take last message
-function call_cost(msg::AbstractVector, model::String)
-    call_cost(last(msg), model)
+## dispatch for array -> take unique messages only (eg, for multiple samples we count only once)
+function call_cost(conv::AbstractVector, model::String)
+    sum_ = 0.0
+    visited_runs = Set{Int}()
+    for msg in conv
+        if isnothing(msg.run_id) || (msg.run_id ∉ visited_runs)
+            sum_ += call_cost(msg, model)
+            push!(visited_runs, msg.run_id)
+        end
+    end
+    return sum_
 end
 
 # helper to produce summary message of how many tokens were used and for how much

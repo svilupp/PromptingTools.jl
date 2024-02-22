@@ -137,6 +137,11 @@ end
     @test cost == 0.0
     @test call_cost(msg, "gpt-3.5-turbo") ≈ 1000 * 0.5e-6 + 1.5e-6 * 2000
 
+    # Test vector - same message, count once
+    @test call_cost([msg, msg], "gpt-3.5-turbo") ≈ (1000 * 0.5e-6 + 1.5e-6 * 2000)
+    msg2 = AIMessage(; content = "", tokens = (1000, 2000))
+    @test call_cost([msg, msg2], "gpt-3.5-turbo") ≈ (1000 * 0.5e-6 + 1.5e-6 * 2000) * 2
+
     msg = DataMessage(; content = nothing, tokens = (1000, 1000))
     cost = call_cost(msg, "unknown_model")
     @test cost == 0.0

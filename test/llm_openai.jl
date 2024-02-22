@@ -596,17 +596,36 @@ end
     @test msg.content == RandomType1235(1)
     @test msg.log_prob ≈ -0.9
 
-    ## Test multiple samples
-    response = Dict(:choices => [mock_choice, mock_choice],
+    ## Test multiple samples -- mock_choice is less probable
+    mock_choice2 = Dict(:message => Dict(:content => "Hello!",
+            :tool_calls => [
+                Dict(:function => Dict(:arguments => JSON3.write(Dict(:x => 1)))),
+            ]),
+        :logprobs => Dict(:content => [Dict(:logprob => -1.2), Dict(:logprob => -0.4)]),
+        :finish_reason => "stop")
+
+    response = Dict(:choices => [mock_choice, mock_choice2],
         :usage => Dict(:total_tokens => 3, :prompt_tokens => 2, :completion_tokens => 1))
     schema2 = TestEchoOpenAISchema(; response, status = 200)
     conv = aiextract(schema2, "Extract number 1"; return_type,
         model = "gpt4",
         api_kwargs = (; temperature = 0, n = 2))
     @test conv[1].content == RandomType1235(1)
-    @test conv[1].log_prob ≈ -0.9
+    @test conv[1].log_prob ≈ -1.6 # sorted first, despite sent later
     @test conv[2].content == RandomType1235(1)
     @test conv[2].log_prob ≈ -0.9
+
+    ## Wrong return_type so it returns a Dict
+    struct RandomType1236
+        x::Int
+        y::Int
+    end
+    return_type = RandomType1236
+    conv = aiextract(schema2, "Extract number 1"; return_type,
+        model = "gpt4",
+        api_kwargs = (; temperature = 0, n = 2))
+    conv[1].content isa AbstractDict
+    conv[2].content isa AbstractDict
 end
 
 @testset "aiscan-OpenAI" begin
