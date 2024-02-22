@@ -87,7 +87,9 @@ end
 
         if content[:model] == "mock-gen"
             user_msg = last(content[:messages])
-            response = Dict(:choices => [Dict(:message => user_msg)],
+            response = Dict(:choices => [
+                    Dict(:message => user_msg, :finish_reason => "stop"),
+                ],
                 :model => content[:model],
                 :usage => Dict(:total_tokens => length(user_msg[:content]),
                     :prompt_tokens => length(user_msg[:content]),
@@ -101,10 +103,11 @@ end
         elseif content[:model] == "mock-meta"
             user_msg = last(content[:messages])
             response = Dict(:choices => [
-                    Dict(:message => Dict(:function_call => Dict(:arguments => JSON3.write(MaybeMetadataItems([
-                        MetadataItem("yes", "category"),
-                    ]))))),
-                ],
+                    Dict(:finish_reason => "stop",
+                        :message => Dict(:tool_calls => [
+                            Dict(:function => Dict(:arguments => JSON3.write(MaybeMetadataItems([
+                                MetadataItem("yes", "category"),
+                            ]))))]))],
                 :model => content[:model],
                 :usage => Dict(:total_tokens => length(user_msg[:content]),
                     :prompt_tokens => length(user_msg[:content]),
@@ -112,9 +115,10 @@ end
         elseif content[:model] == "mock-qa"
             user_msg = last(content[:messages])
             response = Dict(:choices => [
-                    Dict(:message => Dict(:function_call => Dict(:arguments => JSON3.write(QAItem("Question",
-                        "Answer"))))),
-                ],
+                    Dict(:finish_reason => "stop",
+                        :message => Dict(:tool_calls => [
+                            Dict(:function => Dict(:arguments => JSON3.write(QAItem("Question",
+                                "Answer"))))]))],
                 :model => content[:model],
                 :usage => Dict(:total_tokens => length(user_msg[:content]),
                     :prompt_tokens => length(user_msg[:content]),
@@ -122,14 +126,14 @@ end
         elseif content[:model] == "mock-judge"
             user_msg = last(content[:messages])
             response = Dict(:choices => [
-                    Dict(:message => Dict(:function_call => Dict(:arguments => JSON3.write(JudgeAllScores(5,
-                        5,
-                        5,
-                        5,
-                        5,
-                        "Some reasons",
-                        5.0))))),
-                ],
+                    Dict(:message => Dict(:tool_calls => [
+                        Dict(:function => Dict(:arguments => JSON3.write(JudgeAllScores(5,
+                            5,
+                            5,
+                            5,
+                            5,
+                            "Some reasons",
+                            5.0))))]))],
                 :model => content[:model],
                 :usage => Dict(:total_tokens => length(user_msg[:content]),
                     :prompt_tokens => length(user_msg[:content]),

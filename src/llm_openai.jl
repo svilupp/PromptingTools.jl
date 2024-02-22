@@ -273,6 +273,66 @@ function OpenAI.create_embeddings(provider::AbstractCustomProvider,
         kwargs...)
 end
 
+"""
+    response_to_message(schema::AbstractOpenAISchema,
+        MSG::Type{AIMessage},
+        choice,
+        resp;
+        model_id::AbstractString = "",
+        time::Float64 = 0.0,
+        run_id::Integer = rand(Int16),
+        sample_id::Union{Nothing, Integer} = nothing)
+
+Utility to facilitate unwrapping of HTTP response to a message type `MSG` provided for OpenAI-like responses
+
+Note: Extracts `finish_reason` and `log_prob` if available in the response.
+
+# Arguments
+- `schema::AbstractOpenAISchema`: The schema for the prompt.
+- `MSG::Type{AIMessage}`: The message type to be returned.
+- `choice`: The choice from the response (eg, one of the completions).
+- `resp`: The response from the OpenAI API.
+- `model_id::AbstractString`: The model ID to use for generating the response. Defaults to an empty string.
+- `time::Float64`: The elapsed time for the response. Defaults to `0.0`.
+- `run_id::Integer`: The run ID for the response. Defaults to a random integer.
+- `sample_id::Union{Nothing, Integer}`: The sample ID for the response (if there are multiple completions). Defaults to `nothing`.
+"""
+function response_to_message(schema::AbstractOpenAISchema,
+        MSG::Type{AIMessage},
+        choice,
+        resp;
+        model_id::AbstractString = "",
+        time::Float64 = 0.0,
+        run_id::Int = Int(rand(Int32)),
+        sample_id::Union{Nothing, Integer} = nothing)
+    ## extract sum log probability
+    has_log_prob = haskey(choice, :logprobs) &&
+                   !isnothing(get(choice, :logprobs, nothing)) &&
+                   haskey(choice[:logprobs], :content) &&
+                   !isnothing(choice[:logprobs][:content])
+    log_prob = if has_log_prob
+        sum([get(c, :logprob, 0.0) for c in choice[:logprobs][:content]])
+    else
+        nothing
+    end
+    ## calculate cost
+    tokens_prompt = resp.response[:usage][:prompt_tokens]
+    tokens_completion = resp.response[:usage][:completion_tokens]
+    cost = call_cost(tokens_prompt, tokens_completion, model_id)
+    ## build AIMessage object
+    msg = MSG(;
+        content = choice[:message][:content] |> strip,
+        status = Int(resp.status),
+        cost,
+        run_id,
+        sample_id,
+        log_prob,
+        finish_reason = get(choice, :finish_reason, nothing),
+        tokens = (tokens_prompt,
+            tokens_completion),
+        elapsed = time)
+end
+
 ## User-Facing API
 """
     aigenerate(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE;
@@ -296,7 +356,11 @@ Generate an AI response based on a given prompt using the OpenAI API.
 - `dry_run::Bool=false`: If `true`, skips sending the messages to the model (for debugging, often used with `return_all=true`).
 - `conversation`: An optional vector of `AbstractMessage` objects representing the conversation history. If not provided, it is initialized as an empty vector.
 - `http_kwargs`: A named tuple of HTTP keyword arguments.
-- `api_kwargs`: A named tuple of API keyword arguments.
+- `api_kwargs`: A named tuple of API keyword arguments. Useful parameters include:
+    - `temperature`: A float representing the temperature for sampling (ie, the amount of "creativity"). Often defaults to `0.7`.
+    - `logprobs`: A boolean indicating whether to return log probabilities for each token. Defaults to `false`.
+    - `n`: An integer representing the number of completions to generate at once (if supported).
+    - `stop`: A vector of strings representing the stop conditions for the conversation. Defaults to an empty vector.
 - `kwargs`: Prompt variables to be used to fill the prompt/template
 
 # Returns
@@ -365,12 +429,26 @@ function aigenerate(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_
             conv_rendered;
             http_kwargs,
             api_kwargs...)
-        msg = AIMessage(;
-            content = r.response[:choices][begin][:message][:content] |> strip,
-            status = Int(r.status),
-            tokens = (r.response[:usage][:prompt_tokens],
-                r.response[:usage][:completion_tokens]),
-            elapsed = time)
+        ## Process one of more samples returned
+        msg = if length(r.response[:choices]) > 1
+            run_id = Int(rand(Int32)) # remember one run ID
+            ## extract all message
+            msgs = [response_to_message(prompt_schema, AIMessage, choice, r;
+                time, model_id, run_id, sample_id = i)
+                    for (i, choice) in enumerate(r.response[:choices])]
+            ## Order by log probability if available
+            ## bigger is better, keep it last
+            if all(x -> !isnothing(x.log_prob), msgs)
+                sort(msgs, by = x -> x.log_prob)
+            else
+                msgs
+            end
+        else
+            ## only 1 sample / 1 completion
+            choice = r.response[:choices][begin]
+            response_to_message(prompt_schema, AIMessage, choice, r;
+                time, model_id)
+        end
         ## Reporting
         verbose && @info _report_stats(msg, model_id)
     else
@@ -454,7 +532,6 @@ function aiembed(prompt_schema::AbstractOpenAISchema,
     global MODEL_ALIASES
     ## Find the unique ID for the model alias provided
     model_id = get(MODEL_ALIASES, model, model)
-
     time = @elapsed r = create_embeddings(prompt_schema, api_key,
         doc_or_docs,
         model_id;
@@ -463,6 +540,7 @@ function aiembed(prompt_schema::AbstractOpenAISchema,
     msg = DataMessage(;
         content = mapreduce(x -> postprocess(x[:embedding]), hcat, r.response[:data]),
         status = Int(r.status),
+        cost = call_cost(r.response[:usage][:prompt_tokens], 0, model_id),
         tokens = (r.response[:usage][:prompt_tokens], 0),
         elapsed = time)
     ## Reporting
@@ -585,8 +663,15 @@ function decode_choices(schema::TestEchoOpenAISchema,
 end
 
 function decode_choices(schema::OpenAISchema, choices, conv::AbstractVector; kwargs...)
-    if length(conv) > 0 && last(conv) isa AIMessage
-        conv[end] = decode_choices(schema, choices, last(conv))
+    if length(conv) > 0 && last(conv) isa AIMessage && hasproperty(last(conv), :run_id)
+        ## if it is a multi-sample response, 
+        ## Remember its run ID and convert all samples in that run
+        run_id = last(conv).run_id
+        for i in eachindex(conv)
+            if conv[i].run_id == run_id
+                conv[i] = decode_choices(schema, choices, conv[i])
+            end
+        end
     end
     return conv
 end
@@ -615,7 +700,8 @@ function decode_choices(schema::OpenAISchema,
         ## failed decoding
         content = nothing
     end
-    return AIMessage(; content, msg.status, msg.tokens, msg.elapsed)
+    ## create a new object with all the same fields except for content
+    return AIMessage(; [f => getfield(msg, f) for f in fieldnames(typeof(msg))]..., content)
 end
 
 """
@@ -699,6 +785,53 @@ function aiclassify(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_
         api_kwargs,
         kwargs...)
     return decode_choices(prompt_schema, decode_ids, msg_or_conv)
+end
+
+function response_to_message(schema::AbstractOpenAISchema,
+        MSG::Type{DataMessage},
+        choice,
+        resp;
+        return_type = nothing,
+        model_id::AbstractString = "",
+        time::Float64 = 0.0,
+        run_id::Int = Int(rand(Int32)),
+        sample_id::Union{Nothing, Integer} = nothing)
+    @assert !isnothing(return_type) "You must provide a return_type for DataMessage construction"
+    ## extract sum log probability
+    has_log_prob = haskey(choice, :logprobs) &&
+                   !isnothing(get(choice, :logprobs, nothing)) &&
+                   haskey(choice[:logprobs], :content) &&
+                   !isnothing(choice[:logprobs][:content])
+    log_prob = if has_log_prob
+        sum([get(c, :logprob, 0.0) for c in choice[:logprobs][:content]])
+    else
+        nothing
+    end
+    ## calculate cost
+    tokens_prompt = resp.response[:usage][:prompt_tokens]
+    tokens_completion = resp.response[:usage][:completion_tokens]
+    cost = call_cost(tokens_prompt, tokens_completion, model_id)
+    # "Safe" parsing of the response - it still fails if JSON is invalid
+    content = try
+        choice[:message][:tool_calls][1][:function][:arguments] |>
+        x -> JSON3.read(x, return_type)
+    catch e
+        @warn "There was an error parsing the response: $e. Using the raw response instead."
+        choice[:message][:tool_calls][1][:function][:arguments] |>
+        JSON3.read |> copy
+    end
+    ## build DataMessage object
+    msg = MSG(;
+        content = content,
+        status = Int(resp.status),
+        cost,
+        run_id,
+        sample_id,
+        log_prob,
+        finish_reason = get(choice, :finish_reason, nothing),
+        tokens = (tokens_prompt,
+            tokens_completion),
+        elapsed = time)
 end
 
 """
@@ -833,10 +966,12 @@ function aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_T
     ##
     global MODEL_ALIASES
     ## Function calling specifics
-    functions = [function_call_signature(return_type)]
-    function_call = Dict(:name => only(functions)["name"])
+    tools = [Dict(:type => "function", :function => function_call_signature(return_type))]
+    ## force our function to be used
+    tool_choice = Dict(:type => "function",
+        :function => Dict(:name => only(tools)[:function]["name"]))
     ## Add the function call signature to the api_kwargs
-    api_kwargs = merge(api_kwargs, (; functions, function_call))
+    api_kwargs = merge(api_kwargs, (; tools, tool_choice))
     ## Find the unique ID for the model alias provided
     model_id = get(MODEL_ALIASES, model, model)
     conv_rendered = render(prompt_schema, prompt; conversation, kwargs...)
@@ -847,20 +982,26 @@ function aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_T
             conv_rendered;
             http_kwargs,
             api_kwargs...)
-        # "Safe" parsing of the response - it still fails if JSON is invalid
-        content = try
-            r.response[:choices][begin][:message][:function_call][:arguments] |>
-            x -> JSON3.read(x, return_type)
-        catch e
-            @warn "There was an error parsing the response: $e. Using the raw response instead."
-            r.response[:choices][begin][:message][:function_call][:arguments] |>
-            JSON3.read |> copy
+        ## Process one of more samples returned
+        msg = if length(r.response[:choices]) > 1
+            run_id = Int(rand(Int32)) # remember one run ID
+            ## extract all message
+            msgs = [response_to_message(prompt_schema, DataMessage, choice, r;
+                return_type, time, model_id, run_id, sample_id = i)
+                    for (i, choice) in enumerate(r.response[:choices])]
+            ## Order by log probability if available
+            ## bigger is better, keep it last
+            if all(x -> !isnothing(x.log_prob), msgs)
+                sort(msgs, by = x -> x.log_prob)
+            else
+                msgs
+            end
+        else
+            ## only 1 sample / 1 completion
+            choice = r.response[:choices][begin]
+            response_to_message(prompt_schema, DataMessage, choice, r;
+                return_type, time, model_id)
         end
-        msg = DataMessage(; content,
-            status = Int(r.status),
-            tokens = (r.response[:usage][:prompt_tokens],
-                r.response[:usage][:completion_tokens]),
-            elapsed = time)
         ## Reporting
         verbose && @info _report_stats(msg, model_id)
     else
@@ -879,7 +1020,7 @@ function aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_T
 end
 
 """
-aiscan([prompt_schema::AbstractOpenAISchema,] prompt::ALLOWED_PROMPT_TYPE; 
+    aiscan([prompt_schema::AbstractOpenAISchema,] prompt::ALLOWED_PROMPT_TYPE; 
     image_url::Union{Nothing, AbstractString, Vector{<:AbstractString}} = nothing,
     image_path::Union{Nothing, AbstractString, Vector{<:AbstractString}} = nothing,
     image_detail::AbstractString = "auto",
@@ -998,12 +1139,26 @@ function aiscan(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE
             conv_rendered;
             http_kwargs,
             api_kwargs...)
-        msg = AIMessage(;
-            content = r.response[:choices][begin][:message][:content] |> strip,
-            status = Int(r.status),
-            tokens = (r.response[:usage][:prompt_tokens],
-                r.response[:usage][:completion_tokens]),
-            elapsed = time)
+        ## Process one of more samples returned
+        msg = if length(r.response[:choices]) > 1
+            run_id = Int(rand(Int32)) # remember one run ID
+            ## extract all message
+            msgs = [response_to_message(prompt_schema, AIMessage, choice, r;
+                time, model_id, run_id, sample_id = i)
+                    for (i, choice) in enumerate(r.response[:choices])]
+            ## Order by log probability if available
+            ## bigger is better, keep it last
+            if all(x -> !isnothing(x.log_prob), msgs)
+                sort(msgs, by = x -> x.log_prob)
+            else
+                msgs
+            end
+        else
+            ## only 1 sample / 1 completion
+            choice = r.response[:choices][begin]
+            response_to_message(prompt_schema, AIMessage, choice, r;
+                time, model_id)
+        end
         ## Reporting
         verbose && @info _report_stats(msg, model_id)
     else

@@ -1,7 +1,7 @@
 using PromptingTools: AIMessage, SystemMessage, MetadataMessage
 using PromptingTools: UserMessage, UserMessageWithImages, DataMessage
 using PromptingTools: _encode_local_image, attach_images_to_user_message
-using PromptingTools: isusermessage, issystemmessage, isdatamessage
+using PromptingTools: isusermessage, issystemmessage, isdatamessage, isaimessage
 
 @testset "Message constructors" begin
     # Creates an instance of MSG with the given content string.
@@ -29,8 +29,8 @@ using PromptingTools: isusermessage, issystemmessage, isdatamessage
     @test UserMessage(content) |> isusermessage
     @test SystemMessage(content) |> issystemmessage
     @test DataMessage(; content) |> isdatamessage
+    @test AIMessage(; content) |> isaimessage
 end
-
 @testset "UserMessageWithImages" begin
     content = "Hello, world!"
     image_path = joinpath(@__DIR__, "data", "julia.png")

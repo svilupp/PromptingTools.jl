@@ -61,18 +61,64 @@ function UserMessageWithImages(content::T, image_url::Vector{<:AbstractString},
     @assert length(not_allowed_kwargs)==0 "Error: Some placeholders are invalid, as they are reserved for `ai*` functions. Change: $(join(not_allowed_kwargs,","))"
     return UserMessageWithImages{T}(content, string.(image_url), variables, type)
 end
+
+"""
+    AIMessage
+
+A message type for AI-generated text-based responses. 
+Returned by `aigenerate`, `aiclassify`, and `aiscan` functions.
+    
+# Fields
+- `content::Union{AbstractString, Nothing}`: The content of the message.
+- `status::Union{Int, Nothing}`: The status of the message from the API.
+- `tokens::Tuple{Int, Int}`: The number of tokens used (prompt,completion).
+- `elapsed::Float64`: The time taken to generate the response in seconds.
+- `cost::Union{Nothing, Float64}`: The cost of the API call (calculated with information from `MODEL_REGISTRY`).
+- `log_prob::Union{Nothing, Float64}`: The log probability of the response.
+- `finish_reason::Union{Nothing, String}`: The reason the response was finished.
+- `run_id::Union{Nothing, Int}`: The unique ID of the run.
+- `sample_id::Union{Nothing, Int}`: The unique ID of the sample (if multiple samples are generated, they will all have the same `run_id`).
+"""
 Base.@kwdef struct AIMessage{T <: Union{AbstractString, Nothing}} <: AbstractChatMessage
     content::T = nothing
     status::Union{Int, Nothing} = nothing
     tokens::Tuple{Int, Int} = (-1, -1)
     elapsed::Float64 = -1.0
+    cost::Union{Nothing, Float64} = nothing
+    log_prob::Union{Nothing, Float64} = nothing
+    finish_reason::Union{Nothing, String} = nothing
+    run_id::Union{Nothing, Int} = Int(rand(Int16))
+    sample_id::Union{Nothing, Int} = nothing
     _type::Symbol = :aimessage
 end
+
+"""
+    DataMessage
+
+A message type for AI-generated data-based responses, ie, different `content` than text. 
+Returned by `aiextract`, and `aiextract` functions.
+    
+# Fields
+- `content::Union{AbstractString, Nothing}`: The content of the message.
+- `status::Union{Int, Nothing}`: The status of the message from the API.
+- `tokens::Tuple{Int, Int}`: The number of tokens used (prompt,completion).
+- `elapsed::Float64`: The time taken to generate the response in seconds.
+- `cost::Union{Nothing, Float64}`: The cost of the API call (calculated with information from `MODEL_REGISTRY`).
+- `log_prob::Union{Nothing, Float64}`: The log probability of the response.
+- `finish_reason::Union{Nothing, String}`: The reason the response was finished.
+- `run_id::Union{Nothing, Int}`: The unique ID of the run.
+- `sample_id::Union{Nothing, Int}`: The unique ID of the sample (if multiple samples are generated, they will all have the same `run_id`).
+"""
 Base.@kwdef struct DataMessage{T <: Any} <: AbstractDataMessage
     content::T
     status::Union{Int, Nothing} = nothing
     tokens::Tuple{Int, Int} = (-1, -1)
     elapsed::Float64 = -1.0
+    cost::Union{Nothing, Float64} = nothing
+    log_prob::Union{Nothing, Float64} = nothing
+    finish_reason::Union{Nothing, String} = nothing
+    run_id::Union{Nothing, Int} = Int(rand(Int16))
+    sample_id::Union{Nothing, Int} = nothing
     _type::Symbol = :datamessage
 end
 
@@ -83,11 +129,13 @@ end
 isusermessage(m::AbstractMessage) = m isa UserMessage
 issystemmessage(m::AbstractMessage) = m isa SystemMessage
 isdatamessage(m::AbstractMessage) = m isa DataMessage
+isaimessage(m::AbstractMessage) = m isa AIMessage
 
 # equality check for testing, only equal if all fields are equal and type is the same
 Base.var"=="(m1::AbstractMessage, m2::AbstractMessage) = false
 function Base.var"=="(m1::T, m2::T) where {T <: AbstractMessage}
-    all([getproperty(m1, f) == getproperty(m2, f) for f in fieldnames(T)])
+    ## except for run_id, that's random and not important for content comparison
+    all([getproperty(m1, f) == getproperty(m2, f) for f in fieldnames(T) if f != :run_id])
 end
 
 ## Vision Models -- Constructor and Conversion

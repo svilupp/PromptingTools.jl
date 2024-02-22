@@ -214,10 +214,12 @@ function aigenerate(prompt_schema::AbstractOllamaManagedSchema, prompt::ALLOWED_
         time = @elapsed resp = ollama_api(prompt_schema, conv_rendered.prompt;
             conv_rendered.system, endpoint = "generate", model = model_id, http_kwargs,
             api_kwargs...)
+        tokens_prompt = get(resp.response, :prompt_eval_count, 0)
+        tokens_completion = get(resp.response, :eval_count, 0)
         msg = AIMessage(; content = resp.response[:response] |> strip,
             status = Int(resp.status),
-            tokens = (get(resp.response, :prompt_eval_count, 0),
-                get(resp.response, :eval_count, 0)),
+            cost = call_cost(tokens_prompt, tokens_completion, model_id),
+            tokens = (tokens_prompt, tokens_completion),
             elapsed = time)
         ## Reporting
         verbose && @info _report_stats(msg, model_id)
@@ -326,6 +328,7 @@ function aiembed(prompt_schema::AbstractOllamaManagedSchema,
     msg = DataMessage(;
         content = postprocess(resp.response[:embedding]),
         status = Int(resp.status),
+        cost = call_cost(0, 0, model_id),
         tokens = (0, 0), # token counts are not provided for embeddings
         elapsed = time)
     ## Reporting
@@ -356,6 +359,7 @@ function aiembed(prompt_schema::AbstractOllamaManagedSchema,
     msg = DataMessage(;
         content = mapreduce(x -> x.content, hcat, messages),
         status = mapreduce(x -> x.status, max, messages),
+        cost = mapreduce(x -> x.cost, +, messages),
         tokens = (0, 0),# not tracked for embeddings in Ollama
         elapsed = sum(x -> x.elapsed, messages))
     ## Reporting

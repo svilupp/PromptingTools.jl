@@ -1,4 +1,6 @@
-using PromptingTools.Experimental.RAGTools: MaybeMetadataItems, MetadataItem, build_context
+using PromptingTools.Experimental.RAGTools: ChunkIndex,
+    CandidateChunks, build_context, airag
+using PromptingTools.Experimental.RAGTools: MaybeMetadataItems, MetadataItem
 
 @testset "build_context" begin
     index = ChunkIndex(;
@@ -29,7 +31,7 @@ end
 
 @testset "airag" begin
     # test with a mock server
-    PORT = rand(1000:2000)
+    PORT = rand(20000:30000)
     PT.register_model!(; name = "mock-emb", schema = PT.CustomOpenAISchema())
     PT.register_model!(; name = "mock-meta", schema = PT.CustomOpenAISchema())
     PT.register_model!(; name = "mock-gen", schema = PT.CustomOpenAISchema())
@@ -39,7 +41,9 @@ end
 
         if content[:model] == "mock-gen"
             user_msg = last(content[:messages])
-            response = Dict(:choices => [Dict(:message => user_msg)],
+            response = Dict(:choices => [
+                    Dict(:message => user_msg, :finish_reason => "stop"),
+                ],
                 :model => content[:model],
                 :usage => Dict(:total_tokens => length(user_msg[:content]),
                     :prompt_tokens => length(user_msg[:content]),
@@ -53,10 +57,11 @@ end
         elseif content[:model] == "mock-meta"
             user_msg = last(content[:messages])
             response = Dict(:choices => [
-                    Dict(:message => Dict(:function_call => Dict(:arguments => JSON3.write(MaybeMetadataItems([
-                        MetadataItem("yes", "category"),
-                    ]))))),
-                ],
+                    Dict(:finish_reason => "stop",
+                        :message => Dict(:tool_calls => [
+                            Dict(:function => Dict(:arguments => JSON3.write(MaybeMetadataItems([
+                                MetadataItem("yes", "category"),
+                            ]))))]))],
                 :model => content[:model],
                 :usage => Dict(:total_tokens => length(user_msg[:content]),
                     :prompt_tokens => length(user_msg[:content]),

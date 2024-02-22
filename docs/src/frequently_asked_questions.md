@@ -39,6 +39,21 @@ Resources:
 
 Pro tip: Always set the spending limits!
 
+## Getting an error "ArgumentError: api_key cannot be empty" despite having set `OPENAI_API_KEY`?
+
+Quick fix: just provide kwarg `api_key` with your key to the `aigenerate` function (and other `ai*` functions).
+
+This error is thrown when the OpenAI API key is not available in 1) local preferences or 2) environment variables (`ENV["OPENAI_API_KEY"]`).
+
+First, check if you can access the key by running `ENV["OPENAI_API_KEY"]` in the Julia REPL. If it returns `nothing`, the key is not set.
+
+If the key is set, but you still get the error, there was a rare bug in earlier versions where if you first precompiled PromptingTools without the API key, it would remember it and "compile away" the `get(ENV,...)` function call. If you're experiencing this bug on the latest version of PromptingTools, please open an issue on GitHub.
+
+The solution is to force a new precompilation, so you can do any of the below:
+1) Force precompilation (run `Pkg.precompile()` in the Julia REPL)
+2) Update the PromptingTools package (runs precompilation automatically)
+3) Delete your compiled cache in `.julia` DEPOT (usually `.julia/compiled/v1.10/PromptingTools`). You can do it manually in the file explorer or via Julia REPL: `rm("~/.julia/compiled/v1.10/PromptingTools", recursive=true, force=true)`
+
 ## Setting OpenAI Spending Limits
 
 OpenAI allows you to set spending limits directly on your account dashboard to prevent unexpected costs.
@@ -150,3 +165,170 @@ There are three ways how you can customize your workflows (especially when you u
 1) Import the functions/types you need explicitly at the top (eg, `using PromptingTools: OllamaSchema`)
 2) Register your model and its associated schema  (`PT.register_model!(; name="123", schema=PT.OllamaSchema())`). You won't have to specify the schema anymore only the model name. See [Working with Ollama](#working-with-ollama) for more information.
 3) Override your default model (`PT.MODEL_CHAT`) and schema (`PT.PROMPT_SCHEMA`). It can be done persistently with Preferences, eg, `PT.set_preferences!("PROMPT_SCHEMA" => "OllamaSchema", "MODEL_CHAT"=>"llama2")`.
+
+## How to have a Multi-turn Conversations?
+
+Let's say you would like to respond back to a model's response. How to do it?
+
+1) With `ai""` macro
+The simplest way if you used `ai""` macro, is to send a reply with the `ai!""` macro. It will use the last response as the conversation.
+```julia
+ai"Hi! I'm John"
+
+ai!"What's my name?"
+# Return: "Your name is John."
+```
+
+2) With `aigenerate` function
+You can use the `conversation` keyword argument to pass the previous conversation (in all `ai*` functions). It will prepend the past `conversation` before sending the new request to the model.
+
+To get the conversation, set `return_all=true` and store the whole conversation thread (not just the last message) in a variable. Then, use it as a keyword argument in the next call.
+
+```julia
+conversation = aigenerate("Hi! I'm John"; return_all=true)
+@info last(conversation) # display the response
+
+# follow-up (notice that we provide past messages as conversation kwarg
+conversation = aigenerate("What's my name?"; return_all=true, conversation)
+
+## [ Info: Tokens: 50 @ Cost: $0.0 in 1.0 seconds
+## 5-element Vector{PromptingTools.AbstractMessage}:
+##  PromptingTools.SystemMessage("Act as a helpful AI assistant")
+##  PromptingTools.UserMessage("Hi! I'm John")
+##  AIMessage("Hello John! How can I assist you today?")
+##  PromptingTools.UserMessage("What's my name?")
+##  AIMessage("Your name is John.")
+```
+Notice that the last message is the response to the second request, but with `return_all=true` we can see the whole conversation from the beginning.
+
+## Explain What Happens Under the Hood
+
+4 Key Concepts/Objects:
+- Schemas -> object of type `AbstractPromptSchema` that determines which methods are called and, hence, what providers/APIs are used
+- Prompts -> the information you want to convey to the AI model
+- Messages -> the basic unit of communication between the user and the AI model (eg, `UserMessage` vs `AIMessage`)
+- Prompt Templates -> re-usable "prompts" with placeholders that you can replace with your inputs at the time of making the request
+
+When you call `aigenerate`, roughly the following happens: `render` -> `UserMessage`(s) -> `render` -> `OpenAI.create_chat` -> ... -> `AIMessage`.
+
+We'll deep dive into an example in the end.
+
+### Schemas
+
+For your "message" to reach an AI model, it needs to be formatted and sent to the right place.
+
+We leverage the multiple dispatch around the "schemas" to pick the right logic.
+All schemas are subtypes of `AbstractPromptSchema` and there are many subtypes, eg, `OpenAISchema <: AbstractOpenAISchema <:AbstractPromptSchema`.
+
+For example, if you provide `schema = OpenAISchema()`, the system knows that:
+- it will have to format any user inputs to OpenAI's "message specification" (a vector of dictionaries, see their API documentation). Function `render(OpenAISchema(),...)` will take care of the rendering.
+- it will have to send the message to OpenAI's API. We will use the amazing `OpenAI.jl` package to handle the communication.
+
+### Prompts
+
+Prompt is loosely the information you want to convey to the AI model. It can be a question, a statement, or a command. It can have instructions or some context, eg, previous conversation.
+
+You need to remember that Large Language Models (LLMs) are **stateless**. They don't remember the previous conversation/request, so you need to provide the whole history/context every time (similar to how REST APIs work).
+
+Prompts that we send to the LLMs are effectively a sequence of messages (`<:AbstractMessage`).
+
+### Messages
+
+Messages are the basic unit of communication between the user and the AI model. 
+
+There are 5 main types of messages (`<:AbstractMessage`):
+
+- `SystemMessage` - this contains information about the "system", eg, how it should behave, format its output, etc. (eg, `You're a world-class Julia programmer. You write brief and concise code.)
+- `UserMessage` - the information "from the user", ie, your question/statement/task
+- `UserMessageWithImages` - the same as `UserMessage`, but with images (URLs or Base64-encoded images)
+- `AIMessage` - the response from the AI model, when the "output" is text
+- `DataMessage` - the response from the AI model, when the "output" is data, eg, embeddings with `aiembed` or user-defined structs with `aiextract`
+
+### Prompt Templates
+
+We want to have re-usable "prompts", so we provide you with a system to retrieve pre-defined prompts with placeholders (eg, `{{name}}`) that you can replace with your inputs at the time of making the request.
+
+"AI Templates" as we call them (`AITemplate`) are usually a vector of `SystemMessage` and a `UserMessage` with specific purpose/task.
+
+For example, the template `:AssistantAsk` is defined loosely as:
+
+```julia
+ template = [SystemMessage("You are a world-class AI assistant. Your communication is brief and concise. You're precise and answer only when you're confident in the high quality of your answer."),
+             UserMessage("# Question\n\n{{ask}}")]
+```
+
+Notice that we have a placeholder `ask` (`{{ask}}`) that you can replace with your question without having to re-write the generic system instructions.
+
+When you provide a Symbol (eg, `:AssistantAsk`) to ai* functions, thanks to the multiple dispatch, it recognizes that it's an `AITemplate(:AssistantAsk)` and looks it up.
+
+You can discover all available templates with `aitemplates("some keyword")` or just see the details of some template `aitemplates(:AssistantAsk)`.
+
+### Walkthrough Example
+
+```julia
+using PromptingTools
+const PT = PromptingTools
+
+# Let's say this is our ask
+msg = aigenerate(:AssistantAsk; ask="What is the capital of France?")
+
+# it is effectively the same as:
+msg = aigenerate(PT.OpenAISchema(), PT.AITemplate(:AssistantAsk); ask="What is the capital of France?", model="gpt3t")
+```
+
+There is no `model` provided, so we use the default `PT.MODEL_CHAT` (effectively GPT3.5-Turbo). Then we look it up in `PT.MDOEL_REGISTRY` and use the associated schema for it (`OpenAISchema` in this case).
+
+The next step is to render the template, replace the placeholders and render it for the OpenAI model.
+
+```julia
+# Let's remember out schema
+schema = PT.OpenAISchema()
+ask = "What is the capital of France?"
+```
+
+First, we obtain the template (no placeholder replacement yet) and "expand it"
+```julia
+template_rendered = PT.render(schema, AITemplate(:AssistantAsk); ask)
+```
+
+```plaintext
+2-element Vector{PromptingTools.AbstractChatMessage}:
+  PromptingTools.SystemMessage("You are a world-class AI assistant. Your communication is brief and concise. You're precise and answer only when you're confident in the high quality of your answer.")
+  PromptingTools.UserMessage{String}("# Question\n\n{{ask}}", [:ask], :usermessage)
+```
+
+Second, we replace the placeholders
+```julia
+rendered_for_api = PT.render(schema, template_rendered;  ask)
+```
+  
+```plaintext
+2-element Vector{Dict{String, Any}}:
+  Dict("role" => "system", "content" => "You are a world-class AI assistant. Your communication is brief and concise. You're precise and answer only when you're confident in the high quality of your answer.")
+  Dict("role" => "user", "content" => "# Question\n\nWhat is the capital of France?")
+```
+
+Notice that the placeholders are only replaced in the second step. The final output here is a vector of messages with "role" and "content" keys, which is the format required by the OpenAI API.
+
+As a side note, under the hood, the second step is done in two steps:
+
+- replace the placeholders `messages_rendered = PT.render(PT.NoSchema(), template_rendered; ask)` -> returns a vector of Messages!
+- then, we convert the messages to the format required by the provider/schema `PT.render(schema, messages_rendered)` -> returns the OpenAI formatted messages
+
+
+Next, we send the above `rendered_for_api` to the OpenAI API and get the response back.
+
+```julia
+using OpenAI
+OpenAI.create_chat(api_key, model, rendered_for_api)
+```
+
+The last step is to take the JSON response from the API and convert it to the `AIMessage` object.
+
+```julia
+# simplification for educational purposes
+msg = AIMessage(; content = r.response[:choices][1][:message][:content])
+```
+In practice, there are more fields we extract, so we define a utility for it: `PT.response_to_message`. Especially, since with parameter `n`, you can request multiple AI responses at once, so we want to re-use our response processing logic.
+
+That's it! I hope you've learned something new about how PromptingTools.jl works under the hood.

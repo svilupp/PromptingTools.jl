@@ -250,3 +250,16 @@ function aiscan(prompt; model = MODEL_CHAT, kwargs...)
     schema = get(MODEL_REGISTRY, model, (; schema = PROMPT_SCHEMA)).schema
     aiscan(schema, prompt; model, kwargs...)
 end
+
+"Utility to facilitate unwrapping of HTTP response to a message type `MSG` provided. Designed to handle multi-sample completions."
+function response_to_message(schema::AbstractPromptSchema,
+        MSG::Type{T},
+        choice,
+        resp;
+        return_type = nothing,
+        model_id::AbstractString = "",
+        time::Float64 = 0.0,
+        run_id::Integer = rand(Int16),
+        sample_id::Union{Nothing, Integer} = nothing) where {T}
+    throw(ArgumentError("Response unwrapping not implemented for $(typeof(schema)) and $MSG"))
+end
