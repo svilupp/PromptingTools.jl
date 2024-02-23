@@ -98,3 +98,65 @@ ai"Say hi to the llama!"dllama
 You can use `aiembed` as well.
 
 Find more information [here](https://docs.databricks.com/en/machine-learning/foundation-models/api-reference.html).
+
+## Using Together.ai
+
+You can also use the Together.ai API with PromptingTools.jl.
+It requires you to set ENV variable `TOGETHER_API_KEY`.
+
+The corresponding schema is `TogetherOpenAISchema`, but we have registered one model for you, so you can use it as usual.
+Alias "tmixtral" (T for Together.ai and mixtral for the model name) is already set for you.
+
+```julia
+msg = aigenerate("Say hi"; model="tmixtral")
+## [ Info: Tokens: 87 @ Cost: \$0.0001 in 5.1 seconds
+## AIMessage("Hello! I'm here to help you. Is there something specific you'd like to know or discuss? I can provide information on a wide range of topics, assist with tasks, and even engage in a friendly conversation. Let me know how I can best assist you today.")
+```
+
+For embedding a text, use `aiembed`:
+
+```julia
+aiembed(PT.TogetherOpenAISchema(), "embed me"; model="BAAI/bge-large-en-v1.5")
+```
+Note: You can register the model with `PT.register_model!` and use it as usual.
+
+## Using Fireworks.ai
+
+You can also use the Fireworks.ai API with PromptingTools.jl.
+It requires you to set ENV variable `FIREWORKS_API_KEY`.
+
+The corresponding schema is `FireworksOpenAISchema`, but we have registered one model for you, so you can use it as usual.
+Alias "fmixtral" (F for Fireworks.ai and mixtral for the model name) is already set for you.
+
+```julia
+msg = aigenerate("Say hi"; model="fmixtral")
+## [ Info: Tokens: 78 @ Cost: \$0.0001 in 0.9 seconds
+## AIMessage("Hello! I'm glad you're here. I'm here to help answer any questions you have to the best of my ability. Is there something specific you'd like to know or discuss? I can assist with a wide range of topics, so feel free to ask me anything!")
+```
+
+In addition, at the time of writing (23rd Feb 2024), Fireworks is providing access to their new _function calling_ model (fine-tuned Mixtral) **for free**. 
+
+Try it with `aiextract` for structured extraction (model is aliased as `firefunction`):
+
+```julia
+"""
+Extract the food from the sentence. Extract any provided adjectives for the food as well.
+
+Example: "I am eating a crunchy bread." -> Food("bread", ["crunchy"])
+"""
+struct Food
+    name::String
+    adjectives::Union{Nothing,Vector{String}}
+end
+prompt = "I just ate a delicious and juicy apple."
+msg = aiextract(prompt; return_type=Food, model="firefunction")
+msg.content
+# Output: Food("apple", ["delicious", "juicy"])
+```
+
+For embedding a text, use `aiembed`:
+
+```julia
+aiembed(PT.FireworksOpenAISchema(), "embed me"; model="nomic-ai/nomic-embed-text-v1.5")
+```
+Note: You can register the model with `PT.register_model!` and use it as usual.
