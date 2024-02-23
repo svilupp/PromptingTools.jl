@@ -9,9 +9,12 @@ module AgentTools
 
 using PromptingTools
 const PT = PromptingTools
+using AbstractTrees
 using Test
 
 include("utils.jl")
+
+include("mcts.jl")
 
 export aicodefixer_feedback, error_feedback, score_feedback
 include("code_feedback.jl")

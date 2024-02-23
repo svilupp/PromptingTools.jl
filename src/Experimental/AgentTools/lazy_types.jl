@@ -1,3 +1,15 @@
+@kwdef mutable struct RetryConfig
+    retries::Int = 0
+    calls::Int = 0
+    checks::Int = 0
+    max_suggests::Int = 3
+    max_asserts::Int = 3
+    max_retries::Int = 5
+    max_calls::Int = 5
+    retry_delay::Int = 2
+    n_samples::Int = 1
+end
+
 abstract type AICallBlock end
 
 """
@@ -59,8 +71,11 @@ This can be used to "reply" to previous message / continue the stored conversati
     schema::Union{Nothing, PT.AbstractPromptSchema} = nothing
     conversation::Vector{<:PT.AbstractMessage} = Vector{PT.AbstractMessage}()
     kwargs::NamedTuple = NamedTuple()
-    success::Union{Nothing, Bool} = nothing
+    success::Union{Nothing, Bool} = nothing # success of the last call - in different airetry checks etc
     error::Union{Nothing, Exception} = nothing
+    samples::Any = nothing
+    memory::Dict{Symbol, Any} = Dict{Symbol, Any}()
+    config::RetryConfig = RetryConfig()  # Configuration for retries
 end
 ## main sample
 ## samples
@@ -199,12 +214,16 @@ function run!(aicall::AICallBlock;
         else
             aicall.func(schema, conversation; aicall.kwargs..., kwargs..., return_all)
         end
+        # unpack multiple samples
+
         # Remove used kwargs (for placeholders)
         aicall.kwargs = remove_used_kwargs(aicall.kwargs, conversation)
         aicall.conversation = result
+        aicall.config.calls += 1
         aicall.success = true
     catch e
         verbose > 0 && @info "Error detected and caught in AICall"
+        aicall.config.calls += 1
         aicall.success = false
         aicall.error = e
         !catch_errors && rethrow(aicall.error)
@@ -229,6 +248,17 @@ end
 function (aicall::AICall)(msg::PT.UserMessage; kwargs...)
     push!(aicall.conversation, msg)
     return run!(aicall; kwargs...)
+end
+
+"Helpful accessor for AICall blocks. Returns the last message in the conversation."
+function last_message(aicall::AICallBlock)
+    length(aicall.conversation) == 0 ? nothing : aicall.conversation[end]
+end
+
+"Helpful accessor for AICall blocks. Returns the last output in the conversation (eg, the string/data in the last message)."
+function last_output(aicall::AICallBlock)
+    msg = last_message(aicall)
+    return isnothing(msg) ? nothing : msg.content
 end
 
 """
