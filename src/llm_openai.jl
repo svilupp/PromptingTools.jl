@@ -70,7 +70,8 @@ function OpenAI.build_url(provider::AbstractCustomProvider, api::AbstractString)
     string(provider.base_url, "/", api)
 end
 function OpenAI.auth_header(provider::AbstractCustomProvider, api_key::AbstractString)
-    OpenAI.auth_header(OpenAI.OpenAIProvider(provider.api_key,
+    OpenAI.auth_header(
+        OpenAI.OpenAIProvider(provider.api_key,
             provider.base_url,
             provider.api_version),
         api_key)
@@ -162,6 +163,32 @@ function OpenAI.create_chat(schema::MistralOpenAISchema,
     # try to override provided api_key because the default is OpenAI key
     provider = CustomProvider(;
         api_key = isempty(MISTRALAI_API_KEY) ? api_key : MISTRALAI_API_KEY,
+        base_url = url)
+    OpenAI.create_chat(provider, model, conversation; kwargs...)
+end
+function OpenAI.create_chat(schema::FireworksOpenAISchema,
+        api_key::AbstractString,
+        model::AbstractString,
+        conversation;
+        url::String = "https://api.fireworks.ai/inference/v1",
+        kwargs...)
+    # Build the corresponding provider object
+    # try to override provided api_key because the default is OpenAI key
+    provider = CustomProvider(;
+        api_key = isempty(FIREWORKS_API_KEY) ? api_key : FIREWORKS_API_KEY,
+        base_url = url)
+    OpenAI.create_chat(provider, model, conversation; kwargs...)
+end
+function OpenAI.create_chat(schema::TogetherOpenAISchema,
+        api_key::AbstractString,
+        model::AbstractString,
+        conversation;
+        url::String = "https://api.together.xyz/v1",
+        kwargs...)
+    # Build the corresponding provider object
+    # try to override provided api_key because the default is OpenAI key
+    provider = CustomProvider(;
+        api_key = isempty(TOGETHER_API_KEY) ? api_key : TOGETHER_API_KEY,
         base_url = url)
     OpenAI.create_chat(provider, model, conversation; kwargs...)
 end
@@ -434,7 +461,7 @@ function aigenerate(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_
             run_id = Int(rand(Int32)) # remember one run ID
             ## extract all message
             msgs = [response_to_message(prompt_schema, AIMessage, choice, r;
-                time, model_id, run_id, sample_id = i)
+                        time, model_id, run_id, sample_id = i)
                     for (i, choice) in enumerate(r.response[:choices])]
             ## Order by log probability if available
             ## bigger is better, keep it last
@@ -773,7 +800,8 @@ aiclassify(:JudgeIsItTrue;
 function aiclassify(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE;
         choices::AbstractVector{T} = ["true", "false", "unknown"],
         api_kwargs::NamedTuple = NamedTuple(),
-        kwargs...) where {T <: Union{AbstractString, Tuple{<:AbstractString, <:AbstractString}}}
+        kwargs...) where {T <:
+                          Union{AbstractString, Tuple{<:AbstractString, <:AbstractString}}}
     ## Encode the choices and the corresponding prompt 
     ## TODO: maybe check the model provided as well?
     choices_prompt, logit_bias, decode_ids = encode_choices(prompt_schema, choices)
@@ -987,7 +1015,7 @@ function aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_T
             run_id = Int(rand(Int32)) # remember one run ID
             ## extract all message
             msgs = [response_to_message(prompt_schema, DataMessage, choice, r;
-                return_type, time, model_id, run_id, sample_id = i)
+                        return_type, time, model_id, run_id, sample_id = i)
                     for (i, choice) in enumerate(r.response[:choices])]
             ## Order by log probability if available
             ## bigger is better, keep it last
@@ -1144,7 +1172,7 @@ function aiscan(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE
             run_id = Int(rand(Int32)) # remember one run ID
             ## extract all message
             msgs = [response_to_message(prompt_schema, AIMessage, choice, r;
-                time, model_id, run_id, sample_id = i)
+                        time, model_id, run_id, sample_id = i)
                     for (i, choice) in enumerate(r.response[:choices])]
             ## Order by log probability if available
             ## bigger is better, keep it last

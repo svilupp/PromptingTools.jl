@@ -146,6 +146,36 @@ Requires two environment variables to be set:
 """
 struct DatabricksOpenAISchema <: AbstractOpenAISchema end
 
+"""
+    FireworksOpenAISchema
+
+Schema to call the [Fireworks.ai](https://fireworks.ai/) API.
+
+Links:
+- [Get your API key](https://fireworks.ai/api-keys)
+- [API Reference](https://readme.fireworks.ai/reference/createchatcompletion)
+- [Available models](https://fireworks.ai/models)
+
+Requires one environment variables to be set:
+- `FIREWORKS_API_KEY`: Your API key
+"""
+struct FireworksOpenAISchema <: AbstractOpenAISchema end
+
+"""
+    TogetherOpenAISchema
+
+Schema to call the [Together.ai](https://www.together.ai/) API.
+
+Links:
+- [Get your API key](https://api.together.xyz/settings/api-keys)
+- [API Reference](https://docs.together.ai/docs/openai-api-compatibility)
+- [Available models](https://docs.together.ai/docs/inference-models)
+
+Requires one environment variables to be set:
+- `TOGETHER_API_KEY`: Your API key
+"""
+struct TogetherOpenAISchema <: AbstractOpenAISchema end
+
 abstract type AbstractOllamaSchema <: AbstractPromptSchema end
 
 """
