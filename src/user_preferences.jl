@@ -149,6 +149,14 @@ _temp = get(ENV, "GOOGLE_API_KEY", "")
 const GOOGLE_API_KEY::String = @load_preference("GOOGLE_API_KEY",
     default=_temp);
 
+_temp = get(ENV, "TOGETHER_API_KEY", "")
+const TOGETHER_API_KEY::String = @load_preference("TOGETHER_API_KEY",
+    default=_temp);
+
+_temp = get(ENV, "FIREWORKS_API_KEY", "")
+const FIREWORKS_API_KEY::String = @load_preference("FIREWORKS_API_KEY",
+    default=_temp);
+
 _temp = get(ENV, "LOCAL_SERVER", "")
 ## Address of the local server
 const LOCAL_SERVER::String = @load_preference("LOCAL_SERVER",
@@ -267,7 +275,8 @@ end
 ### Model Aliases
 
 # global reference MODEL_ALIASES is defined below
-aliases = merge(Dict("gpt3" => "gpt-3.5-turbo",
+aliases = merge(
+    Dict("gpt3" => "gpt-3.5-turbo",
         "gpt4" => "gpt-4",
         "gpt4v" => "gpt-4-vision-preview", # 4v is for "4 vision"
         "gpt4t" => "gpt-4-turbo-preview", # 4t is for "4 turbo"
@@ -279,11 +288,17 @@ aliases = merge(Dict("gpt3" => "gpt-3.5-turbo",
         "oh25" => "openhermes2.5-mistral",
         "starling" => "starling-lm",
         "local" => "local-server",
-        "gemini" => "gemini-pro"),
+        "gemini" => "gemini-pro",
+        ## f-mixtral -> Fireworks.ai Mixtral
+        "fmixtral" => "accounts/fireworks/models/mixtral-8x7b-instruct",
+        "firefunction" => "accounts/fireworks/models/firefunction-v1",
+        ## t-mixtral -> Together.ai Mixtral
+        "tmixtral" => "mistralai/Mixtral-8x7B-Instruct-v0.1"),
     ## Load aliases from preferences as well
     @load_preference("MODEL_ALIASES", default=Dict{String, String}()))
 
-registry = Dict{String, ModelSpec}("gpt-3.5-turbo" => ModelSpec("gpt-3.5-turbo",
+registry = Dict{String, ModelSpec}(
+    "gpt-3.5-turbo" => ModelSpec("gpt-3.5-turbo",
         OpenAISchema(),
         0.5e-6,
         1.5e-6,
@@ -389,9 +404,10 @@ registry = Dict{String, ModelSpec}("gpt-3.5-turbo" => ModelSpec("gpt-3.5-turbo",
         "Mistral AI's hosted model for embeddings."),
     "echo" => ModelSpec("echo",
         TestEchoOpenAISchema(;
-            response = Dict(:choices => [
+            response = Dict(
+                :choices => [
                     Dict(:message => Dict(:content => "Hello!"),
-                        :finish_reason => "stop"),
+                    :finish_reason => "stop")
                 ],
                 :usage => Dict(:total_tokens => 3,
                     :prompt_tokens => 2,
@@ -408,7 +424,25 @@ registry = Dict{String, ModelSpec}("gpt-3.5-turbo" => ModelSpec("gpt-3.5-turbo",
         GoogleSchema(),
         0.0, #unknown, expected 1.25e-7
         0.0, #unknown, expected 3.75e-7
-        "Gemini Pro is a LLM from Google. For more information, see [models](https://ai.google.dev/models/gemini)."))
+        "Gemini Pro is a LLM from Google. For more information, see [models](https://ai.google.dev/models/gemini)."),
+    "accounts/fireworks/models/mixtral-8x7b-instruct" => ModelSpec(
+        "accounts/fireworks/models/mixtral-8x7b-instruct",
+        FireworksOpenAISchema(),
+        4e-7, #unknown, expected 1.25e-7
+        1.6e-6, #unknown, expected 3.75e-7
+        "Mixtral (8x7b) from Mistral, hosted by Fireworks.ai. For more information, see [models](https://fireworks.ai/models/fireworks/mixtral-8x7b-instruct)."),
+    "accounts/fireworks/models/firefunction-v1" => ModelSpec(
+        "accounts/fireworks/models/firefunction-v1",
+        FireworksOpenAISchema(),
+        0.0, #unknown, expected to be the same as Mixtral
+        0.0, #unknown, expected to be the same as Mixtral
+        "Fireworks' open-source function calling model (fine-tuned Mixtral). Useful for `aiextract` calls. For more information, see [models](https://fireworks.ai/models/fireworks/firefunction-v1)."),
+    "mistralai/Mixtral-8x7B-Instruct-v0.1" => ModelSpec(
+        "mistralai/Mixtral-8x7B-Instruct-v0.1",
+        TogetherOpenAISchema(),
+        6e-7,
+        6e-7,
+        "Mixtral (8x7b) from Mistral, hosted by Together.ai. For more information, see [models](https://docs.together.ai/docs/inference-models)."))
 
 ### Model Registry Structure
 @kwdef mutable struct ModelRegistry
