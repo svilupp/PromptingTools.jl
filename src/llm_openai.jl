@@ -284,6 +284,28 @@ function OpenAI.create_embeddings(schema::DatabricksOpenAISchema,
         input = docs,
         kwargs...)
 end
+function OpenAI.create_embeddings(schema::TogetherOpenAISchema,
+        api_key::AbstractString,
+        docs,
+        model::AbstractString;
+        url::String = "https://api.together.xyz/v1",
+        kwargs...)
+    provider = CustomProvider(;
+        api_key = isempty(TOGETHER_API_KEY) ? api_key : TOGETHER_API_KEY,
+        base_url = url)
+    OpenAI.create_embeddings(provider, docs, model; kwargs...)
+end
+function OpenAI.create_embeddings(schema::FireworksOpenAISchema,
+        api_key::AbstractString,
+        docs,
+        model::AbstractString;
+        url::String = "https://api.fireworks.ai/inference/v1",
+        kwargs...)
+    provider = CustomProvider(;
+        api_key = isempty(FIREWORKS_API_KEY) ? api_key : FIREWORKS_API_KEY,
+        base_url = url)
+    OpenAI.create_embeddings(provider, docs, model; kwargs...)
+end
 
 ## Temporary fix -- it will be moved upstream
 function OpenAI.create_embeddings(provider::AbstractCustomProvider,
@@ -343,8 +365,8 @@ function response_to_message(schema::AbstractOpenAISchema,
         nothing
     end
     ## calculate cost
-    tokens_prompt = resp.response[:usage][:prompt_tokens]
-    tokens_completion = resp.response[:usage][:completion_tokens]
+    tokens_prompt = get(resp.response, :usage, Dict(:prompt_tokens => 0))[:prompt_tokens]
+    tokens_completion = get(resp.response, :usage, Dict(:completion_tokens => 0))[:completion_tokens]
     cost = call_cost(tokens_prompt, tokens_completion, model_id)
     ## build AIMessage object
     msg = MSG(;
@@ -564,11 +586,12 @@ function aiembed(prompt_schema::AbstractOpenAISchema,
         model_id;
         http_kwargs,
         api_kwargs...)
+    tokens_prompt = get(r.response, :usage, Dict(:prompt_tokens => 0))[:prompt_tokens]
     msg = DataMessage(;
         content = mapreduce(x -> postprocess(x[:embedding]), hcat, r.response[:data]),
         status = Int(r.status),
-        cost = call_cost(r.response[:usage][:prompt_tokens], 0, model_id),
-        tokens = (r.response[:usage][:prompt_tokens], 0),
+        cost = call_cost(tokens_prompt, 0, model_id),
+        tokens = (tokens_prompt, 0),
         elapsed = time)
     ## Reporting
     verbose && @info _report_stats(msg, model_id)
@@ -836,8 +859,8 @@ function response_to_message(schema::AbstractOpenAISchema,
         nothing
     end
     ## calculate cost
-    tokens_prompt = resp.response[:usage][:prompt_tokens]
-    tokens_completion = resp.response[:usage][:completion_tokens]
+    tokens_prompt = get(resp.response, :usage, Dict(:prompt_tokens => 0))[:prompt_tokens]
+    tokens_completion = get(resp.response, :usage, Dict(:completion_tokens => 0))[:completion_tokens]
     cost = call_cost(tokens_prompt, tokens_completion, model_id)
     # "Safe" parsing of the response - it still fails if JSON is invalid
     content = try

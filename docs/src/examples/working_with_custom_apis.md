@@ -113,6 +113,12 @@ msg = aigenerate("Say hi"; model="tmixtral")
 ## AIMessage("Hello! I'm here to help you. Is there something specific you'd like to know or discuss? I can provide information on a wide range of topics, assist with tasks, and even engage in a friendly conversation. Let me know how I can best assist you today.")
 ```
 
+For embedding a text, use `aiembed`:
+
+```julia
+aiembed(PT.TogetherOpenAISchema(), "embed me"; model="BAAI/bge-large-en-v1.5")
+```
+Note: You can register the model with `PT.register_model!` and use it as usual.
 
 ## Using Fireworks.ai
 
@@ -147,3 +153,10 @@ msg = aiextract(prompt; return_type=Food, model="firefunction")
 msg.content
 # Output: Food("apple", ["delicious", "juicy"])
 ```
+
+For embedding a text, use `aiembed`:
+
+```julia
+aiembed(PT.FireworksOpenAISchema(), "embed me"; model="nomic-ai/nomic-embed-text-v1.5")
+```
+Note: You can register the model with `PT.register_model!` and use it as usual.
