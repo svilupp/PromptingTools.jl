@@ -1,16 +1,61 @@
+# The following implements lazy types for all ai* functions (eg, aigenerate -> AIGenerate) and AICodeFixer
+
+abstract type AbstractAIPrompter end
+abstract type AICallBlock end
+
+"""
+    RetryConfig
+
+Configuration for self-fixing the AI calls. It includes the following fields:
+
+# Fields
+- `retries::Int`: The number of retries ("fixing rounds") that have been attempted so far.
+- `calls::Int`: The total number of SUCCESSFULLY generated ai* function calls made so far (across all samples/retry rounds).
+  Ie, if a call fails, because of an API error, it's not counted, because it didn't reach the LLM.
+- `max_retries::Int`: The maximum number of retries ("fixing rounds") allowed for the AI call. Defaults to 10.
+- `max_calls::Int`: The maximum number of ai* function calls allowed for the AI call. Defaults to 99.
+- `retry_delay::Int`: The delay (in seconds) between retry rounds. Defaults to 0s.
+- `n_samples::Int`: The number of samples to generate in each ai* call round (to increase changes of successful pass). Defaults to 1.
+- `scoring::AbstractScoringMethod`: The scoring method to use for generating multiple samples. Defaults to `UCT(sqrt(2))`.
+- `ordering::Symbol`: The ordering to use for select the best samples. With `:PostOrderDFS` we prioritize leaves, with `:PreOrderDFS` we prioritize the root. Defaults to `:PostOrderDFS`.
+- `feedback_inplace::Bool`: Whether to provide feedback in previous UserMessage (and remove the past AIMessage) or to create a new UserMessage. Defaults to `false`.
+- `feedback_template::Symbol`: Template to use for feedback in place. Defaults to `:FeedbackFromEvaluator`.
+- `temperature::Float64`: The temperature to use for sampling. Relevant only if not defined in `api_kwargs` provided. Defaults to 0.7.
+- `catch_errors::Bool`: Whether to catch errors during `run!` of AICall. Saves them in `aicall.error`. Defaults to `false`.
+"""
 @kwdef mutable struct RetryConfig
     retries::Int = 0
     calls::Int = 0
-    checks::Int = 0
-    max_suggests::Int = 3
-    max_asserts::Int = 3
-    max_retries::Int = 5
-    max_calls::Int = 5
-    retry_delay::Int = 2
+    max_retries::Int = 10
+    max_calls::Int = 99
+    retry_delay::Int = 0
     n_samples::Int = 1
+    scoring::AbstractScoringMethod = UCT()
+    ordering::Symbol = :PostOrderDFS
+    feedback_inplace::Bool = false
+    feedback_template::Symbol = :FeedbackFromEvaluator # Template to use for feedback
+    temperature::Float64 = 0.7
+    catch_errors::Bool = false
 end
-
-abstract type AICallBlock end
+function Base.show(io::IO, config::RetryConfig)
+    dump(IOContext(io, :limit => true), config, maxdepth = 1)
+end
+function Base.copy(config::RetryConfig)
+    return RetryConfig(
+        config.retries,
+        config.calls,
+        config.max_retries,
+        config.max_calls,
+        config.retry_delay,
+        config.n_samples,
+        config.scoring,
+        config.feedback_inplace,
+        config.feedback_template,
+        config.temperature)
+end
+function Base.var"=="(c1::RetryConfig, c2::RetryConfig)
+    all(f -> getfield(c1, f) == getfield(c2, f), fieldnames(typeof(c1)))
+end
 
 """
     AICall(func::F, args...; kwargs...) where {F<:Function}
@@ -73,35 +118,18 @@ This can be used to "reply" to previous message / continue the stored conversati
     kwargs::NamedTuple = NamedTuple()
     success::Union{Nothing, Bool} = nothing # success of the last call - in different airetry checks etc
     error::Union{Nothing, Exception} = nothing
-    samples::Any = nothing
+    ## by default, we use samples to hold the conversation attempts across different fixing rounds
+    samples::SampleNode = SampleNode(; data = Vector{PT.AbstractMessage}())
+    active_sample_id::Int = -1
     memory::Dict{Symbol, Any} = Dict{Symbol, Any}()
     config::RetryConfig = RetryConfig()  # Configuration for retries
+    prompter::Union{Nothing, AbstractAIPrompter} = nothing
 end
-## main sample
-## samples
 
 function AICall(func::F, args...; kwargs...) where {F <: Function}
-    @assert length(args)<=2 "AICall takes at most 2 positional arguments (provided: $(length(args)))"
-    schema = nothing
-    conversation = Vector{PT.AbstractMessage}()
-    for arg in args
-        if isa(arg, PT.AbstractPromptSchema)
-            schema = arg
-        elseif isa(arg, Vector{<:PT.AbstractMessage})
-            conversation = arg
-        elseif isa(arg, AbstractString) && isempty(conversation)
-            ## User Prompt -- create a UserMessage
-            push!(conversation, PT.UserMessage(arg))
-        elseif isa(arg, Symbol) && isempty(conversation)
-            conversation = PT.render(schema, AITemplate(arg))
-        elseif isa(arg, AITemplate) && isempty(conversation)
-            conversation = PT.render(schema, arg)
-        else
-            error("Invalid argument type: $(typeof(arg))")
-        end
-    end
-
-    return AICall{F}(; func, schema, conversation, kwargs = NamedTuple(kwargs))
+    schema, conversation = unwrap_aicall_args(args)
+    kwargs, config = extract_config(kwargs, RetryConfig())
+    return AICall{F}(; func, schema, conversation, config, kwargs)
 end
 
 """
@@ -174,10 +202,12 @@ end
 
 Executes the AI call wrapped by an `AICallBlock` instance. This method triggers the actual communication with the AI model and processes the response based on the provided conversation context and parameters.
 
+Note: Currently `return_all` must always be set to true.
+
 # Arguments
 - `aicall::AICallBlock`: An instance of `AICallBlock` which encapsulates the AI function call along with its context and parameters (eg, `AICall`, `AIGenerate`)
-- `verbose::Int=1`: A verbosity level for logging. A higher value indicates more detailed logging.
-- `catch_errors::Bool=false`: If set to `true`, the method will catch and handle errors internally. Otherwise, errors are propagated.
+- `verbose::Integer=1`: A verbosity level for logging. A higher value indicates more detailed logging.
+- `catch_errors::Union{Nothing, Bool}=nothing`: A flag to indicate whether errors should be caught and saved to `aicall.error`. If `nothing`, it defaults to `aicall.config.catch_errors`.
 - `return_all::Bool=true`: A flag to indicate whether the whole conversation from the AI call should be returned. It should always be true.
 - `kwargs...`: Additional keyword arguments that are passed to the AI function.
 
@@ -202,31 +232,86 @@ aicall("Say hi!")
 - This method is essential for scenarios where AI interactions are based on dynamic or evolving contexts, as it allows for real-time updates and responses based on the latest information.
 """
 function run!(aicall::AICallBlock;
-        verbose::Int = 1,
-        catch_errors::Bool = false,
+        verbose::Integer = 1,
+        catch_errors::Union{Nothing, Bool} = nothing,
         return_all::Bool = true,
         kwargs...)
     @assert return_all "`return_all` must be true (provided: $return_all)"
-    (; schema, conversation) = aicall
-    try
-        result = if isnothing(schema)
-            aicall.func(conversation; aicall.kwargs..., kwargs..., return_all)
-        else
-            aicall.func(schema, conversation; aicall.kwargs..., kwargs..., return_all)
-        end
-        # unpack multiple samples
+    (; schema, conversation, config) = aicall
+    (; max_calls, n_samples) = aicall.config
 
+    catch_errors = isnothing(catch_errors) ? config.catch_errors : catch_errors
+    verbose = min(verbose, get(aicall.kwargs, :verbose, 99))
+
+    ## Locate the parent node in samples node, if it's the first call, we'll fall back to `aicall.samples` itself
+    parent_node = find_node(aicall.samples, aicall.active_sample_id) |>
+                  x -> isnothing(x) ? aicall.samples : x
+    ## Obtain the new API kwargs (if we need to tweak parameters)
+    new_api_kwargs = merge(
+        get(aicall.kwargs, :api_kwargs, NamedTuple()),
+        get(kwargs, :api_kwargs, NamedTuple()),
+        (; temperature = aicall.config.temperature))
+    ## Collect n_samples in a loop
+    ## if API supports it, you can speed it up via `api_kwargs=(; n= n_samples)` to generate them at once
+    samples_collected = 0
+    for i in 1:n_samples
+        ## Check if we don't need to collect more samples
+        samples_collected >= n_samples && break
+        ## Check if we have budget left
+        if aicall.config.calls >= max_calls
+            verbose > 0 &&
+                @info "Max calls limit reached (calls: $(aicall.config.calls)). Generation interrupted."
+            break
+        end
+        ## We need to set explicit temperature to ensure our calls are not cached 
+        ## (small perturbations in temperature of each request, unless user requested temp=0)
+        if !iszero(new_api_kwargs.temperature)
+            new_api_kwargs = merge(
+                new_api_kwargs, (; temperature = new_api_kwargs.temperature + 1e-3))
+        end
+        ## Call the API with try-catch (eg, catch API errors, bad user inputs, etc.)
+        try
+            ## Note: always return all conversation (including prompt)
+            result = if isnothing(schema)
+                aicall.func(conversation; aicall.kwargs..., kwargs...,
+                    new_api_kwargs..., return_all = true)
+            else
+                aicall.func(
+                    schema, conversation; aicall.kwargs..., kwargs...,
+                    new_api_kwargs..., return_all = true)
+            end
+            # unpack multiple samples (if present; if not, it will be a single sample in a vector)
+            conv_list = split_multi_samples(result)
+            for conv in conv_list
+                ## save the sample into our sample tree
+                node = expand!(parent_node, conv; success = true)
+                aicall.active_sample_id = node.id
+                aicall.config.calls += 1
+                samples_collected += 1
+            end
+            aicall.success = true
+        catch e
+            verbose > 0 && @info "Error detected and caught in AICall"
+            aicall.success = false
+            aicall.error = e
+            !catch_errors && rethrow(aicall.error)
+        end
+        ## Break the loop - no point in sampling if we get errors
+        aicall.success == false && break
+    end
+    ## Finalize the generaion
+    if aicall.success == true
+        ## overwrite the active conversation
+        current_node = find_node(aicall.samples, aicall.active_sample_id)
+        aicall.conversation = current_node.data
         # Remove used kwargs (for placeholders)
-        aicall.kwargs = remove_used_kwargs(aicall.kwargs, conversation)
-        aicall.conversation = result
-        aicall.config.calls += 1
-        aicall.success = true
-    catch e
-        verbose > 0 && @info "Error detected and caught in AICall"
-        aicall.config.calls += 1
-        aicall.success = false
-        aicall.error = e
-        !catch_errors && rethrow(aicall.error)
+        aicall.kwargs = remove_used_kwargs(aicall.kwargs, aicall.conversation)
+        ## If first sample (parent == root node), 
+        ## make sure that root node sample has a conversation to retry from
+        if current_node.parent == aicall.samples && isempty(aicall.samples.data)
+            aicall.samples.data = copy(aicall.conversation)
+            pop!(aicall.samples.data)  # remove the last AI message
+        end
     end
     return aicall
 end
@@ -259,6 +344,28 @@ end
 function last_output(aicall::AICallBlock)
     msg = last_message(aicall)
     return isnothing(msg) ? nothing : msg.content
+end
+
+function Base.isvalid(aicall::AICallBlock)
+    aicall.success == true
+end
+
+function Base.copy(aicall::AICallBlock)
+    return AICall{typeof(aicall.func)}(
+        aicall.func,
+        aicall.schema,
+        copy(aicall.conversation),
+        aicall.kwargs,
+        aicall.success,
+        aicall.error,
+        copy(aicall.samples),
+        aicall.active_sample_id,
+        copy(aicall.memory),
+        copy(aicall.config),
+        aicall.prompter)
+end
+function Base.var"=="(c1::AICallBlock, c2::AICallBlock)
+    all(f -> getfield(c1, f) == getfield(c2, f), fieldnames(typeof(c1)))
 end
 
 """
@@ -436,4 +543,9 @@ function run!(codefixer::AICodeFixer;
     codefixer.call = call
 
     return codefixer
+end
+
+### Prompt Generators
+# Placeholder for future
+@kwdef mutable struct AIPrompter
 end

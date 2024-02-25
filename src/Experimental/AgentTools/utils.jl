@@ -10,6 +10,64 @@ function remove_used_kwargs(kwargs::NamedTuple,
     return filter(pair -> !(pair.first in used_kwargs), pairs(kwargs)) |> NamedTuple
 end
 
+"Unwraps the arguments for AICall and returns the schema and conversation (if provided). Expands any provided AITemplate."
+function unwrap_aicall_args(args)
+    @assert length(args)<=2 "AICall takes at most 2 positional arguments (provided: $(length(args)))"
+    schema = nothing
+    conversation = Vector{PT.AbstractMessage}()
+    for arg in args
+        if isa(arg, PT.AbstractPromptSchema)
+            schema = arg
+        elseif isa(arg, Vector{<:PT.AbstractMessage})
+            conversation = arg
+        elseif isa(arg, AbstractString) && isempty(conversation)
+            ## User Prompt -- create a UserMessage
+            push!(conversation, PT.UserMessage(arg))
+        elseif isa(arg, Symbol) && isempty(conversation)
+            conversation = PT.render(schema, AITemplate(arg))
+        elseif isa(arg, AITemplate) && isempty(conversation)
+            conversation = PT.render(schema, arg)
+        else
+            error("Invalid argument type: $(typeof(arg))")
+        end
+    end
+    return schema, conversation
+end
+
+"Extracts `config::RetryConfig` from kwargs and returns the rest of the kwargs."
+function extract_config(kwargs, default_config::T) where {T}
+    new_kwargs = []
+    config = default_config
+    for (key, val) in Base.pairs(kwargs)
+        if key == :config && val isa T
+            config = val
+        else
+            push!(new_kwargs, (key => val))
+        end
+    end
+    return NamedTuple(new_kwargs), config
+end
+
+"If the conversation has multiple AIMessage samples, split them into separate conversations with the common past."
+function split_multi_samples(conv)
+    ## shortcircuit if the conversation is too short, has no AIMessage or has no integer sample_id
+    if length(conv) <= 1 || !(last(conv) isa PT.AIMessage) ||
+       isnothing(last(conv).sample_id)
+        return [conv]
+    end
+
+    split_convos = typeof(conv)[]
+    run_id = last(conv).run_id
+    ## Extract the common history for all new samples
+    past_conv = filter(x -> !PT.isaimessage(x) || x.run_id != run_id, conv)
+    for i in eachindex(conv)
+        if PT.isaimessage(conv[i]) && conv[i].run_id == run_id
+            push!(split_convos, vcat(copy(past_conv)..., conv[i]))
+        end
+    end
+    return split_convos
+end
+
 """
     truncate_conversation(conversation::AbstractVector{<:PT.AbstractMessage};
         max_conversation_length::Int = 32000)
@@ -31,7 +89,8 @@ function truncate_conversation(conversation::AbstractVector{<:PT.AbstractMessage
                           length(conversation) > 2
         # start with the last two messages' length (always included)
         new_conversation = similar(conversation) |> empty!
-        current_length = sum(length.(getproperty.(conversation[(end - 1):end],
+        current_length = sum(
+            length.(getproperty.(conversation[(end - 1):end],
                 :content)); init = 0)
         for i in eachindex(conversation[begin:(end - 2)])
             length_ = length(conversation[i].content)

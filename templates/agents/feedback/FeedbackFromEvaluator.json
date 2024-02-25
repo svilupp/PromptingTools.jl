@@ -1,0 +1,1 @@
+[{"content":"Template Metadata","description":"Simple user message with \"Feedback from Evaluator\". Placeholders: `feedback`","version":"1.0","source":"","_type":"metadatamessage"},{"content":"### Feedback from Evaluator\n{{feedback}}\n","variables":["feedback"],"_type":"usermessage"}]
