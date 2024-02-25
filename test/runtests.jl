@@ -1,6 +1,7 @@
 using PromptingTools
 using OpenAI, HTTP, JSON3
 using SparseArrays, LinearAlgebra, Markdown
+using Statistics
 using Test, Pkg
 const PT = PromptingTools
 using Aqua

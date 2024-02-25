@@ -1,4 +1,5 @@
 using PromptingTools.Experimental.AgentTools: remove_used_kwargs, truncate_conversation
+using PromptingTools.Experimental.AgentTools: beta_sample, gamma_sample
 
 @testset "remove_used_kwargs" begin
     # Test 1: No overlapping keys
@@ -67,4 +68,84 @@ end
     conversation = PT.AbstractMessage[]
     truncated = truncate_conversation(conversation, max_conversation_length = 32000)
     @test isempty(truncated)
+end
+
+@testset "beta_sample,gamma_sample" begin
+    N = 1000
+    tolerance_mean = 0.05 # Tolerance for mean comparison
+    tolerance_variance = 0.02 # A tighter tolerance for variance, adjust based on observed precision
+
+    # Test 1: Alpha and Beta are integers > 1
+    α, β = 2, 3
+    expected_mean = α / (α + β)
+    expected_variance = (α * β) / ((α + β)^2 * (α + β + 1))
+    samples = [beta_sample(α, β) for _ in 1:N]
+    sample_mean = mean(samples)
+    sample_variance = var(samples, corrected = true)
+    @test abs(sample_mean - expected_mean) < tolerance_mean
+    @test abs(sample_variance - expected_variance) < tolerance_variance
+
+    # Test 2: Alpha and Beta are large integers
+    α, β = 10, 10
+    expected_mean = α / (α + β)
+    expected_variance = (α * β) / ((α + β)^2 * (α + β + 1))
+    sample_values = [beta_sample(α, β) for _ in 1:N]
+    @test abs(mean(sample_values) - expected_mean) < tolerance_mean
+    @test abs(var(sample_values, corrected = true) - expected_variance) < tolerance_variance
+
+    # Test 3: Alpha and Beta are floats > 1
+    α, β = 2.5, 3.5
+    expected_mean = α / (α + β)
+    expected_variance = (α * β) / ((α + β)^2 * (α + β + 1))
+    sample_values = [beta_sample(α, β) for _ in 1:N]
+    @test abs(mean(sample_values) - expected_mean) < tolerance_mean
+    @test abs(var(sample_values, corrected = true) - expected_variance) < tolerance_variance
+
+    # Test 4: Alpha < 1 and Beta > 1
+    α, β = 0.5, 5
+    expected_mean = α / (α + β)
+    expected_variance = (α * β) / ((α + β)^2 * (α + β + 1))
+    sample_values = [beta_sample(α, β) for _ in 1:N]
+    @test abs(mean(sample_values) - expected_mean) < tolerance_mean
+    @test abs(var(sample_values, corrected = true) - expected_variance) < tolerance_variance
+
+    # Test 5: Alpha > 1 and Beta < 1
+    α, β = 5, 0.5
+    expected_mean = α / (α + β)
+    expected_variance = (α * β) / ((α + β)^2 * (α + β + 1))
+    sample_values = [beta_sample(α, β) for _ in 1:N]
+    @test abs(mean(sample_values) - expected_mean) < tolerance_mean
+    @test abs(var(sample_values, corrected = true) - expected_variance) < tolerance_variance
+
+    # Test 6: Alpha and Beta are both < 1
+    α, β = 0.5, 0.5
+    expected_mean = α / (α + β)
+    expected_variance = (α * β) / ((α + β)^2 * (α + β + 1))
+    sample_values = [beta_sample(α, β) for _ in 1:N]
+    @test abs(mean(sample_values) - expected_mean) < tolerance_mean
+    @test abs(var(sample_values, corrected = true) - expected_variance) < tolerance_variance
+
+    # Test 7: Alpha = 1 and Beta = 1 (Uniform distribution)
+    α, β = 1, 1
+    expected_mean = α / (α + β)
+    expected_variance = (α * β) / ((α + β)^2 * (α + β + 1))
+    sample_values = [beta_sample(α, β) for _ in 1:N]
+    @test abs(mean(sample_values) - expected_mean) < tolerance_mean
+    @test abs(var(sample_values, corrected = true) - expected_variance) < tolerance_variance
+
+    # Test 8: Very small Alpha and Beta
+    α, β = 0.1, 0.1
+    expected_mean = α / (α + β)
+    expected_variance = (α * β) / ((α + β)^2 * (α + β + 1))
+    sample_values = [beta_sample(α, β) for _ in 1:N]
+    @test abs(mean(sample_values) - expected_mean) < tolerance_mean
+    @test abs(var(sample_values, corrected = true) - expected_variance) < tolerance_variance
+
+    # Test 9: Very large Alpha and Beta
+    α, β = 100, 100
+    expected_mean = α / (α + β)
+    expected_variance = (α * β) / ((α + β)^2 * (α + β + 1))
+    sample_values = [beta_sample(α, β) for _ in 1:N]
+    @test abs(mean(sample_values) - expected_mean) < tolerance_mean
+    @test abs(var(sample_values, corrected = true) - expected_variance) < tolerance_variance
 end

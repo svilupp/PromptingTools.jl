@@ -107,3 +107,40 @@ function truncate_conversation(conversation::AbstractVector{<:PT.AbstractMessage
     end
     return new_conversation
 end
+
+"""
+    gamma_sample(α::Real, θ::Real)
+
+Approximates a sample from the Gamma distribution using the Marsaglia and Tsang method.
+"""
+function gamma_sample(α::Real, θ::Real)
+    if α < 1
+        return gamma_sample(1.0 + α, θ) * (rand()^(1 / α))
+    end
+    d = α - 1.0 / 3
+    c = 1.0 / sqrt(9d)
+    while true
+        x = randn()
+        v = 1.0 + c * x
+        while v <= 0
+            x = randn()
+            v = 1.0 + c * x
+        end
+        v = v^3
+        u = rand()
+        if u < 1 - 0.0331 * (x^4) || log(u) < 0.5 * x^2 + d * (1 - v + log(v))
+            return d * v * θ
+        end
+    end
+end
+
+"""
+    beta_sample(α::Real, β::Real)
+
+Approximates a sample from the Beta distribution by generating two independent Gamma distributed samples and using their ratio.
+"""
+function beta_sample(α::Real, β::Real)
+    x = gamma_sample(α, 1.0)
+    y = gamma_sample(β, 1.0)
+    return x / (x + y)
+end

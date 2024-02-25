@@ -14,9 +14,10 @@ abstract type AbstractScoringMethod end
 
 Implements scoring and selection for Thompson Sampling method. See https://en.wikipedia.org/wiki/Thompson_sampling for more details.
 """
-struct ThompsonSampling <: AbstractScoringMethod
+@kwdef struct ThompsonSampling <: AbstractScoringMethod
+    alpha::Float64 = 1.0  # Alpha parameter for the Beta distribution
+    beta::Float64 = 1.0  # Beta parameter for the Beta distribution
 end
-# TODO: implement Thompson Sampling
 
 """
     UCT <: AbstractScoringMethod
@@ -107,21 +108,55 @@ end
 
 "Scores a node using the ThomsonSampling method, similar to Bandit algorithms."
 function score(node::SampleNode, scoring::ThompsonSampling)
-    parent_node = AbstractTrees.parent(node)
-    ## parent_node_score = isnothing(parent_node) || iszero(parent_node.visits) ? 0.0 :
-    ##                     scoring.exploration * sqrt(log(parent_node.visits) / node.visits)
-    ## s = iszero(node.visits) ? 0.0 : node.wins / node.visits + parent_node_score
-    # TODO: implement Thompson Sampling
-    s = 0.0
+    (; alpha, beta) = scoring
+    s = beta_sample(alpha + node.wins, beta + node.visits - node.wins)
 end
 
 """
     select_best(node::SampleNode, scoring::AbstractScoringMethod = UCT();
         ordering::Symbol = :PostOrderDFS)
 
-Selects the best node from the tree using the given `scoring`. Defaults to UCT.
+Selects the best node from the tree using the given `scoring` (`UCT` or `ThompsonSampling`). Defaults to UCT.
+Thompson Sampling is more random with small samples, while UCT stabilizes much quicker thanks to looking at parent nodes as well.
 
 Ordering can be either `:PreOrderDFS` or `:PostOrderDFS`. Defaults to `:PostOrderDFS`, which favors the leaves (end points of the tree).
+
+# Example
+Compare the different scoring methods:
+```julia
+# Set up mock samples and scores
+data = PT.AbstractMessage[]
+root = SampleNode(; data)
+child1 = expand!(root, data)
+backpropagate!(child1; wins = 1, visits = 1)
+child2 = expand!(root, data)
+backpropagate!(child2; wins = 0, visits = 1)
+child11 = expand!(child1, data)
+backpropagate!(child11; wins = 1, visits = 1)
+
+# Select with UCT
+n = select_best(root, UCT())
+SampleNode(id: 29826, stats: 1/1, length: 0)
+
+# Show the tree:
+print_samples(root; scoring = UCT())
+## SampleNode(id: 13184, stats: 2/3, score: 0.67, length: 0)
+## ├─ SampleNode(id: 26078, stats: 2/2, score: 2.05, length: 0)
+## │  └─ SampleNode(id: 29826, stats: 1/1, score: 2.18, length: 0)
+## └─ SampleNode(id: 39931, stats: 0/1, score: 1.48, length: 0)
+
+# Select with ThompsonSampling - much more random with small samples
+n = select_best(root, ThompsonSampling())
+SampleNode(id: 26078, stats: 2/2, length: 0)
+
+# Show the tree (run it a few times and see how the scores jump around):
+print_samples(root; scoring = ThompsonSampling())
+## SampleNode(id: 13184, stats: 2/3, score: 0.6, length: 0)
+## ├─ SampleNode(id: 26078, stats: 2/2, score: 0.93, length: 0)
+## │  └─ SampleNode(id: 29826, stats: 1/1, score: 0.22, length: 0)
+## └─ SampleNode(id: 39931, stats: 0/1, score: 0.84, length: 0)
+
+```
 """
 function select_best(node::SampleNode, scoring::AbstractScoringMethod = UCT();
         ordering::Symbol = :PostOrderDFS)
@@ -160,7 +195,7 @@ end
 
 "Pretty prints the samples tree starting from `node`. Usually, `node` is the root of the tree. Example: `print_samples(aicall.samples)`."
 function print_samples(node::SampleNode; scoring::AbstractScoringMethod = UCT())
-    print_tree(show, stdout, node; printnode_kw = (; scoring = UCT()))
+    print_tree(show, stdout, node; printnode_kw = (; scoring))
 end
 function Base.copy(n::SampleNode)
     return deepcopy(n)
