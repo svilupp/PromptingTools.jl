@@ -11,6 +11,7 @@ using PromptingTools
 const PT = PromptingTools
 using AbstractTrees
 using AbstractTrees: print_tree, PreOrderDFS, PostOrderDFS
+using Random
 using Test
 
 export print_tree, PreOrderDFS, PostOrderDFS

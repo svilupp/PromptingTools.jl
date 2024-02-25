@@ -20,11 +20,13 @@ Main struct for storing document chunks and their embeddings. It also stores tag
 - `tags::Union{Nothing, AbstractMatrix{<:Bool}}`: for exact search, filtering, etc. This is often a sparse matrix indicating which chunks have the given `tag` (see `tag_vocab` for the position lookup)
 - `tags_vocab::Union{Nothing, Vector{<:AbstractString}}`: vocabulary for the `tags` matrix (each column in `tags` is one item in `tags_vocab` and rows are the chunks)
 - `sources::Vector{<:AbstractString}`: sources of the chunks
+- `extras::Union{Nothing, AbstractVector}`: additional data, eg, metadata, source code, etc.
 """
 @kwdef struct ChunkIndex{
     T1 <: AbstractString,
     T2 <: Union{Nothing, Matrix{<:Real}},
     T3 <: Union{Nothing, AbstractMatrix{<:Bool}},
+    T4 <: Union{Nothing, AbstractVector}
 } <: AbstractChunkIndex
     id::Symbol = gensym("ChunkIndex")
     # underlying document chunks / snippets
@@ -37,6 +39,7 @@ Main struct for storing document chunks and their embeddings. It also stores tag
     tags::T3 = nothing
     tags_vocab::Union{Nothing, Vector{<:AbstractString}} = nothing
     sources::Vector{<:AbstractString}
+    extras::T4 = nothing
 end
 embeddings(index::ChunkIndex) = index.embeddings
 chunks(index::ChunkIndex) = index.chunks

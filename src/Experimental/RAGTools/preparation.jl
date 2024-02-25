@@ -203,8 +203,9 @@ end
 
 """
     build_index(files_or_docs::Vector{<:AbstractString}; reader::Symbol = :files,
-        separators = ["\n\n", ". ", "\n"], max_length::Int = 256,
+        separators = ["\\n\\n", ". ", "\\n"], max_length::Int = 256,
         sources::Vector{<:AbstractString} = files_or_docs,
+        extras::Union{Nothing, AbstractVector} = nothing,
         extract_metadata::Bool = false, verbose::Integer = 1,
         index_id = gensym("ChunkIndex"),
         metadata_template::Symbol = :RAGExtractMetadataShort,
@@ -222,9 +223,10 @@ optionally extracts metadata, and then compiles this information into a retrieva
 # Arguments
 - `files_or_docs`: A vector of valid file paths OR string documents to be indexed (chunked and embedded).
 - `reader`: A symbol indicating the type of input, can be either `:files` or `:docs`. Default is `:files`.
-- `separators`: A list of strings used as separators for splitting the text in each file into chunks. Default is `[\n\n", ". ", "\n"]`.
+- `separators`: A list of strings used as separators for splitting the text in each file into chunks. Default is `[\\n\\n, ". ", "\\n"]`.
 - `max_length`: The maximum length of each chunk (if possible with provided separators). Default is 256.
 - `sources`: A vector of strings indicating the source of each chunk. Default is equal to `files_or_docs` (for `reader=:files`)
+- `extras`: An optional vector of extra information to be stored with each chunk. Default is `nothing`.
 - `extract_metadata`: A boolean flag indicating whether to extract metadata from each chunk (to build filter `tags` in the index). Default is `false`.
   Metadata extraction incurs additional cost and requires `model_metadata` and `metadata_template` to be provided.
 - `verbose`: An Integer specifying the verbosity of the logs. Default is `1` (high-level logging). `0` is disabled.
@@ -262,6 +264,7 @@ index = build_index(["file1.txt", "file2.txt"];
 function build_index(files_or_docs::Vector{<:AbstractString}; reader::Symbol = :files,
         separators = ["\n\n", ". ", "\n"], max_length::Int = 256,
         sources::Vector{<:AbstractString} = files_or_docs,
+        extras::Union{Nothing, AbstractVector} = nothing,
         extract_metadata::Bool = false, verbose::Integer = 1,
         index_id = gensym("ChunkIndex"),
         metadata_template::Symbol = :RAGExtractMetadataShort,
@@ -304,6 +307,7 @@ function build_index(files_or_docs::Vector{<:AbstractString}; reader::Symbol = :
         embeddings,
         tags, tags_vocab,
         chunks = output_chunks,
-        sources = output_sources)
+        sources = output_sources,
+        extras)
     return index
 end
