@@ -153,6 +153,9 @@ end
 # ID: 30088, Answer: blue
 # ID: 44816, Answer: blue
 ```
+
+Note: `airetry` will attempt to fix the model `max_retries` times. 
+If you set `throw=true`, it will throw an ErrorException if the condition is not met after `max_retries` retries.
 """
 function airetry(
         f_cond::Function, aicall::AICallBlock, feedback::Union{AbstractString, Function} = "";
