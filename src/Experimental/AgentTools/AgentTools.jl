@@ -27,7 +27,8 @@ export RetryConfig, last_output, last_message
 export AICodeFixer, run!
 include("lazy_types.jl")
 
-export airetry
+export airetry!
+# export add_feedback!, evaluate_condition!
 include("retry.jl")
 
 end
