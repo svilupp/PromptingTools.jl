@@ -21,6 +21,7 @@ It must return a boolean value, which indicates whether the condition is met.
 - If controlling keyword arguments are set to nothing, they will fall back to the default values in `aicall.config`. You can override them by passing the keyword arguments explicitly.
 - If there multiple `airetry` checks, they are evaluted sequentially. As long as `throw==false`, they will be all evaluated even if they failed previous checks.
 - Only samples which passed previous evaluations are evaluated (`sample.success` is `true`). If there are no successful samples, the function will evaluate only the active sample (`aicall.active_sample_id`) and nothing else.
+- We implement a version of Monte Carlo Tree Search (MCTS) to always pick the most promising sample to restart from (you can tweak the options in `RetryConfig` to change the behaviour).
 
 # Arguments
 - `f_cond::Function`: A function that accepts the `aicall` object and returns a boolean value. Retry will be attempted if the condition is not met (`f_cond -> false`).
@@ -156,6 +157,100 @@ end
 
 Note: `airetry` will attempt to fix the model `max_retries` times. 
 If you set `throw=true`, it will throw an ErrorException if the condition is not met after `max_retries` retries.
+
+
+```julia
+# Let's define a mini program to guess the number
+\"\"\"
+    llm_guesser()
+
+Mini program to guess the number provided by the user (betwee 1-100).
+\"\"\"
+function llm_guesser(user_number::Int)
+    @assert 1 <= user_number <= 100
+    prompt = \"\"\"
+I’m thinking a number between 1-100. Guess which one it is. 
+You must respond only with digits and nothing else. 
+Your guess:\"\"\"
+    ## 2 samples at a time, max 5 fixing rounds
+    out = AIGenerate(prompt; config = RetryConfig(; n_samples = 2, max_retries = 5),
+        api_kwargs = (; n = 2)) |> run!
+    ## Check the proper output format - must parse to Int, use do-syntax
+    ## We can provide feedback via a function!
+    airetry(out,
+        x -> "Output: \$(last_output(x))\nFeedback: You must respond only with digits!!") do aicall
+        !isnothing(tryparse(Int, last_output(aicall)))
+    end
+    ## Give a hint on bounds
+    lower_bound = (user_number ÷ 10) * 10
+    upper_bound = lower_bound + 10
+    airetry(
+        out, "The number is between or equal to \$lower_bound and \$upper_bound.") do aicall
+        guess = tryparse(Int, last_output(aicall))
+        lower_bound <= guess <= upper_bound
+    end
+    ## You can make at most 3x guess now -- if there is max_retries in `config.max_retries` left
+    max_retries = out.config.retries + 3
+    airetry(==(user_number), out,
+        x -> "Your guess of \$(last_output(x)) is wrong. Try again"; max_retries)
+
+    ## Evaluate the best guess
+    @info "Guess: \$(last_output(out)) vs User: \$user_number (Number of calls made: \$(out.config.calls))"
+    return out
+end
+
+# Let's play the game
+out = llm_guesser(42)
+## [ Info: Condition not met. Retrying...
+## [ Info: Condition not met. Retrying...
+## [ Info: Condition not met. Retrying...
+## [ Info: Condition not met, but maximum retry budget was reached (Retries: 3/3, Calls: 8/99).
+## [ Info: Guess: 25 vs User: 42 (Number of calls made: 8)
+```
+Okay, 3 guesses were not enough to guess the number. Try changing the max_retries or hints :)
+
+Now, we could explore different samples (eg, `print_samples(out.samples)`) or see what the model guessed at each step:
+```julia
+print_samples(out.samples)
+## SampleNode(id: 31817, stats: 4/12, score: 0.33, length: 2)
+## ├─ SampleNode(id: 11089, stats: 2/7, score: 1.13, length: 4)
+## │  ├─ SampleNode(id: 10484, stats: 0/3, score: 1.14, length: 6)
+## │  │  ├─ SampleNode(id: 43493, stats: 0/1, score: 1.48, length: 7)
+## │  │  └─ SampleNode(id: 11480, stats: 0/1, score: 1.48, length: 7)
+## │  └─ SampleNode(id: 43481, stats: 0/1, score: 1.97, length: 5)
+## └─ SampleNode(id: 40077, stats: 2/5, score: 1.4, length: 4)
+##    ├─ SampleNode(id: 65021, stats: 0/1, score: 1.79, length: 5)
+##    └─ SampleNode(id: 40493, stats: 0/1, score: 1.79, length: 5)
+
+# Lastly, let's check all the guesses AI made across all samples. 
+# We can clearly see that despite the feedback, the guesses were too repetitive and not close to the user's number.
+# We could for example change some feedback to try +2 or -2 from the previous guess.
+# Or we could add a condition that tells how far from the user's number the guess was.
+
+for sample in PostOrderDFS(out.samples)
+    [println("ID: \$(sample.id), Guess: \$(msg.content)")
+     for msg in sample.data if msg isa PT.AIMessage]
+end
+## ID: 43493, Guess: 50
+## ID: 43493, Guess: 25
+## ID: 43493, Guess: 75
+## ID: 11480, Guess: 50
+## ID: 11480, Guess: 25
+## ID: 11480, Guess: 75
+## ID: 10484, Guess: 50
+## ID: 10484, Guess: 25
+## ID: 43481, Guess: 50
+## ID: 43481, Guess: 25
+## ID: 11089, Guess: 50
+## ID: 65021, Guess: 50
+## ID: 65021, Guess: 25
+## ID: 40493, Guess: 50
+## ID: 40493, Guess: 25
+## ID: 40077, Guess: 50
+```
+
+Note that the model always see only the feedback of its own and its ancestors, not other "branches". 
+But it can be changed, because feedback function has access to the aicall object.
 """
 function airetry(
         f_cond::Function, aicall::AICallBlock, feedback::Union{AbstractString, Function} = "";
