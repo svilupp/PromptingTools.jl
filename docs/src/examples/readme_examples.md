@@ -180,6 +180,26 @@ In the above example, we used a prompt template `:JudgeIsItTrue`, which automati
 
 For more information on templates, see the [Templated Prompts](#templated-prompts) section.
 
+### Routing to Defined Categories
+
+`aiclassify` can be also used for classification into a set of defined categories (maximum 20), so we can use it for routing.
+
+In addition, if you provide the choices as tuples (`(label, description)`), the model will use the descriptions to decide, but it will return the labels.
+
+Example:
+```julia
+choices = [("A", "any animal or creature"), ("P", "for any plant or tree"), ("O", "for everything else")]
+
+input = "spider" 
+aiclassify(:InputClassifier; choices, input) # -> returns "A" for any animal or creature
+
+# Try also with:
+input = "daphodil" # -> returns "P" for any plant or tree
+input = "castle" # -> returns "O" for everything else
+```
+
+Under the hood, we use the "logit bias" trick to force only 1 generated token - that means it's very cheap and very fast!
+
 ## Data Extraction
 
 Are you tired of extracting data with regex? You can use LLMs to extract structured data from text!
@@ -258,6 +278,69 @@ You can add syntax highlighting of the outputs via Markdown
 using Markdown
 msg.content |> Markdown.parse
 ```
+
+## Experimental Agent Workflows / Output Validation with `airetry!`
+
+This is an experimental feature, so you have to import it explicitly:
+```julia
+using PromptingTools.Experimental.AgentTools
+```
+
+This module offers "lazy" counterparts to the `ai...` functions, so you can use them in a more controlled way, eg, `aigenerate` -> `AIGenerate` (notice the CamelCase), which has exactly the same arguments except it generates only when `run!` is called.
+
+For example:
+```julia
+out = AIGenerate("Say hi!"; model="gpt4t")
+run!(out)
+```
+
+How is it useful? We can use the same "inputs" for repeated calls, eg, when we want to validate 
+or regenerate some outputs. We have a function `airetry` to help us with that.
+
+The signature of `airetry` is `airetry(condition_function, aicall::AICall, feedback_function)`.
+It evaluates the condition `condition_function` on the `aicall` object (eg, we evaluate `f_cond(aicall) -> Bool`). If it fails, we call `feedback_function` on the `aicall` object to provide feedback for the AI model (eg, `f_feedback(aicall) -> String`) and repeat the process until it passes or until `max_retries` value is exceeded.
+
+We can catch API failures (no feedback needed, so none is provided)
+```julia
+# API failure because of a non-existent model
+# RetryConfig allows us to change the "retry" behaviour of any lazy call
+out = AIGenerate("say hi!"; config = RetryConfig(; catch_errors = true),
+    model = "NOTEXIST")
+run!(out) # fails
+
+# we ask to wait 2s between retries and retry 2 times (can be set in `config` in aicall as well)
+airetry!(isvalid, out; retry_delay = 2, max_retries = 2)
+```
+
+Or we can validate some outputs (eg, its format, its content, etc.)
+
+We'll play a color guessing game (I'm thinking "yellow"):
+
+```julia
+# Notice that we ask for two samples (`n_samples=2`) at each attempt (to improve our chances). 
+# Both guesses are scored at each time step, and the best one is chosen for the next step.
+# And with OpenAI, we can set `api_kwargs = (;n=2)` to get both samples simultaneously (cheaper and faster)!
+out = AIGenerate(
+    "Guess what color I'm thinking. It could be: blue, red, black, white, yellow. Answer with 1 word only";
+    verbose = false,
+    config = RetryConfig(; n_samples = 2), api_kwargs = (; n = 2))
+run!(out)
+
+## Check that the output is 1 word only, third argument is the feedback that will be provided if the condition fails
+## Notice: functions operate on `aicall` as the only argument. We can use utilities like `last_output` and `last_message` to access the last message and output in the conversation.
+airetry!(x -> length(split(last_output(x), r" |\\.")) == 1, out,
+    "You must answer with 1 word only.")
+
+# Note: you could also use the do-syntax, eg, 
+airetry!(out, "You must answer with 1 word only.") do aicall
+    length(split(last_output(aicall), r" |\\.")) == 1
+end
+```
+
+You can place multiple `airetry!` calls in a sequence. They will keep retrying until they run out of maximum AI calls allowed (`max_calls`) or maximum retries (`max_retries`).
+
+See the docs for more complex examples and usage tips (`?airetry`).
+We leverage Monte Carlo Tree Search (MCTS) to optimize the sequence of retries, so it's a very powerful tool for building robust AI workflows (inspired by [Language Agent Tree Search paper](https://arxiv.org/abs/2310.04406) and by [DSPy Assertions paper](https://arxiv.org/abs/2312.13382)).
 
 ## Using Ollama models
 

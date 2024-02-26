@@ -70,8 +70,7 @@ function OpenAI.build_url(provider::AbstractCustomProvider, api::AbstractString)
     string(provider.base_url, "/", api)
 end
 function OpenAI.auth_header(provider::AbstractCustomProvider, api_key::AbstractString)
-    OpenAI.auth_header(
-        OpenAI.OpenAIProvider(provider.api_key,
+    OpenAI.auth_header(OpenAI.OpenAIProvider(provider.api_key,
             provider.base_url,
             provider.api_version),
         api_key)
@@ -483,7 +482,7 @@ function aigenerate(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_
             run_id = Int(rand(Int32)) # remember one run ID
             ## extract all message
             msgs = [response_to_message(prompt_schema, AIMessage, choice, r;
-                        time, model_id, run_id, sample_id = i)
+                time, model_id, run_id, sample_id = i)
                     for (i, choice) in enumerate(r.response[:choices])]
             ## Order by log probability if available
             ## bigger is better, keep it last
@@ -788,9 +787,11 @@ aiclassify(:InputClassifier; choices, input)
 Choices with descriptions provided as tuples:
 ```julia
 choices = [("A", "any animal or creature"), ("P", "for any plant or tree"), ("O", "for everything else")]
-input = "spider"
-input = "daphodil"
-input = "castle"
+
+# try the below inputs:
+input = "spider" # -> returns "A" for any animal or creature
+input = "daphodil" # -> returns "P" for any plant or tree
+input = "castle" # -> returns "O" for everything else
 aiclassify(:InputClassifier; choices, input)
 ```
 
@@ -824,7 +825,7 @@ function aiclassify(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_
         choices::AbstractVector{T} = ["true", "false", "unknown"],
         api_kwargs::NamedTuple = NamedTuple(),
         kwargs...) where {T <:
-                          Union{AbstractString, Tuple{<:AbstractString, <:AbstractString}}}
+             Union{AbstractString, Tuple{<:AbstractString, <:AbstractString}}}
     ## Encode the choices and the corresponding prompt 
     ## TODO: maybe check the model provided as well?
     choices_prompt, logit_bias, decode_ids = encode_choices(prompt_schema, choices)
@@ -886,16 +887,17 @@ function response_to_message(schema::AbstractOpenAISchema,
 end
 
 """
-    aiextract([prompt_schema::AbstractOpenAISchema,] prompt::ALLOWED_PROMPT_TYPE; 
-    return_type::Type,
-    verbose::Bool = true,
+    aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE;
+        return_type::Type,
+        verbose::Bool = true,
+        api_key::String = OPENAI_API_KEY,
         model::String = MODEL_CHAT,
-        return_all::Bool = false, dry_run::Bool = false,  
+        return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
-        http_kwargs::NamedTuple = (;
-            retry_non_idempotent = true,
+        http_kwargs::NamedTuple = (retry_non_idempotent = true,
             retries = 5,
-            readtimeout = 120), api_kwargs::NamedTuple = NamedTuple(),
+            readtimeout = 120), api_kwargs::NamedTuple = (;
+            tool_choice = "exact"),
         kwargs...)
 
 Extract required information (defined by a struct **`return_type`**) from the provided prompt by leveraging OpenAI function calling mode.
@@ -917,7 +919,10 @@ It's effectively a light wrapper around `aigenerate` call, which requires additi
 - `dry_run::Bool=false`: If `true`, skips sending the messages to the model (for debugging, often used with `return_all=true`).
 - `conversation`: An optional vector of `AbstractMessage` objects representing the conversation history. If not provided, it is initialized as an empty vector.
 - `http_kwargs`: A named tuple of HTTP keyword arguments.
-- `api_kwargs`: A named tuple of API keyword arguments.
+- `api_kwargs`: A named tuple of API keyword arguments. 
+  - `tool_choice`: A string representing the tool choice to use for the API call. Usually, one of "auto","any","exact". 
+    Defaults to `"exact"`, which is a made-up value to enforce the OpenAI requirements if we want one exact function.
+    Providers like Mistral, Together, etc. use `"any"` instead.
 - `kwargs`: Prompt variables to be used to fill the prompt/template
 
 # Returns
@@ -943,7 +948,6 @@ struct MyMeasurement
     weight::Union{Nothing,Float64} # optional
 end
 msg = aiextract("James is 30, weighs 80kg. He's 180cm tall."; return_type=MyMeasurement)
-# [ Info: Tokens: 129 @ Cost: \$0.0002 in 1.0 seconds
 # PromptingTools.DataMessage(MyMeasurement)
 msg.content
 # MyMeasurement(30, 180, 80.0)
@@ -1002,6 +1006,17 @@ That way, you can handle the error gracefully and get a reason why extraction fa
 
 Note that the error message refers to a giraffe not being a human, 
  because in our `MyMeasurement` docstring, we said that it's for people!
+
+Some non-OpenAI providers require a different specification of the "tool choice" than OpenAI. 
+For example, to use Mistral models ("mistrall" for mistral large), do:
+```julia
+"Some fruit"
+struct Fruit
+    name::String
+end
+aiextract("I ate an apple",return_type=Fruit,api_kwargs=(;tool_choice="any"),model="mistrall")
+# Notice two differences: 1) struct MUST have a docstring, 2) tool_choice is set explicitly set to "any"
+```
 """
 function aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE;
         return_type::Type,
@@ -1012,15 +1027,24 @@ function aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_T
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         http_kwargs::NamedTuple = (retry_non_idempotent = true,
             retries = 5,
-            readtimeout = 120), api_kwargs::NamedTuple = NamedTuple(),
+            readtimeout = 120), api_kwargs::NamedTuple = (;
+            tool_choice = "exact"),
         kwargs...)
     ##
     global MODEL_ALIASES
     ## Function calling specifics
     tools = [Dict(:type => "function", :function => function_call_signature(return_type))]
     ## force our function to be used
-    tool_choice = Dict(:type => "function",
-        :function => Dict(:name => only(tools)[:function]["name"]))
+    tool_choice_ = get(api_kwargs, :tool_choice, "exact")
+    tool_choice = if tool_choice_ == "exact"
+        ## Standard for OpenAI API
+        Dict(:type => "function",
+            :function => Dict(:name => only(tools)[:function]["name"]))
+    else
+        # User provided value, eg, "auto", "any" for various providers like Mistral, Together, etc.
+        tool_choice_
+    end
+
     ## Add the function call signature to the api_kwargs
     api_kwargs = merge(api_kwargs, (; tools, tool_choice))
     ## Find the unique ID for the model alias provided
@@ -1038,7 +1062,7 @@ function aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_T
             run_id = Int(rand(Int32)) # remember one run ID
             ## extract all message
             msgs = [response_to_message(prompt_schema, DataMessage, choice, r;
-                        return_type, time, model_id, run_id, sample_id = i)
+                return_type, time, model_id, run_id, sample_id = i)
                     for (i, choice) in enumerate(r.response[:choices])]
             ## Order by log probability if available
             ## bigger is better, keep it last
@@ -1195,7 +1219,7 @@ function aiscan(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE
             run_id = Int(rand(Int32)) # remember one run ID
             ## extract all message
             msgs = [response_to_message(prompt_schema, AIMessage, choice, r;
-                        time, model_id, run_id, sample_id = i)
+                time, model_id, run_id, sample_id = i)
                     for (i, choice) in enumerate(r.response[:choices])]
             ## Order by log probability if available
             ## bigger is better, keep it last
