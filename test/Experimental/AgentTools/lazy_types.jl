@@ -1,3 +1,21 @@
+@testset "RetryConfig" begin
+    config = RetryConfig()
+    config.retries = 1
+    config.calls = 1
+
+    # Show method
+    io = IOBuffer()
+    show(io, config)
+    str = String(take!(io))
+    @test str ==
+          "RetryConfig\n  retries: Int64 1\n  calls: Int64 1\n  max_retries: Int64 10\n  max_calls: Int64 99\n  retry_delay: Int64 0\n  n_samples: Int64 1\n  scoring: PromptingTools.Experimental.AgentTools.UCT\n  ordering: Symbol PostOrderDFS\n  feedback_inplace: Bool false\n  feedback_template: Symbol FeedbackFromEvaluator\n  temperature: Float64 0.7\n  catch_errors: Bool false\n"
+
+    ## copy
+    config2 = copy(config)
+    @test config2 == config
+    @test config2 !== config
+end
+
 @testset "AICall" begin
     # Create AICall with default parameters
     default_call = AICall(identity)
@@ -81,6 +99,19 @@
     output = String(take!(io))
     @test output ==
           "AICall{typeof(identity)}(Messages: 2, Success: true)\n- Preview of the Latest AIMessage (see property `:conversation`):\n Test message"
+
+    ## last_message, last_output
+    @test last_output(aicall) == aicall.conversation[end].content
+    @test last_message(aicall) == aicall.conversation[end]
+
+    ## isvalid
+    @test isvalid(aicall) == aicall.success
+
+    ## copy
+    aicall = AICall(identity)
+    aicall2 = copy(aicall)
+    @test aicall == aicall2
+    @test aicall !== aicall2
 end
 
 @testset "AICodeFixer" begin
