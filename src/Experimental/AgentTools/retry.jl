@@ -4,7 +4,7 @@
         verbose::Bool = true, throw::Bool = false, evaluate_all::Bool = true, feedback_expensive::Bool = false,
         max_retries::Union{Nothing, Int} = nothing, retry_delay::Union{Nothing, Int} = nothing)
 
-Evalutes the condition `f_cond` on the `aicall` object (eg, we evaluate `f_cond(aicall) -> Bool`). 
+Evaluates the condition `f_cond` on the `aicall` object (eg, we evaluate `f_cond(aicall) -> Bool`). 
 If the condition is not met, it will return the best sample to retry from and provide `feedback` to `aicall`. That's why it's mutating.
 It will retry running the `aicall` `max_retries` times.
 If `throw` is `true`, it will throw an error if the function does not return `true` after `max_retries` retries.
@@ -26,7 +26,12 @@ You can leverage the `last_message`, `last_output`, and `AICode` functions to ac
 - If controlling keyword arguments are set to nothing, they will fall back to the default values in `aicall.config`. You can override them by passing the keyword arguments explicitly.
 - If there multiple `airetry!` checks, they are evaluted sequentially. As long as `throw==false`, they will be all evaluated even if they failed previous checks.
 - Only samples which passed previous evaluations are evaluated (`sample.success` is `true`). If there are no successful samples, the function will evaluate only the active sample (`aicall.active_sample_id`) and nothing else.
+- Feedback from all "ancestor" evaluations is added upon retry, not feedback from the "sibblings" or other branches. To have only ONE long BRANCH (no sibblings), make sure to keep `RetryConfig(; n_samples=1)`. 
+  That way the model will always see ALL previous feedback.
 - We implement a version of Monte Carlo Tree Search (MCTS) to always pick the most promising sample to restart from (you can tweak the options in `RetryConfig` to change the behaviour).
+- For large number of parallel branches (ie, "shallow and wide trees"), you might benefit from switching scoring to `scoring=ThompsonSampling()` (similar to how Bandit algorithms work).
+- Open-source/local models can struggle with too long conversation, you might want to experiment with `in-place feedback` (set `RetryConfig(; feedback_inplace=true)`).
+
 
 # Arguments
 - `f_cond::Function`: A function that accepts the `aicall` object and returns a boolean value. Retry will be attempted if the condition is not met (`f_cond -> false`).
@@ -72,7 +77,7 @@ We'll play a color guessing game (I'm thinking "yellow"):
 ```julia
 # Notice that we ask for two samples (`n_samples=2`) at each attempt (to improve our chances). 
 # Both guesses are scored at each time step, and the best one is chosen for the next step.
-# And with OpenAI, we can set `api_kwargs = (;n=2)` to get both samples simulatenously (cheaper and faster)!
+# And with OpenAI, we can set `api_kwargs = (;n=2)` to get both samples simultaneously (cheaper and faster)!
 out = AIGenerate(
     "Guess what color I'm thinking. It could be: blue, red, black, white, yellow. Answer with 1 word only";
     verbose = false,
@@ -258,13 +263,18 @@ end
 ## etc...
 ```
 
-Note if there are multiple "branches" the model will see only the feedback of its own and its ancestors not the other "branches". 
+Note that if there are multiple "branches" the model will see only the feedback of its own and its ancestors not the other "branches". 
 If you want to show all object, set `n_samples=1`, so all fixing happens sequantially and model sees all feedback (less powerful if model falls into a bad state).
 Alternatively, you can tweak the feedback function.
+
+# See Also
+
+References: `airetry` is inspired by the [Language Agent Tree Search paper](https://arxiv.org/abs/2310.04406) and by [DSPy Assertions paper](https://arxiv.org/abs/2312.13382).
 """
-function airetry!(
-        f_cond::Function, aicall::AICallBlock, feedback::Union{AbstractString, Function} = "";
-        verbose::Integer = 1, throw::Bool = false, evaluate_all::Bool = true, feedback_expensive::Bool = false,
+function airetry!(f_cond::Function, aicall::AICallBlock,
+        feedback::Union{AbstractString, Function} = "";
+        verbose::Integer = 1, throw::Bool = false, evaluate_all::Bool = true,
+        feedback_expensive::Bool = false,
         max_retries::Union{Nothing, Int} = nothing, retry_delay::Union{Nothing, Int} = nothing)
     (; config) = aicall
     (; max_calls, feedback_inplace, feedback_template) = aicall.config
@@ -278,8 +288,8 @@ function airetry!(
     while !condition_passed
 
         ## Evaluation + feedback (sample is either the "successful" node or the best node to retry from)
-        condition_passed, sample = evaluate_condition!(
-            f_cond, aicall, feedback; evaluate_all, feedback_expensive)
+        condition_passed, sample = evaluate_condition!(f_cond, aicall, feedback;
+            evaluate_all, feedback_expensive)
 
         ## Update the aicall
         aicall.conversation = sample.data
@@ -307,8 +317,8 @@ function airetry!(
 
         ## Append feedback if provided
         if sample.feedback != ""
-            aicall.conversation = add_feedback!(
-                aicall.conversation, sample; feedback_inplace, feedback_template)
+            aicall.conversation = add_feedback!(aicall.conversation, sample;
+                feedback_inplace, feedback_template)
         end
         sleep(retry_delay)
         aicall.config.retries += 1
@@ -432,7 +442,7 @@ function evaluate_condition!(f_cond::Function, aicall::AICallBlock,
        feedback_expensive
         ## We were unsuccessful and haven't given any feedback yet
         sample.feedback = if feedback isa Function
-            "\n" * feedback(sample)
+            "\n" * feedback(aicall)
         else
             "\n" * feedback
         end
@@ -485,14 +495,18 @@ conversation[end].content ==
 "### Feedback from Evaluator\n\nFeedback X\n----------\n\nFeedback Y\n"
 ```
 """
-function add_feedback!(
-        conversation::AbstractVector{<:PT.AbstractMessage}, sample::SampleNode; feedback_inplace::Bool = false,
+function add_feedback!(conversation::AbstractVector{<:PT.AbstractMessage},
+        sample::SampleNode; feedback_inplace::Bool = false,
         feedback_template::Symbol = :FeedbackFromEvaluator)
-
+    ##
+    all_feedback = collect_all_feedback(sample)
+    ## short circuit if no feedback
+    if strip(all_feedback) == ""
+        return conversation
+    end
     ## Prepare feedback as a UserMessage
     feedback_message = let schema = PT.NoSchema()
         # feedback from all ancestors, newline separated
-        all_feedback = collect_all_feedback(sample)
         template = PT.AITemplate(feedback_template)
         output = PT.render(schema, template) # render the feedback template
         output = PT.render(schema, output; feedback = all_feedback) # replace the placeholder
@@ -502,10 +516,10 @@ function add_feedback!(
         ## Remove AI Message and extract he user message
         user_msg = pop!(conversation) ## pop the last AI message
         while !PT.isusermessage(user_msg)
-            ## keep popping until we find the user message
-            user_msg = pop!(conversation)
             length(conversation) == 0 &&
                 throw("Something went wrong, no user messages detected to add feedback into.")
+            ## keep popping until we find the user message
+            user_msg = pop!(conversation)
         end
         ## Concatenate the feedback message with the user message
         user_msg = PT.UserMessage(;

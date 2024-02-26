@@ -41,17 +41,7 @@ function Base.show(io::IO, config::RetryConfig)
     dump(IOContext(io, :limit => true), config, maxdepth = 1)
 end
 function Base.copy(config::RetryConfig)
-    return RetryConfig(
-        config.retries,
-        config.calls,
-        config.max_retries,
-        config.max_calls,
-        config.retry_delay,
-        config.n_samples,
-        config.scoring,
-        config.feedback_inplace,
-        config.feedback_template,
-        config.temperature)
+    return deepcopy(config)
 end
 function Base.var"=="(c1::RetryConfig, c2::RetryConfig)
     all(f -> getfield(c1, f) == getfield(c2, f), fieldnames(typeof(c1)))
@@ -247,8 +237,7 @@ function run!(aicall::AICallBlock;
     parent_node = find_node(aicall.samples, aicall.active_sample_id) |>
                   x -> isnothing(x) ? aicall.samples : x
     ## Obtain the new API kwargs (if we need to tweak parameters)
-    new_api_kwargs = merge(
-        get(aicall.kwargs, :api_kwargs, NamedTuple()),
+    new_api_kwargs = merge(get(aicall.kwargs, :api_kwargs, NamedTuple()),
         get(kwargs, :api_kwargs, NamedTuple()),
         (; temperature = aicall.config.temperature))
     ## Collect n_samples in a loop
@@ -266,8 +255,8 @@ function run!(aicall::AICallBlock;
         ## We need to set explicit temperature to ensure our calls are not cached 
         ## (small perturbations in temperature of each request, unless user requested temp=0)
         if !iszero(new_api_kwargs.temperature)
-            new_api_kwargs = merge(
-                new_api_kwargs, (; temperature = new_api_kwargs.temperature + 1e-3))
+            new_api_kwargs = merge(new_api_kwargs,
+                (; temperature = new_api_kwargs.temperature + 1e-3))
         end
         ## Call the API with try-catch (eg, catch API errors, bad user inputs, etc.)
         try
@@ -276,8 +265,7 @@ function run!(aicall::AICallBlock;
                 aicall.func(conversation; aicall.kwargs..., kwargs...,
                     new_api_kwargs..., return_all = true)
             else
-                aicall.func(
-                    schema, conversation; aicall.kwargs..., kwargs...,
+                aicall.func(schema, conversation; aicall.kwargs..., kwargs...,
                     new_api_kwargs..., return_all = true)
             end
             # unpack multiple samples (if present; if not, it will be a single sample in a vector)
@@ -308,7 +296,7 @@ function run!(aicall::AICallBlock;
         aicall.kwargs = remove_used_kwargs(aicall.kwargs, aicall.conversation)
         ## If first sample (parent == root node), 
         ## make sure that root node sample has a conversation to retry from
-        if current_node.parent == aicall.samples && isempty(aicall.samples.data)
+        if current_node.parent.id == aicall.samples.id && isempty(aicall.samples.data)
             aicall.samples.data = copy(aicall.conversation)
             pop!(aicall.samples.data)  # remove the last AI message
         end
@@ -351,8 +339,7 @@ function Base.isvalid(aicall::AICallBlock)
 end
 
 function Base.copy(aicall::AICallBlock)
-    return AICall{typeof(aicall.func)}(
-        aicall.func,
+    return AICall{typeof(aicall.func)}(aicall.func,
         aicall.schema,
         copy(aicall.conversation),
         aicall.kwargs,

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
+### Fixed
+
+## [0.13.0]
+
+### Added
 - Added initial support for Google Gemini models for `aigenerate` (requires environment variable `GOOGLE_API_KEY` and package [GoogleGenAI.jl](https://github.com/tylerjthomas9/GoogleGenAI.jl) to be loaded).
 - Added a utility to compare any two string sequences (and other iterators)`length_longest_common_subsequence`. It can be used to fuzzy match strings (eg, detecting context/sources in an AI-generated response or fuzzy matching AI response to some preset categories). See the docstring for more information `?length_longest_common_subsequence`.
 - Rewrite of `aiclassify` to classify into an arbitrary list of categories (including with descriptions). It's a quick and easy option for "routing" and similar use cases, as it exploits the logit bias trick and outputs only 1 token. Currently, only `OpenAISchema` is supported. See `?aiclassify` for more information.
@@ -18,8 +24,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `sample_id` - ID of the sample in the batch if you requested multiple completions, otherwise `sample_id==nothing` (they will have the same `run_id`)
   - `finish_reason` - the reason why the AI stopped generating the sequence (eg, "stop", "length") to provide more visibility for the user
 - Support for Fireworks.ai and Together.ai providers for fast and easy access to open-source models. Requires environment variables `FIREWORKS_API_KEY` and `TOGETHER_API_KEY` to be set, respectively. See the `?FireworksOpenAISchema` and `?TogetherOpenAISchema` for more information.
+- Added an `extra` field to `ChunkIndex` object for RAG workloads to allow additional flexibility with metadata for each document chunk (assumed to be a vector of the same length as the document chunks).
+- Added `airetry` function to `PromptingTools.Experimental.AgentTools` to allow "guided" automatic retries of the AI calls (eg, `AIGenerate` which is the "lazy" counterpart of `aigenerate`) if a given condition fails. It's useful for robustness and reliability in agentic workflows. You can provide conditions as functions and the same holds for feedback to the model as well. See a guessing game example in `?airetry`.
 
-### Fixed
+## Updated
+- Updated names of endpoints and prices of Mistral.ai models as per the [latest announcement](https://mistral.ai/technology/#models) and [pricing](https://docs.mistral.ai/platform/pricing/). Eg, `mistral-small` -> `mistral-small-latest`. In addition, the latest Mistral model has been added `mistral-large-latest` (aliased as `mistral-large` and `mistrall`, same for the others). `mistral-small-latest` and `mistral-large-latest` now support function calling, which means they will work with `aiextract` (You need to explicitly provide `tool_choice`, see the docs `?aiextract`).
 
 ## [0.12.0]
 

@@ -26,7 +26,7 @@ Main struct for storing document chunks and their embeddings. It also stores tag
     T1 <: AbstractString,
     T2 <: Union{Nothing, Matrix{<:Real}},
     T3 <: Union{Nothing, AbstractMatrix{<:Bool}},
-    T4 <: Union{Nothing, AbstractVector}
+    T4 <: Union{Nothing, AbstractVector},
 } <: AbstractChunkIndex
     id::Symbol = gensym("ChunkIndex")
     # underlying document chunks / snippets

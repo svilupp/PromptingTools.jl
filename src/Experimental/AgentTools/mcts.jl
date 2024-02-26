@@ -65,8 +65,8 @@ function AbstractTrees.children(node::SampleNode)
 end
 AbstractTrees.parent(n::SampleNode) = n.parent
 ## AbstractTrees.nodevalue(n::SampleNode) = n.data
-function Base.show(
-        io::IO, node::SampleNode; scoring::Union{Nothing, AbstractScoringMethod} = nothing)
+function Base.show(io::IO, node::SampleNode;
+        scoring::Union{Nothing, AbstractScoringMethod} = nothing)
     score_str = isnothing(scoring) ? "" : ", score: $(round(score(node, scoring),digits=2))"
     length_str = node.data isa AbstractVector ? ", length: $(length(node.data))" : ""
     print(io,
@@ -75,10 +75,29 @@ end
 function Base.getindex(node::SampleNode, id::Integer)
     find_node(node, id)
 end
+function Base.var"=="(n1::SampleNode, n2::SampleNode)
+    all(fieldnames(typeof(n1))) do f
+        if f == :parent
+            ## both must have a parent or both must not have a parent
+            ## if they don't have a parent, they are equal
+            ## if they have a parent, the parent id must be the same
+            isnothing(n1.parent) == isnothing(n2.parent) &&
+                (isnothing(n1.parent) || (n1.parent.id == n2.parent.id))
+        elseif f == :children
+            all(x -> x[1].id == x[2].id, zip(n1.children, n2.children))
+        else
+            getfield(n1, f) == getfield(n2, f)
+        end
+    end
+end
+function Base.copy(n::SampleNode)
+    return deepcopy(n)
+end
 
 "Expands the tree with a new node from `parent` using the given `data` and `success`."
-function expand!(parent::SampleNode, data; success::Union{Nothing, Bool} = true)
-    child = SampleNode(; data, parent, success)
+function expand!(parent::SampleNode, data;
+        success::Union{Nothing, Bool} = true, feedback::String = "")
+    child = SampleNode(; data, parent, success, feedback)
     push!(AbstractTrees.children(parent), child)
     return child
 end
@@ -95,7 +114,7 @@ function backpropagate!(node::SampleNode; wins::Integer, visits::Int = 1)
 end
 
 function score(node::SampleNode, scoring::AbstractScoringMethod)
-    throw(ArgumentError("Scoring method not implemented for `score` with $(typeof(method))"))
+    throw(ArgumentError("Scoring method not implemented for `score` with $(typeof(scoring))"))
 end
 
 "Scores a node using the UCT (Upper Confidence Bound for Trees) method."
@@ -195,10 +214,10 @@ end
 
 "Pretty prints the samples tree starting from `node`. Usually, `node` is the root of the tree. Example: `print_samples(aicall.samples)`."
 function print_samples(node::SampleNode; scoring::AbstractScoringMethod = UCT())
-    print_tree(show, stdout, node; printnode_kw = (; scoring))
+    print_samples(stdout, node; scoring)
 end
-function Base.copy(n::SampleNode)
-    return deepcopy(n)
+function print_samples(io::IO, node::SampleNode; scoring::AbstractScoringMethod = UCT())
+    print_tree(show, io, node; printnode_kw = (; scoring))
 end
 
 "Sets the `success` field of all nodes in the tree to `success` value."

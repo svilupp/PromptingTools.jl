@@ -89,8 +89,7 @@ function truncate_conversation(conversation::AbstractVector{<:PT.AbstractMessage
                           length(conversation) > 2
         # start with the last two messages' length (always included)
         new_conversation = similar(conversation) |> empty!
-        current_length = sum(
-            length.(getproperty.(conversation[(end - 1):end],
+        current_length = sum(length.(getproperty.(conversation[(end - 1):end],
                 :content)); init = 0)
         for i in eachindex(conversation[begin:(end - 2)])
             length_ = length(conversation[i].content)
