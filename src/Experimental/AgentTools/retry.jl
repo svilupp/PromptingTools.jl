@@ -4,17 +4,16 @@
         verbose::Bool = true, throw::Bool = false, evaluate_all::Bool = true, feedback_expensive::Bool = false,
         max_retries::Union{Nothing, Int} = nothing, retry_delay::Union{Nothing, Int} = nothing)
 
-Evaluates the condition `f_cond` on the `aicall` object (eg, we evaluate `f_cond(aicall) -> Bool`). 
-If the condition is not met, it will return the best sample to retry from and provide `feedback` to `aicall`. That's why it's mutating.
-It will retry running the `aicall` `max_retries` times.
-If `throw` is `true`, it will throw an error if the function does not return `true` after `max_retries` retries.
+Evaluates the condition `f_cond` on the `aicall` object. 
+If the condition is not met, it will return the best sample to retry from and provide `feedback` (string or function) to `aicall`. That's why it's mutating.
+It will retry maximum `max_retries` times, with `throw=true`, an error will be thrown if the condition is not met after `max_retries` retries.
 
-If feedback is provided (not empty), it will be append it to the conversation before the retry. 
-If a function is provided, it must accept the `aicall` object as the only argument and return a string.
+Function signatures
+- `f_cond(aicall::AICallBlock) -> Bool`, ie, it must accept the aicall object and return a boolean value.
+- `feedback` can be a string or `feedback(aicall::AICallBlock) -> String`, ie, it must accept the aicall object and return a string.
 
-Function `f_cond` is expected to accept the `aicall` object as the only argument. 
-It must return a boolean value, which indicates whether the condition is met.
-You can leverage the `last_message`, `last_output`, and `AICode` functions to access the last message, last output and code blocks in the conversation, respectively.
+You can leverage the `last_message`, `last_output`, and `AICode` functions to access the last message, last output and execute code blocks in the conversation, respectively.
+See examples below.
 
 # Good Use Cases
 - Retry with API failures/drops (add `retry_delay=2` to wait 2s between retries)
@@ -62,6 +61,7 @@ run!(out) # fails
 airetry!(isvalid, out; retry_delay = 2, max_retries = 2)
 ```
 
+
 If you provide arguments to the aicall, we try to honor them as much as possible in the following calls, 
 eg, set low verbosity
 ```julia
@@ -70,6 +70,7 @@ model = "NOTEXIST", verbose=false)
 run!(out)
 # No info message, you just see `success = false` in the properties of the AICall
 ```
+
 
 Let's show a toy example to demonstrate the runtime checks / guardrails for the model output.
 We'll play a color guessing game (I'm thinking "yellow"):
@@ -84,24 +85,29 @@ out = AIGenerate(
     config = RetryConfig(; n_samples = 2), api_kwargs = (; n = 2))
 run!(out)
 
+
 ## Check that the output is 1 word only, third argument is the feedback that will be provided if the condition fails
 ## Notice: functions operate on `aicall` as the only argument. We can use utilities like `last_output` and `last_message` to access the last message and output in the conversation.
 airetry!(x -> length(split(last_output(x), r" |\\.")) == 1, out,
     "You must answer with 1 word only.")
 
+
 ## Let's ensure that the output is in lowercase - simple and short
 airetry!(x -> all(islowercase, last_output(x)), out, "You must answer in lowercase.")
 # [ Info: Condition not met. Retrying...
+
 
 ## Let's add final hint - it took us 2 retries
 airetry!(x -> startswith(last_output(x), "y"), out, "It starts with \"y\"")
 # [ Info: Condition not met. Retrying...
 # [ Info: Condition not met. Retrying...
 
+
 ## We end up with the correct answer
 last_output(out)
 # Output: "yellow"
 ```
+
 
 Let's explore how we got here. 
 We save the various attempts in a "tree" (SampleNode object)
@@ -169,8 +175,9 @@ Note: `airetry!` will attempt to fix the model `max_retries` times.
 If you set `throw=true`, it will throw an ErrorException if the condition is not met after `max_retries` retries.
 
 
+
+Let's define a mini program to guess the number and use `airetry!` to guide the model to the correct answer:
 ```julia
-# Let's define a mini program to guess the number
 \"\"\"
     llm_guesser()
 
@@ -264,7 +271,7 @@ end
 ```
 
 Note that if there are multiple "branches" the model will see only the feedback of its own and its ancestors not the other "branches". 
-If you want to show all object, set `n_samples=1`, so all fixing happens sequantially and model sees all feedback (less powerful if model falls into a bad state).
+If you wanted to provide ALL feedback, set `RetryConfig(; n_samples=1)` to remove any "branching". It fixing will be done sequentially in one conversation and the model will see all feedback (less powerful if the model falls into a bad state).
 Alternatively, you can tweak the feedback function.
 
 # See Also
@@ -474,25 +481,25 @@ Adds formatted feedback to the `conversation` based on the `sample` node feedbac
 sample = SampleNode(; data = nothing, feedback = "Feedback X")
 conversation = [PT.UserMessage("I say hi!"), PT.AIMessage(; content = "I say hi!")]
 conversation = AT.add_feedback!(conversation, sample)
-conversation[end].content == "### Feedback from Evaluator\nFeedback X\n"
+conversation[end].content == "### Feedback from Evaluator\\nFeedback X\\n"
 
 Inplace feedback:
 ```julia
 conversation = [PT.UserMessage("I say hi!"), PT.AIMessage(; content = "I say hi!")]
 conversation = AT.add_feedback!(conversation, sample; feedback_inplace = true)
-conversation[end].content == "I say hi!\n\n### Feedback from Evaluator\nFeedback X\n"
+conversation[end].content == "I say hi!\\n\\n### Feedback from Evaluator\\nFeedback X\\n"
 ```
 
 Sample with ancestors with feedback:
 ```julia
-sample_p = SampleNode(; data = nothing, feedback = "\nFeedback X")
+sample_p = SampleNode(; data = nothing, feedback = "\\nFeedback X")
 sample = expand!(sample_p, nothing)
-sample.feedback = "\nFeedback Y"
+sample.feedback = "\\nFeedback Y"
 conversation = [PT.UserMessage("I say hi!"), PT.AIMessage(; content = "I say hi!")]
 conversation = AT.add_feedback!(conversation, sample)
 
 conversation[end].content ==
-"### Feedback from Evaluator\n\nFeedback X\n----------\n\nFeedback Y\n"
+"### Feedback from Evaluator\\n\\nFeedback X\\n----------\\n\\nFeedback Y\\n"
 ```
 """
 function add_feedback!(conversation::AbstractVector{<:PT.AbstractMessage},
