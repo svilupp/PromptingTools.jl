@@ -200,3 +200,91 @@ conversation = aigenerate("What's my name?"; return_all=true, conversation)
 ##  AIMessage("Your name is John.")
 ```
 Notice that the last message is the response to the second request, but with `return_all=true` we can see the whole conversation from the beginning.
+
+## How to have typed responses?
+
+Our responses are always in `AbstractMessage` types to ensure we can also handle downstream processing, error handling, and self-healing code (see `airetry!`).
+
+A good use case for a typed response is when you have a complicated control flow and would like to group and handle certain outcomes differently. You can easily do it as an extra step after the response is received.
+
+Trivially, we can use `aiclassifier` for Bool statements, eg, 
+```julia
+# We can do either
+mybool = tryparse(Bool, aiclassify("Is two plus two four?")) isa Bool # true
+
+# or simply check equality
+msg = aiclassify("Is two plus two four?") # true
+mybool = msg.content == "true"
+```
+
+Now a more complicated example with multiple categories mapping to an enum:
+```julia
+choices = [("A", "any animal or creature"), ("P", "for any plant or tree"), ("O", "for everything else")]
+
+# Set up the return types we want
+@enum Categories A P O
+string_to_category = Dict("A" => A, "P" => P,"O" => O)
+
+# Run an example
+input = "spider"
+msg = aiclassify(:InputClassifier; choices, input)
+
+mytype = string_to_category[msg.content] # A (for animal)
+```
+How does it work? `aiclassify` guarantees to output one of our choices (and it handles some of the common quirks)!
+
+How would we achieve the same with `aigenerate` and arbitrary struct?
+We need to use the "lazy" `AIGenerate` struct and `airetry!` to ensure we get the response and then we can process it further.
+
+`AIGenerate` has two fields you should know about:
+- `conversation` - eg, the vector of "messages" in the current conversation (same as what you get from `aigenerate` with `return_all=true`)
+- `success` - a boolean flag if the request was successful AND if it passed any subsequent `airetry!` calls
+
+Let's mimic a case where our "program" should return one of three types: `SmallInt`, `LargeInt`, `FailedResponse`.
+
+We first need to define our custom types:
+```julia
+
+# not needed, just to show a fully typed example
+abstract type MyAbstractResponse end
+struct SmallInt <: MyAbstractResponse
+    number::Int
+end
+struct LargeInt <: MyAbstractResponse
+    number::Int
+end
+struct FailedResponse <: MyAbstractResponse
+    content::String
+end
+```
+
+Let's define our "program" as a function to be cleaner. Notice that we use `AIGenerate` and `airetry!` to ensure we get the response and then we can process it further.
+
+```julia
+using PromptingTools.Experimental.AgentTools
+
+function give_me_number(prompt::String)::MyAbstractResponse
+    # Generate the response
+    response = AIGenerate(prompt; config=RetryConfig(;max_retries=2)) |> run!
+
+    # Check if it's parseable as Int, if not, send back to be fixed
+    # syntax: airetry!(CONDITION-TO-CHECK, <response object>, FEEDBACK-TO-MODEL)
+    airetry!(x->tryparse(Int,last_output(x))|>!isnothing, response, "Wrong output format! Answer with digits and nothing else. The number is:")
+
+    if response.success != true
+        ## we failed to generate a parseable integer
+        return FailedResponse("I failed to get the response. Last output: $(last_output(response))")
+    end
+    number = tryparse(Int,last_output(response))
+    return number < 1000 ? SmallInt(number) : LargeInt(number)
+end
+
+give_me_number("How many car seats are in Porsche 911T?")
+## [ Info: Condition not met. Retrying...
+## [ Info: Condition not met. Retrying...
+## SmallInt(2)
+```
+
+We ultimately received our custom type `SmallInt` with the number of car seats in the Porsche 911T (I hope it's correct!).
+
+If you want to access the full conversation history (all the attempts and feedback), simply output the `response` object and explore `response.conversation`.
