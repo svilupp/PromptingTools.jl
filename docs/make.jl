@@ -15,7 +15,7 @@ makedocs(;
     modules = [
         PromptingTools,
         PromptingTools.Experimental.RAGTools,
-        PromptingTools.Experimental.AgentTools,
+        PromptingTools.Experimental.AgentTools
     ],
     authors = "J S <49557684+svilupp@users.noreply.github.com> and contributors",
     repo = "https://github.com/svilupp/PromptingTools.jl/blob/{commit}{path}#{line}",
@@ -30,13 +30,14 @@ makedocs(;
     pages = [
         "Home" => "index.md",
         "Getting Started" => "getting_started.md",
+        "How It Works" => "how_it_works.md",
         "Examples" => [
             "Various examples" => "examples/readme_examples.md",
             "Using AITemplates" => "examples/working_with_aitemplates.md",
             "Local models with Ollama.ai" => "examples/working_with_ollama.md",
             "Google AIStudio" => "examples/working_with_google_ai_studio.md",
             "Custom APIs (Mistral, Llama.cpp)" => "examples/working_with_custom_apis.md",
-            "Building RAG Application" => "examples/building_RAG.md",
+            "Building RAG Application" => "examples/building_RAG.md"
         ],
         "F.A.Q." => "frequently_asked_questions.md",
         "Reference" => [
@@ -44,8 +45,8 @@ makedocs(;
             "Experimental Modules" => "reference_experimental.md",
             "RAGTools" => "reference_ragtools.md",
             "AgentTools" => "reference_agenttools.md",
-            "APITools" => "reference_apitools.md",
-        ],
+            "APITools" => "reference_apitools.md"
+        ]
     ])
 
 deploydocs(;
