@@ -128,66 +128,107 @@ Removes all templates from `TEMPLATE_STORE` and `TEMPLATE_METADATA`.
 remove_templates!(; store = TEMPLATE_STORE, metadata_store = TEMPLATE_METADATA) = (empty!(store); empty!(metadata_store); nothing)
 
 """
-    load_templates!(; remove_templates::Bool=true)
+    load_templates!(dir_templates::Union{String, Nothing} = nothing;
+        remember_path::Bool = true,
+        remove_templates::Bool = isnothing(dir_templates),
+        store::Dict{Symbol, <:Any} = TEMPLATE_STORE,
+        metadata_store::Vector{<:AITemplateMetadata} = TEMPLATE_METADATA)
 
 Loads templates from folder `templates/` in the package root and stores them in `TEMPLATE_STORE` and `TEMPLATE_METADATA`.
 
 Note: Automatically removes any existing templates and metadata from `TEMPLATE_STORE` and `TEMPLATE_METADATA` if `remove_templates=true`.
+
+# Arguments
+- `dir_templates::Union{String, Nothing}`: The directory path to load templates from. If `nothing`, uses the default list of paths. It usually used only once "to register" a new template storage.
+- `remember_path::Bool=true`: If true, remembers the path for future refresh (in `TEMPLATE_PATH`).
+- `remove_templates::Bool=isnothing(dir_templates)`: If true, removes any existing templates and metadata from `store` and `metadata_store`.
+- `store::Dict{Symbol, <:Any}=TEMPLATE_STORE`: The store to load the templates into.
+- `metadata_store::Vector{<:AITemplateMetadata}=TEMPLATE_METADATA`: The metadata store to load the metadata into.
+
+# Example
+
+Load the default templates:
+```julia
+PT.load_templates!() # no path needed
+```
+
+Load templates from a new custom path:
+```julia
+PT.load_templates!("path/to/templates") # we will remember this path for future refresh
+```
+
+If you want to now refresh the default templates and the new path, just call `load_templates!()` without any arguments.
 """
-function load_templates!(dir_templates::String = joinpath(@__DIR__, "..", "templates");
-        remove_templates::Bool = true,
+function load_templates!(dir_templates::Union{String, Nothing} = nothing;
+        remember_path::Bool = true,
+        remove_templates::Bool = isnothing(dir_templates),
         store::Dict{Symbol, <:Any} = TEMPLATE_STORE,
-        metadata_store::Vector{<:AITemplateMetadata} = TEMPLATE_METADATA,)
+        metadata_store::Vector{<:AITemplateMetadata} = TEMPLATE_METADATA)
+    ## Init
+    global TEMPLATE_PATH
+    @assert isnothing(dir_templates)||isdir(dir_templates) "Invalid directory path provided! ($dir_templates)"
+
+    # If no path is provided, use the default list
+    load_paths = isnothing(dir_templates) ? TEMPLATE_PATH : [dir_templates]
     # first remove any old templates and their metadata
     remove_templates && remove_templates!(; store, metadata_store)
-    # recursively load all templates from the `templates` folder
-    for (root, dirs, files) in walkdir(dir_templates)
-        for file in files
-            if endswith(file, ".json")
-                template_name = Symbol(split(basename(file), ".")[begin])
-                template, metadata_msgs = load_template(joinpath(root, file))
-                # add to store
-                if haskey(store, template_name)
-                    @warn("Template $(template_name) already exists, overwriting! Metadata will be duplicated.")
-                end
-                store[template_name] = template
+    # remember the path for future refresh
+    if remember_path && !isnothing(dir_templates)
+        if !(dir_templates in TEMPLATE_PATH)
+            push!(TEMPLATE_PATH, dir_templates)
+        end
+    end
 
-                # prepare the metadata
-                wordcount = 0
-                system_preview = ""
-                user_preview = ""
-                variables = Symbol[]
-                for i in eachindex(template)
-                    msg = template[i]
-                    wordcount += length(msg.content)
-                    if hasproperty(msg, :variables)
-                        append!(variables, msg.variables)
+    # recursively load all templates from the `load_paths`
+    for template_path in load_paths
+        for (root, dirs, files) in walkdir(template_path)
+            for file in files
+                if endswith(file, ".json")
+                    template_name = Symbol(split(basename(file), ".")[begin])
+                    template, metadata_msgs = load_template(joinpath(root, file))
+                    # add to store
+                    if haskey(store, template_name)
+                        @warn("Template $(template_name) already exists, overwriting! Metadata will be duplicated.")
                     end
-                    # truncate previews to 100 characters
-                    if msg isa SystemMessage && length(system_preview) < 100
-                        system_preview *= first(msg.content, 100)
-                    elseif msg isa UserMessage && length(user_preview) < 100
-                        user_preview *= first(msg.content, 100)
+                    store[template_name] = template
+
+                    # prepare the metadata
+                    wordcount = 0
+                    system_preview = ""
+                    user_preview = ""
+                    variables = Symbol[]
+                    for i in eachindex(template)
+                        msg = template[i]
+                        wordcount += length(msg.content)
+                        if hasproperty(msg, :variables)
+                            append!(variables, msg.variables)
+                        end
+                        # truncate previews to 100 characters
+                        if msg isa SystemMessage && length(system_preview) < 100
+                            system_preview *= first(msg.content, 100)
+                        elseif msg isa UserMessage && length(user_preview) < 100
+                            user_preview *= first(msg.content, 100)
+                        end
                     end
+                    if !isempty(metadata_msgs)
+                        # use the first metadata message found if available
+                        meta = first(metadata_msgs)
+                        metadata = AITemplateMetadata(; name = template_name,
+                            meta.description, meta.version, meta.source,
+                            wordcount,
+                            system_preview = first(system_preview, 100),
+                            user_preview = first(user_preview, 100),
+                            variables = unique(variables))
+                    else
+                        metadata = AITemplateMetadata(; name = template_name,
+                            wordcount,
+                            system_preview = first(system_preview, 100),
+                            user_preview = first(user_preview, 100),
+                            variables = unique(variables))
+                    end
+                    # add metadata to store
+                    push!(metadata_store, metadata)
                 end
-                if !isempty(metadata_msgs)
-                    # use the first metadata message found if available
-                    meta = first(metadata_msgs)
-                    metadata = AITemplateMetadata(; name = template_name,
-                        meta.description, meta.version, meta.source,
-                        wordcount,
-                        system_preview = first(system_preview, 100),
-                        user_preview = first(user_preview, 100),
-                        variables = unique(variables))
-                else
-                    metadata = AITemplateMetadata(; name = template_name,
-                        wordcount,
-                        system_preview = first(system_preview, 100),
-                        user_preview = first(user_preview, 100),
-                        variables = unique(variables))
-                end
-                # add metadata to store
-                push!(metadata_store, metadata)
             end
         end
     end
@@ -249,7 +290,8 @@ function aitemplates(query_name::Symbol;
         limit::Int = 10,
         metadata_store::Vector{AITemplateMetadata} = TEMPLATE_METADATA)
     query_str = lowercase(string(query_name))
-    found_templates = filter(x -> occursin(query_str,
+    found_templates = filter(
+        x -> occursin(query_str,
             lowercase(string(x.name))), metadata_store)
     return first(found_templates, limit)
 end
@@ -258,7 +300,8 @@ function aitemplates(query_key::AbstractString;
         limit::Int = 10,
         metadata_store::Vector{AITemplateMetadata} = TEMPLATE_METADATA)
     query_str = lowercase(query_key)
-    found_templates = filter(x -> occursin(query_str, lowercase(string(x.name))) ||
+    found_templates = filter(
+        x -> occursin(query_str, lowercase(string(x.name))) ||
             occursin(query_str, lowercase(string(x.description))),
         metadata_store)
     return first(found_templates, limit)
@@ -267,13 +310,14 @@ end
 function aitemplates(query_key::Regex;
         limit::Int = 10,
         metadata_store::Vector{AITemplateMetadata} = TEMPLATE_METADATA)
-    found_templates = filter(x -> occursin(query_key,
-                                          string(x.name)) ||
-                                      occursin(query_key,
-                                          x.description) ||
-                                      occursin(query_key,
-                                          x.system_preview) ||
-                                      occursin(query_key, x.user_preview),
+    found_templates = filter(
+        x -> occursin(query_key,
+                     string(x.name)) ||
+                 occursin(query_key,
+                     x.description) ||
+                 occursin(query_key,
+                     x.system_preview) ||
+                 occursin(query_key, x.user_preview),
         metadata_store)
     return first(found_templates, limit)
 end
@@ -304,4 +348,83 @@ function aiextract(schema::AbstractPromptSchema, template::Symbol; kwargs...)
 end
 function aiscan(schema::AbstractPromptSchema, template::Symbol; kwargs...)
     aiscan(schema, AITemplate(template); kwargs...)
+end
+
+## Utility for creating templates
+"""
+    create_template(; user::AbstractString, system::AbstractString="Act as a helpful AI assistant.")
+
+    create_template(system::AbstractString, user::AbstractString)
+
+Creates a simple template with a user and system message. Convenience function to prevent writing `[PT.UserMessage(...), ...]`
+
+# Arguments
+- `system::AbstractString`: The system message. Usually defines the personality, style, instructions, output format, etc.
+- `user::AbstractString`: The user message. Usually defines the input, query, request, etc.
+
+Use double handlebar placeholders (eg, `{{name}}`) to define variables that can be replaced by the `kwargs` during the AI call (see example).
+
+Returns a vector of `SystemMessage` and UserMessage objects.
+
+# Examples
+
+Let's generate a quick template for a simple conversation (only one placeholder: name)
+```julia
+# first system message, then user message (or use kwargs)
+tpl=PT.create_template("You must speak like a pirate", "Say hi to {{name}}")
+
+## 2-element Vector{PromptingTools.AbstractChatMessage}:
+## PromptingTools.SystemMessage("You must speak like a pirate")
+##  PromptingTools.UserMessage("Say hi to {{name}}")
+```
+
+You can immediately use this template in `ai*` functions:
+```julia
+aigenerate(tpl; name="Jack Sparrow")
+# Output: AIMessage("Arr, me hearty! Best be sending me regards to Captain Jack Sparrow on the salty seas! May his compass always point true to the nearest treasure trove. Yarrr!")
+```
+
+If you want to save it in your project folder:
+```julia
+PT.save_template("templates/GreatingPirate.json", tpl; version="1.0") # optionally, add description
+```
+It will be saved and accessed under its basename, ie, `GreatingPirate`.
+
+Now you can load it like all the other templates (provide the template directory):
+```
+PT.load_templates!("templates") # it will remember the folder after the first run
+# Note: If you save it again, overwrite it, etc., you need to explicitly reload all templates again!
+```
+
+You can verify that your template is loaded with a quick search for "pirate":
+```julia
+aitemplates("pirate")
+
+## 1-element Vector{AITemplateMetadata}:
+## PromptingTools.AITemplateMetadata
+##   name: Symbol GreatingPirate
+##   description: String ""
+##   version: String "1.0"
+##   wordcount: Int64 46
+##   variables: Array{Symbol}((1,))
+##   system_preview: String "You must speak like a pirate"
+##   user_preview: String "Say hi to {{name}}"
+##   source: String ""
+```
+
+Now you can use it like any other template (notice it's a symbol, so `:GreatingPirate`):
+```julia
+aigenerate(:GreatingPirate; name="Jack Sparrow")
+# Output: AIMessage("Arr, me hearty! Best be sending me regards to Captain Jack Sparrow on the salty seas! May his compass always point true to the nearest treasure trove. Yarrr!")
+````
+"""
+function create_template(
+        system::AbstractString,
+        user::AbstractString)
+    return [SystemMessage(system), UserMessage(user)]
+end
+# Kwarg version
+function create_template(;
+        user::AbstractString, system::AbstractString = "Act as a helpful AI assistant.")
+    create_template(system, user)
 end

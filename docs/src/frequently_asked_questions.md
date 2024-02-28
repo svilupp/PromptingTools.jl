@@ -201,134 +201,90 @@ conversation = aigenerate("What's my name?"; return_all=true, conversation)
 ```
 Notice that the last message is the response to the second request, but with `return_all=true` we can see the whole conversation from the beginning.
 
-## Explain What Happens Under the Hood
+## How to have typed responses?
 
-4 Key Concepts/Objects:
-- Schemas -> object of type `AbstractPromptSchema` that determines which methods are called and, hence, what providers/APIs are used
-- Prompts -> the information you want to convey to the AI model
-- Messages -> the basic unit of communication between the user and the AI model (eg, `UserMessage` vs `AIMessage`)
-- Prompt Templates -> re-usable "prompts" with placeholders that you can replace with your inputs at the time of making the request
+Our responses are always in `AbstractMessage` types to ensure we can also handle downstream processing, error handling, and self-healing code (see `airetry!`).
 
-When you call `aigenerate`, roughly the following happens: `render` -> `UserMessage`(s) -> `render` -> `OpenAI.create_chat` -> ... -> `AIMessage`.
+A good use case for a typed response is when you have a complicated control flow and would like to group and handle certain outcomes differently. You can easily do it as an extra step after the response is received.
 
-We'll deep dive into an example in the end.
+Trivially, we can use `aiclassifier` for Bool statements, eg, 
+```julia
+# We can do either
+mybool = tryparse(Bool, aiclassify("Is two plus two four?")) isa Bool # true
 
-### Schemas
+# or simply check equality
+msg = aiclassify("Is two plus two four?") # true
+mybool = msg.content == "true"
+```
 
-For your "message" to reach an AI model, it needs to be formatted and sent to the right place.
+Now a more complicated example with multiple categories mapping to an enum:
+```julia
+choices = [("A", "any animal or creature"), ("P", "for any plant or tree"), ("O", "for everything else")]
 
-We leverage the multiple dispatch around the "schemas" to pick the right logic.
-All schemas are subtypes of `AbstractPromptSchema` and there are many subtypes, eg, `OpenAISchema <: AbstractOpenAISchema <:AbstractPromptSchema`.
+# Set up the return types we want
+@enum Categories A P O
+string_to_category = Dict("A" => A, "P" => P,"O" => O)
 
-For example, if you provide `schema = OpenAISchema()`, the system knows that:
-- it will have to format any user inputs to OpenAI's "message specification" (a vector of dictionaries, see their API documentation). Function `render(OpenAISchema(),...)` will take care of the rendering.
-- it will have to send the message to OpenAI's API. We will use the amazing `OpenAI.jl` package to handle the communication.
+# Run an example
+input = "spider"
+msg = aiclassify(:InputClassifier; choices, input)
 
-### Prompts
+mytype = string_to_category[msg.content] # A (for animal)
+```
+How does it work? `aiclassify` guarantees to output one of our choices (and it handles some of the common quirks)!
 
-Prompt is loosely the information you want to convey to the AI model. It can be a question, a statement, or a command. It can have instructions or some context, eg, previous conversation.
+How would we achieve the same with `aigenerate` and arbitrary struct?
+We need to use the "lazy" `AIGenerate` struct and `airetry!` to ensure we get the response and then we can process it further.
 
-You need to remember that Large Language Models (LLMs) are **stateless**. They don't remember the previous conversation/request, so you need to provide the whole history/context every time (similar to how REST APIs work).
+`AIGenerate` has two fields you should know about:
+- `conversation` - eg, the vector of "messages" in the current conversation (same as what you get from `aigenerate` with `return_all=true`)
+- `success` - a boolean flag if the request was successful AND if it passed any subsequent `airetry!` calls
 
-Prompts that we send to the LLMs are effectively a sequence of messages (`<:AbstractMessage`).
+Let's mimic a case where our "program" should return one of three types: `SmallInt`, `LargeInt`, `FailedResponse`.
 
-### Messages
+We first need to define our custom types:
+```julia
 
-Messages are the basic unit of communication between the user and the AI model. 
+# not needed, just to show a fully typed example
+abstract type MyAbstractResponse end
+struct SmallInt <: MyAbstractResponse
+    number::Int
+end
+struct LargeInt <: MyAbstractResponse
+    number::Int
+end
+struct FailedResponse <: MyAbstractResponse
+    content::String
+end
+```
 
-There are 5 main types of messages (`<:AbstractMessage`):
-
-- `SystemMessage` - this contains information about the "system", eg, how it should behave, format its output, etc. (eg, `You're a world-class Julia programmer. You write brief and concise code.)
-- `UserMessage` - the information "from the user", ie, your question/statement/task
-- `UserMessageWithImages` - the same as `UserMessage`, but with images (URLs or Base64-encoded images)
-- `AIMessage` - the response from the AI model, when the "output" is text
-- `DataMessage` - the response from the AI model, when the "output" is data, eg, embeddings with `aiembed` or user-defined structs with `aiextract`
-
-### Prompt Templates
-
-We want to have re-usable "prompts", so we provide you with a system to retrieve pre-defined prompts with placeholders (eg, `{{name}}`) that you can replace with your inputs at the time of making the request.
-
-"AI Templates" as we call them (`AITemplate`) are usually a vector of `SystemMessage` and a `UserMessage` with specific purpose/task.
-
-For example, the template `:AssistantAsk` is defined loosely as:
+Let's define our "program" as a function to be cleaner. Notice that we use `AIGenerate` and `airetry!` to ensure we get the response and then we can process it further.
 
 ```julia
- template = [SystemMessage("You are a world-class AI assistant. Your communication is brief and concise. You're precise and answer only when you're confident in the high quality of your answer."),
-             UserMessage("# Question\n\n{{ask}}")]
+using PromptingTools.Experimental.AgentTools
+
+function give_me_number(prompt::String)::MyAbstractResponse
+    # Generate the response
+    response = AIGenerate(prompt; config=RetryConfig(;max_retries=2)) |> run!
+
+    # Check if it's parseable as Int, if not, send back to be fixed
+    # syntax: airetry!(CONDITION-TO-CHECK, <response object>, FEEDBACK-TO-MODEL)
+    airetry!(x->tryparse(Int,last_output(x))|>!isnothing, response, "Wrong output format! Answer with digits and nothing else. The number is:")
+
+    if response.success != true
+        ## we failed to generate a parseable integer
+        return FailedResponse("I failed to get the response. Last output: $(last_output(response))")
+    end
+    number = tryparse(Int,last_output(response))
+    return number < 1000 ? SmallInt(number) : LargeInt(number)
+end
+
+give_me_number("How many car seats are in Porsche 911T?")
+## [ Info: Condition not met. Retrying...
+## [ Info: Condition not met. Retrying...
+## SmallInt(2)
 ```
 
-Notice that we have a placeholder `ask` (`{{ask}}`) that you can replace with your question without having to re-write the generic system instructions.
+We ultimately received our custom type `SmallInt` with the number of car seats in the Porsche 911T (I hope it's correct!).
 
-When you provide a Symbol (eg, `:AssistantAsk`) to ai* functions, thanks to the multiple dispatch, it recognizes that it's an `AITemplate(:AssistantAsk)` and looks it up.
-
-You can discover all available templates with `aitemplates("some keyword")` or just see the details of some template `aitemplates(:AssistantAsk)`.
-
-### Walkthrough Example
-
-```julia
-using PromptingTools
-const PT = PromptingTools
-
-# Let's say this is our ask
-msg = aigenerate(:AssistantAsk; ask="What is the capital of France?")
-
-# it is effectively the same as:
-msg = aigenerate(PT.OpenAISchema(), PT.AITemplate(:AssistantAsk); ask="What is the capital of France?", model="gpt3t")
-```
-
-There is no `model` provided, so we use the default `PT.MODEL_CHAT` (effectively GPT3.5-Turbo). Then we look it up in `PT.MDOEL_REGISTRY` and use the associated schema for it (`OpenAISchema` in this case).
-
-The next step is to render the template, replace the placeholders and render it for the OpenAI model.
-
-```julia
-# Let's remember out schema
-schema = PT.OpenAISchema()
-ask = "What is the capital of France?"
-```
-
-First, we obtain the template (no placeholder replacement yet) and "expand it"
-```julia
-template_rendered = PT.render(schema, AITemplate(:AssistantAsk); ask)
-```
-
-```plaintext
-2-element Vector{PromptingTools.AbstractChatMessage}:
-  PromptingTools.SystemMessage("You are a world-class AI assistant. Your communication is brief and concise. You're precise and answer only when you're confident in the high quality of your answer.")
-  PromptingTools.UserMessage{String}("# Question\n\n{{ask}}", [:ask], :usermessage)
-```
-
-Second, we replace the placeholders
-```julia
-rendered_for_api = PT.render(schema, template_rendered;  ask)
-```
-  
-```plaintext
-2-element Vector{Dict{String, Any}}:
-  Dict("role" => "system", "content" => "You are a world-class AI assistant. Your communication is brief and concise. You're precise and answer only when you're confident in the high quality of your answer.")
-  Dict("role" => "user", "content" => "# Question\n\nWhat is the capital of France?")
-```
-
-Notice that the placeholders are only replaced in the second step. The final output here is a vector of messages with "role" and "content" keys, which is the format required by the OpenAI API.
-
-As a side note, under the hood, the second step is done in two steps:
-
-- replace the placeholders `messages_rendered = PT.render(PT.NoSchema(), template_rendered; ask)` -> returns a vector of Messages!
-- then, we convert the messages to the format required by the provider/schema `PT.render(schema, messages_rendered)` -> returns the OpenAI formatted messages
-
-
-Next, we send the above `rendered_for_api` to the OpenAI API and get the response back.
-
-```julia
-using OpenAI
-OpenAI.create_chat(api_key, model, rendered_for_api)
-```
-
-The last step is to take the JSON response from the API and convert it to the `AIMessage` object.
-
-```julia
-# simplification for educational purposes
-msg = AIMessage(; content = r.response[:choices][1][:message][:content])
-```
-In practice, there are more fields we extract, so we define a utility for it: `PT.response_to_message`. Especially, since with parameter `n`, you can request multiple AI responses at once, so we want to re-use our response processing logic.
-
-That's it! I hope you've learned something new about how PromptingTools.jl works under the hood.
+If you want to access the full conversation history (all the attempts and feedback), simply output the `response` object and explore `response.conversation`.

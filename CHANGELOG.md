@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Added a new documentation section "How it works" to explain the inner workings of the package. It's a work in progress, but it should give you a good idea of what's happening under the hood.
+- Improved template loading, so if you load your custom templates once with `load_templates!("my/template/folder)`, it will remember your folder for all future re-loads.
+- Added convenience function `create_template` to create templates on the fly without having to deal with `PT.UserMessage` etc. See `?create_template` for more information.
 
 ### Fixed
 
