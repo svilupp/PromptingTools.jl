@@ -23,7 +23,7 @@ const RESERVED_KWARGS = [
     :image_url,
     :image_path,
     :image_detail,
-    :model,
+    :model
 ]
 
 # export replace_words, split_by_length, call_cost, auth_header # for debugging only
@@ -45,6 +45,7 @@ include("messages.jl")
 export aitemplates, AITemplate
 include("templates.jl")
 
+const TEMPLATE_PATH = String[joinpath(@__DIR__, "..", "templates")]
 const TEMPLATE_STORE = Dict{Symbol, Any}()
 const TEMPLATE_METADATA = Vector{AITemplateMetadata}()
 

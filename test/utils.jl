@@ -3,7 +3,7 @@ using PromptingTools: _extract_handlebar_variables, call_cost, _report_stats
 using PromptingTools: _string_to_vector, _encode_local_image
 using PromptingTools: DataMessage, AIMessage
 using PromptingTools: push_conversation!,
-    resize_conversation!, @timeout, preview, auth_header
+                      resize_conversation!, @timeout, preview, auth_header
 
 @testset "replace_words" begin
     words = ["Disney", "Snow White", "Mickey Mouse"]
@@ -243,7 +243,7 @@ end
         PT.SystemMessage("Welcome"),
         PT.UserMessage("Hello"),
         PT.AIMessage("World"),
-        PT.DataMessage(; content = ones(10)),
+        PT.DataMessage(; content = ones(10))
     ]
     preview_output = preview(conversation)
     expected_output = Markdown.parse("# System Message\n\nWelcome\n\n---\n\n# User Message\n\nHello\n\n---\n\n# AI Message\n\nWorld\n\n---\n\n# Data Message\n\nData: Vector{Float64} (Size: (10,))\n")
@@ -255,7 +255,7 @@ end
     @test headers == [
         "Authorization" => "Bearer <my-api-key>",
         "Content-Type" => "application/json",
-        "Accept" => "application/json",
+        "Accept" => "application/json"
     ]
     @test_throws ArgumentError auth_header("")
     @test length(auth_header(nothing)) == 2
