@@ -1,3 +1,7 @@
+```@meta
+CurrentModule = PromptingTools
+```
+
 # Getting Started
 
 ## Prerequisites

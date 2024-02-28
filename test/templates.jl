@@ -1,11 +1,12 @@
 using PromptingTools: AbstractChatMessage, SystemMessage, UserMessage, MetadataMessage
 using PromptingTools: render
-using PromptingTools: load_templates!, aitemplates
+using PromptingTools: load_templates!, aitemplates, create_template
 using PromptingTools: TestEchoOpenAISchema
 
 @testset "Template rendering" begin
     template = AITemplate(:JudgeIsItTrue)
-    expected_output = AbstractChatMessage[SystemMessage("You are an impartial AI judge evaluting whether the provided statement is \"true\" or \"false\". Answer \"unknown\" if you cannot decide."),
+    expected_output = AbstractChatMessage[
+        SystemMessage("You are an impartial AI judge evaluting whether the provided statement is \"true\" or \"false\". Answer \"unknown\" if you cannot decide."),
         UserMessage("# Statement\n\n{{it}}")]
     @test expected_output == render(PT.PROMPT_SCHEMA, template)
     @test expected_output == render(template)
@@ -30,6 +31,41 @@ end
     # Search via regex
     tmps = aitemplates(r"IMPARTIAL AI JUDGE"i)
     @test length(tmps) >= 1
+end
+
+@testset "load_templates!" begin
+    load_templates!()
+    PT.TEMPLATE_PATH = PT.TEMPLATE_PATH[[1]] # reset
+    dir_name = joinpath(tempdir(), "templates")
+    dir_name in PT.TEMPLATE_PATH
+    mkpath(dir_name)
+    load_templates!(dir_name)
+    @test length(PT.TEMPLATE_PATH) == 2
+    @test PT.TEMPLATE_PATH[2] == dir_name
+    # no more changes
+    load_templates!(dir_name)
+    load_templates!(dir_name)
+    @test length(PT.TEMPLATE_PATH) == 2
+    @test PT.TEMPLATE_PATH[2] == dir_name
+    # reset to normal
+    PT.TEMPLATE_PATH = PT.TEMPLATE_PATH[[1]] # reset
+end
+
+@testset "create_template" begin
+    tpl = create_template("You must speak like a pirate", "Say hi to {{name}}")
+    @test tpl[1].content == "You must speak like a pirate"
+    @test tpl[1] isa SystemMessage
+    @test tpl[2].content == "Say hi to {{name}}"
+    @test tpl[2].variables == [:name]
+    @test tpl[2] isa UserMessage
+
+    # kwarg constructor
+    tpl = create_template(; user = "Say hi to {{chef}}")
+    @test tpl[1].content == "Act as a helpful AI assistant."
+    @test tpl[1] isa SystemMessage
+    @test tpl[2].content == "Say hi to {{chef}}"
+    @test tpl[2].variables == [:chef]
+    @test tpl[2] isa UserMessage
 end
 
 @testset "Templates - Echo aigenerate call" begin
