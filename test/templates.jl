@@ -66,6 +66,15 @@ end
     @test tpl[2].content == "Say hi to {{chef}}"
     @test tpl[2].variables == [:chef]
     @test tpl[2] isa UserMessage
+
+    # use save_as
+    tpl = create_template(
+        "You must speak like a pirate", "Say hi to {{name}}"; load_as = :PirateGreetingX)
+    @test haskey(PT.TEMPLATE_STORE, :PirateGreetingX)
+    @test length(filter(x -> x.name == :PirateGreetingX, PT.TEMPLATE_METADATA)) == 1
+    ## clean up
+    delete!(PT.TEMPLATE_STORE, :PirateGreetingX)
+    filter!(x -> x.name != :PirateGreetingX, PT.TEMPLATE_METADATA)
 end
 
 @testset "Templates - Echo aigenerate call" begin
