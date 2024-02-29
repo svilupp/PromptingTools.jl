@@ -288,3 +288,67 @@ give_me_number("How many car seats are in Porsche 911T?")
 We ultimately received our custom type `SmallInt` with the number of car seats in the Porsche 911T (I hope it's correct!).
 
 If you want to access the full conversation history (all the attempts and feedback), simply output the `response` object and explore `response.conversation`.
+
+## How to quickly create a prompt template?
+
+Many times, you will want to create a prompt template that you can reuse with different inputs (eg, to create templates for AIHelpMe or LLMTextAnalysis). 
+
+Previously, you would have to create a vector of `SystemMessage` and `UserMessage` objects and then save it to a disk and reload. 
+Now, you can use the `create_template` function to do it for you. It's designed for quick prototyping, so it skips the serialization step and loads it directly into the template store (ie, you can use it like any other templates - try `aitemplates()` search).
+
+The syntax is simple: `create_template(;user=<user prompt>, system=<system prompt>, load_as=<template name>)` 
+
+When called it creates a vector of messages, which you can use directly in the `ai*` functions. If you provide `load_as`, it will load the template in the template store (under the `load_as` name).
+
+Let's generate a quick template for a simple conversation (only one placeholder: name)
+```julia
+# first system message, then user message (or use kwargs)
+tpl=PT.create_template("You must speak like a pirate", "Say hi to {{name}}"; load_as="GreatingPirate")
+
+## 2-element Vector{PromptingTools.AbstractChatMessage}:
+## PromptingTools.SystemMessage("You must speak like a pirate")
+##  PromptingTools.UserMessage("Say hi to {{name}}")
+```
+
+You can immediately use this template in `ai*` functions:
+```julia
+aigenerate(tpl; name="Jack Sparrow")
+# Output: AIMessage("Arr, me hearty! Best be sending me regards to Captain Jack Sparrow on the salty seas! May his compass always point true to the nearest treasure trove. Yarrr!")
+```
+
+Since we provided `load_as`, it's also registered in the template store:
+```julia
+aitemplates("pirate")
+
+## 1-element Vector{AITemplateMetadata}:
+## PromptingTools.AITemplateMetadata
+##   name: Symbol GreatingPirate
+##   description: String ""
+##   version: String "1.0"
+##   wordcount: Int64 46
+##   variables: Array{Symbol}((1,))
+##   system_preview: String "You must speak like a pirate"
+##   user_preview: String "Say hi to {{name}}"
+##   source: String ""
+```
+
+So you can use it like any other template:
+```julia
+aigenerate(:GreatingPirate; name="Jack Sparrow")
+# Output: AIMessage("Arr, me hearty! Best be sending me regards to Captain Jack Sparrow on the salty seas! May his compass always point true to the nearest treasure trove. Yarrr!")
+```
+
+If you want to save it in your project folder:
+```julia
+PT.save_template("templates/GreatingPirate.json", tpl; version="1.0") # optionally, add description
+```
+It will be saved and accessed under its basename, ie, `GreatingPirate` (same as `load_as` keyword argument).
+
+Note: If you make any changes to the templates on the disk/in a folder, you need to explicitly reload all templates again!
+
+If you are using the main PromptingTools templates, you can simply call `PT.load_templates!()`.
+If you have a project folder with your templates, you want to add it first:
+```julia
+PT.load_templates!("templates") 
+```
+After the first run, we will remember the folder and you can simply call `PT.load_templates!()` to reload all the templates in the future!

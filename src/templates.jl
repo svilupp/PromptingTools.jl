@@ -119,7 +119,56 @@ function render(schema::Nothing, template::AITemplate; kwargs...)
 end
 
 ## Loading/saving -- see src/serialization.jl
+"""
+    build_template_metadata(
+        template::AbstractVector{<:AbstractMessage}, template_name::Symbol,
+        metadata_msgs::AbstractVector{<:MetadataMessage} = MetadataMessage[])
 
+Builds `AITemplateMetadata` for a given template based on the messages in `template` and other information.
+
+`AITemplateMetadata` is a helper struct for easy searching and reviewing of templates via `aitemplates()`.
+"""
+function build_template_metadata(
+        template::AbstractVector{<:AbstractMessage}, template_name::Symbol,
+        metadata_msgs::AbstractVector{<:MetadataMessage} = MetadataMessage[])
+
+    # prepare the metadata
+    wordcount = 0
+    system_preview = ""
+    user_preview = ""
+    variables = Symbol[]
+    for i in eachindex(template)
+        msg = template[i]
+        wordcount += length(msg.content)
+        if hasproperty(msg, :variables)
+            append!(variables, msg.variables)
+        end
+        # truncate previews to 100 characters
+        if msg isa SystemMessage && length(system_preview) < 100
+            system_preview *= first(msg.content, 100)
+        elseif msg isa UserMessage && length(user_preview) < 100
+            user_preview *= first(msg.content, 100)
+        end
+    end
+    if !isempty(metadata_msgs)
+        # use the first metadata message found if available
+        meta = first(metadata_msgs)
+        metadata = AITemplateMetadata(; name = template_name,
+            meta.description, meta.version, meta.source,
+            wordcount,
+            system_preview = first(system_preview, 100),
+            user_preview = first(user_preview, 100),
+            variables = unique(variables))
+    else
+        metadata = AITemplateMetadata(; name = template_name,
+            wordcount,
+            system_preview = first(system_preview, 100),
+            user_preview = first(user_preview, 100),
+            variables = unique(variables))
+    end
+
+    return metadata
+end
 """
         remove_templates!()
 
@@ -192,41 +241,9 @@ function load_templates!(dir_templates::Union{String, Nothing} = nothing;
                     end
                     store[template_name] = template
 
-                    # prepare the metadata
-                    wordcount = 0
-                    system_preview = ""
-                    user_preview = ""
-                    variables = Symbol[]
-                    for i in eachindex(template)
-                        msg = template[i]
-                        wordcount += length(msg.content)
-                        if hasproperty(msg, :variables)
-                            append!(variables, msg.variables)
-                        end
-                        # truncate previews to 100 characters
-                        if msg isa SystemMessage && length(system_preview) < 100
-                            system_preview *= first(msg.content, 100)
-                        elseif msg isa UserMessage && length(user_preview) < 100
-                            user_preview *= first(msg.content, 100)
-                        end
-                    end
-                    if !isempty(metadata_msgs)
-                        # use the first metadata message found if available
-                        meta = first(metadata_msgs)
-                        metadata = AITemplateMetadata(; name = template_name,
-                            meta.description, meta.version, meta.source,
-                            wordcount,
-                            system_preview = first(system_preview, 100),
-                            user_preview = first(user_preview, 100),
-                            variables = unique(variables))
-                    else
-                        metadata = AITemplateMetadata(; name = template_name,
-                            wordcount,
-                            system_preview = first(system_preview, 100),
-                            user_preview = first(user_preview, 100),
-                            variables = unique(variables))
-                    end
                     # add metadata to store
+                    metadata = build_template_metadata(
+                        template, template_name, metadata_msgs)
                     push!(metadata_store, metadata)
                 end
             end
@@ -352,19 +369,23 @@ end
 
 ## Utility for creating templates
 """
-    create_template(; user::AbstractString, system::AbstractString="Act as a helpful AI assistant.")
+    create_template(; user::AbstractString, system::AbstractString="Act as a helpful AI assistant.", 
+        load_as::Union{Nothing, Symbol, AbstractString} = nothing)
 
-    create_template(system::AbstractString, user::AbstractString)
+    create_template(system::AbstractString, user::AbstractString, 
+        load_as::Union{Nothing, Symbol, AbstractString} = nothing)
 
 Creates a simple template with a user and system message. Convenience function to prevent writing `[PT.UserMessage(...), ...]`
 
 # Arguments
 - `system::AbstractString`: The system message. Usually defines the personality, style, instructions, output format, etc.
 - `user::AbstractString`: The user message. Usually defines the input, query, request, etc.
+- `load_as::Union{Nothing, Symbol, AbstractString}`: If provided, loads the template into the `TEMPLATE_STORE` under the provided name `load_as`. If `nothing`, does not load the template.
 
 Use double handlebar placeholders (eg, `{{name}}`) to define variables that can be replaced by the `kwargs` during the AI call (see example).
 
 Returns a vector of `SystemMessage` and UserMessage objects.
+If `load_as` is provided, it registers the template in the `TEMPLATE_STORE` and `TEMPLATE_METADATA` as well.
 
 # Examples
 
@@ -384,6 +405,8 @@ aigenerate(tpl; name="Jack Sparrow")
 # Output: AIMessage("Arr, me hearty! Best be sending me regards to Captain Jack Sparrow on the salty seas! May his compass always point true to the nearest treasure trove. Yarrr!")
 ```
 
+If you're interested in saving the template in the template registry, jump to the end of these examples!
+
 If you want to save it in your project folder:
 ```julia
 PT.save_template("templates/GreatingPirate.json", tpl; version="1.0") # optionally, add description
@@ -391,7 +414,7 @@ PT.save_template("templates/GreatingPirate.json", tpl; version="1.0") # optional
 It will be saved and accessed under its basename, ie, `GreatingPirate`.
 
 Now you can load it like all the other templates (provide the template directory):
-```
+```julia
 PT.load_templates!("templates") # it will remember the folder after the first run
 # Note: If you save it again, overwrite it, etc., you need to explicitly reload all templates again!
 ```
@@ -416,15 +439,45 @@ Now you can use it like any other template (notice it's a symbol, so `:GreatingP
 ```julia
 aigenerate(:GreatingPirate; name="Jack Sparrow")
 # Output: AIMessage("Arr, me hearty! Best be sending me regards to Captain Jack Sparrow on the salty seas! May his compass always point true to the nearest treasure trove. Yarrr!")
+```
+
+If you do not need to save this template as a file, but you want to make it accessible in the template store for all `ai*` functions, you can use the `load_as` (= template name) keyword argument:
+```julia
+# this will not only create the template, but also register it for immediate use
+tpl=PT.create_template("You must speak like a pirate", "Say hi to {{name}}"; load_as="GreatingPirate")
+
+# you can now use it like any other template
+aiextract(:GreatingPirate; name="Jack Sparrow")
 ````
 """
 function create_template(
         system::AbstractString,
-        user::AbstractString)
-    return [SystemMessage(system), UserMessage(user)]
+        user::AbstractString; load_as::Union{Nothing, Symbol, AbstractString} = nothing)
+    ##
+    global TEMPLATE_STORE, TEMPLATE_METADATA
+    ##
+    template = [SystemMessage(system), UserMessage(user)]
+    ## Should it be loaded as well?
+    if !isnothing(load_as)
+        template_name = Symbol(load_as)
+        ## add to store
+        if haskey(TEMPLATE_STORE, template_name)
+            @warn("Template $(template_name) already exists, overwriting!")
+            ## remove from metadata to avoid duplicates
+            filter!(x -> x.name != template_name, TEMPLATE_METADATA)
+        end
+        TEMPLATE_STORE[template_name] = template
+        ## prepare the metadata
+        metadata = build_template_metadata(
+            template, template_name)
+        push!(TEMPLATE_METADATA, metadata)
+    end
+
+    return template
 end
 # Kwarg version
 function create_template(;
-        user::AbstractString, system::AbstractString = "Act as a helpful AI assistant.")
-    create_template(system, user)
+        user::AbstractString, system::AbstractString = "Act as a helpful AI assistant.",
+        load_as::Union{Nothing, Symbol, AbstractString} = nothing)
+    create_template(system, user; load_as)
 end
