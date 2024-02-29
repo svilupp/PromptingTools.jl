@@ -76,6 +76,8 @@ When you provide a Symbol (eg, `:AssistantAsk`) to ai* functions, thanks to the 
 
 You can discover all available templates with `aitemplates("some keyword")` or just see the details of some template `aitemplates(:AssistantAsk)`.
 
+Note: There is a new way to create and register templates in one go with `create_template(;user=<user prompt>, system=<system prompt>, load_as=<template name>)` (it skips the serialization step where a template previously must have been saved somewhere on the disk). See FAQ for more details or directly `?create_template`.
+
 ## ai* Functions
 
 The above steps are implemented in the `ai*` functions, eg, `aigenerate`, `aiembed`, `aiextract`, etc. They all have the same basic structure: 
