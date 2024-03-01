@@ -2,7 +2,8 @@ using PromptingTools: TestEchoOpenAISchema, render, OpenAISchema
 using PromptingTools: AIMessage, SystemMessage, AbstractMessage
 using PromptingTools: UserMessage, UserMessageWithImages, DataMessage
 using PromptingTools: CustomProvider,
-    CustomOpenAISchema, MistralOpenAISchema, MODEL_EMBEDDING
+                      CustomOpenAISchema, MistralOpenAISchema, MODEL_EMBEDDING,
+                      MODEL_IMAGE_GENERATION
 using PromptingTools: encode_choices, decode_choices, response_to_message, call_cost
 
 @testset "render-OpenAI" begin
@@ -10,11 +11,11 @@ using PromptingTools: encode_choices, decode_choices, response_to_message, call_
     # Given a schema and a vector of messages with handlebar variables, it should replace the variables with the correct values in the conversation dictionary.
     messages = [
         SystemMessage("Act as a helpful AI assistant"),
-        UserMessage("Hello, my name is {{name}}"),
+        UserMessage("Hello, my name is {{name}}")
     ]
     expected_output = [
         Dict("role" => "system", "content" => "Act as a helpful AI assistant"),
-        Dict("role" => "user", "content" => "Hello, my name is John"),
+        Dict("role" => "user", "content" => "Hello, my name is John")
     ]
     conversation = render(schema, messages; name = "John")
     @test conversation == expected_output
@@ -29,11 +30,11 @@ using PromptingTools: encode_choices, decode_choices, response_to_message, call_
     # AI message does NOT replace variables
     messages = [
         SystemMessage("Act as a helpful AI assistant"),
-        AIMessage("Hello, my name is {{name}}"),
+        AIMessage("Hello, my name is {{name}}")
     ]
     expected_output = [
         Dict("role" => "system", "content" => "Act as a helpful AI assistant"),
-        Dict("role" => "assistant", "content" => "Hello, my name is John"),
+        Dict("role" => "assistant", "content" => "Hello, my name is John")
     ]
     conversation = render(schema, messages; name = "John")
     # Broken: AIMessage does not replace handlebar variables
@@ -41,12 +42,12 @@ using PromptingTools: encode_choices, decode_choices, response_to_message, call_
 
     # Given a schema and a vector of messages with no system messages, it should add a default system prompt to the conversation dictionary.
     messages = [
-        UserMessage("User message"),
+        UserMessage("User message")
     ]
     conversation = render(schema, messages)
     expected_output = [
         Dict("role" => "system", "content" => "Act as a helpful AI assistant"),
-        Dict("role" => "user", "content" => "User message"),
+        Dict("role" => "user", "content" => "User message")
     ]
     @test conversation == expected_output
 
@@ -55,14 +56,14 @@ using PromptingTools: encode_choices, decode_choices, response_to_message, call_
         UserMessage("Hello"),
         AIMessage("Hi there"),
         UserMessage("How are you?"),
-        AIMessage("I'm doing well, thank you!"),
+        AIMessage("I'm doing well, thank you!")
     ]
     expected_output = [
         Dict("role" => "system", "content" => "Act as a helpful AI assistant"),
         Dict("role" => "user", "content" => "Hello"),
         Dict("role" => "assistant", "content" => "Hi there"),
         Dict("role" => "user", "content" => "How are you?"),
-        Dict("role" => "assistant", "content" => "I'm doing well, thank you!"),
+        Dict("role" => "assistant", "content" => "I'm doing well, thank you!")
     ]
     conversation = render(schema, messages)
     @test conversation == expected_output
@@ -71,12 +72,12 @@ using PromptingTools: encode_choices, decode_choices, response_to_message, call_
     messages = [
         UserMessage("Hello"),
         AIMessage("Hi there"),
-        SystemMessage("This is a system message"),
+        SystemMessage("This is a system message")
     ]
     expected_output = [
         Dict("role" => "system", "content" => "This is a system message"),
         Dict("role" => "user", "content" => "Hello"),
-        Dict("role" => "assistant", "content" => "Hi there"),
+        Dict("role" => "assistant", "content" => "Hi there")
     ]
     conversation = render(schema, messages)
     @test conversation == expected_output
@@ -84,7 +85,7 @@ using PromptingTools: encode_choices, decode_choices, response_to_message, call_
     # Given an empty vector of messages, it should return an empty conversation dictionary just with the system prompt
     messages = AbstractMessage[]
     expected_output = [
-        Dict("role" => "system", "content" => "Act as a helpful AI assistant"),
+        Dict("role" => "system", "content" => "Act as a helpful AI assistant")
     ]
     conversation = render(schema, messages)
     @test conversation == expected_output
@@ -92,11 +93,11 @@ using PromptingTools: encode_choices, decode_choices, response_to_message, call_
     # Given a schema and a vector of messages with a system message containing handlebar variables not present in kwargs, it should replace the variables with empty strings in the conversation dictionary.
     messages = [
         SystemMessage("Hello, {{name}}!"),
-        UserMessage("How are you?"),
+        UserMessage("How are you?")
     ]
     expected_output = [
         Dict("role" => "system", "content" => "Hello, !"),
-        Dict("role" => "user", "content" => "How are you?"),
+        Dict("role" => "user", "content" => "How are you?")
     ]
     conversation = render(schema, messages)
     # Broken because we do not remove any unused handlebar variables
@@ -106,12 +107,12 @@ using PromptingTools: encode_choices, decode_choices, response_to_message, call_
     messages = [
         UserMessage("Hello"),
         DataMessage(; content = ones(3, 3)),
-        AIMessage("Hi there"),
+        AIMessage("Hi there")
     ]
     expected_output = [
         Dict("role" => "system", "content" => "Act as a helpful AI assistant"),
         Dict("role" => "user", "content" => "Hello"),
-        Dict("role" => "assistant", "content" => "Hi there"),
+        Dict("role" => "assistant", "content" => "Hi there")
     ]
     conversation = render(schema, messages)
     @test conversation == expected_output
@@ -119,14 +120,17 @@ using PromptingTools: encode_choices, decode_choices, response_to_message, call_
     # Test UserMessageWithImages
     messages = [
         SystemMessage("System message 1"),
-        UserMessageWithImages("User message"; image_url = "https://example.com/image.png"),
+        UserMessageWithImages("User message"; image_url = "https://example.com/image.png")
     ]
     conversation = render(schema, messages)
-    expected_output = Dict{String, Any}[Dict("role" => "system",
+    expected_output = Dict{String, Any}[
+        Dict("role" => "system",
             "content" => "System message 1"),
         Dict("role" => "user",
-            "content" => Dict{String, Any}[Dict("text" => "User message", "type" => "text"),
-                Dict("image_url" => Dict("detail" => "auto",
+            "content" => Dict{String, Any}[
+                Dict("text" => "User message", "type" => "text"),
+                Dict(
+                    "image_url" => Dict("detail" => "auto",
                         "url" => "https://example.com/image.png"),
                     "type" => "image_url")])]
     @test conversation == expected_output
@@ -137,25 +141,29 @@ using PromptingTools: encode_choices, decode_choices, response_to_message, call_
         UserMessageWithImages("User message";
             image_url = [
                 "https://example.com/image1.png",
-                "https://example.com/image2.png",
-            ]),
+                "https://example.com/image2.png"
+            ])
     ]
     conversation = render(schema, messages; image_detail = "low")
-    expected_output = Dict{String, Any}[Dict("role" => "system",
+    expected_output = Dict{String, Any}[
+        Dict("role" => "system",
             "content" => "System message 2"),
         Dict("role" => "user",
-            "content" => Dict{String, Any}[Dict("text" => "User message", "type" => "text"),
-                Dict("image_url" => Dict("detail" => "low",
+            "content" => Dict{String, Any}[
+                Dict("text" => "User message", "type" => "text"),
+                Dict(
+                    "image_url" => Dict("detail" => "low",
                         "url" => "https://example.com/image1.png"),
                     "type" => "image_url"),
-                Dict("image_url" => Dict("detail" => "low",
+                Dict(
+                    "image_url" => Dict("detail" => "low",
                         "url" => "https://example.com/image2.png"),
                     "type" => "image_url")])]
     @test conversation == expected_output
     # Test with dry_run=true
     messages_alt = [
         SystemMessage("System message 2"),
-        UserMessage("User message"),
+        UserMessage("User message")
     ]
     image_url = ["https://example.com/image1.png",
         "https://example.com/image2.png"]
@@ -185,13 +193,14 @@ end
     echo_server = HTTP.serve!(PORT, verbose = -1) do req
         content = JSON3.read(req.body)
         user_msg = last(content[:messages])
-        response = Dict(:choices => [
+        response = Dict(
+            :choices => [
                 Dict(:message => user_msg,
-                    :logprobs => Dict(:content => [
-                        Dict(:logprob => -0.1),
-                        Dict(:logprob => -0.2),
-                    ]),
-                    :finish_reason => "stop"),
+                :logprobs => Dict(:content => [
+                    Dict(:logprob => -0.1),
+                    Dict(:logprob => -0.2)
+                ]),
+                :finish_reason => "stop")
             ],
             :model => content[:model],
             :usage => Dict(:total_tokens => length(user_msg[:content]),
@@ -286,9 +295,10 @@ end
 
     #### With DataMessage
     # Mock the response and choice data
-    mock_choice = Dict(:message => Dict(:content => "Hello!",
+    mock_choice = Dict(
+        :message => Dict(:content => "Hello!",
             :tool_calls => [
-                Dict(:function => Dict(:arguments => JSON3.write(Dict(:x => 1)))),
+                Dict(:function => Dict(:arguments => JSON3.write(Dict(:x => 1))))
             ]),
         :logprobs => Dict(:content => [Dict(:logprob => -0.5), Dict(:logprob => -0.4)]),
         :finish_reason => "stop")
@@ -348,9 +358,10 @@ end
 
 @testset "aigenerate-OpenAI" begin
     # corresponds to OpenAI API v1
-    response = Dict(:choices => [
+    response = Dict(
+        :choices => [
             Dict(:message => Dict(:content => "Hello!"),
-                :finish_reason => "stop"),
+            :finish_reason => "stop")
         ],
         :usage => Dict(:total_tokens => 3, :prompt_tokens => 2, :completion_tokens => 1))
 
@@ -372,7 +383,7 @@ end
     @test msg == expected_output
     @test schema1.inputs ==
           [Dict("role" => "system", "content" => "Act as a helpful AI assistant")
-        Dict("role" => "user", "content" => "Hello World")]
+           Dict("role" => "user", "content" => "Hello World")]
     @test schema1.model_id == "gpt-3.5-turbo"
 
     # Test different input combinations and different prompts
@@ -390,15 +401,16 @@ end
     @test msg == expected_output
     @test schema1.inputs ==
           [Dict("role" => "system", "content" => "Act as a helpful AI assistant")
-        Dict("role" => "user", "content" => "Hello World")]
+           Dict("role" => "user", "content" => "Hello World")]
     @test schema2.model_id == "gpt-4"
 
     ## Test multiple samples
-    response = Dict(:choices => [
+    response = Dict(
+        :choices => [
             Dict(:message => Dict(:content => "Hello1!"),
                 :finish_reason => "stop"),
             Dict(:message => Dict(:content => "Hello2!"),
-                :finish_reason => "stop"),
+                :finish_reason => "stop")
         ],
         :usage => Dict(:total_tokens => 3, :prompt_tokens => 2, :completion_tokens => 1))
     schema3 = TestEchoOpenAISchema(; response, status = 200)
@@ -476,7 +488,7 @@ end
         [
             ("A", "any animal or creature"),
             ("P", "for any plant or tree"),
-            ("O", "for everything else"),
+            ("O", "for everything else")
         ])
     expected_prompt = "1. \"A\" for any animal or creature\n2. \"P\" for for any plant or tree\n3. \"O\" for for everything else"
     expected_logit_bias = Dict(16 => 100, 17 => 100, 18 => 100)
@@ -487,7 +499,7 @@ end
     choices_prompt, logit_bias, ids = encode_choices(OpenAISchema(),
         [
             ("true", "If the statement is true"),
-            ("false", "If the statement is false"),
+            ("false", "If the statement is false")
         ])
     expected_prompt = "true for \"If the statement is true\"\nfalse for \"If the statement is false\""
     expected_logit_bias = Dict(837 => 100, 905 => 100)
@@ -527,7 +539,7 @@ end
     conv = [
         AIMessage("1"), # do not touch, different run
         AIMessage(; content = "1", run_id = 1, sample_id = 1),
-        AIMessage(; content = "1", run_id = 1, sample_id = 2),
+        AIMessage(; content = "1", run_id = 1, sample_id = 2)
     ]
     decoded_conv = decode_choices(OpenAISchema(), ["true", "false"], conv)
     @test decoded_conv[1].content == "1"
@@ -545,9 +557,10 @@ end
 
 @testset "aiclassify-OpenAI" begin
     # corresponds to OpenAI API v1
-    response = Dict(:choices => [
+    response = Dict(
+        :choices => [
             Dict(:message => Dict(:content => "1"),
-                :finish_reason => "stop"),
+            :finish_reason => "stop")
         ],
         :usage => Dict(:total_tokens => 3, :prompt_tokens => 2, :completion_tokens => 1))
 
@@ -556,7 +569,7 @@ end
     choices = [
         ("A", "any animal or creature"),
         ("P", "for any plant or tree"),
-        ("O", "for everything else"),
+        ("O", "for everything else")
     ]
     msg = aiclassify(schema1, :InputClassifier; input = "pelican", choices)
     expected_output = AIMessage(;
@@ -568,7 +581,8 @@ end
         elapsed = msg.elapsed)
     @test msg == expected_output
     @test schema1.inputs ==
-          Dict{String, Any}[Dict("role" => "system",
+          Dict{String, Any}[
+        Dict("role" => "system",
             "content" => "You are a world-class classification specialist. \n\nYour task is to select the most appropriate label from the given choices for the given user input.\n\n**Available Choices:**\n---\n1. \"A\" for any animal or creature\n2. \"P\" for for any plant or tree\n3. \"O\" for for everything else\n---\n\n**Instructions:**\n- You must respond in one word. \n- You must respond only with the label ID (e.g., \"1\", \"2\", ...) that best fits the input.\n"),
         Dict("role" => "user", "content" => "User Input: pelican\n\nLabel:\n")]
 end
@@ -580,9 +594,10 @@ end
     end
     return_type = RandomType1235
 
-    mock_choice = Dict(:message => Dict(:content => "Hello!",
+    mock_choice = Dict(
+        :message => Dict(:content => "Hello!",
             :tool_calls => [
-                Dict(:function => Dict(:arguments => JSON3.write(Dict(:x => 1)))),
+                Dict(:function => Dict(:arguments => JSON3.write(Dict(:x => 1))))
             ]),
         :logprobs => Dict(:content => [Dict(:logprob => -0.5), Dict(:logprob => -0.4)]),
         :finish_reason => "stop")
@@ -597,9 +612,10 @@ end
     @test msg.log_prob ≈ -0.9
 
     ## Test multiple samples -- mock_choice is less probable
-    mock_choice2 = Dict(:message => Dict(:content => "Hello!",
+    mock_choice2 = Dict(
+        :message => Dict(:content => "Hello!",
             :tool_calls => [
-                Dict(:function => Dict(:arguments => JSON3.write(Dict(:x => 1)))),
+                Dict(:function => Dict(:arguments => JSON3.write(Dict(:x => 1))))
             ]),
         :logprobs => Dict(:content => [Dict(:logprob => -1.2), Dict(:logprob => -0.4)]),
         :finish_reason => "stop")
@@ -630,13 +646,14 @@ end
 
 @testset "aiscan-OpenAI" begin
     ## Test with single sample and log_probs samples
-    response = Dict(:choices => [
+    response = Dict(
+        :choices => [
             Dict(:message => Dict(:content => "Hello1!"),
-                :finish_reason => "stop",
-                :logprobs => Dict(:content => [
-                    Dict(:logprob => -0.1),
-                    Dict(:logprob => -0.2),
-                ])),
+            :finish_reason => "stop",
+            :logprobs => Dict(:content => [
+                Dict(:logprob => -0.1),
+                Dict(:logprob => -0.2)
+            ]))
         ],
         :usage => Dict(:total_tokens => 3, :prompt_tokens => 2, :completion_tokens => 1))
     schema1 = TestEchoOpenAISchema(; response, status = 200)
@@ -648,11 +665,12 @@ end
     @test msg.log_prob ≈ -0.3
 
     ## Test multiple samples
-    response = Dict(:choices => [
+    response = Dict(
+        :choices => [
             Dict(:message => Dict(:content => "Hello1!"),
                 :finish_reason => "stop"),
             Dict(:message => Dict(:content => "Hello2!"),
-                :finish_reason => "stop"),
+                :finish_reason => "stop")
         ],
         :usage => Dict(:total_tokens => 3, :prompt_tokens => 2, :completion_tokens => 1))
     schema1 = TestEchoOpenAISchema(; response, status = 200)
@@ -662,4 +680,45 @@ end
         api_kwargs = (; temperature = 0, n = 2))
     @test conv[end - 1].content == "Hello1!"
     @test conv[end].content == "Hello2!"
+end
+
+@testset "aiimage-OpenAI" begin
+    # corresponds to OpenAI API v1 for create_images
+    payload = Dict(:url => "xyz/url", :revised_prompt => "New prompt")
+    response1 = Dict(:data => [payload])
+    schema1 = TestEchoOpenAISchema(; response = response1, status = 200)
+
+    msg = aiimage(schema1, "Hello World")
+    expected_output = DataMessage(;
+        content = payload,
+        status = 200,
+        tokens = (0, 0),
+        cost = msg.cost,
+        elapsed = msg.elapsed)
+    @test msg == expected_output
+    @test schema1.inputs == "Hello World"
+    @test schema1.model_id == MODEL_IMAGE_GENERATION
+
+    # Test different inputs
+    msg = aiimage(schema1, :AssistantAsk; model = "banana")
+    expected_output = DataMessage(;
+        content = payload,
+        status = 200,
+        tokens = (0, 0),
+        cost = msg.cost,
+        elapsed = msg.elapsed)
+    @test msg == expected_output
+    @test schema1.inputs == "# Question\n\n{{ask}}" # Grabs only the content of last message
+    @test schema1.model_id == "banana"
+
+    conv = aiimage(OpenAISchema(), :AssistantAsk; dry_run = true, return_all = true)
+    template = PT.render(OpenAISchema(), AITemplate(:AssistantAsk)) |>
+               x -> PT.render(OpenAISchema(), x)
+    @test conv == template
+
+    # Invalid inputs
+    @test_throws AssertionError aiimage(OpenAISchema(), "my input"; image_size = "wrong")
+    @test_throws AssertionError aiimage(OpenAISchema(), "my input"; image_n = 2)
+    @test_throws AssertionError aiimage(
+        OpenAISchema(), "my input"; conversation = [PT.UserMessage("hi")])
 end
