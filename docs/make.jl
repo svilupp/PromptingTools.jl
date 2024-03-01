@@ -1,5 +1,5 @@
+using Documenter, DocumenterVitepress
 using PromptingTools
-using Documenter
 using SparseArrays, LinearAlgebra, Markdown
 using PromptingTools.Experimental.RAGTools
 using PromptingTools.Experimental.AgentTools
