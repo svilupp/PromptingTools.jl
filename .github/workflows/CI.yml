@@ -49,24 +49,30 @@ jobs:
     permissions:
       contents: write
       statuses: write
+      pages: write
+      id-token: write
+      actions: write
     steps:
-      - uses: actions/checkout@v3
-      - uses: julia-actions/setup-julia@v1
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node # This is still useful because it caches the node_modules so we don't constantly re-install.  You don't technically need this, though.
+        uses: actions/setup-node@v3
         with:
-          version: '1'
-      - name: Configure doc environment
-        run: |
-          julia --project=docs/ -e '
-            using Pkg
-            Pkg.develop(PackageSpec(path=pwd()))
-            Pkg.instantiate()'
-      - uses: julia-actions/julia-buildpkg@v1
-      - uses: julia-actions/julia-docdeploy@v1
+            node-version: 20
+            cache: npm # or pnpm / yarn
+            cache-dependency-path: 'docs/package-lock.json' # this should be a package-lock.json file
+      - name: Setup Julia
+        uses: julia-actions/setup-julia@v1
+      - name: Pull Julia cache
+        uses: julia-actions/cache@v1
+      - name: Install documentation dependencies
+        run: julia --project=docs -e 'using Pkg; pkg"dev ."; Pkg.instantiate(); Pkg.precompile(); Pkg.status()'
+      - name: Instantiate NPM
+        run: cd docs/; npm i; cd ..
+      #- name: Creating new mds from src
+      - name: Build and deploy docs
+        uses: julia-actions/julia-docdeploy@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - run: |
-          julia --project=docs -e '
-            using Documenter: DocMeta, doctest
-            using PromptingTools
-            DocMeta.setdocmeta!(PromptingTools, :DocTestSetup, :(using PromptingTools); recursive=true)
-            doctest(PromptingTools)'
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # For authentication with GitHub Actions token
+          GKSwstype: "100" # for Plots.jl plots (if you have them)
+          JULIA_DEBUG: "Documenter"
