@@ -70,7 +70,8 @@ function OpenAI.build_url(provider::AbstractCustomProvider, api::AbstractString)
     string(provider.base_url, "/", api)
 end
 function OpenAI.auth_header(provider::AbstractCustomProvider, api_key::AbstractString)
-    OpenAI.auth_header(OpenAI.OpenAIProvider(provider.api_key,
+    OpenAI.auth_header(
+        OpenAI.OpenAIProvider(provider.api_key,
             provider.base_url,
             provider.api_version),
         api_key)
@@ -321,6 +322,25 @@ function OpenAI.create_embeddings(provider::AbstractCustomProvider,
         kwargs...)
 end
 
+## Wrap create_images for testing and routing
+## Note: Careful, API is non-standard compared to other OAI functions
+function OpenAI.create_images(schema::AbstractOpenAISchema,
+        api_key::AbstractString,
+        prompt,
+        args...;
+        kwargs...)
+    OpenAI.create_images(api_key, prompt, args...; kwargs...)
+end
+function OpenAI.create_images(schema::TestEchoOpenAISchema,
+        api_key::AbstractString,
+        prompt,
+        args...;
+        kwargs...)
+    schema.model_id = model
+    schema.inputs = prompt
+    return schema
+end
+
 """
     response_to_message(schema::AbstractOpenAISchema,
         MSG::Type{AIMessage},
@@ -482,7 +502,7 @@ function aigenerate(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_
             run_id = Int(rand(Int32)) # remember one run ID
             ## extract all message
             msgs = [response_to_message(prompt_schema, AIMessage, choice, r;
-                time, model_id, run_id, sample_id = i)
+                        time, model_id, run_id, sample_id = i)
                     for (i, choice) in enumerate(r.response[:choices])]
             ## Order by log probability if available
             ## bigger is better, keep it last
@@ -825,7 +845,7 @@ function aiclassify(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_
         choices::AbstractVector{T} = ["true", "false", "unknown"],
         api_kwargs::NamedTuple = NamedTuple(),
         kwargs...) where {T <:
-             Union{AbstractString, Tuple{<:AbstractString, <:AbstractString}}}
+                          Union{AbstractString, Tuple{<:AbstractString, <:AbstractString}}}
     ## Encode the choices and the corresponding prompt 
     ## TODO: maybe check the model provided as well?
     choices_prompt, logit_bias, decode_ids = encode_choices(prompt_schema, choices)
@@ -1062,7 +1082,7 @@ function aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_T
             run_id = Int(rand(Int32)) # remember one run ID
             ## extract all message
             msgs = [response_to_message(prompt_schema, DataMessage, choice, r;
-                return_type, time, model_id, run_id, sample_id = i)
+                        return_type, time, model_id, run_id, sample_id = i)
                     for (i, choice) in enumerate(r.response[:choices])]
             ## Order by log probability if available
             ## bigger is better, keep it last
@@ -1219,7 +1239,7 @@ function aiscan(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE
             run_id = Int(rand(Int32)) # remember one run ID
             ## extract all message
             msgs = [response_to_message(prompt_schema, AIMessage, choice, r;
-                time, model_id, run_id, sample_id = i)
+                        time, model_id, run_id, sample_id = i)
                     for (i, choice) in enumerate(r.response[:choices])]
             ## Order by log probability if available
             ## bigger is better, keep it last
@@ -1234,6 +1254,143 @@ function aiscan(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE
             response_to_message(prompt_schema, AIMessage, choice, r;
                 time, model_id)
         end
+        ## Reporting
+        verbose && @info _report_stats(msg, model_id)
+    else
+        msg = nothing
+    end
+
+    ## Select what to return // input `msgs` to preserve the image attachments
+    output = finalize_outputs(msgs,
+        conv_rendered,
+        msg;
+        conversation,
+        return_all,
+        dry_run,
+        kwargs...)
+
+    return output
+end
+
+"""
+    aiimage([prompt_schema::AbstractOpenAISchema,] prompt::ALLOWED_PROMPT_TYPE; 
+    verbose::Bool = true, api_key::String = OPENAI_API_KEY,
+        model::String = MODEL_CHAT,
+        return_all::Bool = false, dry_run::Bool = false,
+        conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
+        http_kwargs::NamedTuple = (;
+            retry_non_idempotent = true,
+            retries = 5,
+            readtimeout = 120), 
+        api_kwargs::NamedTuple = = NamedTuple(),
+        kwargs...)
+
+Generates an image from the provided `prompt`. If multiple "messages" are provided, it extracts the text ONLY from the last message!
+
+Image will be returned in a `DataMessage.content`, the format will depend on the `api_kwargs.response_type` you set.
+
+Can be used for generating images of varying quality and style with `dall-e-*` models.
+This function DOES NOT SUPPORT multi-term conversations (ie, do not provide previous conversation via `conversation` argument).
+
+# Arguments
+- `prompt_schema`: An optional object to specify which prompt template should be applied (Default to `PROMPT_SCHEMA = OpenAISchema`)
+- `prompt`: Can be a string representing the prompt for the AI conversation, a `UserMessage`, a vector of `AbstractMessage` or an `AITemplate`
+- `verbose`: A boolean indicating whether to print additional information.
+- `api_key`: A string representing the API key for accessing the OpenAI API.
+- `model`: A string representing the model to use for generating the response. Can be an alias corresponding to a model ID defined in `MODEL_ALIASES`.
+- `return_all::Bool=false`: If `true`, returns the entire conversation history, otherwise returns only the last message (the `AIMessage`).
+- `dry_run::Bool=false`: If `true`, skips sending the messages to the model (for debugging, often used with `return_all=true`).
+- `conversation`: An optional vector of `AbstractMessage` objects representing the conversation history. If not provided, it is initialized as an empty vector.
+- `http_kwargs`: A named tuple of HTTP keyword arguments.
+- `api_kwargs`: A named tuple of API keyword arguments. Several important arguments are highlighted below:
+    - `response_type`
+- `kwargs`: Prompt variables to be used to fill the prompt/template
+
+# Returns
+If `return_all=false` (default):
+- `msg`: A `DataMessage` object representing one or more generated images, including the rewritten prompt if relevant, status, and elapsed time.
+ Use `msg.content` to access the extracted string.
+
+If `return_all=true`:
+- `conversation`: A vector of `AbstractMessage` objects representing the full conversation history, including the response from the AI model (`AIMessage`).
+
+See also: `ai_str`, `aai_str`, `aigenerate`, `aiembed`, `aiclassify`, `aiextract`, `aitemplates`
+
+# Notes
+- This function DOES NOT SUPPORT multi-term conversations (ie, do not provide previous conversation via `conversation` argument).
+- There is no token tracking provided by the API, so the messages will NOT report any cost despite costing you money!
+
+# Example
+
+Describe the provided image:
+```julia
+msg = aiscan("Describe the image"; image_path="julia.png", model="gpt4v")
+# [ Info: Tokens: 1141 @ Cost: \$0.0117 in 2.2 seconds
+# AIMessage("The image shows a logo consisting of the word "julia" written in lowercase")
+```
+
+You can provide multiple images at once as a vector and ask for "low" level of detail (cheaper):
+```julia
+msg = aiscan("Describe the image"; image_path=["julia.png","python.png"], image_detail="low", model="gpt4v")
+```
+
+You can use this function as a nice and quick OCR (transcribe text in the image) with a template `:OCRTask`. 
+Let's transcribe some SQL code from a screenshot (no more re-typing!):
+
+```julia
+# Screenshot of some SQL code
+image_url = "https://www.sqlservercentral.com/wp-content/uploads/legacy/8755f69180b7ac7ee76a69ae68ec36872a116ad4/24622.png"
+msg = aiscan(:OCRTask; image_url, model="gpt4v", task="Transcribe the SQL code in the image.", api_kwargs=(; max_tokens=2500))
+
+# [ Info: Tokens: 362 @ Cost: \$0.0045 in 2.5 seconds
+# AIMessage("```sql
+# update Orders <continue>
+
+# You can add syntax highlighting of the outputs via Markdown
+using Markdown
+msg.content |> Markdown.parse
+```
+
+Notice that we enforce `max_tokens = 2500`. That's because OpenAI seems to default to ~300 tokens, which provides incomplete outputs.
+Hence, we set this value to 2500 as a default. If you still get truncated outputs, increase this value.
+
+"""
+function aiimage(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE;
+        verbose::Bool = true,
+        api_key::String = OPENAI_API_KEY,
+        model::String = MODEL_IMAGE_GENERATION,
+        return_all::Bool = false, dry_run::Bool = false,
+        conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
+        http_kwargs::NamedTuple = (retry_non_idempotent = true,
+            retries = 5,
+            readtimeout = 120), api_kwargs::NamedTuple = NamedTuple(),
+        kwargs...)
+    @assert isempty(conversation) "Multi-turn `conversation` is not supported for image generation."
+    ##
+    global MODEL_ALIASES
+    ## Find the unique ID for the model alias provided
+    model_id = get(MODEL_ALIASES, model, model)
+    ## Build the conversation, pass what image detail is required (if provided)
+    conv_rendered = render(prompt_schema, msgs; conversation, kwargs...)
+    if !dry_run
+        ## prompt must be a string, so we extract from last message
+        prompt = last(conv_rendered).content
+
+        ## Model call
+        time = @elapsed r = create_images(prompt_schema, api_key,
+            prompt;
+            model = model_id,
+            http_kwargs,
+            api_kwargs...)
+        @info r.response
+        tokens_prompt = get(r.response, :usage, Dict(:prompt_tokens => 0))[:prompt_tokens]
+        msg = DataMessage(;
+            content = r.response[:data],
+            status = Int(r.status),
+            cost = call_cost(tokens_prompt, 0, model_id),
+            tokens = (tokens_prompt, 0),
+            elapsed = time)
+
         ## Reporting
         verbose && @info _report_stats(msg, model_id)
     else

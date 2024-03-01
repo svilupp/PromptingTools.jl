@@ -13,6 +13,7 @@ function aiembed end
 function aiclassify end
 function aiextract end
 function aiscan end
+function aiimage end
 # Re-usable blocks are defined in src/llm_shared.jl
 
 ## Prompt Schema
@@ -280,7 +281,10 @@ function aiscan(prompt; model = MODEL_CHAT, kwargs...)
     schema = get(MODEL_REGISTRY, model, (; schema = PROMPT_SCHEMA)).schema
     aiscan(schema, prompt; model, kwargs...)
 end
-
+function aiimage(prompt; model = MODEL_CHAT, kwargs...)
+    schema = get(MODEL_REGISTRY, model, (; schema = PROMPT_SCHEMA)).schema
+    aiimage(schema, prompt; model, kwargs...)
+end
 "Utility to facilitate unwrapping of HTTP response to a message type `MSG` provided. Designed to handle multi-sample completions."
 function response_to_message(schema::AbstractPromptSchema,
         MSG::Type{T},
