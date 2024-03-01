@@ -352,6 +352,9 @@ end
 function aiscan(schema::AbstractPromptSchema, template::AITemplate; kwargs...)
     aiscan(schema, render(schema, template); kwargs...)
 end
+function aiimage(schema::AbstractPromptSchema, template::AITemplate; kwargs...)
+    aiimage(schema, render(schema, template); kwargs...)
+end
 
 # Shortcut for symbols
 function aigenerate(schema::AbstractPromptSchema, template::Symbol; kwargs...)
@@ -365,6 +368,9 @@ function aiextract(schema::AbstractPromptSchema, template::Symbol; kwargs...)
 end
 function aiscan(schema::AbstractPromptSchema, template::Symbol; kwargs...)
     aiscan(schema, AITemplate(template); kwargs...)
+end
+function aiimage(schema::AbstractPromptSchema, template::Symbol; kwargs...)
+    aiimage(schema, AITemplate(template); kwargs...)
 end
 
 ## Utility for creating templates

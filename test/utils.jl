@@ -1,5 +1,6 @@
 using PromptingTools: split_by_length, replace_words, length_longest_common_subsequence
-using PromptingTools: _extract_handlebar_variables, call_cost, _report_stats
+using PromptingTools: _extract_handlebar_variables, call_cost, call_cost_alternative,
+                      _report_stats
 using PromptingTools: _string_to_vector, _encode_local_image
 using PromptingTools: DataMessage, AIMessage
 using PromptingTools: push_conversation!,
@@ -146,6 +147,22 @@ end
     cost = call_cost(msg, "unknown_model")
     @test cost == 0.0
     @test call_cost(msg, "gpt-3.5-turbo") ≈ 1000 * 0.5e-6 + 1.5e-6 * 1000
+
+    # From message
+    msg = DataMessage(; content = nothing, tokens = (-1, -1), cost = 1.0)
+    cost = call_cost(msg, "unknown_model")
+    @test cost == 1.0
+end
+
+@testset "call_cost_alternative" begin
+    @test call_cost_alternative(
+        1, "dall-e-3"; image_quality = "standard", image_size = "1024x1024") ≈ 0.04
+    @test call_cost_alternative(
+        5, "dall-e-3"; image_quality = "standard", image_size = "1024x1024") ≈ 0.2
+    @test call_cost_alternative(
+        2, "dall-e-2"; image_quality = "weird", image_size = "xxx") ≈ 0.0
+    @test call_cost_alternative(
+        2, "unknown"; image_quality = "weird", image_size = "xxx") ≈ 0.0
 end
 
 @testset "report_stats" begin

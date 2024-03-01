@@ -113,6 +113,8 @@ end
 const MODEL_CHAT::String = @load_preference("MODEL_CHAT", default="gpt-3.5-turbo")
 const MODEL_EMBEDDING::String = @load_preference("MODEL_EMBEDDING",
     default="text-embedding-3-small")
+const MODEL_IMAGE_GENERATION = @load_preference("MODEL_IMAGE_GENERATION",
+    default="dall-e-3")
 # the prompt schema default is defined in llm_interace.jl !
 # const PROMPT_SCHEMA = OpenAISchema()
 
@@ -275,7 +277,8 @@ end
 ### Model Aliases
 
 # global reference MODEL_ALIASES is defined below
-aliases = merge(Dict("gpt3" => "gpt-3.5-turbo",
+aliases = merge(
+    Dict("gpt3" => "gpt-3.5-turbo",
         "gpt4" => "gpt-4",
         "gpt4v" => "gpt-4-vision-preview", # 4v is for "4 vision"
         "gpt4t" => "gpt-4-turbo-preview", # 4t is for "4 turbo"
@@ -303,7 +306,8 @@ aliases = merge(Dict("gpt3" => "gpt-3.5-turbo",
     ## Load aliases from preferences as well
     @load_preference("MODEL_ALIASES", default=Dict{String, String}()))
 
-registry = Dict{String, ModelSpec}("gpt-3.5-turbo" => ModelSpec("gpt-3.5-turbo",
+registry = Dict{String, ModelSpec}(
+    "gpt-3.5-turbo" => ModelSpec("gpt-3.5-turbo",
         OpenAISchema(),
         0.5e-6,
         1.5e-6,
@@ -343,6 +347,16 @@ registry = Dict{String, ModelSpec}("gpt-3.5-turbo" => ModelSpec("gpt-3.5-turbo",
         1e-5,
         3e-5,
         "GPT-4 Vision is similar to GPT-4 but it adds visual capabilities."),
+    "dall-e-3" => ModelSpec("dall-e-3",
+        OpenAISchema(),
+        0, ## tracked differently via ALTERNATIVE_GENERATION_COSTS
+        0,  ## tracked differently via ALTERNATIVE_GENERATION_COSTS
+        "The best image generation model from OpenAI DALL-E 3. Note: Costs are tracked on per-image basis!"),
+    "dall-e-2" => ModelSpec("dall-e-2",
+        OpenAISchema(),
+        0, ## tracked differently via ALTERNATIVE_GENERATION_COSTS
+        0,  ## tracked differently via ALTERNATIVE_GENERATION_COSTS
+        "Image generation model from OpenAI DALL-E 2. Note: Costs are tracked on per-image basis!"),
     "text-embedding-ada-002" => ModelSpec("text-embedding-ada-002",
         OpenAISchema(),
         1e-7,
@@ -419,9 +433,10 @@ registry = Dict{String, ModelSpec}("gpt-3.5-turbo" => ModelSpec("gpt-3.5-turbo",
         "Mistral AI's hosted model for embeddings."),
     "echo" => ModelSpec("echo",
         TestEchoOpenAISchema(;
-            response = Dict(:choices => [
+            response = Dict(
+                :choices => [
                     Dict(:message => Dict(:content => "Hello!"),
-                        :finish_reason => "stop"),
+                    :finish_reason => "stop")
                 ],
                 :usage => Dict(:total_tokens => 3,
                     :prompt_tokens => 2,
@@ -439,21 +454,41 @@ registry = Dict{String, ModelSpec}("gpt-3.5-turbo" => ModelSpec("gpt-3.5-turbo",
         0.0, #unknown, expected 1.25e-7
         0.0, #unknown, expected 3.75e-7
         "Gemini Pro is a LLM from Google. For more information, see [models](https://ai.google.dev/models/gemini)."),
-    "accounts/fireworks/models/mixtral-8x7b-instruct" => ModelSpec("accounts/fireworks/models/mixtral-8x7b-instruct",
+    "accounts/fireworks/models/mixtral-8x7b-instruct" => ModelSpec(
+        "accounts/fireworks/models/mixtral-8x7b-instruct",
         FireworksOpenAISchema(),
         4e-7, #unknown, expected 1.25e-7
         1.6e-6, #unknown, expected 3.75e-7
         "Mixtral (8x7b) from Mistral, hosted by Fireworks.ai. For more information, see [models](https://fireworks.ai/models/fireworks/mixtral-8x7b-instruct)."),
-    "accounts/fireworks/models/firefunction-v1" => ModelSpec("accounts/fireworks/models/firefunction-v1",
+    "accounts/fireworks/models/firefunction-v1" => ModelSpec(
+        "accounts/fireworks/models/firefunction-v1",
         FireworksOpenAISchema(),
         0.0, #unknown, expected to be the same as Mixtral
         0.0, #unknown, expected to be the same as Mixtral
         "Fireworks' open-source function calling model (fine-tuned Mixtral). Useful for `aiextract` calls. For more information, see [models](https://fireworks.ai/models/fireworks/firefunction-v1)."),
-    "mistralai/Mixtral-8x7B-Instruct-v0.1" => ModelSpec("mistralai/Mixtral-8x7B-Instruct-v0.1",
+    "mistralai/Mixtral-8x7B-Instruct-v0.1" => ModelSpec(
+        "mistralai/Mixtral-8x7B-Instruct-v0.1",
         TogetherOpenAISchema(),
         6e-7,
         6e-7,
         "Mixtral (8x7b) from Mistral, hosted by Together.ai. For more information, see [models](https://docs.together.ai/docs/inference-models)."))
+
+"""
+    ALTERNATIVE_GENERATION_COSTS
+
+Tracker of alternative costing models, eg, for image generation (`dall-e-3`), the cost is driven by quality/size.
+"""
+ALTERNATIVE_GENERATION_COSTS = Dict{String, Any}(
+    "dall-e-3" => Dict(
+        "standard" => Dict(
+            "1024x1024" => 0.04, "1024x1792" => 0.08, "1792x1024" => 0.08),
+        "hd" => Dict(
+            "1024x1024" => 0.08, "1024x1792" => 0.12, "1792x1024" => 0.12)),
+    "dall-e-2" => Dict(
+        "standard" => Dict(
+            "1024x1024" => 0.02, "512x512" => 0.018, "256x256" => 0.016),
+        "hd" => Dict("1024x1024" => 0.02, "512x512" => 0.018, "256x256" => 0.016))
+)
 
 ### Model Registry Structure
 @kwdef mutable struct ModelRegistry

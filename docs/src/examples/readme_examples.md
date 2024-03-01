@@ -1,6 +1,45 @@
 # Various Examples
 
-Noteworthy functions: `aigenerate`, `aiembed`, `aiclassify`, `aiextract`, `aitemplates`
+## `ai*` Functions Overview
+
+Noteworthy functions: `aigenerate`, `aiembed`, `aiclassify`, `aiextract`, `aiscan`, `aiimage`, `aitemplates`
+
+All `ai*` functions have the same basic structure: 
+
+`ai*(<optional schema>,<prompt or conversation>; <optional keyword arguments>)`, 
+
+but they differ in purpose:
+
+- `aigenerate` is the general-purpose function to generate any text response with LLMs, ie, it returns `AIMessage` with field `:content` containing the generated text (eg, `ans.content isa AbstractString`)
+- `aiembed` is designed to extract embeddings from the AI model's response, ie, it returns `DataMessage` with field `:content` containing the embeddings (eg, `ans.content isa AbstractArray`)
+- `aiextract` is designed to extract structured data from the AI model's response and return them as a Julia struct (eg, if we provide `return_type=Food`, we get `ans.content isa Food`). You need to define the return type first and then provide it as a keyword argument.
+- `aiclassify` is designed to classify the input text into (or simply respond within) a set of discrete `choices` provided by the user. It can be very useful as an LLM Judge or a router for RAG systems, as it uses the "logit bias trick" and generates exactly 1 token. It returns `AIMessage` with field `:content`, but the `:content` can be only one of the provided `choices` (eg, `ans.content in choices`)
+- `aiscan` is for working with images and vision-enabled models (as an input), but it returns `AIMessage` with field `:content` containing the generated text (eg, `ans.content isa AbstractString`) similar to `aigenerate`.
+- `aiimage` is for generating images (eg, with OpenAI DALL-E 3). It returns a `DataMessage`, where the field `:content` might contain either the URL to download the image from or the Base64-encoded image depending on the user-provided kwarg `api_kwargs.response_format`.
+- `aitemplates` is a helper function to discover available templates and see their details (eg, `aitemplates("some keyword")` or `aitemplates(:AssistantAsk)`)
+
+If you're using a known `model`, you do NOT need to provide a `schema` (the first argument).
+
+Optional keyword arguments in `ai*` tend to be:
+
+- `model::String` - Which model you want to use
+- `verbose::Bool` - Whether you went to see INFO logs around AI costs
+- `return_all::Bool` - Whether you want the WHOLE conversation or just the AI answer (ie, whether you want to include your inputs/prompt in the output)
+- `api_kwargs::NamedTuple` - Specific parameters for the model, eg, `temperature=0.0` to be NOT creative (and have more similar output in each run)
+- `http_kwargs::NamedTuple` - Parameters for the HTTP.jl package, eg, `readtimeout = 120` to time out in 120 seconds if no response was received.
+
+In addition to the above list of `ai*` functions, you can also use the **"lazy" counterparts** of these functions from the experimental AgentTools module.
+```julia
+using PromptingTools.Experimental.AgentTools
+```
+
+For example, `AIGenerate()` will create a lazy instance of `aigenerate`. It is an instance of `AICall` with `aigenerate` as its ai function.
+It uses exactly the same arguments and keyword arguments as `aigenerate` (see `?aigenerate` for details).
+
+"lazy" refers to the fact that it does NOT generate any output when instantiated (only when `run!` is called). 
+
+Or said differently, the `AICall` struct and all its flavors (`AIGenerate`, ...) are designed to facilitate a deferred execution model (lazy evaluation) for AI functions that interact with a Language Learning Model (LLM). It stores the necessary information for an AI call and executes the underlying AI function only when supplied with a `UserMessage` or when the `run!` method is applied. This allows us to remember user inputs and trigger the LLM call repeatedly if needed, which enables automatic fixing (see `?airetry!`).
+
 
 ## Seamless Integration Into Your Workflow
 Google search is great, but it's a context switch. You often have to open a few pages and read through the discussion to find the answer you need. Same with the ChatGPT website.
