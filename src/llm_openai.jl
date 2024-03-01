@@ -1287,12 +1287,12 @@ end
             readtimeout = 120), api_kwargs::NamedTuple = NamedTuple(),
         kwargs...)
 
-Generates an image from the provided `prompt`. If multiple "messages" are provided, it extracts the text ONLY from the last message!
+Generates an image from the provided `prompt`. If multiple "messages" are provided in `prompt`, it extracts the text ONLY from the last message!
 
-Image will be returned in a `DataMessage.content`, the format will depend on the `api_kwargs.response_format` you set.
+Image (or the reference to it) will be returned in a `DataMessage.content`, the format will depend on the `api_kwargs.response_format` you set.
 
 Can be used for generating images of varying quality and style with `dall-e-*` models.
-This function DOES NOT SUPPORT multi-term conversations (ie, do not provide previous conversation via `conversation` argument).
+This function DOES NOT SUPPORT multi-turn conversations (ie, do not provide previous conversation via `conversation` argument).
 
 # Arguments
 - `prompt_schema`: An optional object to specify which prompt template should be applied (Default to `PROMPT_SCHEMA = OpenAISchema`)
@@ -1323,8 +1323,9 @@ If `return_all=true`:
 See also: `ai_str`, `aai_str`, `aigenerate`, `aiembed`, `aiclassify`, `aiextract`, `aiscan`, `aitemplates`
 
 # Notes
-- This function DOES NOT SUPPORT multi-term conversations (ie, do not provide previous conversation via `conversation` argument).
+- This function DOES NOT SUPPORT multi-turn conversations (ie, do not provide previous conversation via `conversation` argument).
 - There is no token tracking provided by the API, so the messages will NOT report any cost despite costing you money!
+- You MUST download any URL-based images within 60 minutes. The links will become inactive.
 
 # Example
 
@@ -1345,9 +1346,9 @@ msg.content[:revised_prompt]
 # The scene could be set under the blue sky, enhancing the contrast between the white cat, the colorful car, and the bright blue sky."
 ```
 
-Note that you MUST download any URL-based images within 60 minutes. The links will become inactive after an hour.
+Note that you MUST download any URL-based images within 60 minutes. The links will become inactive.
 
-If you wanted to download image directly into the DataMessage, provide `response_format="b64_json"` api kwargs:
+If you wanted to download image directly into the DataMessage, provide `response_format="b64_json"` in `api_kwargs`:
 ```julia
 msg = aiimage("A white cat on a car"; image_quality="hd", api_kwargs=(; response_format="b64_json"))
 
@@ -1416,5 +1417,3 @@ function aiimage(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYP
 
     return output
 end
-
-test_f(a; model::String = MODEL_CHAT) = model

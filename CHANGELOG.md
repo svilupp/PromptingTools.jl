@@ -7,8 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Added experimental support for image generation with OpenAI DALL-E models.
-- TODO: update docs!
+- Added experimental support for image generation with OpenAI DALL-E models - see `?aiimage` for more details.
 
 ### Fixed
 

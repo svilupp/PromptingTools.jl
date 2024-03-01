@@ -78,7 +78,7 @@ You can discover all available templates with `aitemplates("some keyword")` or j
 
 Note: There is a new way to create and register templates in one go with `create_template(;user=<user prompt>, system=<system prompt>, load_as=<template name>)` (it skips the serialization step where a template previously must have been saved somewhere on the disk). See FAQ for more details or directly `?create_template`.
 
-## ai* Functions
+## ai* Functions Overview
 
 The above steps are implemented in the `ai*` functions, eg, `aigenerate`, `aiembed`, `aiextract`, etc. They all have the same basic structure: 
 
@@ -91,9 +91,20 @@ but they differ in purpose:
 - `aiextract` is designed to extract structured data from the AI model's response and return them as a Julia struct (eg, if we provide `return_type=Food`, we get `ans.content isa Food`). You need to define the return type first and then provide it as a keyword argument.
 - `aiclassify` is designed to classify the input text into (or simply respond within) a set of discrete `choices` provided by the user. It can be very useful as an LLM Judge or a router for RAG systems, as it uses the "logit bias trick" and generates exactly 1 token. It returns `AIMessage` with field `:content`, but the `:content` can be only one of the provided `choices` (eg, `ans.content in choices`)
 - `aiscan` is for working with images and vision-enabled models (as an input), but it returns `AIMessage` with field `:content` containing the generated text (eg, `ans.content isa AbstractString`) similar to `aigenerate`.
+- `aiimage` is for generating images (eg, with OpenAI DALL-E 3). It returns a `DataMessage`, where the field `:content` might contain either the URL to download the image from or the Base64-encoded image depending on the user-provided kwarg `api_kwargs.response_format`.
 - `aitemplates` is a helper function to discover available templates and see their details (eg, `aitemplates("some keyword")` or `aitemplates(:AssistantAsk)`)
 
-In addition to the above list, you can also use the **"lazy" counterparts** of these functions from the experimental AgentTools module.
+If you're using a known `model`, you do NOT need to provide a `schema` (the first argument).
+
+Optional keyword arguments in `ai*` tend to be:
+
+- `model::String` - Which model you want to use
+- `verbose::Bool` - Whether you went to see INFO logs around AI costs
+- `return_all::Bool` - Whether you want the WHOLE conversation or just the AI answer (ie, whether you want to include your inputs/prompt in the output)
+- `api_kwargs::NamedTuple` - Specific parameters for the model, eg, `temperature=0.0` to be NOT creative (and have more similar output in each run)
+- `http_kwargs::NamedTuple` - Parameters for the HTTP.jl package, eg, `readtimeout = 120` to time out in 120 seconds if no response was received.
+
+In addition to the above list of `ai*` functions, you can also use the **"lazy" counterparts** of these functions from the experimental AgentTools module.
 ```julia
 using PromptingTools.Experimental.AgentTools
 ```
@@ -119,9 +130,7 @@ result = aigenerate(:JuliaExpertAsk; ask="xyz", model="abc", api_kwargs=(; tempe
 
 Lazy AI calls and self-healing mechanisms unlock much more robust and useful LLM workflows!
 
-## Walkthroughs
-
-### Walkthrough Example for `aigenerate`
+## Walkthrough Example for `aigenerate`
 
 ```julia
 using PromptingTools
