@@ -66,7 +66,7 @@ A good start might be a soft limit of c.$5 and a hard limit of c.$10 - you can a
 Resources:
 - [OpenAI Forum](https://community.openai.com/t/how-to-set-a-price-limit/13086)
 
-### How much does it cost? Is it worth paying for?
+## How much does it cost? Is it worth paying for?
 
 If you use a local model (eg, with Ollama), it's free. If you use any commercial APIs (eg, OpenAI), you will likely pay per "token" (a sub-word unit).
 

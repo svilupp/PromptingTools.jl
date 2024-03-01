@@ -1,5 +1,5 @@
+using Documenter, DocumenterVitepress
 using PromptingTools
-using Documenter
 using SparseArrays, LinearAlgebra, Markdown
 using PromptingTools.Experimental.RAGTools
 using PromptingTools.Experimental.AgentTools
@@ -20,13 +20,18 @@ makedocs(;
     authors = "J S <49557684+svilupp@users.noreply.github.com> and contributors",
     repo = "https://github.com/svilupp/PromptingTools.jl/blob/{commit}{path}#{line}",
     sitename = "PromptingTools.jl",
-    format = Documenter.HTML(;
-        prettyurls = get(ENV, "CI", "false") == "true",
-        repolink = "https://github.com/svilupp/PromptingTools.jl",
-        canonical = "https://svilupp.github.io/PromptingTools.jl",
-        edit_link = "main",
-        size_threshold = nothing,
-        assets = String[]),
+    ## format = Documenter.HTML(;
+    ##     prettyurls = get(ENV, "CI", "false") == "true",
+    ##     repolink = "https://github.com/svilupp/PromptingTools.jl",
+    ##     canonical = "https://svilupp.github.io/PromptingTools.jl",
+    ##     edit_link = "main",
+    ##     size_threshold = nothing,
+    ##     assets = String[]),
+    format = DocumenterVitepress.MarkdownVitepress(
+        repo = "https://github.com/YourGithubUsername/YourPackage.jl",
+        devurl = "dev",
+        deploy_url = "svilupp.github.io/PromptingTools.jl"
+    ),
     pages = [
         "Home" => "index.md",
         "Getting Started" => "getting_started.md",
@@ -47,8 +52,10 @@ makedocs(;
             "AgentTools" => "reference_agenttools.md",
             "APITools" => "reference_apitools.md"
         ]
-    ])
+    ],
+    warnonly = true)
 
 deploydocs(;
     repo = "github.com/svilupp/PromptingTools.jl",
+    push_preview = true,
     devbranch = "main")

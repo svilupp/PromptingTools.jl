@@ -1,3 +1,9 @@
+```@raw html
+---
+outline: deep
+---
+```
+
 # Reference
 
 ```@index
