@@ -1,5 +1,5 @@
-using Documenter, DocumenterVitepress
 using PromptingTools
+using Documenter
 using SparseArrays, LinearAlgebra, Markdown
 using PromptingTools.Experimental.RAGTools
 using PromptingTools.Experimental.AgentTools
@@ -28,10 +28,14 @@ makedocs(;
     ##     size_threshold = nothing,
     ##     assets = String[]),
     format = DocumenterVitepress.MarkdownVitepress(
-        repo = "https://github.com/YourGithubUsername/YourPackage.jl",
+        repo = "https://github.com/svilupp/PromptingTools.jl",
+        devbranch = "main",
         devurl = "dev",
         deploy_url = "svilupp.github.io/PromptingTools.jl"
     ),
+    draft = false,
+    source = "src",
+    build = "build",
     pages = [
         "Home" => "index.md",
         "Getting Started" => "getting_started.md",
@@ -52,10 +56,11 @@ makedocs(;
             "AgentTools" => "reference_agenttools.md",
             "APITools" => "reference_apitools.md"
         ]
-    ],
-    warnonly = true)
+    ])
 
 deploydocs(;
     repo = "github.com/svilupp/PromptingTools.jl",
+    target = "build",
     push_preview = true,
+    branch = "gh-pages",
     devbranch = "main")
