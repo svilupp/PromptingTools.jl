@@ -347,6 +347,16 @@ registry = Dict{String, ModelSpec}(
         1e-5,
         3e-5,
         "GPT-4 Vision is similar to GPT-4 but it adds visual capabilities."),
+    "dall-e-3" => ModelSpec("dall-e-3",
+        OpenAISchema(),
+        0, ## tracked differently via ALTERNATIVE_GENERATION_COSTS
+        0,  ## tracked differently via ALTERNATIVE_GENERATION_COSTS
+        "The best image generation model from OpenAI DALL-E 3. Note: Costs are tracked on per-image basis!"),
+    "dall-e-2" => ModelSpec("dall-e-2",
+        OpenAISchema(),
+        0, ## tracked differently via ALTERNATIVE_GENERATION_COSTS
+        0,  ## tracked differently via ALTERNATIVE_GENERATION_COSTS
+        "Image generation model from OpenAI DALL-E 2. Note: Costs are tracked on per-image basis!"),
     "text-embedding-ada-002" => ModelSpec("text-embedding-ada-002",
         OpenAISchema(),
         1e-7,
@@ -462,6 +472,23 @@ registry = Dict{String, ModelSpec}(
         6e-7,
         6e-7,
         "Mixtral (8x7b) from Mistral, hosted by Together.ai. For more information, see [models](https://docs.together.ai/docs/inference-models)."))
+
+"""
+    ALTERNATIVE_GENERATION_COSTS
+
+Tracker of alternative costing models, eg, for image generation (`dall-e-3`), the cost is driven by quality/size.
+"""
+ALTERNATIVE_GENERATION_COSTS = Dict{String, Any}(
+    "dall-e-3" => Dict(
+        "standard" => Dict(
+            "1024x1024" => 0.04, "1024x1792" => 0.08, "1792x1024" => 0.08),
+        "hd" => Dict(
+            "1024x1024" => 0.08, "1024x1792" => 0.12, "1792x1024" => 0.12)),
+    "dall-e-2" => Dict(
+        "standard" => Dict(
+            "1024x1024" => 0.02, "512x512" => 0.018, "256x256" => 0.016),
+        "hd" => Dict("1024x1024" => 0.02, "512x512" => 0.018, "256x256" => 0.016))
+)
 
 ### Model Registry Structure
 @kwdef mutable struct ModelRegistry

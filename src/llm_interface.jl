@@ -281,7 +281,7 @@ function aiscan(prompt; model = MODEL_CHAT, kwargs...)
     schema = get(MODEL_REGISTRY, model, (; schema = PROMPT_SCHEMA)).schema
     aiscan(schema, prompt; model, kwargs...)
 end
-function aiimage(prompt; model = MODEL_CHAT, kwargs...)
+function aiimage(prompt; model = MODEL_IMAGE_GENERATION, kwargs...)
     schema = get(MODEL_REGISTRY, model, (; schema = PROMPT_SCHEMA)).schema
     aiimage(schema, prompt; model, kwargs...)
 end

@@ -17,7 +17,8 @@ replace_words(text, ["Disney", "Snow White", "Mickey Mouse"])
 # Output: "ABC is a great company"
 ```
 """
-replace_words(text::AbstractString, words::Vector{<:AbstractString}; replacement::AbstractString = "ABC") = replace_words(text,
+replace_words(text::AbstractString, words::Vector{<:AbstractString}; replacement::AbstractString = "ABC") = replace_words(
+    text,
     Regex("\\b$(join(words, "\\b|\\b"))\\b", "i"),
     replacement)
 function replace_words(text::AbstractString, pattern::Regex, replacement::AbstractString)
@@ -319,6 +320,27 @@ function call_cost(conv::AbstractVector, model::String)
     return sum_
 end
 
+"""
+call_cost_alternative()
+
+Alternative cost calculation. Used to calculate cost of image generation with DALL-E 3 and similar.
+"""
+function call_cost_alternative(
+        count_images, model; image_quality::Union{AbstractString, Nothing} = nothing,
+        image_size::Union{AbstractString, Nothing} = nothing)
+    global ALTERNATIVE_GENERATION_COSTS
+    default_img_cost = 0.0 # per image
+    if haskey(ALTERNATIVE_GENERATION_COSTS, model) && !isnothing(image_quality) &&
+       !isnothing(image_size)
+        model_costs = get(
+            ALTERNATIVE_GENERATION_COSTS, model, Dict())
+        quality_costs = get(model_costs, image_quality, Dict())
+        size_costs = get(quality_costs, image_size, default_img_cost) * count_images
+    else
+        default_img_cost * count_images
+    end
+end
+
 # helper to produce summary message of how many tokens were used and for how much
 function _report_stats(msg,
         model::String)
@@ -474,7 +496,7 @@ function auth_header(api_key::Union{Nothing, AbstractString};
     headers = [
         "Content-Type" => "application/json",
         "Accept" => "application/json",
-        extra_headers...,
+        extra_headers...
     ]
     !isnothing(api_key) && pushfirst!(headers, "Authorization" => "Bearer $api_key")
     return headers

@@ -30,7 +30,7 @@ const RESERVED_KWARGS = [
 # export length_longest_common_subsequence
 include("utils.jl")
 
-export aigenerate, aiembed, aiclassify, aiextract, aiscan
+export aigenerate, aiembed, aiclassify, aiextract, aiscan, aiimage
 # export render # for debugging only
 include("llm_interface.jl")
 
