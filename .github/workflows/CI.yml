@@ -63,10 +63,8 @@ jobs:
             cache-dependency-path: 'docs/package-lock.json' # this should be a package-lock.json file
       - name: Setup Julia
         uses: julia-actions/setup-julia@v1
-      - name: Pull Julia cache
-        uses: julia-actions/cache@v1
-        with:
-          cache-compiled: false
+      # - name: Pull Julia cache
+      #   uses: julia-actions/cache@v1
       - name: Install documentation dependencies
         run: julia --project=docs -e 'using Pkg; pkg"dev ."; Pkg.instantiate(); Pkg.precompile(); Pkg.status()'
       - name: Instantiate NPM
