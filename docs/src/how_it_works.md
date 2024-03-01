@@ -11,11 +11,12 @@ We'll start with the key concepts and then walk through an example of `aigenerat
 ## Key Concepts
 
 5 Key Concepts (/Objects):
-- API/Model Providers -> The method that gives you access to Large Language Models (LLM), it can be an API (eg, OpenAI) or a locally-hosted application (eg, Llama.cpp or Ollama)
-- Schemas -> object of type `AbstractPromptSchema` that determines which methods are called and, hence, what providers/APIs are used
-- Prompts -> the information you want to convey to the AI model
-- Messages -> the basic unit of communication between the user and the AI model (eg, `UserMessage` vs `AIMessage`)
-- Prompt Templates -> re-usable "prompts" with placeholders that you can replace with your inputs at the time of making the request
+
+- **API/Model Providers** -> The method that gives you access to Large Language Models (LLM), it can be an API (eg, OpenAI) or a locally-hosted application (eg, Llama.cpp or Ollama)
+- **Schemas** -> object of type `AbstractPromptSchema` that determines which methods are called and, hence, what providers/APIs are used
+- **Prompts** -> the information you want to convey to the AI model
+- **Messages** -> the basic unit of communication between the user and the AI model (eg, `UserMessage` vs `AIMessage`)
+- **Prompt Templates** -> re-usable "prompts" with placeholders that you can replace with your inputs at the time of making the request
 
 When you call `aigenerate`, roughly the following happens: `render` -> `UserMessage`(s) -> `render` -> `OpenAI.create_chat` -> ... -> `AIMessage`.
 
@@ -78,7 +79,7 @@ You can discover all available templates with `aitemplates("some keyword")` or j
 
 Note: There is a new way to create and register templates in one go with `create_template(;user=<user prompt>, system=<system prompt>, load_as=<template name>)` (it skips the serialization step where a template previously must have been saved somewhere on the disk). See FAQ for more details or directly `?create_template`.
 
-## ai* Functions Overview
+### ai* Functions Overview
 
 The above steps are implemented in the `ai*` functions, eg, `aigenerate`, `aiembed`, `aiextract`, etc. They all have the same basic structure: 
 
