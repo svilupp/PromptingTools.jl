@@ -19,8 +19,8 @@
 - [`PromptingTools.Experimental.RAGTools.get_metadata`](#PromptingTools.Experimental.RAGTools.get_metadata-Tuple{Vector{<:AbstractString}})
 - [`PromptingTools.Experimental.RAGTools.metadata_extract`](#PromptingTools.Experimental.RAGTools.metadata_extract-Tuple{PromptingTools.Experimental.RAGTools.MetadataItem})
 - [`PromptingTools.Experimental.RAGTools.rerank`](#PromptingTools.Experimental.RAGTools.rerank-Tuple{PromptingTools.Experimental.RAGTools.CohereRerank,%20PromptingTools.Experimental.RAGTools.AbstractChunkIndex,%20Any,%20Any})
-- [`PromptingTools.Experimental.RAGTools.run_qa_evals`](#PromptingTools.Experimental.RAGTools.run_qa_evals-Tuple{PromptingTools.Experimental.RAGTools.QAEvalItem,%20PromptingTools.Experimental.RAGTools.RAGContext})
 - [`PromptingTools.Experimental.RAGTools.run_qa_evals`](#PromptingTools.Experimental.RAGTools.run_qa_evals-Tuple{PromptingTools.Experimental.RAGTools.AbstractChunkIndex,%20AbstractVector{<:PromptingTools.Experimental.RAGTools.QAEvalItem}})
+- [`PromptingTools.Experimental.RAGTools.run_qa_evals`](#PromptingTools.Experimental.RAGTools.run_qa_evals-Tuple{PromptingTools.Experimental.RAGTools.QAEvalItem,%20PromptingTools.Experimental.RAGTools.RAGContext})
 - [`PromptingTools.Experimental.RAGTools.score_retrieval_hit`](#PromptingTools.Experimental.RAGTools.score_retrieval_hit-Tuple{AbstractString,%20Vector{<:AbstractString}})
 - [`PromptingTools.Experimental.RAGTools.score_retrieval_rank`](#PromptingTools.Experimental.RAGTools.score_retrieval_rank-Tuple{AbstractString,%20Vector{<:AbstractString}})
 
