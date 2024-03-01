@@ -12,4 +12,4 @@ PromptingTools = "670122d1-24a8-4d70-bfce-740807c42192"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
 [compat]
-DocumenterVitepress = "0.0.8"
+DocumenterVitepress = "0.0.7"
