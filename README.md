@@ -11,6 +11,9 @@ Streamline your life using PromptingTools.jl, the Julia package that simplifies 
 
 PromptingTools.jl is not meant for building large-scale systems. It's meant to be the go-to tool in your global environment that will save you 20 minutes every day!
 
+> [!TIP]
+> Jump to the **[docs](https://svilupp.github.io/PromptingTools.jl/dev/)**
+
 ## Quick Start with `@ai_str` and Easy Templating
 
 Getting started with PromptingTools.jl is as easy as importing the package and using the `@ai_str` macro for your questions.
