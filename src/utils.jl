@@ -168,6 +168,63 @@ function split_by_length(text, separators::Vector{String}; max_length)
 end
 
 """
+    split_recursive( data::String; [separators, chunk_size] ) -> Vector{String}
+
+Recursively split the data using the provided separators (default: ["\n\n", "\n", "  ", " "]) 
+in ordered manner and chunk_size (default: 4096). The function will split the data using the
+first delimiter and then recursively split the chunks using the next delimiter if the chunk
+size is larger than the provided chunk_size. If all separators are exhausted then the function
+will split the data based on the chunk_size. The function will merge consecutive chunks if they 
+are smaller than chunk_size. 
+
+
+# Arguments
+
+- data::AbstractString: The data to be split
+- separators::Array{String}: The separators to be used for splitting the data
+- chunk_size::Int: The size of the chunk
+
+"""
+function split_recursive( text::AbstractString; 
+        separators=["\n\n", "\n", "  ", " "], 
+        max_length=4096 )
+
+    chunked_data = [] # store chunked data
+
+    # split the data using the first delimiter
+    delim = separators[1]
+    chunks = split( text, delim; keepempty=false )
+
+    # individually process each chunk         
+    for (idx,c) in enumerate(chunks)
+        if length(c) <= max_length
+            push!(chunked_data, c)
+
+        elseif (length(c) > max_length) && (length(separators[2:end]) > 0)   # split using next delim if larger than max_length
+            new_separators = separators[2:end]
+            r = split_recursive(c, separators = new_separators, max_length=max_length)
+            chunked_data = cat(chunked_data, r, dims=1)
+            
+        elseif (length(c) > max_length) && (length(separators[2:end]) == 0)  # if all delims are exhausted then just split on length
+            r = [c[i:min(i+max_length-1,end)] for i in 1:max_length:length(c)]
+            chunked_data = cat(chunked_data, r, dims=1)
+        end
+    end
+
+    # merge consecutive chunks if they are smaller than max_length
+    merged_data = []
+    for (idx,c) in enumerate(chunked_data)
+        prev_chunk_len = (length(merged_data) == 0) ? max_length + 1 : length(merged_data[end])
+        if length(c) + prev_chunk_len  <= max_length    # merge if the chunks are smaller than max_length
+            merged_data[end] = join([merged_data[end], c], " ")
+        else
+            push!(merged_data, c)
+        end
+    end
+    merged_data .|> lstrip
+end
+
+"""
     length_longest_common_subsequence(itr1, itr2)
 
 Compute the length of the longest common subsequence between two sequences (ie, the higher the number, the better the match).

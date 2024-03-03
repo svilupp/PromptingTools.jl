@@ -1,4 +1,4 @@
-using PromptingTools: split_by_length, replace_words, length_longest_common_subsequence
+using PromptingTools: split_by_length, split_recursive, replace_words, length_longest_common_subsequence
 using PromptingTools: _extract_handlebar_variables, call_cost, call_cost_alternative,
                       _report_stats
 using PromptingTools: _string_to_vector, _encode_local_image
@@ -85,6 +85,42 @@ end
     chunks = split_by_length(text, separators, max_length = 20)
     chunks = split_by_length(text, separators, max_length = 20)
     @test length(separators) == sep_length
+end
+
+@testset "split_recursive" begin
+    text = """Last night to the flicks. All war films. \n\nOne very good one of a ship 
+              full of refugees\n being bombed somewhere in the Mediterranean."""
+    chunks = split_recursive(text, max_length = 8)
+    @test length(chunks) == 17
+    @test chunks[7] == "One very"
+    
+    # Test with empty strings
+    text = ""
+    chunks = split_recursive(text, max_length = 8)
+    @test chunks == []
+    
+    # Test with custom seperator ['(number)', '\n']
+    text = """It was a bright cold day in April, and the (1) clocks were striking thirteen. 
+               Winston Smith, his chin nuzzled into (2) his breast in an effort to escape the
+               vile wind, slipped quickly through the glass doors of Victory Mansions,
+               though not quickly enough to prevent a (3) swirl of gritty dust from entering
+               along with him."""
+    
+    chunks = split_recursive(text, separators=[r"\(\d.*\)", "\n"], max_length = 32)
+    @test chunks[3] == "clocks were striking thirteen. "
+    
+    text = """It was a bright cold day in April, and the (1) clocks were striking thirteen. 
+               Winston Smith, his chin nuzzled into (2) his breast in an effort to escape the
+               vile wind, slipped quickly through the glass doors of Victory Mansions,
+               though not quickly enough to prevent a (3) swirl of gritty dust from entering
+               along with him."""
+    
+    chunks = split_recursive(text, separators=[r"\(\d.*\)", ",", "\n"], max_length = 32)
+    @test chunks[5] == "his chin nuzzled into "
+    
+    text = "ALongStringWithoutAnyMatchingSeperator.ItwasabrightcolddayinApril,andtheclockswerestrikingthirteen."
+    chunks = split_recursive(text, max_length = 39)
+    @test chunks[1] == "ALongStringWithoutAnyMatchingSeperator."
 end
 
 @testset "length_longest_common_subsequence" begin
