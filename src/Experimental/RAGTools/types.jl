@@ -1,10 +1,4 @@
-### Types
-# Defines three key types for RAG: ChunkIndex, MultiIndex, and CandidateChunks
-# In addition, RAGContext is defined for debugging purposes
 
-abstract type AbstractDocumentIndex end
-abstract type AbstractMultiIndex <: AbstractDocumentIndex end
-abstract type AbstractChunkIndex <: AbstractDocumentIndex end
 # More advanced index would be: HybridChunkIndex
 
 # Stores document chunks and their embeddings
@@ -26,7 +20,7 @@ Main struct for storing document chunks and their embeddings. It also stores tag
     T1 <: AbstractString,
     T2 <: Union{Nothing, Matrix{<:Real}},
     T3 <: Union{Nothing, AbstractMatrix{<:Bool}},
-    T4 <: Union{Nothing, AbstractVector},
+    T4 <: Union{Nothing, AbstractVector}
 } <: AbstractChunkIndex
     id::Symbol = gensym("ChunkIndex")
     # underlying document chunks / snippets
@@ -96,7 +90,6 @@ function Base.var"=="(i1::MultiIndex, i2::MultiIndex)
     return true
 end
 
-abstract type AbstractCandidateChunks end
 @kwdef struct CandidateChunks{TP <: Union{Integer, AbstractCandidateChunks}, TD <: Real} <:
               AbstractCandidateChunks
     index_id::Symbol
@@ -191,13 +184,15 @@ function Base.getindex(mi::MultiIndex,
 end
 
 """
-    RAGContext
+    RAGDetails
 
 A struct for debugging RAG answers. It contains the question, answer, context, and the candidate chunks at each step of the RAG pipeline.
 """
-@kwdef struct RAGContext
+@kwdef mutable struct RAGDetails <: AbstractRAGResult
     question::AbstractString
+    rephrased_question::AbstractVector{<:AbstractString}
     answer::AbstractString
+    refined_answer::AbstractString
     context::Vector{<:AbstractString}
     sources::Vector{<:AbstractString}
     emb_candidates::CandidateChunks
@@ -208,6 +203,6 @@ end
 
 # Structured show method for easier reading (each kwarg on a new line)
 function Base.show(io::IO,
-        t::Union{AbstractDocumentIndex, AbstractCandidateChunks, RAGContext})
+        t::Union{AbstractDocumentIndex, AbstractCandidateChunks, AbstractRAGResult})
     dump(IOContext(io, :limit => true), t, maxdepth = 1)
 end

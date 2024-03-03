@@ -9,5 +9,6 @@ using JSON3, HTTP
     include("preparation.jl")
     include("retrieval.jl")
     include("generation.jl")
+    include("annotation.jl")
     include("evaluation.jl")
 end

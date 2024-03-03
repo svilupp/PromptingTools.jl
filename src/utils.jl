@@ -476,8 +476,11 @@ macro timeout(seconds, expr_to_run, expr_when_fails)
     end
 end
 
-"Utility for rendering the conversation (vector of messages) as markdown. REQUIRES the Markdown package to load the extension!"
+"Utility for rendering the conversation (vector of messages) as markdown. REQUIRES the Markdown package to load the extension! See also `pprint`"
 function preview end
+
+"Utility for pretty printing PromptingTools types in REPL."
+function pprint end
 
 """
     auth_header(api_key::Union{Nothing, AbstractString};
