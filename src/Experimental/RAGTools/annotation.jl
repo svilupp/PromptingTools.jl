@@ -71,7 +71,8 @@ function AbstractTrees.childtype(::Type{T}) where {T <: AbstractAnnotatedNode}
     T
 end
 function AbstractTrees.nodevalue(n::AbstractAnnotatedNode)
-    !isempty(n.children) ? "Group: $(n.group_id)" :
+    !isempty(n.children) ?
+    "Group: $(n.group_id)($(isnothing(n.score) ? nothing : round(n.score;digits=2)))" :
     "$(n.content)($(isnothing(n.score) ? nothing : round(n.score;digits=2)))"
 end
 
@@ -116,8 +117,17 @@ function trigrams(input_string::AbstractString; add_word::AbstractString = "")
     trigrams = SubString{String}[]
     # Ensure the input string length is at least 3 to form a trigram
     if length(input_string) >= 3
-        for i in 1:(length(input_string) - 2)
-            push!(trigrams, @views input_string[i:(i + 2)])
+        nunits = ncodeunits(input_string)
+        i = 1
+        while i <= nunits
+            j = nextind(input_string, i, 2)
+            if j <= nunits
+                push!(trigrams, @views input_string[i:j])
+                ## next starter
+                i = nextind(input_string, i)
+            else
+                break
+            end
         end
         !isempty(add_word) && push!(trigrams, convert(SubString{String}, add_word))
     else
@@ -129,8 +139,17 @@ function trigrams_hashed(input_string::AbstractString; add_word::AbstractString 
     trigrams = Set{UInt64}()
     # Ensure the input string length is at least 3 to form a trigram
     if length(input_string) >= 3
-        for i in 1:(length(input_string) - 2)
-            push!(trigrams, hash(@views input_string[i:(i + 2)]))
+        nunits = ncodeunits(input_string)
+        i = 1
+        while i <= nunits
+            j = nextind(input_string, i, 2)
+            if j <= nunits
+                push!(trigrams, hash(@views input_string[i:j]))
+                ## next starter
+                i = nextind(input_string, i)
+            else
+                break
+            end
         end
         !isempty(add_word) && push!(trigrams, hash(add_word))
     else
@@ -308,13 +327,17 @@ end
 
 "Find if the `parent_node.content` is supported by the provided `context_trigrams`"
 function trigram_support!(parent_node::AnnotatedNode,
-        context_trigrams::AbstractVector; min_score::Float64 = 0.5,
-        styler_kwargs...)
+        context_trigrams::AbstractVector, trigram_func::F = trigrams;
+        skip_trigrams::Bool = false, min_score::Float64 = 0.5,
+        min_source_score::Float64 = 0.25,
+        stop_words::AbstractVector{<:String} = STOPWORDS,
+        styler_kwargs...) where {F <: Function}
     method = TrigramAnnotater()
     context_scores = zeros(Float64, length(context_trigrams))
     ## Iterate max-sim over all the tokens (find match via trigrams)
     tokens = tokenize(parent_node.content)
     length_toks = length(tokens)
+    cnt_scored_toks = 0 # number of tokens scored
     prev_token = nothing
     for i in eachindex(tokens)
         next_tok = i == length_toks ? nothing : tokens[i + 1]
@@ -322,17 +345,26 @@ function trigram_support!(parent_node::AnnotatedNode,
         node = AnnotatedNode(; content = curr_tok, parent_node.group_id,
             score = nothing, sources = Int[], parent = parent_node)
         push!(parent_node.children, node)
+        ## if too short, skip scoring
+        length(curr_tok) == 1 && continue
+        ## if a stop word, skip scoring
+        (curr_tok in stop_words) && continue
+        cnt_scored_toks += 1
         ## find the highest scoring source based on trigrams
         for si in eachindex(context_trigrams)
-            ## if too short, skip scoring
-            length(curr_tok) == 1 && continue
             ## load trigrams in the context source
             src = context_trigrams[si]
-            ## Score the trigram
-            full_tok = token_with_boundaries(prev_token, curr_tok, next_tok)
-            trig = trigrams(full_tok; add_word = curr_tok)
-            ## count portion of trigrams that match
-            score = count(in(src), trig) / length(trig)
+            ## Score the match of the word itself if found
+            direct_match = skip_trigrams ? in(curr_tok, src) : false
+            if !direct_match
+                ## Score the trigram if direct match failed
+                full_tok = token_with_boundaries(prev_token, curr_tok, next_tok)
+                trig = trigrams(full_tok; add_word = curr_tok)
+                ## count portion of trigrams that match
+                score = count(in(src), trig) / length(trig)
+            else
+                score = 1.0
+            end
             # Add up cumulative score for each separate context
             context_scores[si] += score
             # if 1.0, increment hits
@@ -358,9 +390,9 @@ function trigram_support!(parent_node::AnnotatedNode,
 
     ## Evaluate best source
     idx = argmax(context_scores)
-    max_score = context_scores[idx]
-    if max_score >= min_score ## unnecessary, it's a sum of scores, so it will be over 0
-        parent_node.score = max_score / length_toks # avg score
+    # avg score = max_score / tokens
+    parent_node.score = (cnt_scored_toks) > 0 ? context_scores[idx] / cnt_scored_toks : 0.0
+    if parent_node.score >= min_source_score
         parent_node.sources = [idx]
     end
 
@@ -371,68 +403,111 @@ function add_node_metadata!(annotater::TrigramAnnotater,
         root::AnnotatedNode; add_sources::Bool = true, add_scores::Bool = true,
         sources::Union{Nothing, AbstractVector{<:AbstractString}} = nothing)
     # Ensure there are children to process
-    if isempty(root.children)
-        return
+    children = AbstractTrees.children(root)
+    if isempty(children)
+        return root
     end
-
-    # Placeholder for new children array with metadata nodes
-    new_children = AnnotatedNode[]
-    current_group_id = root.children[1].group_id
-    best_source = root.children[1].sources[1]
-    best_score = isnothing(root.children[1].score) ? 0 :
-                 root.children[1].score * length(root.children[1].content)
-    for child in root.children
-        # Check if group_id has changed or it's the last child
-        if child.group_id != current_group_id
+    # We track cumulative score (score*length) and length
+    i = 1
+    source_scores = Dict{Int, Float64}()
+    source_lengths = Dict{Int, Int}()
+    previous_group_id = children[1].group_id
+    while i <= length(children)
+        child = children[i]
+        # Check if group_id has changed or it's the last child to record source
+        if (child.group_id != previous_group_id) && !isempty(source_scores)
             # Add a metadata node for the previous group
-            metadata_content = add_scores ?
-                               "[$best_source,$(round(best_score, digits=2))]" :
-                               "[$best_source]"
-            push!(new_children, AnnotatedNode(content = metadata_content))
-            # Reset tracking variables
-            current_group_id = child.group_id
-            best_source = child.sources[1]
-            best_score = isnothing(child.score) ? 0 : child.score * length(child.content)
-        else
-            # Update best source based on score * content length
-            current_score = isnothing(child.score) ? 0 : child.score * length(child.content)
-            if current_score > best_score
-                best_source = child.sources[1]
-                best_score = current_score
+            src, score_sum = maximum(source_scores)
+            score = score_sum / source_lengths[src] # average score, length weighted
+            metadata_content = string("[",
+                add_sources ? src : "",
+                add_sources ? "," : "",
+                add_scores ? round(score, digits = 2) : "",
+                "]")
+            ## Check if there is any content, then add it
+            if length(metadata_content) > 2
+                src_node = AnnotatedNode(; parent = root, group_id = previous_group_id,
+                    content = metadata_content)
+                insert!(children, i, src_node)
             end
+            # Reset tracking variables
+            previous_group_id = child.group_id
+            empty!(source_scores)
+            empty!(source_lengths)
+            # increment i, since we added item
+            i += 1
         end
-        push!(new_children, child)
+
+        # Update tracking
+        if !isnothing(child.score) && !isempty(child.sources)
+            src = only(child.sources)
+            len = length(child.content)
+            source_scores[src] = get(source_scores, src, 0) + child.score * len
+            source_lengths[src] = get(source_lengths, src, 0) + len
+        end
+        # Next round
+        i += 1
     end
-    # Add metadata for the last group if necessary
-    if add_sources
-        metadata_content = add_scores ? "[$best_source,$(round(best_score, digits=2))]" :
-                           "[$best_source]"
-        push!(new_children, AnnotatedNode(content = metadata_content))
+    ## Run for the last item
+    if !isempty(source_scores)
+        # Add a metadata node for the previous group
+        src, score_sum = maximum(source_scores)
+        score = score_sum / source_lengths[src] # average score, length weighted
+        metadata_content = string("[",
+            add_sources ? src : "",
+            add_sources ? "," : "",
+            add_scores ? round(score, digits = 2) : "",
+            "]")
+        ## Check if there is any content, then add it
+        if length(metadata_content) > 2
+            src_node = AnnotatedNode(; parent = root, group_id = previous_group_id,
+                content = metadata_content)
+            insert!(children, i, src_node)
+        end
     end
 
-    # Replace old children with new ones including metadata nodes
-    root.children = new_children
-
-    # TODO: Add the actual sources at the end if provided
+    ## Simply enumerate the sources at the end
+    if !isnothing(sources)
+        metadata_content = "\n\n**Sources:**\n" *
+                           join(["$(i). $(src)" for (i, src) in enumerate(sources)], "\n")
+        src_node = AnnotatedNode(; parent = root, group_id = previous_group_id + 1,
+            content = metadata_content)
+        push!(children, src_node)
+    end
 
     return root
 end
 
 "Annotates the `answer` with the `context` and returns the annotated tree of nodes representing the `answer`"
 function annotate_support(annotater::TrigramAnnotater, answer::AbstractString,
-        context::AbstractVector; min_score::Float64 = 0.5, add_sources::Bool = true,
+        context::AbstractVector; min_score::Float64 = 0.5,
+        skip_trigrams::Bool = true, hashed::Bool = false,
+        min_source_score::Float64 = 0.25,
+        add_sources::Bool = true,
         add_scores::Bool = true, kwargs...)
     # TODO: add RAG sources - inline and at the end of the context
+    ## use hashed trigrams?
+    if hashed
+        trigram_func = trigrams_hashed
+        text_to_trigram_func = text_to_trigrams_hashed
+    else
+        trigram_func = trigrams
+        text_to_trigram_func = text_to_trigrams
+    end
     sentences, group_ids = split_sentences(answer)
-    context_trigrams = text_to_trigrams.(context)
+    context_trigrams = text_to_trigram_func.(context)
     root = AnnotatedNode()
     for i in eachindex(sentences, group_ids)
         node = AnnotatedNode(;
             content = sentences[i], group_id = group_ids[i], parent = root)
         push!(root.children, node)
-        trigram_support!(node, context_trigrams; min_score, kwargs...)
+        trigram_support!(
+            node, context_trigrams, trigram_func; skip_trigrams,
+            min_score, min_source_score, kwargs...)
     end
     ## add_sources/scores if requested
-    ## add_node_metadata!(annotater, root; add_sources, add_scores)
+    if add_sources || add_scores
+        add_node_metadata!(annotater, root; add_sources, add_scores)
+    end
     return root
 end

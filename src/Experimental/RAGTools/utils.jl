@@ -1,3 +1,15 @@
+# STOPWORDS - used for annotation highlighting
+# Just a small list to
+const STOPWORDS = [
+    "a", "an", "the", "and", "is", "isn't", "are", "aren't", "be", "was", "wasn't", "been",
+    "will", "won't", "would", "wouldn't",
+    "have", "haven't", "has", "hasn't", "do", "don't", "does", "did", "to",
+    "from", "go", "goes", "went", "gone", "at",
+    "into", "on", "or", "but", "per", "so", "then", "than",
+    "what", "why", "who", "where", "whom", "which", "that", "with",
+    "its", "their"] |> x -> vcat(x, titlecase.(x))
+# "if","else","elseif", "in", "for", "let","for", 
+
 # Utility to check model suitability
 function _check_aiextract_capability(model::AbstractString)
     # Check that the provided model is known and that it is an OpenAI model (for the aiextract function to work)

@@ -1,4 +1,7 @@
-using Test
+using PromptingTools.Experimental.RAGTools: tokenize, trigrams, trigrams_hashed
+using PromptingTools.Experimental.RAGTools: token_with_boundaries, text_to_trigrams,
+                                            text_to_trigrams_hashed
+using PromptingTools.Experimental.RAGTools: trigram_support!
 
 @testset "tokenize" begin
     # Test basic tokenization with common delimiters
@@ -15,9 +18,16 @@ using Test
 
     # Test tokenization of an empty string
     @test tokenize("") == []
-end
 
-using Test
+    # multi-space
+    @test tokenize("   ") == ["   "]
+
+    # Special characters for Julia code
+    @test tokenize("α β γ δ") == ["α", " ", "β", " ", "γ", " ", "δ"]
+    @test tokenize("a = (; a=1)") == ["a", " ", "=", " ", "(;", " ", "a", "=", "1", ")"]
+    @test tokenize("replace(s, \"abc\"=>\"ABC\")") ==
+          ["replace", "(", "s", ",", " ", "\"", "abc", "\"", "=>", "\"", "ABC", "\"", ")"]
+end
 
 @testset "trigrams" begin
     # Test generating trigrams from a string of sufficient length
@@ -27,43 +37,56 @@ using Test
     @test trigrams("cat") == ["cat"]
 
     # Test with a string of length less than 3, expecting an empty array
-    @test trigrams("no") == []
+    @test trigrams("no") == ["no"]
 
     # Test with an empty string, also expecting an empty array
-    @test trigrams("") == []
+    @test trigrams("") == [""]
 
     # Test a case with special characters and spaces
     @test trigrams("a b c") == ["a b", " b ", "b c"]
-end
 
-using Test
+    # With boundaries
+    @test trigrams(" (cat=") == [" (c", "(ca", "cat", "at="]
+
+    # Add the token itself
+    @test trigrams("hello"; add_word = "hello") == ["hel", "ell", "llo", "hello"]
+
+    # non-standard chars
+    s = "α β γ δ"
+    @test trigrams(s) == ["α β", " β ", "β γ", " γ ", "γ δ"]
+end
 
 @testset "trigrams_hashed" begin
     # Test hashing trigrams from a string of sufficient length
     # Since hashing produces unique UInt64 values, we test for the set's length instead of specific values
-    @test length(trigrams_hashed("hello")) == 3
+    @test trigrams_hashed("hello") == hash.(["hel", "ell", "llo"]) |> Set
 
     # Test hashing a string with exactly 3 characters
-    # Expecting a set with 1 unique hash value because there's only one trigram
-    @test length(trigrams_hashed("cat")) == 1
+    @test trigrams_hashed("cat") == Set(hash("cat"))
 
     # Test with a string of length less than 3, expecting a set with 1 hash value
-    @test length(trigrams_hashed("no")) == 1
+    @test trigrams_hashed("no") == Set(hash("no"))
 
     # Test with an empty string, expecting a set with 1 hash value because the empty string itself is hashed
-    @test length(trigrams_hashed("")) == 1
+    @test (trigrams_hashed("")) == Set(hash(""))
 
     # Test to ensure no duplicate hash values in case of repeating trigrams
     # "ababab" will generate "aba", "bab", "aba", "bab" - only two unique trigrams when hashed
-    @test length(trigrams_hashed("ababab")) == 2
+    @test trigrams_hashed("ababab") == Set([hash("aba"), hash("bab")])
 
     # Test a unique case with special characters to ensure hashing works across different character sets
-    # We use length check due to unpredictability of hash values
-    @test length(trigrams_hashed("a!@")) == 1
+    @test trigrams_hashed("a!@") == Set(hash("a!@"))
+
+    # Add the token itself
+    @test trigrams_hashed("hello"; add_word = "hello") ==
+          hash.(["hel", "ell", "llo", "hello"]) |> Set
+
+    # special chars
+    s = "α β γ δ"
+    @test trigrams_hashed(s) == Set(hash.(["α β", " β ", "β γ", " γ ", "γ δ"]))
 end
 
-using Test
-
+## TODO: fix tests below
 @testset "token_with_boundaries" begin
     # Test with no surrounding tokens
     @test token_with_boundaries(nothing, "current", nothing) == "current"
