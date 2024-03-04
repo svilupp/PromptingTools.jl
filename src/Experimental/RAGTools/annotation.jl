@@ -112,23 +112,27 @@ function tokenize(input::Union{String, SubString{String}})
     SubString{String}[m.match for m in eachmatch(pattern, input)]
 end
 
-function trigrams(input_string::AbstractString)
+function trigrams(input_string::AbstractString; add_word::AbstractString = "")
     trigrams = SubString{String}[]
     # Ensure the input string length is at least 3 to form a trigram
     if length(input_string) >= 3
         for i in 1:(length(input_string) - 2)
             push!(trigrams, @views input_string[i:(i + 2)])
         end
+        !isempty(add_word) && push!(trigrams, convert(SubString{String}, add_word))
+    else
+        push!(trigrams, convert(SubString{String}, input_string))
     end
     return trigrams
 end
-function trigrams_hashed(input_string::AbstractString)
+function trigrams_hashed(input_string::AbstractString; add_word::AbstractString = "")
     trigrams = Set{UInt64}()
     # Ensure the input string length is at least 3 to form a trigram
     if length(input_string) >= 3
         for i in 1:(length(input_string) - 2)
             push!(trigrams, hash(@views input_string[i:(i + 2)]))
         end
+        !isempty(add_word) && push!(trigrams, hash(add_word))
     else
         push!(trigrams, hash(input_string))
     end
@@ -162,7 +166,7 @@ function token_with_boundaries(
     end
 end
 
-function text_to_trigrams(input::Union{String, SubString{String}})
+function text_to_trigrams(input::Union{String, SubString{String}}; add_word::Bool = true)
     tokens = tokenize(input)
     length_toks = length(tokens)
     trig = SubString{String}[]
@@ -175,13 +179,17 @@ function text_to_trigrams(input::Union{String, SubString{String}})
             push!(trig, curr_tok)
         else
             full_tok = token_with_boundaries(prev_token, curr_tok, next_tok)
-            append!(trig, trigrams(full_tok))
+            if add_word
+                append!(trig, trigrams(full_tok; add_word = curr_tok))
+            else
+                append!(trig, trigrams(full_tok))
+            end
         end
         prev_token = curr_tok
     end
     return trig
 end
-function text_to_trigrams_hashed(input::AbstractString)
+function text_to_trigrams_hashed(input::AbstractString; add_word::Bool = true)
     tokens = tokenize(input)
     length_toks = length(tokens)
     trig = Set{UInt64}()
@@ -194,7 +202,11 @@ function text_to_trigrams_hashed(input::AbstractString)
             push!(trig, hash(curr_tok))
         else
             full_tok = token_with_boundaries(prev_token, curr_tok, next_tok)
-            union!(trig, trigrams_hashed(full_tok))
+            if add_word
+                union!(trig, trigrams_hashed(full_tok; add_word = curr_tok))
+            else
+                union!(trig, trigrams_hashed(full_tok))
+            end
         end
         prev_token = curr_tok
     end
@@ -318,7 +330,7 @@ function trigram_support!(parent_node::AnnotatedNode,
             src = context_trigrams[si]
             ## Score the trigram
             full_tok = token_with_boundaries(prev_token, curr_tok, next_tok)
-            trig = trigrams(full_tok)
+            trig = trigrams(full_tok; add_word = curr_tok)
             ## count portion of trigrams that match
             score = count(in(src), trig) / length(trig)
             # Add up cumulative score for each separate context
