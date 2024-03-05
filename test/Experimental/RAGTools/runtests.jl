@@ -2,6 +2,7 @@ using Test
 using SparseArrays, LinearAlgebra
 using PromptingTools.Experimental.RAGTools
 using PromptingTools
+using AbstractTrees
 const PT = PromptingTools
 using JSON3, HTTP
 

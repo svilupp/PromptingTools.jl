@@ -108,11 +108,25 @@ end
 PromptingTools.pprint(node::AbstractAnnotatedNode) = pprint(stdout, node)
 
 #### TEXT UTILITIES
+"""
+    tokenize(input::Union{String, SubString{String}})
+
+Tokenizes provided `input` by spaces, special characters or Julia symbols (eg, `=>`).
+
+Unlike other tokenizers, it aims to lossless - ie, keep both the separated text and the separators.
+"""
 function tokenize(input::Union{String, SubString{String}})
     pattern = r"(\s+|=>|\(;|,|\.|\(|\)|\{|\}|\[|\]|;|:|\+|-|\*|/|<|>|=|&|\||!|@|#|\$|%|\^|~|`|\"|'|\w+)"
     SubString{String}[m.match for m in eachmatch(pattern, input)]
 end
 
+"""
+    trigrams(input_string::AbstractString; add_word::AbstractString = "")
+
+Splits provided `input_string` into a vector of trigrams (combination of three consecutive characters found in the `input_string`).
+
+If `add_word` is provided, it is added to the resulting array. Useful to add the full word itself to the resulting array for exact match.
+"""
 function trigrams(input_string::AbstractString; add_word::AbstractString = "")
     trigrams = SubString{String}[]
     # Ensure the input string length is at least 3 to form a trigram
@@ -129,12 +143,22 @@ function trigrams(input_string::AbstractString; add_word::AbstractString = "")
                 break
             end
         end
-        !isempty(add_word) && push!(trigrams, convert(SubString{String}, add_word))
-    else
-        push!(trigrams, convert(SubString{String}, input_string))
+        ## else
+        ##     push!(trigrams, convert(SubString{String}, input_string))
     end
+    !isempty(add_word) && push!(trigrams, convert(SubString{String}, add_word))
     return trigrams
 end
+
+"""
+    trigrams_hashed(input_string::AbstractString; add_word::AbstractString = "")
+
+Splits provided `input_string` into a Set of hashed trigrams (combination of three consecutive characters found in the `input_string`).
+
+It is more efficient for lookups in large strings (eg, >100K characters).
+
+If `add_word` is provided, it is added to the resulting array to hash. Useful to add the full word itself to the resulting array for exact match.
+"""
 function trigrams_hashed(input_string::AbstractString; add_word::AbstractString = "")
     trigrams = Set{UInt64}()
     # Ensure the input string length is at least 3 to form a trigram
@@ -151,14 +175,20 @@ function trigrams_hashed(input_string::AbstractString; add_word::AbstractString 
                 break
             end
         end
-        !isempty(add_word) && push!(trigrams, hash(add_word))
-    else
-        push!(trigrams, hash(input_string))
+        ## else
+        ##     push!(trigrams, hash(input_string))
     end
+    !isempty(add_word) && push!(trigrams, hash(add_word))
     return trigrams
 end
 
-"Add boundaries to the token to improve the matched context (ie, separate partial matches from exact match)"
+"""
+    token_with_boundaries(
+        prev_token::Union{Nothing, AbstractString}, curr_token::AbstractString,
+        next_token::Union{Nothing, AbstractString})
+
+Joins the three tokens together. Useful to add boundary tokens (like spaces vs brackets) to the `curr_token` to improve the matched context (ie, separate partial matches from exact match)
+"""
 function token_with_boundaries(
         prev_token::Union{Nothing, AbstractString}, curr_token::AbstractString,
         next_token::Union{Nothing, AbstractString})
@@ -193,10 +223,10 @@ function text_to_trigrams(input::Union{String, SubString{String}}; add_word::Boo
     for i in eachindex(tokens)
         next_tok = i == length_toks ? nothing : tokens[i + 1]
         curr_tok = tokens[i]
-        ## if too short, just add the token directly
-        if length(curr_tok) == 1
-            push!(trig, curr_tok)
-        else
+        ## if too short, skip the token
+        if length(curr_tok) > 1
+            ##     push!(trig, curr_tok)
+            ## else
             full_tok = token_with_boundaries(prev_token, curr_tok, next_tok)
             if add_word
                 append!(trig, trigrams(full_tok; add_word = curr_tok))
@@ -216,10 +246,10 @@ function text_to_trigrams_hashed(input::AbstractString; add_word::Bool = true)
     for i in eachindex(tokens)
         next_tok = i == length_toks ? nothing : tokens[i + 1]
         curr_tok = tokens[i]
-        ## if too short, just add the token directly
-        if length(curr_tok) == 1
-            push!(trig, hash(curr_tok))
-        else
+        ## if too short, just skip the token
+        if length(curr_tok) > 1
+            ##     push!(trig, hash(curr_tok))
+            ## else
             full_tok = token_with_boundaries(prev_token, curr_tok, next_tok)
             if add_word
                 union!(trig, trigrams_hashed(full_tok; add_word = curr_tok))
@@ -232,31 +262,61 @@ function text_to_trigrams_hashed(input::AbstractString; add_word::Bool = true)
     return trig
 end
 
-function split_sentences(input::Union{String, SubString{String}})
-    # Pattern to match code blocks in triple backticks, inline code in backticks, and sentences in normal text
-    # This regex captures code blocks, inline code, and sentences, retaining their delimiters
-    pattern = r"(\n|\t|```[\s\S]+?```|^\s*[*+-]\s+|^\s*\d+\.\s+|[^.!?]+[.!?]|[\s\S]+)"ms
-    # TODO: single code line? `.+?`
+"""
+    split_into_code_and_sentences(input::Union{String, SubString{String}})
+
+Splits text block into code or text and sub-splits into units.
+
+If code block, it splits by newline but keep the `group_id` the same (to have the same source)
+If text block, splits into sentences, bullets, etc., provides different `group_id` (to have different source)
+"""
+function split_into_code_and_sentences(input::Union{String, SubString{String}})
+    # Combining the patterns for code blocks, inline code, and sentences in one regex
+    # This pattern aims to match code blocks first, then inline code, and finally any text outside of code blocks as sentences or parts thereof.
+    pattern = r"(```[\s\S]+?```)|(`[^`]*?`)|([^`]+)"
+
+    ## Patterns for sentences: newline, tab, bullet, enumerate list, sentence, any left out characters
+    sentence_pattern = r"(\n|\t|^\s*[*+-]\s*|^\s*\d+\.\s+|[^\n\t*+-.!?]+|[\n\t*+-.!?])"ms
 
     # Initialize an empty array to store the split sentences
     sentences = SubString{String}[]
     group_ids = Int[]
 
-    # Process each match to handle code blocks and normal sentences differently
-    for (i, m) in enumerate(eachmatch(pattern, input))
-        sentence = m.match
+    # Loop over the input string, searching for matches to the pattern
+    i = 1
+    for m in eachmatch(pattern, input)
+        ## number of sub-parts
+        j = 1
+        # Extract the full match, including any delimiters
+        match_block = m.match
         # Check if the match is a code block with triple backticks
-        if startswith(sentence, "```") && endswith(sentence, "```")
+        if startswith(match_block, "```")
             # Split code block by newline, retaining the backticks
-            block_lines = split(sentence, "\n", keepempty = false)
-            append!(sentences, block_lines)
-            # all the lines of the chode block are the same group to have one source annotation
-            append!(group_ids, fill(i, length(block_lines)))
-        else
-            # For inline code and normal sentences, add them directly to the sentences array
-            push!(sentences, sentence)
+            block_lines = split(match_block, "\n", keepempty = false)
+            for (cnt, block) in enumerate(block_lines)
+                push!(sentences, block)
+                # all the lines of the chode block are the same group to have one source annotation
+                push!(group_ids, i)
+                if cnt < length(block_lines)
+                    ## return newlines
+                    push!(sentences, "\n")
+                    push!(group_ids, i)
+                end
+            end
+        elseif startswith(match_block, "`")
+            push!(sentences, match_block)
             push!(group_ids, i)
+        else
+            ## Split text further
+            j = 0
+            for m_sent in eachmatch(sentence_pattern, match_block)
+                push!(sentences, m_sent.match)
+                push!(group_ids, i + j) # all sentences to have separate group
+                j += 1
+            end
         end
+        ## increment counter
+        i += j
     end
 
     return sentences, group_ids
@@ -494,7 +554,7 @@ function annotate_support(annotater::TrigramAnnotater, answer::AbstractString,
         trigram_func = trigrams
         text_to_trigram_func = text_to_trigrams
     end
-    sentences, group_ids = split_sentences(answer)
+    sentences, group_ids = split_into_code_and_sentences(answer)
     context_trigrams = text_to_trigram_func.(context)
     root = AnnotatedNode()
     for i in eachindex(sentences, group_ids)
