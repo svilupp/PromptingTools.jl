@@ -37,6 +37,20 @@ Defines styling keywords for `printstyled` for each `AbstractAnnotatedNode`
 end
 
 """
+    HTMLStyler
+
+Defines styling via classes (attribute `class`) and styles (attribute `style`) for HTML formatting of `AbstractAnnotatedNode`
+"""
+@kwdef mutable struct HTMLStyler <: AbstractAnnotationStyler
+    classes::AbstractString
+    styles::AbstractString
+end
+Base.var"=="(a::AbstractAnnotationStyler, b::AbstractAnnotationStyler) = false
+function Base.var"=="(a::T, b::T) where {T <: AbstractAnnotationStyler}
+    all(x -> getfield(a, x) == getfield(b, x), fieldnames(Styler))
+end
+
+"""
     AnnotatedNode{T}  <: AbstractAnnotatedNode
 
 A node to add annotations to the generated answer in `airag`
@@ -44,14 +58,10 @@ A node to add annotations to the generated answer in `airag`
 Annotations can be: sources, scores, whether its supported or not by the context, etc.
 
 # Fields
-- `id::UInt16`: Unique identifier for the node
-- `parent::Union{SampleNode, Nothing}`: Parent node that current node was built on
-- `children::Vector{SampleNode}`: Children nodes
-- `wins::Int`: Number of successful outcomes
-- `visits::Int`: Number of condition checks done (eg, losses are `checks - wins`)
-- `data::T`: eg, the conversation or some parameter to be optimized
-- `feedback::String`: Feedback from the evaluation, always a string! Defaults to empty string.
-- `success::Union{Nothing, Bool}`: Success of the generation and subsequent evaluations, proxy for whether it should be further evaluated. Defaults to nothing.
+- `group_id::Int`: Unique identifier for the same group of nodes (eg, different lines of the same code block)
+- `parent::Union{AnnotatedNode, Nothing}`: Parent node that current node was built on
+- `children::Vector{AnnotatedNode}`: Children nodes
+- `score::
 """
 @kwdef mutable struct AnnotatedNode{T} <: AbstractAnnotatedNode
     group_id::Int = 0
@@ -61,7 +71,7 @@ Annotations can be: sources, scores, whether its supported or not by the context
     hits::Int = 0
     content::T = SubString{String}("")
     sources::Vector{Int} = Int[]
-    style::Styler = Styler()
+    style::AbstractAnnotationStyler = Styler()
 end
 Base.IteratorEltype(::Type{<:TreeIterator{AbstractAnnotatedNode}}) = Base.HasEltype()
 function Base.eltype(::Type{<:TreeIterator{T}}) where {T <: AbstractAnnotatedNode}
@@ -83,10 +93,8 @@ AbstractTrees.parent(n::AbstractAnnotatedNode) = n.parent
 ## AbstractTrees.nodevalue(n::SampleNode) = n.data
 function Base.show(io::IO, node::AbstractAnnotatedNode;
         annotater::Union{Nothing, AbstractAnnotater} = nothing)
-    ## score_str = isnothing(scoring) ? "" : ", score: $(round(score(node, scoring),digits=2))"
-    ## length_str = node.data isa AbstractVector ? ", length: $(length(node.data))" : ""
     print(io,
-        "$(nameof(typeof(node)))(id: $(node.group_id), length: $(length(node.content)), score: $(node.score))")
+        "$(nameof(typeof(node)))(group id: $(node.group_id), length: $(length(node.content)), score: $(node.score))")
 end
 
 """
@@ -107,221 +115,6 @@ end
 
 PromptingTools.pprint(node::AbstractAnnotatedNode) = pprint(stdout, node)
 
-#### TEXT UTILITIES
-"""
-    tokenize(input::Union{String, SubString{String}})
-
-Tokenizes provided `input` by spaces, special characters or Julia symbols (eg, `=>`).
-
-Unlike other tokenizers, it aims to lossless - ie, keep both the separated text and the separators.
-"""
-function tokenize(input::Union{String, SubString{String}})
-    pattern = r"(\s+|=>|\(;|,|\.|\(|\)|\{|\}|\[|\]|;|:|\+|-|\*|/|<|>|=|&|\||!|@|#|\$|%|\^|~|`|\"|'|\w+)"
-    SubString{String}[m.match for m in eachmatch(pattern, input)]
-end
-
-"""
-    trigrams(input_string::AbstractString; add_word::AbstractString = "")
-
-Splits provided `input_string` into a vector of trigrams (combination of three consecutive characters found in the `input_string`).
-
-If `add_word` is provided, it is added to the resulting array. Useful to add the full word itself to the resulting array for exact match.
-"""
-function trigrams(input_string::AbstractString; add_word::AbstractString = "")
-    trigrams = SubString{String}[]
-    # Ensure the input string length is at least 3 to form a trigram
-    if length(input_string) >= 3
-        nunits = ncodeunits(input_string)
-        i = 1
-        while i <= nunits
-            j = nextind(input_string, i, 2)
-            if j <= nunits
-                push!(trigrams, @views input_string[i:j])
-                ## next starter
-                i = nextind(input_string, i)
-            else
-                break
-            end
-        end
-        ## else
-        ##     push!(trigrams, convert(SubString{String}, input_string))
-    end
-    !isempty(add_word) && push!(trigrams, convert(SubString{String}, add_word))
-    return trigrams
-end
-
-"""
-    trigrams_hashed(input_string::AbstractString; add_word::AbstractString = "")
-
-Splits provided `input_string` into a Set of hashed trigrams (combination of three consecutive characters found in the `input_string`).
-
-It is more efficient for lookups in large strings (eg, >100K characters).
-
-If `add_word` is provided, it is added to the resulting array to hash. Useful to add the full word itself to the resulting array for exact match.
-"""
-function trigrams_hashed(input_string::AbstractString; add_word::AbstractString = "")
-    trigrams = Set{UInt64}()
-    # Ensure the input string length is at least 3 to form a trigram
-    if length(input_string) >= 3
-        nunits = ncodeunits(input_string)
-        i = 1
-        while i <= nunits
-            j = nextind(input_string, i, 2)
-            if j <= nunits
-                push!(trigrams, hash(@views input_string[i:j]))
-                ## next starter
-                i = nextind(input_string, i)
-            else
-                break
-            end
-        end
-        ## else
-        ##     push!(trigrams, hash(input_string))
-    end
-    !isempty(add_word) && push!(trigrams, hash(add_word))
-    return trigrams
-end
-
-"""
-    token_with_boundaries(
-        prev_token::Union{Nothing, AbstractString}, curr_token::AbstractString,
-        next_token::Union{Nothing, AbstractString})
-
-Joins the three tokens together. Useful to add boundary tokens (like spaces vs brackets) to the `curr_token` to improve the matched context (ie, separate partial matches from exact match)
-"""
-function token_with_boundaries(
-        prev_token::Union{Nothing, AbstractString}, curr_token::AbstractString,
-        next_token::Union{Nothing, AbstractString})
-    ##
-    len1 = isnothing(prev_token) ? 0 : length(prev_token)
-    len2 = length(curr_token)
-    len3 = isnothing(next_token) ? 0 : length(next_token)
-
-    ## concat only if single token boundaries!
-    token = if len2 == 1
-        curr_token
-    elseif len1 == 1 && len3 == 1
-        prev_token * curr_token * next_token
-    elseif len1 == 0 && len3 == 1
-        ## no prev_token, but next_token
-        curr_token * next_token
-    elseif len3 == 1
-        curr_token * next_token
-    elseif len1 == 1
-        ## convert both len3=0 and len3>1
-        prev_token * curr_token
-    else
-        curr_token
-    end
-end
-
-function text_to_trigrams(input::Union{String, SubString{String}}; add_word::Bool = true)
-    tokens = tokenize(input)
-    length_toks = length(tokens)
-    trig = SubString{String}[]
-    prev_token = nothing
-    for i in eachindex(tokens)
-        next_tok = i == length_toks ? nothing : tokens[i + 1]
-        curr_tok = tokens[i]
-        ## if too short, skip the token
-        if length(curr_tok) > 1
-            ##     push!(trig, curr_tok)
-            ## else
-            full_tok = token_with_boundaries(prev_token, curr_tok, next_tok)
-            if add_word
-                append!(trig, trigrams(full_tok; add_word = curr_tok))
-            else
-                append!(trig, trigrams(full_tok))
-            end
-        end
-        prev_token = curr_tok
-    end
-    return trig
-end
-function text_to_trigrams_hashed(input::AbstractString; add_word::Bool = true)
-    tokens = tokenize(input)
-    length_toks = length(tokens)
-    trig = Set{UInt64}()
-    prev_token = nothing
-    for i in eachindex(tokens)
-        next_tok = i == length_toks ? nothing : tokens[i + 1]
-        curr_tok = tokens[i]
-        ## if too short, just skip the token
-        if length(curr_tok) > 1
-            ##     push!(trig, hash(curr_tok))
-            ## else
-            full_tok = token_with_boundaries(prev_token, curr_tok, next_tok)
-            if add_word
-                union!(trig, trigrams_hashed(full_tok; add_word = curr_tok))
-            else
-                union!(trig, trigrams_hashed(full_tok))
-            end
-        end
-        prev_token = curr_tok
-    end
-    return trig
-end
-
-"""
-    split_into_code_and_sentences(input::Union{String, SubString{String}})
-
-Splits text block into code or text and sub-splits into units.
-
-If code block, it splits by newline but keep the `group_id` the same (to have the same source)
-If text block, splits into sentences, bullets, etc., provides different `group_id` (to have different source)
-"""
-function split_into_code_and_sentences(input::Union{String, SubString{String}})
-    # Combining the patterns for code blocks, inline code, and sentences in one regex
-    # This pattern aims to match code blocks first, then inline code, and finally any text outside of code blocks as sentences or parts thereof.
-    pattern = r"(```[\s\S]+?```)|(`[^`]*?`)|([^`]+)"
-
-    ## Patterns for sentences: newline, tab, bullet, enumerate list, sentence, any left out characters
-    sentence_pattern = r"(\n|\t|^\s*[*+-]\s*|^\s*\d+\.\s+|[^\n\t*+-.!?]+|[\n\t*+-.!?])"ms
-
-    # Initialize an empty array to store the split sentences
-    sentences = SubString{String}[]
-    group_ids = Int[]
-
-    # Loop over the input string, searching for matches to the pattern
-    i = 1
-    for m in eachmatch(pattern, input)
-        ## number of sub-parts
-        j = 1
-        # Extract the full match, including any delimiters
-        match_block = m.match
-        # Check if the match is a code block with triple backticks
-        if startswith(match_block, "```")
-            # Split code block by newline, retaining the backticks
-            block_lines = split(match_block, "\n", keepempty = false)
-            for (cnt, block) in enumerate(block_lines)
-                push!(sentences, block)
-                # all the lines of the chode block are the same group to have one source annotation
-                push!(group_ids, i)
-                if cnt < length(block_lines)
-                    ## return newlines
-                    push!(sentences, "\n")
-                    push!(group_ids, i)
-                end
-            end
-        elseif startswith(match_block, "`")
-            push!(sentences, match_block)
-            push!(group_ids, i)
-        else
-            ## Split text further
-            j = 0
-            for m_sent in eachmatch(sentence_pattern, match_block)
-                push!(sentences, m_sent.match)
-                push!(group_ids, i + j) # all sentences to have separate group
-                j += 1
-            end
-        end
-        ## increment counter
-        i += j
-    end
-
-    return sentences, group_ids
-end
-
 ### ANNOTATION METHODS -- TrigramAnnotater
 
 """
@@ -334,17 +127,21 @@ It's very simple method (and it can loose some semantic meaning in longer sequen
 struct TrigramAnnotater <: AbstractAnnotater end
 
 """
-    set_node_style!(annotater::TrigramAnnotater, node::AnnotatedNode; low_threshold::Float64=0.5, high_threshold::Float64=1.0,
-    high_styler::Styler=Styler(color=:green, bold=false), low_styler::Styler=Styler(color=:red, bold=false), bold_multihits::Bool=true)
+    set_node_style!(::TrigramAnnotater, node::AnnotatedNode;
+        low_threshold::Float64 = 0.0, medium_threshold::Float64 = 0.5, high_threshold::Float64 = 1.0,
+        low_styler::Styler = Styler(color = :magenta, bold = false),
+        medium_styler::Styler = Styler(color = :blue, bold = false),
+        high_styler::Styler = Styler(color = :green, bold = false),
+        bold_multihits::Bool = false)
 
 Sets style of `node` based on the provided rules
 """
-function set_node_style!(annotater::TrigramAnnotater, node::AnnotatedNode;
+function set_node_style!(::TrigramAnnotater, node::AnnotatedNode;
         low_threshold::Float64 = 0.0, medium_threshold::Float64 = 0.5, high_threshold::Float64 = 1.0,
         low_styler::Styler = Styler(color = :magenta, bold = false),
-        medium_styler::Styler = Styler(color = :yellow, bold = false),
+        medium_styler::Styler = Styler(color = :blue, bold = false),
         high_styler::Styler = Styler(color = :green, bold = false),
-        bold_multihits::Bool = true)
+        bold_multihits::Bool = false)
     node.style = if isnothing(node.score)
         ## skip for now
         Styler()
@@ -354,6 +151,8 @@ function set_node_style!(annotater::TrigramAnnotater, node::AnnotatedNode;
         medium_styler
     elseif node.score >= low_threshold
         low_styler
+    else
+        Styler()
     end
     if node.hits > 1 && bold_multihits
         node.style.bold = true
