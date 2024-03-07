@@ -75,7 +75,7 @@ end
 
 @testset "build_qa_evals" begin
     # test with a mock server
-    PORT = rand(9000:11000)
+    PORT = rand(10000:40000)
     PT.register_model!(; name = "mock-emb", schema = PT.CustomOpenAISchema())
     PT.register_model!(; name = "mock-meta", schema = PT.CustomOpenAISchema())
     PT.register_model!(; name = "mock-gen", schema = PT.CustomOpenAISchema())
@@ -87,8 +87,9 @@ end
 
         if content[:model] == "mock-gen"
             user_msg = last(content[:messages])
-            response = Dict(:choices => [
-                    Dict(:message => user_msg, :finish_reason => "stop"),
+            response = Dict(
+                :choices => [
+                    Dict(:message => user_msg, :finish_reason => "stop")
                 ],
                 :model => content[:model],
                 :usage => Dict(:total_tokens => length(user_msg[:content]),
@@ -102,38 +103,41 @@ end
                     :completion_tokens => 0))
         elseif content[:model] == "mock-meta"
             user_msg = last(content[:messages])
-            response = Dict(:choices => [
+            response = Dict(
+                :choices => [
                     Dict(:finish_reason => "stop",
-                        :message => Dict(:tool_calls => [
-                            Dict(:function => Dict(:arguments => JSON3.write(MaybeMetadataItems([
-                                MetadataItem("yes", "category"),
-                            ]))))]))],
+                    :message => Dict(:tool_calls => [
+                        Dict(:function => Dict(:arguments => JSON3.write(MaybeMetadataItems([
+                        MetadataItem("yes", "category")
+                    ]))))]))],
                 :model => content[:model],
                 :usage => Dict(:total_tokens => length(user_msg[:content]),
                     :prompt_tokens => length(user_msg[:content]),
                     :completion_tokens => 0))
         elseif content[:model] == "mock-qa"
             user_msg = last(content[:messages])
-            response = Dict(:choices => [
+            response = Dict(
+                :choices => [
                     Dict(:finish_reason => "stop",
-                        :message => Dict(:tool_calls => [
-                            Dict(:function => Dict(:arguments => JSON3.write(QAItem("Question",
-                                "Answer"))))]))],
+                    :message => Dict(:tool_calls => [
+                        Dict(:function => Dict(:arguments => JSON3.write(QAItem("Question",
+                        "Answer"))))]))],
                 :model => content[:model],
                 :usage => Dict(:total_tokens => length(user_msg[:content]),
                     :prompt_tokens => length(user_msg[:content]),
                     :completion_tokens => 0))
         elseif content[:model] == "mock-judge"
             user_msg = last(content[:messages])
-            response = Dict(:choices => [
+            response = Dict(
+                :choices => [
                     Dict(:message => Dict(:tool_calls => [
-                        Dict(:function => Dict(:arguments => JSON3.write(JudgeAllScores(5,
-                            5,
-                            5,
-                            5,
-                            5,
-                            "Some reasons",
-                            5.0))))]))],
+                    Dict(:function => Dict(:arguments => JSON3.write(JudgeAllScores(5,
+                    5,
+                    5,
+                    5,
+                    5,
+                    "Some reasons",
+                    5.0))))]))],
                 :model => content[:model],
                 :usage => Dict(:total_tokens => length(user_msg[:content]),
                     :prompt_tokens => length(user_msg[:content]),
@@ -150,7 +154,7 @@ end
         chunks = ["a", "b", "c"],
         embeddings = zeros(128, 3),
         tags = vcat(trues(2, 2), falses(1, 2)),
-        tags_vocab = ["yes", "no"],)
+        tags_vocab = ["yes", "no"])
 
     # Test for successful Q&A extraction from document chunks
     qa_evals = build_qa_evals(chunks(index),
@@ -177,7 +181,7 @@ end
         model_metadata = "mock-meta", api_kwargs = (; url = "http://localhost:$(PORT)"),
         tag_filter = :auto,
         extract_metadata = false, verbose = false,
-        return_context = true)
+        return_details = true)
 
     result = run_qa_evals(qa_evals[1], ctx;
         model_judge = "mock-judge",

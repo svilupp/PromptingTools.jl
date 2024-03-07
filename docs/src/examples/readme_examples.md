@@ -28,6 +28,8 @@ Optional keyword arguments in `ai*` tend to be:
 - `api_kwargs::NamedTuple` - Specific parameters for the model, eg, `temperature=0.0` to be NOT creative (and have more similar output in each run)
 - `http_kwargs::NamedTuple` - Parameters for the HTTP.jl package, eg, `readtimeout = 120` to time out in 120 seconds if no response was received.
 
+**Experimental: AgentTools**
+
 In addition to the above list of `ai*` functions, you can also use the **"lazy" counterparts** of these functions from the experimental AgentTools module.
 ```julia
 using PromptingTools.Experimental.AgentTools
@@ -39,6 +41,15 @@ It uses exactly the same arguments and keyword arguments as `aigenerate` (see `?
 "lazy" refers to the fact that it does NOT generate any output when instantiated (only when `run!` is called). 
 
 Or said differently, the `AICall` struct and all its flavors (`AIGenerate`, ...) are designed to facilitate a deferred execution model (lazy evaluation) for AI functions that interact with a Language Learning Model (LLM). It stores the necessary information for an AI call and executes the underlying AI function only when supplied with a `UserMessage` or when the `run!` method is applied. This allows us to remember user inputs and trigger the LLM call repeatedly if needed, which enables automatic fixing (see `?airetry!`).
+
+**Experimental: RAGTools**
+
+Lastly, we provide a set of tools to build RAG applications (Retrieve, Answer, Generate). 
+
+It can be as simple as two calls: `build_index` and `airag` (Retrieve, Answer, Generate). 
+
+If you then use pretty-printing with `PromptingTools.pprint`, we highlight the generated text vs text likely sourced from the context and we score how strongly is the generated answer supported by the context.
+In addition, we annotate each generated chunk with a reference to which source document it likely came from (including the confidence score between 0 and 1).
 
 
 ## Seamless Integration Into Your Workflow
