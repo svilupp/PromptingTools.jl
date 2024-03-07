@@ -281,6 +281,13 @@ end
 end
 
 @testset "pprint" begin
+    # anything -> passthrough to show
+    x = "abc"
+    io = IOBuffer()
+    pprint(io, x)
+    output = String(take!(io))
+    @test output == "\"abc\""
+    #
     conversation = [
         PT.SystemMessage("Welcome"),
         PT.UserMessage("Hello"),
@@ -292,6 +299,15 @@ end
     output = String(take!(io))
     exp_output = "--------------------\nSystem Message\n--------------------\nWelcome\n\n--------------------\nUser Message\n--------------------\nHello\n\n--------------------\nAI Message\n--------------------\nWorld\n\n--------------------\nData Message\n--------------------\nData: Vector{Float64} (Size: (10,))\n\n"
     @test output == exp_output
+
+    struct RandomMessage1234x <: PT.AbstractMessage
+        content::String
+    end
+    msgx = RandomMessage1234x("xyz")
+    io = IOBuffer()
+    pprint(io, msgx)
+    output = String(take!(io))
+    @test occursin("\nUnknown Message\n", output)
 end
 
 @testset "auth_header" begin

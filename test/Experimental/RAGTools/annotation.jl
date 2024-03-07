@@ -1,5 +1,8 @@
-using PromptingTools.Experimental.RAGTools: AnnotatedNode, set_node_style!,
+using PromptingTools.Experimental.RAGTools: AnnotatedNode, AbstractAnnotater,
+                                            AbstractAnnotatedNode,
+                                            set_node_style!,
                                             align_node_styles!, TrigramAnnotater, Styler,
+                                            HTMLStyler,
                                             pprint
 using PromptingTools.Experimental.RAGTools: trigram_support!, add_node_metadata!,
                                             annotate_support, RAGDetails, text_to_trigrams
@@ -36,6 +39,16 @@ using PromptingTools.Experimental.RAGTools: trigram_support!, add_node_metadata!
     # Test nodevalue and childtype methods for tree traversal
     @test AbstractTrees.nodevalue(child_node) == "child(nothing)"
     @test AbstractTrees.childtype(node) === AnnotatedNode
+
+    # Show
+    node = AnnotatedNode()
+    io = IOBuffer()
+    show(io, node)
+    output = String(take!(io))
+    @test output == "AnnotatedNode(group id: 0, length: 0, score: -"
+    # test inequality
+    struct Random123AnnotatedNode <: AbstractAnnotatedNode end
+    @test AnnotatedNode() != Random123AnnotatedNode()
 end
 
 @testset "AnnotatedNode-pprint" begin
@@ -107,6 +120,19 @@ end
     set_node_style!(annotater, node)
     @test node.style.color == :nothing
     @test node.style.bold == false
+
+    # Unknown types
+    struct Random123Annotater <: AbstractAnnotater end
+    node = AnnotatedNode()
+    @test node == set_node_style!(
+        Random123Annotater(), node)
+
+    # Styler inequality
+    styler1 = Styler()
+    styler2 = Styler()
+    @test styler1 == styler2
+    styler3 = HTMLStyler("", "")
+    @test styler1 != styler3
 end
 
 @testset "align_node_styles!" begin
@@ -151,6 +177,12 @@ end
     align_node_styles!(annotater, nodes4)
     @test nodes4[2].style.color == :blue
     @test nodes4[4].style.color == :nothing
+
+    # Unknown types
+    struct Random123Annotater <: AbstractAnnotater end
+    nodes = [AnnotatedNode(), AnnotatedNode(), AnnotatedNode()]
+    @test nodes == align_node_styles!(
+        Random123Annotater(), nodes)
 end
 
 @testset "trigram_support!" begin
@@ -232,6 +264,13 @@ end
     add_node_metadata!(annotater, root, sources = ["Source 1"])
     @test occursin("\nSOURCES\n", root.children[end].content)
     @test occursin("1. Source 1", root.children[end].content)
+
+    # Passthrough for unknown
+    struct Random123Annotater <: AbstractAnnotater end
+    struct Random123AnnotatedNode <: AbstractAnnotatedNode end
+    node = Random123AnnotatedNode()
+    @test node == add_node_metadata!(
+        Random123Annotater(), node)
 end
 
 @testset "annotate_support" begin
@@ -301,4 +340,8 @@ end
     @test occursin("[1,0.67]", output)
     @test occursin("\nSOURCES\n", output)
     @test occursin("1. Source 1", output)
+
+    # Invalid types
+    struct Random123Annotater <: AbstractAnnotater end
+    @test_throws ArgumentError annotate_support(Random123Annotater(), "test", context)
 end

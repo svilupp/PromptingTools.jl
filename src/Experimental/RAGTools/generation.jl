@@ -101,7 +101,19 @@ msg = airag(index, :RAGAnswerFromContext; question)
 msg = airag(index; question)
 ```
 
-See also `build_index`, `build_context`, `CandidateChunks`, `find_closest`, `find_tags`, `rerank`
+To understand the details of the RAG process, use `return_details=true`
+```julia
+msg, details = airag(index; question, return_details = true)
+# details is a RAGDetails object with all the internal steps of the `airag` function
+```
+
+You can also pretty-print `details` to highlight generated text vs text that is supported by context.
+It also includes annotations of which context was used for each part of the response (where available).
+```julia
+PT.pprint(details)
+```
+
+See also `build_index`, `build_context`, `CandidateChunks`, `find_closest`, `find_tags`, `rerank`, `annotate_support`
 """
 function airag(index::AbstractChunkIndex, rag_template::Symbol = :RAGAnswerFromContext;
         question::AbstractString,

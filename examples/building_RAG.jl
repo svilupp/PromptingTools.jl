@@ -22,7 +22,7 @@ const RT = PromptingTools.Experimental.RAGTools
 
 files = [
     joinpath("examples", "data", "database_style_joins.txt"),
-    joinpath("examples", "data", "what_is_dataframes.txt"),
+    joinpath("examples", "data", "what_is_dataframes.txt")
 ]
 ## Build an index of chunks, embed them, and create a lookup index of metadata/tags for each chunk
 index = build_index(files; extract_metadata = false)
@@ -42,7 +42,7 @@ answer = airag(index; question = "I like dplyr, what is the equivalent in Julia?
 #   - [OPTIONAL] extracts any potential tags/filters from the question and applies them to filter down the potential candidates (use `extract_metadata=true` in `build_index`, you can also provide some filters explicitly via `tag_filter`)
 #   - [OPTIONAL] re-ranks the candidate chunks (define and provide your own `rerank_strategy`, eg Cohere ReRank API)
 #   - build a context from the closest chunks (use `chunks_window_margin` to tweak if we include preceding and succeeding chunks as well, see `?build_context` for more details)
-# - generate an answer from the closest chunks (use `return_context=true` to see under the hood and debug your application)
+# - generate an answer from the closest chunks (use `return_details=true` to see under the hood and debug your application)
 
 # You should save the index for later to avoid re-embedding / re-extracting the document chunks!
 serialize("examples/index.jls", index)

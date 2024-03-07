@@ -15,13 +15,13 @@ end
 # Passthrough by default
 function align_node_styles!(
         annotater::AbstractAnnotater, nodes::AbstractVector{<:AbstractAnnotatedNode}; kwargs...)
-    node
+    nodes
 end
 
 # Passthrough by default
 function add_node_metadata!(annotater::AbstractAnnotater,
         root::AbstractAnnotatedNode; kwargs...)
-    node
+    root
 end
 
 """
@@ -93,8 +93,9 @@ AbstractTrees.parent(n::AbstractAnnotatedNode) = n.parent
 ## AbstractTrees.nodevalue(n::SampleNode) = n.data
 function Base.show(io::IO, node::AbstractAnnotatedNode;
         annotater::Union{Nothing, AbstractAnnotater} = nothing)
+    score_str = isnothing(node.score) ? "-" : round(node.score; digits = 2)
     print(io,
-        "$(nameof(typeof(node)))(group id: $(node.group_id), length: $(length(node.content)), score: $(round(node.score; digits=2))")
+        "$(nameof(typeof(node)))(group id: $(node.group_id), length: $(length(node.content)), score: $(score_str)")
 end
 
 """
