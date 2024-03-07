@@ -22,12 +22,12 @@
 #   flow: get_chunks -> get_embeddings -> get_tags
 # 
 # airag: 
-#   signature: () -> AIMessage or (AIMessage, RAGContext)
+#   signature: () -> AIMessage or (AIMessage, RAGDetails)
 #   flow: retrieve -> generate
 #
 # retrieve:
 #   signature: () -> RAGContext
-#   flow: rephrase -> aiembed -> find_closest -> find_exact -> rerank
+#   flow: rephrase -> aiembed -> find_closest -> find_tags -> rerank
 #
 # generate:
 #  signature: () -> AIMessage or (AIMessage, RAGContext)
@@ -67,34 +67,37 @@ abstract type AbstractChunkIndex <: AbstractDocumentIndex end
 
 abstract type AbstractCandidateChunks end
 
+# supertype for RAGDetails
 abstract type AbstractRAGResult end
 
 # ## Retrieval stage
-abstract type AbstractRetrievalStrategies end
+# Main dispatch type for `retrieve`
+abstract type AbstractRetrievalMethod end
 
 # Main dispatch type for `rephrase`
-abstract type AbstractRephraserStrategy <: AbstractRetrievalStrategies end
+abstract type AbstractRephraser <: AbstractRetrievalMethod end
 
-# Main dispatch type for `find_similar`
-abstract type AbstractSimilarityStrategy <: AbstractRetrievalStrategies end
+# Main dispatch type for `find_closest`
+abstract type AbstractSimilaritySearch <: AbstractRetrievalMethod end
 
-# Main dispatch type for `find_exact`
-abstract type AbstractExactnessStrategy <: AbstractRetrievalStrategies end
+# Main dispatch type for `find_tags`
+abstract type AbstractTagMatch <: AbstractRetrievalMethod end
 
 # Main dispatch type for `rerank`
-abstract type AbstractRerankerStrategy <: AbstractRetrievalStrategies end
+abstract type AbstractReranker <: AbstractRetrievalMethod end
 
 # ## Generation stage
-abstract type AbstractGenerationStrategies end
+abstract type AbstractGenerationMethod end
 
 # Main dispatch type for: `format_context`
-abstract type AbstractContextFormater <: AbstractGenerationStrategies end
+abstract type AbstractContextFormater <: AbstractGenerationMethod end
 
 # Main dispatch type for: `refine`
-abstract type AbstractRefiner <: AbstractGenerationStrategies end
+abstract type AbstractRefiner <: AbstractGenerationMethod end
 
 # ## Exploration/Display stage
 
+# Supertype for annotaters, dispatch for `annotate_support`
 abstract type AbstractAnnotater end
 
 abstract type AbstractAnnotatedNode end

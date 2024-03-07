@@ -2,7 +2,7 @@ using PromptingTools.Experimental.RAGTools: AnnotatedNode, set_node_style!,
                                             align_node_styles!, TrigramAnnotater, Styler,
                                             pprint
 using PromptingTools.Experimental.RAGTools: trigram_support!, add_node_metadata!,
-                                            annotate_support
+                                            annotate_support, RAGDetails, text_to_trigrams
 
 @testset "AnnotatedNode" begin
     # Test node creation with default values
@@ -71,7 +71,8 @@ end
 
     # Test with a high score exceeding high_threshold
     node = AnnotatedNode(score = 0.9)
-    set_node_style!(annotater, node; high_threshold = 0.8, low_threshold = 0.3)
+    set_node_style!(annotater, node; high_styler = Styler(color = :green),
+        high_threshold = 0.8, low_threshold = 0.3)
     @test node.style.color == :green
     @test node.style.bold == false
 
@@ -89,13 +90,15 @@ end
 
     # Test applying bold style for multiple hits
     node = AnnotatedNode(score = 0.9, hits = 2)
-    set_node_style!(annotater, node; high_threshold = 0.8, bold_multihits = true)
+    set_node_style!(annotater, node; high_threshold = 0.8, bold_multihits = true,
+        high_styler = Styler(color = :green))
     @test node.style.color == :green
     @test node.style.bold == true
 
     # Test not applying bold style when bold_multihits is false
     node = AnnotatedNode(score = 0.9, hits = 2)
-    set_node_style!(annotater, node; high_threshold = 0.8, bold_multihits = false)
+    set_node_style!(annotater, node; high_threshold = 0.8, bold_multihits = false,
+        high_styler = Styler(color = :green))
     @test node.style.color == :green
     @test node.style.bold == false
 
@@ -150,48 +153,85 @@ end
     @test nodes4[4].style.color == :nothing
 end
 
-# TODO: continue
 @testset "trigram_support!" begin
-    # Preparing a mock context of trigrams for testing
-    context_trigrams = [trigrams("This is a test."), trigrams("Another test."),
-        trigrams("More content here.")]
+    # Preparing a mock context of trigrams for testing, capitalize IS to avoid STOPWORDS
+    context_trigrams = text_to_trigrams.(["This IS a test.", "Another test.",
+        "More content here."])
 
     # Test updating a node with no matching trigrams in context
-    @test begin
-        node = AnnotatedNode(content = "Unrelated content")
-        trigram_support!(node, context_trigrams)
-        isempty(node.children) && isnothing(node.score) && node.hits == 0
-    end
+    node = AnnotatedNode(content = "xyz")
+    trigram_support!(node, context_trigrams)
+    @test node.children[1].score ≈ 0
+    @test node.hits == 0
 
     # Test updating a node with partial matching trigrams in context
-    @test begin
-        node = AnnotatedNode(content = "This is")
-        trigram_support!(node, context_trigrams)
-        !isempty(node.children) && node.score > 0 &&
-            node.hits < length(tokenize(node.content))
-    end
+    node = AnnotatedNode(content = "This IS")
+    trigram_support!(node, context_trigrams)
+    @test length(node.children) == 3
+    @test node.score == 1.0
+    @test node.children[1].hits == 1
+    @test node.children[3].hits == 1
 
     # Test updating a node with full matching trigrams in context
-    @test begin
-        node = AnnotatedNode(content = "Another test.")
-        trigram_support!(node, context_trigrams)
-        !isempty(node.children) && !isnothing(node.score) &&
-            node.hits == length(tokenize(node.content))
-    end
+    node = AnnotatedNode(content = "Another test.")
+    trigram_support!(node, context_trigrams)
+    @test node.children[1].hits == 1
+    @test node.children[3].hits == 2
 
-    # Test handling of a single-character content, which should not form trigrams
-    @test begin
-        node = AnnotatedNode(content = "A")
-        trigram_support!(node, context_trigrams)
-        !isempty(node.children) && isnothing(node.score) && node.hits == 0
-    end
+    # Test handling of a single-character content, which should not be scored
+    node = AnnotatedNode(content = "A")
+    trigram_support!(node, context_trigrams)
+    @test node.children[1].score == nothing
 
-    # Test with an empty content, expecting no children and no score
-    @test begin
-        node = AnnotatedNode(content = "")
-        trigram_support!(node, context_trigrams)
-        isempty(node.children) && isnothing(node.score)
-    end
+    # Test with an empty content, expecting no children and 0 score
+    node = AnnotatedNode(content = "")
+    trigram_support!(node, context_trigrams)
+    @test isempty(node.children)
+    @test node.score ≈ 0
+end
+
+@testset "add_node_metadata!" begin
+    annotater = TrigramAnnotater()
+
+    # Empty root node
+    root = AnnotatedNode()
+    modified_root = add_node_metadata!(annotater, root)
+    @test isempty(modified_root.children)
+
+    # Single group, no sources or scores addition
+    root = AnnotatedNode()
+    child1 = AnnotatedNode(group_id = 1, content = "Child 1", score = 0.5, sources = [1])
+    push!(root.children, child1)
+    add_node_metadata!(annotater, root, add_sources = false, add_scores = false)
+    @test length(root.children) == 1
+    @test root.children[1].content == "Child 1"
+
+    # Multiple groups with sources and scores
+    root = AnnotatedNode()
+    child1 = AnnotatedNode(group_id = 1, content = "Child 1", score = 0.5, sources = [1])
+    child2 = AnnotatedNode(group_id = 2, content = "Child 2", score = 0.8, sources = [2])
+    push!(root.children, child1, child2)
+    add_node_metadata!(annotater, root)
+    @test length(root.children) == 4 # Two original children + two metadata node
+    @test occursin("[1,0.5]", root.children[2].content)
+    @test occursin("[2,0.8]", root.children[4].content)
+
+    # Handle last group metadata correctly for the same group
+    root = AnnotatedNode()
+    child1 = AnnotatedNode(group_id = 1, content = "Child 1", score = 0.5, sources = [1])
+    child2 = AnnotatedNode(
+        group_id = 1, content = "Child 2", score = 0.9, sources = [1])
+    push!(root.children, child1, child2)
+    add_node_metadata!(annotater, root)
+    @test occursin("[1,0.7]", root.children[end].content) # Checks if score is averaged correctly
+
+    # Add sources list at the end
+    root = AnnotatedNode()
+    child = AnnotatedNode(group_id = 1, content = "Child 1", score = 0.5, sources = [1])
+    push!(root.children, child)
+    add_node_metadata!(annotater, root, sources = ["Source 1"])
+    @test occursin("\nSOURCES\n", root.children[end].content)
+    @test occursin("1. Source 1", root.children[end].content)
 end
 
 @testset "annotate_support" begin
@@ -199,42 +239,66 @@ end
     annotater = TrigramAnnotater()
     context = [
         "This is a test context.", "Another context sentence.", "Final piece of context."]
-    context_trigrams = prepare_context_trigrams(context)
 
     # Test annotating an answer that partially matches the context
-    @test begin
-        answer = "This is a test answer. It has multiple sentences."
-        annotated_root = annotate_support(annotater, answer, context_trigrams)
-        !isempty(annotated_root.children) && length(annotated_root.children) == 2
-    end
+    answer = "This is a test answer. It has multiple sentences."
+    annotated_root = annotate_support(annotater, answer, context)
+    @test length(annotated_root.children) == 3 # One for each sentence + metadata
+    @test annotated_root.score≈0.42 atol=0.01
+    io = IOBuffer()
+    pprint(io, annotated_root)
+    output = String(take!(io))
+    @test occursin("[1,0.67]", output)
+    @test occursin("This is a test answer.", output)
+    @test occursin("It has multiple sentences.", output)
 
     # Test annotating an answer that fully matches the context
-    @test begin
-        answer = "This is a test context. Another context sentence."
-        annotated_root = annotate_support(annotater, answer, context_trigrams)
-        all(child -> !isnothing(child.score) && child.hits > 0, annotated_root.children)
-    end
+    answer = "This is a test context. Another context sentence."
+    annotated_root = annotate_support(annotater, answer, context)
+    @test annotated_root.score ≈ 1.0
+    @test all(child -> isnothing(child.score) || child.score == 1, annotated_root.children)
 
     # Test annotating an answer with no matching content in the context
-    @test begin
-        answer = "Unrelated content here. Completely different."
-        annotated_root = annotate_support(annotater, answer, context_trigrams)
-        all(child -> isnothing(child.score), annotated_root.children)
-    end
+    answer = "Unrelated content here. Completely different."
+    annotated_root = annotate_support(annotater, answer, context)
+    @test annotated_root.score < 0.2 # some trigram matches on content vs context
 
     # Test annotating an empty answer, expecting a root node with no children
-    @test begin
-        answer = ""
-        annotated_root = annotate_support(annotater, answer, context_trigrams)
-        isempty(annotated_root.children)
-    end
+    answer = ""
+    annotated_root = annotate_support(annotater, answer, context)
+    @test isempty(annotated_root.children)
 
     # Test handling of special characters and punctuation in the answer
-    @test begin
-        answer = "Special characters: !@#$%. Punctuation marks: ,;:."
-        annotated_root = annotate_support(annotater, answer, context_trigrams)
-        !isempty(annotated_root.children) && length(annotated_root.children) == 2
-    end
-end
+    answer = "Special characters: !@#\$%. Punctuation marks: ,;:."
+    annotated_root = annotate_support(
+        annotater, answer, context; add_sources = false, add_scores = false)
+    # no scores, so no extra children
+    @test length(annotated_root.children) == 3
+    io = IOBuffer()
+    pprint(io, annotated_root)
+    output = String(take!(io))
+    @test answer == output
 
-# TODO: add_node_metadata!
+    # Test adding sources
+    answer = "This is a test answer."
+    annotated_root = annotate_support(
+        annotater, answer, context; sources = ["Source 1", "Source 2", "Source 3"])
+    io = IOBuffer()
+    pprint(io, annotated_root)
+    output = String(take!(io))
+    @test occursin("\nSOURCES\n", output)
+    @test occursin("1. Source 1", output)
+
+    ## RAG Details dispatch
+    answer = "This is a test answer."
+    r = RAGDetails(
+        "?", answer, context; sources = ["Source 1", "Source 2", "Source 3"])
+    annotated_root = annotate_support(annotater, r)
+    io = IOBuffer()
+    pprint(io, annotated_root)
+    output = String(take!(io))
+    @test occursin("This is a test answer.", output)
+    @test occursin("[1,0.67]", output)
+    @test occursin("\nSOURCES\n", output)
+    @test occursin("1. Source 1", output)
+end

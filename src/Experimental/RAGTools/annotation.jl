@@ -94,15 +94,17 @@ AbstractTrees.parent(n::AbstractAnnotatedNode) = n.parent
 function Base.show(io::IO, node::AbstractAnnotatedNode;
         annotater::Union{Nothing, AbstractAnnotater} = nothing)
     print(io,
-        "$(nameof(typeof(node)))(group id: $(node.group_id), length: $(length(node.content)), score: $(node.score))")
+        "$(nameof(typeof(node)))(group id: $(node.group_id), length: $(length(node.content)), score: $(round(node.score; digits=2))")
 end
 
 """
-    pprint(io::IO, node::AbstractAnnotatedNode)
+    PromptingTools.pprint(
+        io::IO, node::AbstractAnnotatedNode; text_width::Int = displaysize(io)[2])
 
 Pretty print the `node` to the `io` stream, including all its children
 """
-function PromptingTools.pprint(io::IO, node::AbstractAnnotatedNode)
+function PromptingTools.pprint(
+        io::IO, node::AbstractAnnotatedNode; text_width::Int = displaysize(io)[2])
     for node in AbstractTrees.PreOrderDFS(node)
         ## print out text only for leaf nodes (ie, with no children)
         if isempty(node.children)
@@ -113,7 +115,10 @@ function PromptingTools.pprint(io::IO, node::AbstractAnnotatedNode)
     return nothing
 end
 
-PromptingTools.pprint(node::AbstractAnnotatedNode) = pprint(stdout, node)
+function PromptingTools.pprint(
+        node::AbstractAnnotatedNode; text_width::Int = displaysize(stdout)[2])
+    pprint(stdout, node; text_width)
+end
 
 ### ANNOTATION METHODS -- TrigramAnnotater
 
@@ -131,7 +136,7 @@ struct TrigramAnnotater <: AbstractAnnotater end
         low_threshold::Float64 = 0.0, medium_threshold::Float64 = 0.5, high_threshold::Float64 = 1.0,
         low_styler::Styler = Styler(color = :magenta, bold = false),
         medium_styler::Styler = Styler(color = :blue, bold = false),
-        high_styler::Styler = Styler(color = :green, bold = false),
+        high_styler::Styler = Styler(color = :nothing, bold = false),
         bold_multihits::Bool = false)
 
 Sets style of `node` based on the provided rules
@@ -140,7 +145,7 @@ function set_node_style!(::TrigramAnnotater, node::AnnotatedNode;
         low_threshold::Float64 = 0.0, medium_threshold::Float64 = 0.5, high_threshold::Float64 = 1.0,
         low_styler::Styler = Styler(color = :magenta, bold = false),
         medium_styler::Styler = Styler(color = :blue, bold = false),
-        high_styler::Styler = Styler(color = :green, bold = false),
+        high_styler::Styler = Styler(color = :nothing, bold = false),
         bold_multihits::Bool = false)
     node.style = if isnothing(node.score)
         ## skip for now
@@ -184,13 +189,42 @@ function align_node_styles!(
     return nodes
 end
 
-"Find if the `parent_node.content` is supported by the provided `context_trigrams`"
-function trigram_support!(parent_node::AnnotatedNode,
-        context_trigrams::AbstractVector, trigram_func::F = trigrams;
+"""
+    trigram_support!(parent_node::AnnotatedNode,
+        context_trigrams::AbstractVector, trigram_func::F1 = trigrams, token_transform::F2 = identity;
         skip_trigrams::Bool = false, min_score::Float64 = 0.5,
         min_source_score::Float64 = 0.25,
         stop_words::AbstractVector{<:String} = STOPWORDS,
-        styler_kwargs...) where {F <: Function}
+        styler_kwargs...) where {F1 <: Function, F2 <: Function}
+
+Find if the `parent_node.content` is supported by the provided `context_trigrams`.
+
+Logic:
+- Split the `parent_node.content` into tokens
+- Create an `AnnotatedNode` for each token
+- If `skip_trigrams` is enabled, it looks for an exact match in the `context_trigrams`
+- If no exact match found, it counts trigram-based match (include the surrounding tokens for better contextual awareness) as a score
+- Then it sets the style of the node based on the score
+- Lastly, it aligns the styles of neighboring nodes with `score==nothing` (eg, single character tokens)
+- Then, it rolls up the scores and sources to the parent node
+
+For diagnostics, you can use `AbstractTrees.print_tree(parent_node)` to see the tree structure of each token and its score.
+
+# Example
+```julia
+context_trigrams = text_to_trigrams.(["This IS a test.", "Another test.",
+    "More content here."])
+
+node = AnnotatedNode(content = "xyz") 
+trigram_support!(node, context_trigrams) # updates node.children!
+``
+`"""
+function trigram_support!(parent_node::AnnotatedNode,
+        context_trigrams::AbstractVector, trigram_func::F1 = trigrams, token_transform::F2 = identity;
+        skip_trigrams::Bool = false, min_score::Float64 = 0.5,
+        min_source_score::Float64 = 0.25,
+        stop_words::AbstractVector{<:String} = STOPWORDS,
+        styler_kwargs...) where {F1 <: Function, F2 <: Function}
     method = TrigramAnnotater()
     context_scores = zeros(Float64, length(context_trigrams))
     ## Iterate max-sim over all the tokens (find match via trigrams)
@@ -213,12 +247,12 @@ function trigram_support!(parent_node::AnnotatedNode,
         for si in eachindex(context_trigrams)
             ## load trigrams in the context source
             src = context_trigrams[si]
-            ## Score the match of the word itself if found
-            direct_match = skip_trigrams ? in(curr_tok, src) : false
+            ## Score the match of the word itself if found; if we use hashed trigrams, we must hash the word
+            direct_match = skip_trigrams ? in(token_transform(curr_tok), src) : false
             if !direct_match
                 ## Score the trigram if direct match failed
                 full_tok = token_with_boundaries(prev_token, curr_tok, next_tok)
-                trig = trigrams(full_tok; add_word = curr_tok)
+                trig = trigram_func(full_tok; add_word = curr_tok)
                 ## count portion of trigrams that match
                 score = count(in(src), trig) / length(trig)
             else
@@ -258,6 +292,17 @@ function trigram_support!(parent_node::AnnotatedNode,
     return parent_node
 end
 
+"""
+    add_node_metadata!(annotater::TrigramAnnotater,
+        root::AnnotatedNode; add_sources::Bool = true, add_scores::Bool = true,
+        sources::Union{Nothing, AbstractVector{<:AbstractString}} = nothing)
+
+Adds metadata to the children of `root`. Metadata includes sources and scores, if requested.
+
+Optionally, it can add a list of `sources` at the end of the printed text.
+
+The metadata is added by inserting new nodes in the `root` children list (with no children of its own to be printed out).
+"""
 function add_node_metadata!(annotater::TrigramAnnotater,
         root::AnnotatedNode; add_sources::Bool = true, add_scores::Bool = true,
         sources::Union{Nothing, AbstractVector{<:AbstractString}} = nothing)
@@ -327,7 +372,7 @@ function add_node_metadata!(annotater::TrigramAnnotater,
 
     ## Simply enumerate the sources at the end
     if !isnothing(sources)
-        metadata_content = "\n\n**Sources:**\n" *
+        metadata_content = string("\n\n", "-"^20, "\n", "SOURCES", "\n", "-"^20, "\n") *
                            join(["$(i). $(src)" for (i, src) in enumerate(sources)], "\n")
         src_node = AnnotatedNode(; parent = root, group_id = previous_group_id + 1,
             content = metadata_content)
@@ -337,20 +382,65 @@ function add_node_metadata!(annotater::TrigramAnnotater,
     return root
 end
 
-"Annotates the `answer` with the `context` and returns the annotated tree of nodes representing the `answer`"
-function annotate_support(annotater::TrigramAnnotater, answer::AbstractString,
+"""
+    annotate_support(annotater::TrigramAnnotater, answer::AbstractString,
         context::AbstractVector; min_score::Float64 = 0.5,
-        skip_trigrams::Bool = true, hashed::Bool = false,
+        skip_trigrams::Bool = true, hashed::Bool = true,
+        sources::Union{Nothing, AbstractVector{<:AbstractString}} = nothing,
         min_source_score::Float64 = 0.25,
         add_sources::Bool = true,
         add_scores::Bool = true, kwargs...)
-    # TODO: add RAG sources - inline and at the end of the context
-    ## use hashed trigrams?
+
+Annotates the `answer` with the overlap/what's supported in `context` and returns the annotated tree of nodes representing the `answer`
+
+Returns a "root" node with children nodes representing the sentences/code blocks in the `answer`. Only the "leaf" nodes are to be printed (to avoid duplication), "leaf" nodes are those with NO children.
+
+Default logic: 
+- Split into sentences/code blocks, then into tokens (~words).
+- Then match each token (~word) exactly.
+- If no exact match found, count trigram-based match (include the surrounding tokens for better contextual awareness).
+- If the match is higher than `min_score`, it's recorded in the `score` of the node.
+
+# Arguments
+- `annotater::TrigramAnnotater`: Annotater to use
+- `answer::AbstractString`: Text to annotate
+- `context::AbstractVector`: Context to annotate against, ie, look for "support" in the texts in `context`
+- `min_score::Float64`: Minimum score to consider a match. Default: 0.5, which means that half of the trigrams of each word should match
+- `skip_trigrams::Bool`: Whether to potentially skip trigram matching if exact full match is found. Default: true
+- `hashed::Bool`: Whether to use hashed trigrams. It's harder to debug, but it's much faster for larger texts (hashed text are held in a Set to deduplicate). Default: true
+- `sources::Union{Nothing, AbstractVector{<:AbstractString}}`: Sources to add at the end of the context. Default: nothing
+- `min_source_score::Float64`: Minimum score to consider/to display a source. Default: 0.25, which means that at least a quarter of the trigrams of each word should match to some context.
+  The threshold is lower than `min_score`, because it's average across ALL words in a block, so it's much harder to match fully with generated text.
+- `add_sources::Bool`: Whether to add sources at the end of each code block/sentence. Sources are addded in the square brackets like "[1]". Default: true
+- `add_scores::Bool`: Whether to add source-matching scores at the end of each code block/sentence. Scores are added in the square brackets like "[0.75]". Default: true
+- kwargs: Additional keyword arguments to pass to `trigram_support!` and `set_node_style!`. See their documentation for more details (eg, customize the colors of the nodes based on the score)
+
+# Example
+```julia
+annotater = TrigramAnnotater()
+context = [
+    "This is a test context.", "Another context sentence.", "Final piece of context."]
+answer = "This is a test context. Another context sentence."
+
+annotated_root = annotate_support(annotater, answer, context)
+pprint(annotated_root) # pretty print the annotated tree
+```
+"""
+function annotate_support(annotater::TrigramAnnotater, answer::AbstractString,
+        context::AbstractVector; min_score::Float64 = 0.5,
+        skip_trigrams::Bool = true, hashed::Bool = true,
+        sources::Union{Nothing, AbstractVector{<:AbstractString}} = nothing,
+        min_source_score::Float64 = 0.25,
+        add_sources::Bool = true,
+        add_scores::Bool = true, kwargs...)
+    ## use hashed trigrams by default (more efficient for larger sequences)
     if hashed
         trigram_func = trigrams_hashed
+        word_transform = hash
         text_to_trigram_func = text_to_trigrams_hashed
     else
         trigram_func = trigrams
+        word_transform = identity
         text_to_trigram_func = text_to_trigrams
     end
     sentences, group_ids = split_into_code_and_sentences(answer)
@@ -361,12 +451,36 @@ function annotate_support(annotater::TrigramAnnotater, answer::AbstractString,
             content = sentences[i], group_id = group_ids[i], parent = root)
         push!(root.children, node)
         trigram_support!(
-            node, context_trigrams, trigram_func; skip_trigrams,
+            node, context_trigrams, trigram_func, word_transform; skip_trigrams,
             min_score, min_source_score, kwargs...)
     end
     ## add_sources/scores if requested
     if add_sources || add_scores
-        add_node_metadata!(annotater, root; add_sources, add_scores)
+        add_node_metadata!(annotater, root; add_sources, add_scores, sources)
     end
+    ## Roll up children scores, weighted by length
+    score_sum = 0
+    score_lengths = 0
+    for child in AbstractTrees.children(root)
+        if !isnothing(child.score)
+            len_ = length(child.content)
+            score_sum += child.score * len_
+            score_lengths += len_
+        end
+    end
+    root.score = score_lengths > 0 ? score_sum / score_lengths : 0.0
+
     return root
+end
+
+# Dispatch for RAGResult
+function annotate_support(
+        annotater::TrigramAnnotater, result::AbstractRAGResult; min_score::Float64 = 0.5,
+        skip_trigrams::Bool = true, hashed::Bool = false,
+        min_source_score::Float64 = 0.25,
+        add_sources::Bool = true,
+        add_scores::Bool = true, kwargs...)
+    return annotate_support(
+        annotater, result.refined_answer, result.context; min_score, skip_trigrams,
+        hashed, result.sources, min_source_score, add_sources, add_scores, kwargs...)
 end

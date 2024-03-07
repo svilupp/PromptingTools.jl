@@ -232,13 +232,13 @@ end
           Set(hash.(text_to_trigrams("Complex sentence: 123!")))
 end
 
-@testset "split_sentences" begin
+@testset "split_into_code_and_sentences" begin
     # Test basic sentence splitting
     input = "This is a test. This is another test."
     sentences, group_ids = split_into_code_and_sentences(input)
-    @test sentences == ["This is a test", ".", " This is another test", "."]
+    @test sentences == ["This is a test.", " This is another test."]
     @test join(sentences, "") == input # lossless
-    @test group_ids == [1, 2, 3, 4]
+    @test group_ids == [1, 2]
 
     # Test handling of code blocks and inline code
     input = """Here is a code block: 
@@ -247,10 +247,11 @@ end
       ```
       and `inline code`."""
     sentences, group_ids = split_into_code_and_sentences(input)
-    @test sentences == ["Here is a code block: ", "\n", "```julia", "\n",
+    sentences
+    @test sentences == ["Here is a code block: \n", "```julia", "\n",
         "code here", "\n", "```", "\n", "and ", "`inline code`", "."]
     @test join(sentences, "") == input
-    @test group_ids == [1, 2, 3, 3, 3, 3, 3, 4, 5, 6, 7]
+    @test group_ids == [1, 2, 2, 2, 2, 2, 3, 4, 5, 6]
 
     ## Multi-faceted code
     input = """Here is a code block: 
@@ -270,13 +271,11 @@ end
     """
     sentences, group_ids = split_into_code_and_sentences(input)
     @test sentences ==
-          ["Here is a code block: ", "\n", "```julia", "\n", "code here", "\n", "```",
-        "\n", "and ", "`inline code`", ".", "\n", "Sentences here", ".", "\n",
-        "Bullets:", "\n", "- ", "I like this", "\n", "- ", "But does it work",
-        "?", "\n", "```julia", "\n", "another code", "\n", "```", "\n", "1. ",
-        "Tester", "\n", "Third sentence ", "-", " but what happened", ".", "\n"]
+          ["Here is a code block: \n", "```julia", "\n", "code here", "\n", "```", "\n",
+        "and ", "`inline code`", ".", "\n", "Sentences here.\n", "Bullets:\n-",
+        " I like this\n-", " But does it work?\n", "```julia", "\n", "another code",
+        "\n", "```", "\n", "1. ", "Tester\n", "Third sentence -", " but what happened.\n"]
     @test join(sentences, "") == input
-    @test group_ids ==
-          [1, 2, 3, 3, 3, 3, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17,
-        18, 19, 20, 21, 21, 21, 21, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30]
+    @test group_ids == [
+        1, 2, 2, 2, 2, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 12, 12, 12, 12, 13, 14, 15, 16, 17]
 end

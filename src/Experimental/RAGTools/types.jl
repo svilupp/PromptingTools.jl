@@ -200,9 +200,38 @@ A struct for debugging RAG answers. It contains the question, answer, context, a
     filtered_candidates::CandidateChunks
     reranked_candidates::CandidateChunks
 end
+# Simplification of the RAGDetails struct
+function RAGDetails(
+        question, answer, context; sources = ["Source $i" for i in 1:length(context)])
+    return RAGDetails(question, [question], answer, answer, context, sources,
+        CandidateChunks(index_id = :emb, positions = Int[], distances = Float32[]),
+        nothing,
+        CandidateChunks(index_id = :emb, positions = Int[], distances = Float32[]),
+        CandidateChunks(index_id = :emb, positions = Int[], distances = Float32[]))
+end
 
 # Structured show method for easier reading (each kwarg on a new line)
 function Base.show(io::IO,
         t::Union{AbstractDocumentIndex, AbstractCandidateChunks, AbstractRAGResult})
     dump(IOContext(io, :limit => true), t, maxdepth = 1)
+end
+
+# Pretty print
+function PT.pprint(
+        io::IO, r::AbstractRAGResult; text_width::Int = displaysize(io)[2])
+    if !isempty(r.rephrased_question)
+        content = PT.wrap_string("- " * join(r.rephrased_question, "\n- "), text_width)
+        print(io, "-"^20, "\n")
+        printstyled(io, "QUESTION(s)", color = :blue, bold = true)
+        print(io, "\n", "-"^20, "\n")
+        print(io, content, "\n\n")
+    end
+    if !isempty(r.refined_answer)
+        annotater = TrigramAnnotater()
+        root = annotate_support(annotater, r)
+        print(io, "-"^20, "\n")
+        printstyled(io, "ANSWER", color = :blue, bold = true)
+        print(io, "\n", "-"^20, "\n")
+        pprint(io, root; text_width)
+    end
 end

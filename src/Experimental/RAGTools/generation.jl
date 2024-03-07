@@ -81,7 +81,7 @@ The function selects relevant chunks from an `ChunkIndex`, optionally filters th
 
 # Returns
 - If `return_details` is `false`, returns the generated message (`msg`).
-- If `return_details` is `true`, returns a tuple of the generated message (`msg`) and the RAG context (`rag_context`).
+- If `return_details` is `true`, returns a tuple of the generated message (`msg`) and the `RAGDetails` for context (`rag_details`).
 
 # Notes
 - The function first finds the closest chunks to the question embedding, then optionally filters these based on tags. After that, it reranks the candidates and builds a context for the RAG model.
@@ -183,7 +183,7 @@ function airag(index::AbstractChunkIndex, rag_template::Symbol = :RAGAnswerFromC
         joined_kwargs...)
 
     if return_details # for evaluation
-        rag_context = RAGDetails(;
+        rag_details = RAGDetails(;
             question,
             rephrased_question = [question],
             answer = msg.content,
@@ -194,8 +194,15 @@ function airag(index::AbstractChunkIndex, rag_template::Symbol = :RAGAnswerFromC
             tag_candidates,
             filtered_candidates,
             reranked_candidates)
-        return msg, rag_context
+        return msg, rag_details
     else
         return msg
     end
+end
+
+# Special method to pretty-print the airag results
+function PT.pprint(io::IO, airag_result::Tuple{PT.AIMessage, AbstractRAGResult},
+        text_width::Int = displaysize(io)[2])
+    rag_details = airag_result[2]
+    pprint(io, rag_details; text_width)
 end

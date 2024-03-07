@@ -266,7 +266,7 @@ function run_qa_evals(index::AbstractChunkIndex, qa_items::AbstractVector{<:QAEv
     # Run evaluations in parallel
     results = asyncmap(qa_items) do qa_item
         # Generate an answer -- often you want the model_judge to be the highest quality possible, eg, "GPT-4 Turbo" (alias "gpt4t)
-        msg, ctx = airag(index; qa_item.question, return_context = true,
+        msg, ctx = airag(index; qa_item.question, return_details = true,
             verbose, api_kwargs, airag_kwargs...)
 
         # Evaluate the response

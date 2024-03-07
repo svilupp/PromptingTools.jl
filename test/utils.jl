@@ -1,10 +1,11 @@
-using PromptingTools: split_by_length, replace_words, length_longest_common_subsequence
+using PromptingTools: split_by_length, wrap_string, replace_words,
+                      length_longest_common_subsequence
 using PromptingTools: _extract_handlebar_variables, call_cost, call_cost_alternative,
                       _report_stats
 using PromptingTools: _string_to_vector, _encode_local_image
 using PromptingTools: DataMessage, AIMessage
 using PromptingTools: push_conversation!,
-                      resize_conversation!, @timeout, preview, auth_header
+                      resize_conversation!, @timeout, preview, pprint, auth_header
 
 @testset "replace_words" begin
     words = ["Disney", "Snow White", "Mickey Mouse"]
@@ -85,6 +86,18 @@ end
     chunks = split_by_length(text, separators, max_length = 20)
     chunks = split_by_length(text, separators, max_length = 20)
     @test length(separators) == sep_length
+end
+
+@testset "wrap_string" begin
+    @test wrap_string("", 10) == ""
+    @test wrap_string("Hi", 10) == "Hi"
+    @test wrap_string(strip(" Hi "), 10) == "Hi" # SubString type
+    output = wrap_string("This function will wrap words into lines", 10)
+    @test maximum(length.(split(output, "\n"))) <= 10
+    output = wrap_string("This function will wrap words into lines", 20)
+    @test_broken maximum(length.(split(output, "\n"))) <= 20 #bug, it adds back the separator
+    str = "This function will wrap words into lines"
+    @test wrap_string(str, length(str)) == str
 end
 
 @testset "length_longest_common_subsequence" begin
@@ -265,6 +278,20 @@ end
     preview_output = preview(conversation)
     expected_output = Markdown.parse("# System Message\n\nWelcome\n\n---\n\n# User Message\n\nHello\n\n---\n\n# AI Message\n\nWorld\n\n---\n\n# Data Message\n\nData: Vector{Float64} (Size: (10,))\n")
     @test preview_output == expected_output
+end
+
+@testset "pprint" begin
+    conversation = [
+        PT.SystemMessage("Welcome"),
+        PT.UserMessage("Hello"),
+        PT.AIMessage("World"),
+        PT.DataMessage(; content = ones(10))
+    ]
+    io = IOBuffer()
+    pprint(io, conversation)
+    output = String(take!(io))
+    exp_output = "--------------------\nSystem Message\n--------------------\nWelcome\n\n--------------------\nUser Message\n--------------------\nHello\n\n--------------------\nAI Message\n--------------------\nWorld\n\n--------------------\nData Message\n--------------------\nData: Vector{Float64} (Size: (10,))\n\n"
+    @test output == exp_output
 end
 
 @testset "auth_header" begin
