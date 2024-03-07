@@ -109,8 +109,15 @@ function PromptingTools.pprint(
     for node in AbstractTrees.PreOrderDFS(node)
         ## print out text only for leaf nodes (ie, with no children)
         if isempty(node.children)
-            printstyled(io, node.content; node.style.bold, node.style.color,
-                node.style.underline, node.style.italic)
+            @static if VERSION ≥ v"1.10"
+                printstyled(io, node.content; node.style.bold, node.style.color,
+                    node.style.underline, node.style.italic)
+            else
+                ## Implies VERSION ≥ v"1.9" (not supported below)
+                ## Remove italic keyword
+                printstyled(io, node.content; node.style.bold, node.style.color,
+                    node.style.underline)
+            end
         end
     end
     return nothing
