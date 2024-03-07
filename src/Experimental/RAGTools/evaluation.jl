@@ -143,15 +143,15 @@ function score_retrieval_rank(orig_context::AbstractString,
 end
 
 """
-    run_qa_evals(qa_item::QAEvalItem, ctx::RAGContext; verbose::Bool = true,
+    run_qa_evals(qa_item::QAEvalItem, ctx::RAGDetails; verbose::Bool = true,
                  parameters_dict::Dict{Symbol, <:Any}, judge_template::Symbol = :RAGJudgeAnswerFromContext,
                  model_judge::AbstractString, api_kwargs::NamedTuple = NamedTuple()) -> QAEvalResult
 
-Evaluates a single `QAEvalItem` using a RAG context (`RAGContext`) and returns a `QAEvalResult` structure. This function assesses the relevance and accuracy of the answers generated in a QA evaluation context.
+Evaluates a single `QAEvalItem` using RAG details (`RAGDetails`) and returns a `QAEvalResult` structure. This function assesses the relevance and accuracy of the answers generated in a QA evaluation context.
 
 # Arguments
 - `qa_item::QAEvalItem`: The QA evaluation item containing the question and its answer.
-- `ctx::RAGContext`: The context used for generating the QA pair, including the original context and the answers.
+- `ctx::RAGDetails`: The context used for generating the QA pair, including the original context and the answers.
   Comes from `airag(...; return_context=true)`
 - `verbose::Bool`: If `true`, enables verbose logging. Defaults to `true`.
 - `parameters_dict::Dict{Symbol, Any}`: Track any parameters used for later evaluations. Keys must be Symbols.
@@ -173,13 +173,13 @@ Evaluates a single `QAEvalItem` using a RAG context (`RAGContext`) and returns a
 Evaluating a QA pair using a specific context and model:
 ```julia
 qa_item = QAEvalItem(question="What is the capital of France?", answer="Paris", context="France is a country in Europe.")
-ctx = RAGContext(source="Wikipedia", context="France is a country in Europe.", answer="Paris")
+ctx = RAGDetails(source="Wikipedia", context="France is a country in Europe.", answer="Paris")
 parameters_dict = Dict("param1" => "value1", "param2" => "value2")
 
 eval_result = run_qa_evals(qa_item, ctx, parameters_dict=parameters_dict, model_judge="MyAIJudgeModel")
 ```
 """
-function run_qa_evals(qa_item::QAEvalItem, ctx::RAGContext;
+function run_qa_evals(qa_item::QAEvalItem, ctx::RAGDetails;
         verbose::Bool = true, parameters_dict::Dict{Symbol, <:Any} = Dict{Symbol, Any}(),
         judge_template::Symbol = :RAGJudgeAnswerFromContextShort,
         model_judge::AbstractString = PT.MODEL_CHAT,
@@ -187,7 +187,7 @@ function run_qa_evals(qa_item::QAEvalItem, ctx::RAGContext;
     retrieval_score = score_retrieval_hit(qa_item.context, ctx.context)
     retrieval_rank = score_retrieval_rank(qa_item.context, ctx.context)
 
-    # Note we could evaluate if RAGContext and QAEvalItem are at least using the same sources etc. 
+    # Note we could evaluate if RAGDetails and QAEvalItem are at least using the same sources etc. 
 
     answer_score = try
         msg = aiextract(judge_template; model = model_judge, verbose,
@@ -266,7 +266,7 @@ function run_qa_evals(index::AbstractChunkIndex, qa_items::AbstractVector{<:QAEv
     # Run evaluations in parallel
     results = asyncmap(qa_items) do qa_item
         # Generate an answer -- often you want the model_judge to be the highest quality possible, eg, "GPT-4 Turbo" (alias "gpt4t)
-        msg, ctx = airag(index; qa_item.question, return_context = true,
+        msg, ctx = airag(index; qa_item.question, return_details = true,
             verbose, api_kwargs, airag_kwargs...)
 
         # Evaluate the response

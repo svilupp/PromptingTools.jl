@@ -9,7 +9,7 @@ abstract type AbstractDataMessage <: AbstractMessage end # with data-based conte
 const ALLOWED_PROMPT_TYPE = Union{
     AbstractString,
     AbstractMessage,
-    Vector{<:AbstractMessage},
+    Vector{<:AbstractMessage}
 }
 
 # Workaround to be able to add metadata to serialized conversations, templates, etc.
@@ -264,3 +264,48 @@ StructTypes.StructType(::Type{UserMessage}) = StructTypes.Struct()
 StructTypes.StructType(::Type{UserMessageWithImages}) = StructTypes.Struct()
 StructTypes.StructType(::Type{AIMessage}) = StructTypes.Struct()
 StructTypes.StructType(::Type{DataMessage}) = StructTypes.Struct()
+
+### Utilities for Pretty Printing
+"""
+    pprint(io::IO, msg::AbstractMessage; text_width::Int = displaysize(io)[2])
+
+Pretty print a single `AbstractMessage` to the given IO stream.
+
+`text_width` is the width of the text to be displayed. If not provided, it defaults to the width of the given IO stream and add `newline` separators as needed.
+"""
+function pprint(io::IO, msg::AbstractMessage; text_width::Int = displaysize(io)[2])
+    ## never use extension, because we don't have good method for single message
+    role = if msg isa Union{UserMessage, UserMessageWithImages}
+        "User Message"
+    elseif msg isa DataMessage
+        "Data Message"
+    elseif msg isa SystemMessage
+        "System Message"
+    elseif msg isa AIMessage
+        "AI Message"
+    else
+        "Unknown Message"
+    end
+    content = if msg isa DataMessage
+        length_ = msg.content isa AbstractArray ? " (Size: $(size(msg.content)))" : ""
+        "Data: $(typeof(msg.content))$(length_)"
+    else
+        wrap_string(msg.content, text_width)
+    end
+    print(io, "-"^20, "\n")
+    printstyled(io, role, color = :blue, bold = true)
+    print(io, "\n", "-"^20, "\n")
+    print(io, content, "\n\n")
+end
+"""
+    pprint(io::IO, conversation::AbstractVector{<:AbstractMessage})
+
+Pretty print a vector of `AbstractMessage` to the given IO stream.
+"""
+function pprint(
+        io::IO, conversation::AbstractVector{<:AbstractMessage};
+        text_width::Int = displaysize(io)[2])
+    for msg in conversation
+        pprint(io, msg; text_width)
+    end
+end

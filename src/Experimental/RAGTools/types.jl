@@ -1,10 +1,4 @@
-### Types
-# Defines three key types for RAG: ChunkIndex, MultiIndex, and CandidateChunks
-# In addition, RAGContext is defined for debugging purposes
 
-abstract type AbstractDocumentIndex end
-abstract type AbstractMultiIndex <: AbstractDocumentIndex end
-abstract type AbstractChunkIndex <: AbstractDocumentIndex end
 # More advanced index would be: HybridChunkIndex
 
 # Stores document chunks and their embeddings
@@ -26,7 +20,7 @@ Main struct for storing document chunks and their embeddings. It also stores tag
     T1 <: AbstractString,
     T2 <: Union{Nothing, Matrix{<:Real}},
     T3 <: Union{Nothing, AbstractMatrix{<:Bool}},
-    T4 <: Union{Nothing, AbstractVector},
+    T4 <: Union{Nothing, AbstractVector}
 } <: AbstractChunkIndex
     id::Symbol = gensym("ChunkIndex")
     # underlying document chunks / snippets
@@ -96,7 +90,6 @@ function Base.var"=="(i1::MultiIndex, i2::MultiIndex)
     return true
 end
 
-abstract type AbstractCandidateChunks end
 @kwdef struct CandidateChunks{TP <: Union{Integer, AbstractCandidateChunks}, TD <: Real} <:
               AbstractCandidateChunks
     index_id::Symbol
@@ -191,13 +184,15 @@ function Base.getindex(mi::MultiIndex,
 end
 
 """
-    RAGContext
+    RAGDetails
 
 A struct for debugging RAG answers. It contains the question, answer, context, and the candidate chunks at each step of the RAG pipeline.
 """
-@kwdef struct RAGContext
+@kwdef mutable struct RAGDetails <: AbstractRAGResult
     question::AbstractString
+    rephrased_question::AbstractVector{<:AbstractString}
     answer::AbstractString
+    refined_answer::AbstractString
     context::Vector{<:AbstractString}
     sources::Vector{<:AbstractString}
     emb_candidates::CandidateChunks
@@ -205,9 +200,38 @@ A struct for debugging RAG answers. It contains the question, answer, context, a
     filtered_candidates::CandidateChunks
     reranked_candidates::CandidateChunks
 end
+# Simplification of the RAGDetails struct
+function RAGDetails(
+        question, answer, context; sources = ["Source $i" for i in 1:length(context)])
+    return RAGDetails(question, [question], answer, answer, context, sources,
+        CandidateChunks(index_id = :emb, positions = Int[], distances = Float32[]),
+        nothing,
+        CandidateChunks(index_id = :emb, positions = Int[], distances = Float32[]),
+        CandidateChunks(index_id = :emb, positions = Int[], distances = Float32[]))
+end
 
 # Structured show method for easier reading (each kwarg on a new line)
 function Base.show(io::IO,
-        t::Union{AbstractDocumentIndex, AbstractCandidateChunks, RAGContext})
+        t::Union{AbstractDocumentIndex, AbstractCandidateChunks, AbstractRAGResult})
     dump(IOContext(io, :limit => true), t, maxdepth = 1)
+end
+
+# Pretty print
+function PT.pprint(
+        io::IO, r::AbstractRAGResult; text_width::Int = displaysize(io)[2])
+    if !isempty(r.rephrased_question)
+        content = PT.wrap_string("- " * join(r.rephrased_question, "\n- "), text_width)
+        print(io, "-"^20, "\n")
+        printstyled(io, "QUESTION(s)", color = :blue, bold = true)
+        print(io, "\n", "-"^20, "\n")
+        print(io, content, "\n\n")
+    end
+    if !isempty(r.refined_answer)
+        annotater = TrigramAnnotater()
+        root = annotate_support(annotater, r)
+        print(io, "-"^20, "\n")
+        printstyled(io, "ANSWER", color = :blue, bold = true)
+        print(io, "\n", "-"^20, "\n")
+        pprint(io, root; text_width)
+    end
 end
