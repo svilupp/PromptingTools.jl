@@ -46,7 +46,7 @@ end
         model_metadata::String = PT.MODEL_CHAT,
         metadata_template::Symbol = :RAGExtractMetadataShort,
         chunks_window_margin::Tuple{Int, Int} = (1, 1),
-        return_context::Bool = false, verbose::Bool = true,
+        return_details::Bool = false, verbose::Bool = true,
         rerank_kwargs::NamedTuple = NamedTuple(),
         api_kwargs::NamedTuple = NamedTuple(),
         aiembed_kwargs::NamedTuple = NamedTuple(),
@@ -72,7 +72,7 @@ The function selects relevant chunks from an `ChunkIndex`, optionally filters th
 - `model_metadata::String`: Model used for extracting metadata, default is `PT.MODEL_CHAT`.
 - `metadata_template::Symbol`: Template for the metadata extraction process from the question, defaults to: `:RAGExtractMetadataShort`
 - `chunks_window_margin::Tuple{Int,Int}`: The window size around each chunk to consider for context building. See `?build_context` for more information.
-- `return_context::Bool`: If `true`, returns the context used for RAG along with the response.
+- `return_details::Bool`: If `true`, returns the details used for RAG along with the response.
 - `verbose::Bool`: If `true`, enables verbose logging.
 - `api_kwargs`: API parameters that will be forwarded to ALL of the API calls (`aiembed`, `aigenerate`, and `aiextract`).
 - `aiembed_kwargs`: API parameters that will be forwarded to the `aiembed` call. If you need to provide `api_kwargs` only to this function, simply add them as a keyword argument, eg, `aiembed_kwargs = (; api_kwargs = (; x=1))`.
@@ -80,8 +80,8 @@ The function selects relevant chunks from an `ChunkIndex`, optionally filters th
 - `aiextract_kwargs`: API parameters that will be forwarded to the `aiextract` call for the metadata extraction.
 
 # Returns
-- If `return_context` is `false`, returns the generated message (`msg`).
-- If `return_context` is `true`, returns a tuple of the generated message (`msg`) and the RAG context (`rag_context`).
+- If `return_details` is `false`, returns the generated message (`msg`).
+- If `return_details` is `true`, returns a tuple of the generated message (`msg`) and the `RAGDetails` for context (`rag_details`).
 
 # Notes
 - The function first finds the closest chunks to the question embedding, then optionally filters these based on tags. After that, it reranks the candidates and builds a context for the RAG model.
@@ -101,7 +101,19 @@ msg = airag(index, :RAGAnswerFromContext; question)
 msg = airag(index; question)
 ```
 
-See also `build_index`, `build_context`, `CandidateChunks`, `find_closest`, `find_tags`, `rerank`
+To understand the details of the RAG process, use `return_details=true`
+```julia
+msg, details = airag(index; question, return_details = true)
+# details is a RAGDetails object with all the internal steps of the `airag` function
+```
+
+You can also pretty-print `details` to highlight generated text vs text that is supported by context.
+It also includes annotations of which context was used for each part of the response (where available).
+```julia
+PT.pprint(details)
+```
+
+See also `build_index`, `build_context`, `CandidateChunks`, `find_closest`, `find_tags`, `rerank`, `annotate_support`
 """
 function airag(index::AbstractChunkIndex, rag_template::Symbol = :RAGAnswerFromContext;
         question::AbstractString,
@@ -112,7 +124,7 @@ function airag(index::AbstractChunkIndex, rag_template::Symbol = :RAGAnswerFromC
         model_metadata::String = PT.MODEL_CHAT,
         metadata_template::Symbol = :RAGExtractMetadataShort,
         chunks_window_margin::Tuple{Int, Int} = (1, 1),
-        return_context::Bool = false, verbose::Bool = true,
+        return_details::Bool = false, verbose::Bool = true,
         rerank_kwargs::NamedTuple = NamedTuple(),
         api_kwargs::NamedTuple = NamedTuple(),
         aiembed_kwargs::NamedTuple = NamedTuple(),
@@ -182,18 +194,27 @@ function airag(index::AbstractChunkIndex, rag_template::Symbol = :RAGAnswerFromC
         context = join(context, "\n\n"), model = model_chat, verbose,
         joined_kwargs...)
 
-    if return_context # for evaluation
-        rag_context = RAGContext(;
+    if return_details # for evaluation
+        rag_details = RAGDetails(;
             question,
+            rephrased_question = [question],
             answer = msg.content,
+            refined_answer = msg.content,
             context,
             sources = sources(index)[reranked_candidates.positions],
             emb_candidates,
             tag_candidates,
             filtered_candidates,
             reranked_candidates)
-        return msg, rag_context
+        return msg, rag_details
     else
         return msg
     end
+end
+
+# Special method to pretty-print the airag results
+function PT.pprint(io::IO, airag_result::Tuple{PT.AIMessage, AbstractRAGResult},
+        text_width::Int = displaysize(io)[2])
+    rag_details = airag_result[2]
+    pprint(io, rag_details; text_width)
 end

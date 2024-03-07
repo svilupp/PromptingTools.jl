@@ -174,7 +174,7 @@ end
         id = Symbol("AnotherChunkIndex"))
     test_multi_index = MultiIndex(indexes = [
         test_chunk_index,
-        another_chuck_index,
+        another_chuck_index
     ])
     @test collect(test_multi_index[candidate_chunks]) == ["First chunk", "Third chunk"]
 

@@ -168,6 +168,51 @@ function split_by_length(text, separators::Vector{String}; max_length)
 end
 
 """
+    wrap_string(str::String,
+        text_width::Int = 20;
+        newline::Union{AbstractString, AbstractChar} = '\n')
+
+Breaks a string into lines of a given `text_width`.
+Optionally, you can specify the `newline` character or string to use.
+
+# Example:
+
+```julia
+wrap_string("Certainly, here's a function in Julia that will wrap a string according to the specifications:", 10) |> print
+```
+"""
+function wrap_string(str::AbstractString,
+        text_width::Int = 20;
+        newline::Union{AbstractString, AbstractChar} = '\n')
+    words = split(str)
+    output = IOBuffer()
+    current_line_length = 0
+
+    for word in words
+        word_length = length(word)
+        if current_line_length + word_length > text_width
+            if current_line_length > 0
+                write(output, newline)
+                current_line_length = 0
+            end
+            while word_length > text_width
+                write(output, word[1:(text_width - 1)], "-$newline")
+                word = word[text_width:end]
+                word_length -= text_width - 1
+            end
+        end
+        if current_line_length > 0
+            write(output, ' ')
+            current_line_length += 1
+        end
+        write(output, word)
+        current_line_length += word_length
+    end
+
+    return String(take!(output))
+end;
+
+"""
     length_longest_common_subsequence(itr1, itr2)
 
 Compute the length of the longest common subsequence between two sequences (ie, the higher the number, the better the match).
@@ -476,8 +521,21 @@ macro timeout(seconds, expr_to_run, expr_when_fails)
     end
 end
 
-"Utility for rendering the conversation (vector of messages) as markdown. REQUIRES the Markdown package to load the extension!"
+"Utility for rendering the conversation (vector of messages) as markdown. REQUIRES the Markdown package to load the extension! See also `pprint`"
 function preview end
+
+"Utility for pretty printing PromptingTools types in REPL."
+function pprint end
+
+# show fallback
+function pprint(io::IO, anything::Any; text_width::Int = displaysize(io)[2])
+    show(io, anything)
+end
+
+function pprint(anything::Any;
+        text_width = displaysize(stdout)[2])
+    pprint(stdout, anything; text_width)
+end
 
 """
     auth_header(api_key::Union{Nothing, AbstractString};
