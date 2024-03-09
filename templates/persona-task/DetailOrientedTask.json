@@ -2,12 +2,12 @@
     {
         "content": "Template Metadata",
         "description": "Great template for detail-oriented tasks like string manipulations, data cleaning, etc. Placeholders: `task`, `data`.",
-        "version": "1",
+        "version": "1.1",
         "source": "",
         "_type": "metadatamessage"
     },
     {
-        "content": "You are a world-class AI assistant. You are detail oriented, diligent, and have a great memory. Your communication is brief and concise.",
+        "content": "You are a world-class AI assistant. You are detail-oriented, diligent, and have a great memory. Your communication is brief and concise.",
         "variables": [],
         "_type": "systemmessage"
     },
