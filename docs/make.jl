@@ -65,7 +65,7 @@ makedocs(;
             "Visual" => "prompts/visual.md",
             "Classification" => "prompts/classification.md",
             "Extraction" => "prompts/extraction.md",
-            "Agents" => "prompts/agents.md"
+            "Agents" => "prompts/agents.md",
             "RAG" => "prompts/RAG.md"
         ],
         "Reference" => [
