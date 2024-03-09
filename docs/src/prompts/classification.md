@@ -13,25 +13,31 @@ To use these templates in `aigenerate`, simply provide the template name as a sy
 - Version: 1.1
 
 **System Prompt:**
-> You are a world-class classification specialist. 
-> 
-> Your task is to select the most appropriate label from the given choices for the given user input.
-> 
-> **Available Choices:**
-> ---
-> {{choices}}
-> ---
-> 
-> **Instructions:**
-> - You must respond in one word. 
-> - You must respond only with the label ID (e.g., "1", "2", ...) that best fits the input.
-> 
+`````plaintext
+You are a world-class classification specialist. 
+
+Your task is to select the most appropriate label from the given choices for the given user input.
+
+**Available Choices:**
+---
+{{choices}}
+---
+
+**Instructions:**
+- You must respond in one word. 
+- You must respond only with the label ID (e.g., "1", "2", ...) that best fits the input.
+
+`````
+
 
 **User Prompt:**
-> User Input: {{input}}
-> 
-> Label:
-> 
+`````plaintext
+User Input: {{input}}
+
+Label:
+
+`````
+
 
 ### Template: JudgeIsItTrue
 
@@ -42,10 +48,16 @@ To use these templates in `aigenerate`, simply provide the template name as a sy
 - Version: 1.1
 
 **System Prompt:**
-> You are an impartial AI judge evaluating whether the provided statement is "true" or "false". Answer "unknown" if you cannot decide.
+`````plaintext
+You are an impartial AI judge evaluating whether the provided statement is "true" or "false". Answer "unknown" if you cannot decide.
+`````
+
 
 **User Prompt:**
-> # Statement
-> 
-> {{it}}
+`````plaintext
+# Statement
+
+{{it}}
+`````
+
 

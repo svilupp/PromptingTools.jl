@@ -26,8 +26,10 @@ function extract_md_hierarchy(fn)
 end
 function escape_prompt(s)
     ## escape HTML tags
-    s = replace(s, "\n" => "\n> ", "<" => "\\<", ">" => "\\>")
-    return "> " * s
+    ## s = replace(
+    ##     s, "\n" => "\n> ", "<" => "\\<", ">" => "\\>", "{{" => "\\{\\{", "}}" => "\\}\\}")
+    ## return "> " * s
+    """`````plaintext\n$(s)\n`````\n"""
 end
 
 ## Load the templates

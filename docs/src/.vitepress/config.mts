@@ -16,7 +16,6 @@ export default defineConfig({
 
   markdown: {
     math: true,
-    attrs: { disable: true },
     config(md) {
       md.use(tabsMarkdownPlugin),
       md.use(mathjax3),
