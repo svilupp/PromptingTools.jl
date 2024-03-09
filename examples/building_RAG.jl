@@ -80,7 +80,7 @@ evals[1]
 # Let's evaluate this QA item with a "judge model" (often GPT-4 is used as a judge).
 
 ## Note: that we used the same question, but generated a different context and answer via `airag`
-msg, ctx = airag(index; evals[1].question, return_context = true);
+msg, ctx = airag(index; evals[1].question, return_details = true);
 
 ## ctx is a RAGContext object that keeps all intermediate states of the RAG pipeline for easy evaluation
 judged = aiextract(:RAGJudgeAnswerFromContext;
@@ -110,7 +110,7 @@ x = run_qa_evals(evals[10], ctx;
 
 results = asyncmap(evals[1:10]) do qa_item
     ## Generate an answer -- often you want the model_judge to be the highest quality possible, eg, "GPT-4 Turbo" (alias "gpt4t)
-    msg, ctx = airag(index; qa_item.question, return_context = true,
+    msg, ctx = airag(index; qa_item.question, return_details = true,
         top_k = 3, verbose = false, model_judge = "gpt4t")
     ## Evaluate the response
     ## Note: you can log key parameters for easier analysis later

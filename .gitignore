@@ -7,3 +7,6 @@
 
 **/.DS_Store
 **/.vscode
+
+# exclude scratch files
+**/_*
