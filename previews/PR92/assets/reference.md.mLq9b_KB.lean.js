@@ -33,7 +33,7 @@ const _hoisted_170 = /* @__PURE__ */ createBaseVNode("p", null, [
 const _hoisted_171 = /* @__PURE__ */ createBaseVNode("p", null, 'aiextract(:GreatingPirate; name="Jack Sparrow") ````', -1);
 const _hoisted_172 = /* @__PURE__ */ createBaseVNode("p", null, [
   /* @__PURE__ */ createBaseVNode("a", {
-    href: "https://github.com/svilupp/PromptingTools.jl/blob/3597233dbeb2b96828639b6efdfd51cabac275cb/src/templates.jl#L379-L460",
+    href: "https://github.com/svilupp/PromptingTools.jl/blob/01f875594534345ce7d339737f80cb0542f85c3a/src/templates.jl#L379-L460",
     target: "_blank",
     rel: "noreferrer"
   }, "source")
@@ -289,7 +289,7 @@ const _hoisted_198 = /* @__PURE__ */ createBaseVNode("div", { style: { "border-w
         ]),
         /* @__PURE__ */ createTextVNode("\n"),
         /* @__PURE__ */ createBaseVNode("span", { class: "line" }, [
-          /* @__PURE__ */ createBaseVNode("span", null, "[source](https://github.com/svilupp/PromptingTools.jl/blob/3597233dbeb2b96828639b6efdfd51cabac275cb/src/extraction.jl#L84-L152)")
+          /* @__PURE__ */ createBaseVNode("span", null, "[source](https://github.com/svilupp/PromptingTools.jl/blob/01f875594534345ce7d339737f80cb0542f85c3a/src/extraction.jl#L84-L152)")
         ]),
         /* @__PURE__ */ createTextVNode("\n"),
         /* @__PURE__ */ createBaseVNode("span", { class: "line" }, [
@@ -371,7 +371,7 @@ const _hoisted_198 = /* @__PURE__ */ createBaseVNode("div", { style: { "border-w
   ]),
   /* @__PURE__ */ createBaseVNode("p", null, [
     /* @__PURE__ */ createBaseVNode("a", {
-      href: "https://github.com/svilupp/PromptingTools.jl/blob/3597233dbeb2b96828639b6efdfd51cabac275cb/src/user_preferences.jl#L94-L105",
+      href: "https://github.com/svilupp/PromptingTools.jl/blob/01f875594534345ce7d339737f80cb0542f85c3a/src/user_preferences.jl#L94-L105",
       target: "_blank",
       rel: "noreferrer"
     }, "source")
@@ -401,7 +401,7 @@ const _hoisted_242 = /* @__PURE__ */ createBaseVNode("ul", null, [
 ], -1);
 const _hoisted_243 = /* @__PURE__ */ createBaseVNode("p", null, [
   /* @__PURE__ */ createBaseVNode("a", {
-    href: "https://github.com/svilupp/PromptingTools.jl/blob/3597233dbeb2b96828639b6efdfd51cabac275cb/src/llm_google.jl#L2-L13",
+    href: "https://github.com/svilupp/PromptingTools.jl/blob/01f875594534345ce7d339737f80cb0542f85c3a/src/llm_google.jl#L2-L13",
     target: "_blank",
     rel: "noreferrer"
   }, "source")
@@ -435,7 +435,7 @@ const _hoisted_252 = /* @__PURE__ */ createBaseVNode("ul", null, [
 ], -1);
 const _hoisted_253 = /* @__PURE__ */ createBaseVNode("p", null, [
   /* @__PURE__ */ createBaseVNode("a", {
-    href: "https://github.com/svilupp/PromptingTools.jl/blob/3597233dbeb2b96828639b6efdfd51cabac275cb/src/llm_ollama_managed.jl#L9-L21",
+    href: "https://github.com/svilupp/PromptingTools.jl/blob/01f875594534345ce7d339737f80cb0542f85c3a/src/llm_ollama_managed.jl#L9-L21",
     target: "_blank",
     rel: "noreferrer"
   }, "source")
@@ -464,7 +464,7 @@ const _hoisted_261 = /* @__PURE__ */ createBaseVNode("ul", null, [
 ], -1);
 const _hoisted_262 = /* @__PURE__ */ createBaseVNode("p", null, [
   /* @__PURE__ */ createBaseVNode("a", {
-    href: "https://github.com/svilupp/PromptingTools.jl/blob/3597233dbeb2b96828639b6efdfd51cabac275cb/src/llm_ollama.jl#L10-L21",
+    href: "https://github.com/svilupp/PromptingTools.jl/blob/01f875594534345ce7d339737f80cb0542f85c3a/src/llm_ollama.jl#L10-L21",
     target: "_blank",
     rel: "noreferrer"
   }, "source")
@@ -500,7 +500,7 @@ const _hoisted_284 = /* @__PURE__ */ createBaseVNode("li", null, [
 ], -1);
 const _hoisted_285 = /* @__PURE__ */ createBaseVNode("p", null, [
   /* @__PURE__ */ createBaseVNode("a", {
-    href: "https://github.com/svilupp/PromptingTools.jl/blob/3597233dbeb2b96828639b6efdfd51cabac275cb/src/llm_shared.jl#L2-L20",
+    href: "https://github.com/svilupp/PromptingTools.jl/blob/01f875594534345ce7d339737f80cb0542f85c3a/src/llm_shared.jl#L2-L20",
     target: "_blank",
     rel: "noreferrer"
   }, "source")
