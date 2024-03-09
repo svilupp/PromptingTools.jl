@@ -122,15 +122,17 @@ end
 """
     build_template_metadata(
         template::AbstractVector{<:AbstractMessage}, template_name::Symbol,
-        metadata_msgs::AbstractVector{<:MetadataMessage} = MetadataMessage[])
+        metadata_msgs::AbstractVector{<:MetadataMessage} = MetadataMessage[]; max_length::Int = 100)
 
 Builds `AITemplateMetadata` for a given template based on the messages in `template` and other information.
 
 `AITemplateMetadata` is a helper struct for easy searching and reviewing of templates via `aitemplates()`.
+
+Note: Assumes that there is only ever one UserMessage and SystemMessage (concats them together)
 """
 function build_template_metadata(
         template::AbstractVector{<:AbstractMessage}, template_name::Symbol,
-        metadata_msgs::AbstractVector{<:MetadataMessage} = MetadataMessage[])
+        metadata_msgs::AbstractVector{<:MetadataMessage} = MetadataMessage[]; max_length::Int = 100)
 
     # prepare the metadata
     wordcount = 0
@@ -144,10 +146,10 @@ function build_template_metadata(
             append!(variables, msg.variables)
         end
         # truncate previews to 100 characters
-        if msg isa SystemMessage && length(system_preview) < 100
-            system_preview *= first(msg.content, 100)
-        elseif msg isa UserMessage && length(user_preview) < 100
-            user_preview *= first(msg.content, 100)
+        if msg isa SystemMessage && length(system_preview) < max_length
+            system_preview *= first(msg.content, max_length)
+        elseif msg isa UserMessage && length(user_preview) < max_length
+            user_preview *= first(msg.content, max_length)
         end
     end
     if !isempty(metadata_msgs)
@@ -156,14 +158,14 @@ function build_template_metadata(
         metadata = AITemplateMetadata(; name = template_name,
             meta.description, meta.version, meta.source,
             wordcount,
-            system_preview = first(system_preview, 100),
-            user_preview = first(user_preview, 100),
+            system_preview = first(system_preview, max_length),
+            user_preview = first(user_preview, max_length),
             variables = unique(variables))
     else
         metadata = AITemplateMetadata(; name = template_name,
             wordcount,
-            system_preview = first(system_preview, 100),
-            user_preview = first(user_preview, 100),
+            system_preview = first(system_preview, max_length),
+            user_preview = first(user_preview, max_length),
             variables = unique(variables))
     end
 
