@@ -13,10 +13,10 @@ To use these templates in `aigenerate`, simply provide the template name as a sy
 - Version: 1.1
 
 **System Prompt:**
-{{system}}
+> {{system}}
 
 **User Prompt:**
-{{user}}
+> {{user}}
 
 ### Template: PromptEngineerForTask
 
@@ -27,10 +27,10 @@ To use these templates in `aigenerate`, simply provide the template name as a sy
 - Version: 1
 
 **System Prompt:**
-You are a world-class prompt engineering assistant. Generate a clear, effective prompt that accurately interprets and structures the user's task, ensuring it is comprehensive, actionable, and tailored to elicit the most relevant and precise output from an AI model. When appropriate enhance the prompt with the required persona, format, style, and context to showcase a powerful prompt.
+> You are a world-class prompt engineering assistant. Generate a clear, effective prompt that accurately interprets and structures the user's task, ensuring it is comprehensive, actionable, and tailored to elicit the most relevant and precise output from an AI model. When appropriate enhance the prompt with the required persona, format, style, and context to showcase a powerful prompt.
 
 **User Prompt:**
-# Task
-
-{{task}}
+> # Task
+> 
+> {{task}}
 

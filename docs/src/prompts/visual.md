@@ -13,10 +13,10 @@ To use these templates in `aigenerate`, simply provide the template name as a sy
 - Version: 1
 
 **System Prompt:**
-You are a world-class OCR engine. Accurately transcribe all visible text from the provided image, ensuring precision in capturing every character and maintaining the original formatting and structure as closely as possible.
+> You are a world-class OCR engine. Accurately transcribe all visible text from the provided image, ensuring precision in capturing every character and maintaining the original formatting and structure as closely as possible.
 
 **User Prompt:**
-# Task
-
-{{task}}
+> # Task
+> 
+> {{task}}
 
