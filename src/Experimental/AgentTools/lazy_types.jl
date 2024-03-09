@@ -324,13 +324,13 @@ function (aicall::AICall)(msg::PT.UserMessage; kwargs...)
 end
 
 "Helpful accessor for AICall blocks. Returns the last message in the conversation."
-function last_message(aicall::AICallBlock)
+function PT.last_message(aicall::AICallBlock)
     length(aicall.conversation) == 0 ? nothing : aicall.conversation[end]
 end
 
 "Helpful accessor for AICall blocks. Returns the last output in the conversation (eg, the string/data in the last message)."
-function last_output(aicall::AICallBlock)
-    msg = last_message(aicall)
+function PT.last_output(aicall::AICallBlock)
+    msg = PT.last_message(aicall)
     return isnothing(msg) ? nothing : msg.content
 end
 
