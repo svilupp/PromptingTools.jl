@@ -54,6 +54,28 @@ The solution is to force a new precompilation, so you can do any of the below:
 2) Update the PromptingTools package (runs precompilation automatically)
 3) Delete your compiled cache in `.julia` DEPOT (usually `.julia/compiled/v1.10/PromptingTools`). You can do it manually in the file explorer or via Julia REPL: `rm("~/.julia/compiled/v1.10/PromptingTools", recursive=true, force=true)`
 
+## Getting an error "Rate limit exceeded" from OpenAI?
+
+Have you opened a new account recently? It is quite likely that you've exceeded the free tier limits.
+
+OpenAI has a rate limit on the number of requests and the number of tokens you can make in a given period. If you exceed either of these, you will receive a "Rate limit exceeded" error.
+"Free tier" (ie, before you pay the first $5) has very low limits, eg, maximum 3 requests per minute. See the [OpenAI Rate Limits](https://platform.openai.com/docs/guides/rate-limits/usage-tiers?context=tier-free) for more information.
+
+If you look at the HTTP response headers in the error, you can see the limits remaining and how long until it resets, eg, `x-ratelimit-remaining-*` and `x-ratelimit-reset-*`.
+
+If you want to avoid this error, you have two options:
+
+1) Put a simple `sleep(x)` after every request, where `x` is calculated so that the number of your requests stays below the limit.
+2) Use `ntasks` keyword argument in `asyncmap` to limit the number of concurrent requests. Eg, let's assume you want to process 100x c. 10,000 tokens, but your tier limit is only 60,000 tokens per minute. 
+   If we know that one request takes c. 10 seconds, it means that with `ntasks=1` we would send 6 requests per minute, which already maxes out our limit.
+   If we set `ntasks=2`, we could process 12 requests per minute, so we would need our limit to be 120,000 tokens per minute.
+   ```julia
+   # simple asyncmap loop with 2 concurrent requests; otherwise, same syntax as `map`
+   asyncmap(my_prompts; ntasks=2) do prompt
+       aigenerate(prompt)
+   end
+   ```
+
 ## Setting OpenAI Spending Limits
 
 OpenAI allows you to set spending limits directly on your account dashboard to prevent unexpected costs.
@@ -352,3 +374,20 @@ If you have a project folder with your templates, you want to add it first:
 PT.load_templates!("templates") 
 ```
 After the first run, we will remember the folder and you can simply call `PT.load_templates!()` to reload all the templates in the future!
+
+## Do we have a RecursiveCharacterTextSplitter like Langchain?
+
+Yes, we do! Look for utility `recursive_spliter` (previously known as `split_by_length`). See its docstring for more information.
+
+For reference, Langchain's [`RecursiveCharacterTextSplitter`](https://python.langchain.com/docs/modules/data_connection/document_transformers/recursive_text_splitter) uses the following setting: `separators = ["\n\n", "\n", " ", ""]`.
+
+I'd recommend using the following instead: `separators = ["\\n\\n", ". ", "\\n", " "]` (ie, it does not split words, which tends to be unnecessary and quite damaging to the chunk quality).
+
+Example:
+```julia
+using PromptingTools: recursive_splitter
+
+text = "Paragraph 1\n\nParagraph 2. Sentence 1. Sentence 2.\nParagraph 3"
+separators = ["\n\n", ". ", "\n", " "] # split by paragraphs, sentences, and newlines, and words
+chunks = recursive_splitter(text, separators, max_length=10)
+```

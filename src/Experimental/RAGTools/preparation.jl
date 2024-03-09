@@ -87,7 +87,7 @@ function get_chunks(files_or_docs::Vector{<:AbstractString}; reader::Symbol = :f
         end
         isempty(doc_raw) && continue
         # split into chunks, if you want to start simple - just do `split(text,"\n\n")`
-        doc_chunks = PT.split_by_length(doc_raw, separators; max_length) .|> strip |>
+        doc_chunks = PT.recursive_splitter(doc_raw, separators; max_length) .|> strip |>
                      x -> filter(!isempty, x)
         # skip if no chunks found
         isempty(doc_chunks) && continue

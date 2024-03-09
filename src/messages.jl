@@ -193,6 +193,20 @@ function attach_images_to_user_message(msgs::Vector{T};
     return msgs
 end
 
+## Helpful accessors
+"Helpful accessor for the last message in `conversation`. Returns the last message in the conversation."
+function last_message(conversation::AbstractVector{<:AbstractMessage})
+    length(conversation) == 0 ? nothing : conversation[end]
+end
+
+"Helpful accessor for the last generated output (`msg.content`) in `conversation`. Returns the last output in the conversation (eg, the string/data in the last message)."
+function last_output(conversation::AbstractVector{<:AbstractMessage})
+    msg = last_message(conversation)
+    return isnothing(msg) ? nothing : msg.content
+end
+last_message(msg::AbstractMessage) = msg
+last_output(msg::AbstractMessage) = msg.content
+
 ## Display methods
 function Base.show(io::IO, ::MIME"text/plain", m::AbstractChatMessage)
     type_ = string(typeof(m)) |> x -> split(x, "{")[begin]

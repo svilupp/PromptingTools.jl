@@ -48,6 +48,12 @@ makedocs(;
             "Custom APIs (Mistral, Llama.cpp)" => "examples/working_with_custom_apis.md",
             "Building RAG Application" => "examples/building_RAG.md"
         ],
+        "Extra Tools" => [
+            "Text Utilities" => "extra_tools/text_utilities_intro.md",
+            "AgentTools" => "extra_tools/agent_tools_intro.md",
+            "RAGTools" => "extra_tools/rag_tools_intro.md",
+            "APITools" => "extra_tools/api_tools_intro.md"
+        ],
         "F.A.Q." => "frequently_asked_questions.md",
         "Reference" => [
             "PromptingTools.jl" => "reference.md",

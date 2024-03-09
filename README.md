@@ -462,7 +462,7 @@ run!(out)
 How is it useful? We can use the same "inputs" for repeated calls, eg, when we want to validate 
 or regenerate some outputs. We have a function `airetry` to help us with that.
 
-The signature of `airetry` is `airetry(condition_function, aicall::AICall, feedback_function)`.
+The signature of `airetry!` is `airetry!(condition_function, aicall::AICall, feedback_function)`.
 It evaluates the condition `condition_function` on the `aicall` object (eg, we evaluate `f_cond(aicall) -> Bool`). If it fails, we call `feedback_function` on the `aicall` object to provide feedback for the AI model (eg, `f_feedback(aicall) -> String`) and repeat the process until it passes or until `max_retries` value is exceeded.
 
 We can catch API failures (no feedback needed, so none is provided)

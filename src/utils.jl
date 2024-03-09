@@ -32,10 +32,12 @@ function replace_words(text::AbstractString,
 end
 
 """
-    split_by_length(text::String; separator::String=" ", max_length::Int=35000) -> Vector{String}
+    recursive_splitter(text::String; separator::String=" ", max_length::Int=35000) -> Vector{String}
 
 Split a given string `text` into chunks of a specified maximum length `max_length`. 
 This is particularly useful for splitting larger documents or texts into smaller segments, suitable for models or systems with smaller context windows.
+
+There is a method for dispatching on multiple separators, `recursive_splitter(text::String, separators::Vector{String}; max_length::Int=35000) -> Vector{String}` that mimics the logic of Langchain's `RecursiveCharacterTextSplitter`.
 
 # Arguments
 - `text::String`: The text to be split.
@@ -56,18 +58,18 @@ This is particularly useful for splitting larger documents or texts into smaller
 Splitting text with the default separator (" "):
 ```julia
 text = "Hello world. How are you?"
-chunks = split_by_length(text; max_length=13)
+chunks = recursive_splitter(text; max_length=13)
 length(chunks) # Output: 2
 ```
 
 Using a custom separator and custom `max_length`
 ```julia
 text = "Hello,World," ^ 2900 # length 34900 chars
-split_by_length(text; separator=",", max_length=10000) # for 4K context window
+recursive_splitter(text; separator=",", max_length=10000) # for 4K context window
 length(chunks[1]) # Output: 4
 ```
 """
-function split_by_length(text::String;
+function recursive_splitter(text::String;
         separator::String = " ",
         max_length::Int = 35000)
     ## shortcut
@@ -108,64 +110,96 @@ function split_by_length(text::String;
 end
 
 # Overload for dispatch on multiple separators
-function split_by_length(text::String,
+function recursive_splitter(text::String,
         separator::String,
         max_length::Int = 35000)
-    split_by_length(text; separator, max_length)
+    recursive_splitter(text; separator, max_length)
 end
 
 """
-    split_by_length(text::String, separators::Vector{String}; max_length::Int=35000) -> Vector{String}
+    recursive_splitter(text::AbstractString, separators::Vector{String}; max_length::Int=35000) -> Vector{String}
 
-Split a given string `text` into chunks using a series of separators, with each chunk having a maximum length of `max_length`. 
+Split a given string `text` into chunks recursively using a series of separators, with each chunk having a maximum length of `max_length` (if it's achievable given the `separators` provided). 
 This function is useful for splitting large documents or texts into smaller segments that are more manageable for processing, particularly for models or systems with limited context windows.
 
+It was previously known as `split_by_length`.
+
+This is similar to Langchain's [`RecursiveCharacterTextSplitter`](https://python.langchain.com/docs/modules/data_connection/document_transformers/recursive_text_splitter).
+To achieve the same behavior, use `separators=["\\n\\n", "\\n", " ", ""]`.
+
 # Arguments
-- `text::String`: The text to be split.
-- `separators::Vector{String}`: An ordered list of separators used to split the text. The function iteratively applies these separators to split the text.
-- `max_length::Int=35000`: The maximum length of each chunk. Defaults to 35,000 characters. This length is considered after each iteration of splitting, ensuring chunks fit within specified constraints.
+- `text::AbstractString`: The text to be split.
+- `separators::Vector{String}`: An ordered list of separators used to split the text. The function iteratively applies these separators to split the text. Recommend to use `["\\n\\n", ". ", "\\n", " "]`
+- `max_length::Int`: The maximum length of each chunk. Defaults to 35,000 characters. This length is considered after each iteration of splitting, ensuring chunks fit within specified constraints.
 
 # Returns
 `Vector{String}`: A vector of strings, where each string is a chunk of the original text that is smaller than or equal to `max_length`.
 
-# Notes
+# Usage Tips
+- I tend to prefer splitting on sentences (`". "`) before splitting on newline characters (`"\\n"`) to preserve the structure of the text. 
+- What's the difference between `separators=["\\n"," ",""]` and `separators=["\\n"," "]`? 
+  The former will split down to character level (`""`), so it will always achieve the `max_length` but it will split words (bad for context!)
+  I prefer to instead set slightly smaller `max_length` but not split words.
 
-- The function processes the text iteratively with each separator in the provided order. This ensures more nuanced splitting, especially in structured texts.
-- Each chunk is as close to `max_length` as possible without exceeding it (unless we cannot split it any further)
+# How It Works
+
+- The function processes the text iteratively with each separator in the provided order. It then measures the length of each chunk and splits it further if it exceeds the `max_length`.
+  If the chunks is "short enough", the subsequent separators are not applied to it.
+- Each chunk is as close to `max_length` as possible (unless we cannot split it any further, eg, if the splitters are "too big" / there are not enough of them)
 - If the `text` is empty, the function returns an empty array.
 - Separators are re-added to the text chunks after splitting, preserving the original structure of the text as closely as possible. Apply `strip` if you do not need them.
+- The function provides `separators` as the second argument to distinguish itself from its single-separator counterpart dispatch.
 
 # Examples
 
 Splitting text using multiple separators:
 ```julia
-text = "Paragraph 1\n\nParagraph 2. Sentence 1. Sentence 2.\nParagraph 3"
-separators = ["\n\n", ". ", "\n"]
-chunks = split_by_length(text, separators, max_length=20)
+text = "Paragraph 1\\n\\nParagraph 2. Sentence 1. Sentence 2.\\nParagraph 3"
+separators = ["\\n\\n", ". ", "\\n"] # split by paragraphs, sentences, and newlines (not by words)
+chunks = recursive_splitter(text, separators, max_length=20)
+```
+
+Splitting text using multiple separators - with splitting on words:
+```julia
+text = "Paragraph 1\\n\\nParagraph 2. Sentence 1. Sentence 2.\\nParagraph 3"
+separators = ["\\n\\n", ". ", "\\n", " "] # split by paragraphs, sentences, and newlines, words
+chunks = recursive_splitter(text, separators, max_length=10)
 ```
 
 Using a single separator:
 ```julia
 text = "Hello,World," ^ 2900  # length 34900 characters
-chunks = split_by_length(text, [","], max_length=10000)
+chunks = recursive_splitter(text, [","], max_length=10000)
+```
+
+To achieve the same behavior as Langchain's `RecursiveCharacterTextSplitter`, use `separators=["\\n\\n", "\\n", " ", ""]`.
+```julia
+text = "Paragraph 1\\n\\nParagraph 2. Sentence 1. Sentence 2.\\nParagraph 3"
+separators = ["\\n\\n", "\\n", " ", ""]
+chunks = recursive_splitter(text, separators, max_length=10)
+
 ```
 """
-function split_by_length(text, separators::Vector{String}; max_length)
+function recursive_splitter(
+        text::AbstractString, separators::Vector{String};
+        max_length::Int = 35000)
     @assert !isempty(separators) "`separators` can't be empty"
     separators_ = copy(separators)
     separator = popfirst!(separators_)
-    chunks = split_by_length(text; separator, max_length)
+    chunks = recursive_splitter(text; separator, max_length)
 
     isempty(separators_) && return chunks
     ## Iteratively split by separators
     for separator in separators_
-        chunks = mapreduce(text_ -> split_by_length(text_; max_length, separator),
+        chunks = mapreduce(text_ -> recursive_splitter(text_; max_length, separator),
             vcat,
             chunks)
     end
 
     return chunks
 end
+# Alias to keep compatibility
+const split_by_length = recursive_splitter
 
 """
     wrap_string(str::String,
@@ -245,26 +279,8 @@ let pos = argmax(length_longest_common_subsequence.(Ref(query), commands))
 end
 ```
 
-You can also use it to find the closest context for some AI generated summary/story:
+But it might be easier to use directly the convenience wrapper `distance_longest_common_subsequence`!
 
-```julia
-context = ["The enigmatic stranger vanished as swiftly as a wisp of smoke, leaving behind a trail of unanswered questions.",
-    "Beneath the shimmering moonlight, the ocean whispered secrets only the stars could hear.",
-    "The ancient tree stood as a silent guardian, its gnarled branches reaching for the heavens.",
-    "The melody danced through the air, painting a vibrant tapestry of emotions.",
-    "Time flowed like a relentless river, carrying away memories and leaving imprints in its wake."]
-
-story = \"\"\"
-  Beneath the shimmering moonlight, the ocean whispered secrets only the stars could hear.
-
-  Under the celestial tapestry, the vast ocean whispered its secrets to the indifferent stars. Each ripple, a murmured confidence, each wave, a whispered lament. The glittering celestial bodies listened in silent complicity, their enigmatic gaze reflecting the ocean's unspoken truths. The cosmic dance between the sea and the sky, a symphony of shared secrets, forever echoing in the ethereal expanse.
-  \"\"\"
-
-let pos = argmax(length_longest_common_subsequence.(Ref(story), context))
-    dist = length_longest_common_subsequence(story, context[pos])
-    norm = dist / min(length(story), length(context[pos]))
-    @info "The closest context to the query: \"\$(first(story,20))...\" is: \"\$(context[pos])\" (distance: \$(dist), normalized: \$(norm))"
-end
 ```
 """
 function length_longest_common_subsequence(itr1, itr2)
@@ -277,6 +293,65 @@ function length_longest_common_subsequence(itr1, itr2)
     end
 
     return dp[m, n]
+end
+
+"""
+    distance_longest_common_subsequence(
+        input1::AbstractString, input2::AbstractString)
+
+    distance_longest_common_subsequence(
+        input1::AbstractString, input2::AbstractVector{<:AbstractString})
+
+Measures distance between two strings using the length of the longest common subsequence (ie, the lower the number, the better the match). Perfect match is `distance = 0.0`
+
+Convenience wrapper around `length_longest_common_subsequence` to normalize the distances to 0-1 range.
+There is a also a dispatch for comparing a string vs an array of strings.
+
+
+# Notes
+- Use `argmin` and `minimum` to find the position of the closest match and the distance, respectively.
+- Matching with an empty string will always return 1.0 (worst match), even if the other string is empty as well (safety mechanism to avoid division by zero).
+
+
+# Arguments
+- `input1::AbstractString`: The first string to compare.
+- `input2::AbstractString`: The second string to compare.
+
+# Example
+
+You can also use it to find the closest context for some AI generated summary/story:
+
+```julia
+context = ["The enigmatic stranger vanished as swiftly as a wisp of smoke, leaving behind a trail of unanswered questions.",
+    "Beneath the shimmering moonlight, the ocean whispered secrets only the stars could hear.",
+    "The ancient tree stood as a silent guardian, its gnarled branches reaching for the heavens.",
+    "The melody danced through the air, painting a vibrant tapestry of emotions.",
+    "Time flowed like a relentless river, carrying away memories and leaving imprints in its wake."]
+
+story = \"\"\"
+    Beneath the shimmering moonlight, the ocean whispered secrets only the stars could hear.
+
+    Under the celestial tapestry, the vast ocean whispered its secrets to the indifferent stars. Each ripple, a murmured confidence, each wave, a whispered lament. The glittering celestial bodies listened in silent complicity, their enigmatic gaze reflecting the ocean's unspoken truths. The cosmic dance between the sea and the sky, a symphony of shared secrets, forever echoing in the ethereal expanse.
+    \"\"\"
+
+dist = distance_longest_common_subsequence(story, context)
+@info "The closest context to the query: \"\$(first(story,20))...\" is: \"\$(context[argmin(dist)])\" (distance: \$(minimum(dist)))"
+```
+"""
+function distance_longest_common_subsequence(
+        input1::AbstractString, input2::AbstractString)
+    if isempty(input1) || isempty(input2)
+        return 1.0
+    end
+    similarity = length_longest_common_subsequence(input1, input2)
+    shortest_length = min(length(input1), length(input2))
+    # it's a distance, so 1.0 is the worst match, 0.0 is the best match (=no distance)
+    return 1.0 - similarity / shortest_length
+end
+# Dispatch for arrays (eg, context)
+function distance_longest_common_subsequence(
+        input1::AbstractString, input2::AbstractVector{<:AbstractString})
+    distance_longest_common_subsequence.(Ref(input1), input2)
 end
 
 ### INTERNAL FUNCTIONS - DO NOT USE DIRECTLY

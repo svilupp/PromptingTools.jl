@@ -159,6 +159,11 @@ function testset_feedback(msg::AIMessage;
 end
 
 ### Feedback for individual errors
+"""
+    error_feedback(e::Any; max_length::Int = 512)
+
+Set of specialized methods to provide feedback on different types of errors (`e`).
+"""
 error_feedback(e::Any; max_length::Int = 512) = "No error found. Ignore."
 function error_feedback(e::Exception; max_length::Int = 512)
     io = IOBuffer()
