@@ -1,1 +1,16 @@
-[{"content":"Template Metadata","description":"This template is meant to be used with `AICodeFixer` to ask for code improvements based on `feedback`. It uses the same message for both the introduction of the new task and for the iterations. Placeholders: `feedback`","version":"1.0","source":"","_type":"metadatamessage"},{"content":"\nThe above Julia code has been executed with the following results:\n\n```plaintext\n{{feedback}}\n```\n\n0. Read the user request word-by-word. Does the code implementation follow the request to the the letter? Think it though step-by-step.\n1. Review the execution results in detail and, if there is an error, explain why it happened.\n2. Suggest improvements to the code. Be EXTREMELY SPECIFIC. Think step-by-step and break it down.\n3. Write an improved implemented based on your reflection.\n\nAll code must be enclosed in triple backticks code fence (```julia\\n ... \\n```) and included in one message to be re-evaluated.\n\nI believe in you. Take a deep breath. You can actually do it, so do it ffs. Avoid shortcuts or placing comments instead of code. I also need code, actual working Julia code.\n","variables":["feedback"],"_type":"usermessage"}]
+[
+    {
+        "content": "Template Metadata",
+        "description": "This template is meant to be used with `AICodeFixer` to ask for code improvements based on `feedback`. It uses the same message for both the introduction of the new task and for the iterations. Placeholders: `feedback`",
+        "version": "1.1",
+        "source": "",
+        "_type": "metadatamessage"
+    },
+    {
+        "content": "\nThe above Julia code has been executed with the following results:\n\n```plaintext\n{{feedback}}\n```\n\n0. Read the user request word-by-word. Does the code implementation follow the request to the letter? Let's think step by step.\n1. Review the execution results in detail and, if there is an error, explain why it happened.\n2. Suggest improvements to the code. Be EXTREMELY SPECIFIC. Think step-by-step and break it down.\n3. Write an improved implementation based on your reflection.\n\nAll code must be enclosed in triple backticks code fence (```julia\\n ... \\n```) and included in one message to be re-evaluated.\n\nI believe in you. Take a deep breath. You can actually do it, so do it ffs. Avoid shortcuts or placing comments instead of code. I also need code, actual working Julia code.\n",
+        "variables": [
+            "feedback"
+        ],
+        "_type": "usermessage"
+    }
+]

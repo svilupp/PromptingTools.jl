@@ -6,7 +6,7 @@ using PromptingTools: TestEchoOpenAISchema
 @testset "Template rendering" begin
     template = AITemplate(:JudgeIsItTrue)
     expected_output = AbstractChatMessage[
-        SystemMessage("You are an impartial AI judge evaluting whether the provided statement is \"true\" or \"false\". Answer \"unknown\" if you cannot decide."),
+        SystemMessage("You are an impartial AI judge evaluating whether the provided statement is \"true\" or \"false\". Answer \"unknown\" if you cannot decide."),
         UserMessage("# Statement\n\n{{it}}")]
     @test expected_output == render(PT.PROMPT_SCHEMA, template)
     @test expected_output == render(template)
@@ -37,7 +37,6 @@ end
     load_templates!()
     PT.TEMPLATE_PATH = PT.TEMPLATE_PATH[[1]] # reset
     dir_name = joinpath(tempdir(), "templates")
-    dir_name in PT.TEMPLATE_PATH
     mkpath(dir_name)
     load_templates!(dir_name)
     @test length(PT.TEMPLATE_PATH) == 2

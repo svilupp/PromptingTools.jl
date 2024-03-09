@@ -59,7 +59,7 @@ The solution is to force a new precompilation, so you can do any of the below:
 Have you opened a new account recently? It is quite likely that you've exceeded the free tier limits.
 
 OpenAI has a rate limit on the number of requests and the number of tokens you can make in a given period. If you exceed either of these, you will receive a "Rate limit exceeded" error.
-"Free tier" (ie, before you pay the first $5) has very low limits, eg, maximum 3 requests per minute. See the [OpenAI Rate Limits](https://platform.openai.com/docs/guides/rate-limits/usage-tiers?context=tier-free) for more information.
+"Free tier" (ie, before you pay the first 5 USD) has very low limits, eg, maximum of 3 requests per minute. See the [OpenAI Rate Limits](https://platform.openai.com/docs/guides/rate-limits/usage-tiers?context=tier-free) for more information.
 
 If you look at the HTTP response headers in the error, you can see the limits remaining and how long until it resets, eg, `x-ratelimit-remaining-*` and `x-ratelimit-reset-*`.
 
