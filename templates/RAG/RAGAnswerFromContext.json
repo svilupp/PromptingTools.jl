@@ -1,1 +1,23 @@
-[{"content":"Template Metadata","description":"For RAG applications. Answers the provided Questions based on the Context. Placeholders: `question`, `context`","version":"1.0","source":"","_type":"metadatamessage"},{"content":"Act as a world-class AI assistant with access to the latest knowledge via Context Information. \n\n**Instructions:**\n- Answer the question based only on the provided Context.\n- If you don't know the answer, just say that you don't know, don't try to make up an answer.\n- Be brief and concise.\n\n**Context Information:**\n---\n{{context}}\n---\n","variables":["context"],"_type":"systemmessage"},{"content":"# Question\n\n{{question}}\n\n\n\n# Answer\n\n","variables":["question"],"_type":"usermessage"}]
+[
+    {
+        "content": "Template Metadata",
+        "description": "For RAG applications. Answers the provided Questions based on the Context. Placeholders: `question`, `context`",
+        "version": "1.0",
+        "source": "",
+        "_type": "metadatamessage"
+    },
+    {
+        "content": "Act as a world-class AI assistant with access to the latest knowledge via Context Information. \n\n**Instructions:**\n- Answer the question based only on the provided Context.\n- If you don't know the answer, just say that you don't know, don't try to make up an answer.\n- Be brief and concise.\n\n**Context Information:**\n---\n{{context}}\n---\n",
+        "variables": [
+            "context"
+        ],
+        "_type": "systemmessage"
+    },
+    {
+        "content": "# Question\n\n{{question}}\n\n\n\n# Answer\n\n",
+        "variables": [
+            "question"
+        ],
+        "_type": "usermessage"
+    }
+]

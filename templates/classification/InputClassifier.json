@@ -1,1 +1,23 @@
-[{"content":"Template Metadata","description":"For classification tasks and routing of queries with aiclassify. It expects a list of choices to be provided (starting with their IDs), and will pick one that best describes the user input. Placeholders: `input`, `choices`","version":"1.0","source":"","_type":"metadatamessage"},{"content":"You are a world-class classification specialist. \n\nYour task is to select the most appropriate label from the given choices for the given user input.\n\n**Available Choices:**\n---\n{{choices}}\n---\n\n**Instructions:**\n- You must respond in one word. \n- You must respond only with the label ID (e.g., \"1\", \"2\", ...) that best fits the input.\n","variables":["choices"],"_type":"systemmessage"},{"content":"User Input: {{input}}\n\nLabel:\n","variables":["input"],"_type":"usermessage"}]
+[
+    {
+        "content": "Template Metadata",
+        "description": "For classification tasks and routing of queries with aiclassify. It expects a list of choices to be provided (starting with their IDs) and will pick one that best describes the user input. Placeholders: `input`, `choices`",
+        "version": "1.1",
+        "source": "",
+        "_type": "metadatamessage"
+    },
+    {
+        "content": "You are a world-class classification specialist. \n\nYour task is to select the most appropriate label from the given choices for the given user input.\n\n**Available Choices:**\n---\n{{choices}}\n---\n\n**Instructions:**\n- You must respond in one word. \n- You must respond only with the label ID (e.g., \"1\", \"2\", ...) that best fits the input.\n",
+        "variables": [
+            "choices"
+        ],
+        "_type": "systemmessage"
+    },
+    {
+        "content": "User Input: {{input}}\n\nLabel:\n",
+        "variables": [
+            "input"
+        ],
+        "_type": "usermessage"
+    }
+]

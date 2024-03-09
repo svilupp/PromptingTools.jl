@@ -24,6 +24,11 @@ function extract_md_hierarchy(fn)
         p[idx + 1] * ".md", titlecase(p[idx + 2])
     end
 end
+function escape_prompt(s)
+    ## escape HTML tags
+    s = replace(s, "\n" => "\n> ", "<" => "\\<", ">" => "\\>")
+    return "> " * s
+end
 
 ## Load the templates
 # key: top-level folder, sub-folder, file
@@ -41,7 +46,7 @@ for (dir, _, files) in walkdir(joinpath(@__DIR__, "..", "templates"))
             template_name = splitext(basename(file))[1] |> Symbol
             # Assumes that there is only ever one UserMessage and SystemMessage (concats them together)
             meta = PT.build_template_metadata(
-                template, template_name, metadata; max_length = 1000)
+                template, template_name, metadata; max_length = 10^6)
             ## save to loaded_templates
             file_dict = get!(loaded_templates, dest_file_path, Dict())
             section_vect = get!(file_dict, section, [])
@@ -53,13 +58,13 @@ end
 ## Write into files
 for file_path in keys(loaded_templates)
     io = IOBuffer()
+    println(io,
+        "The following file is auto-generated from the `templates` folder. For any changes, please modify the source files in the `templates` folder.\n")
+    println(io,
+        "To use these templates in `aigenerate`, simply provide the template name as a symbol, eg, `aigenerate(:MyTemplate; placeholder1 = value1)`")
+    println(io)
     for (section, templates) in loaded_templates[file_path]
         println(io, "## $(section) Templates\n")
-        println(io,
-            "The following files are auto-generated from the `templates` folder. For any changes, please modify the source files in the `templates` folder.\n")
-        println(io,
-            "To use these templates in `aigenerate`, simply provide the template name as a symbol, eg, `aigenerate(:MyTemplate; placeholder1 = value1)`")
-        println(io)
         for meta in templates
             println(io, "### Template: $(meta.name)")
             println(io)
@@ -71,10 +76,10 @@ for file_path in keys(loaded_templates)
             println(io, "- Version: $(meta.version)")
             println(io)
             println(io, "**System Prompt:**")
-            println(io, meta.system_preview)
+            println(io, escape_prompt(meta.system_preview))
             println(io)
             println(io, "**User Prompt:**")
-            println(io, meta.user_preview)
+            println(io, escape_prompt(meta.user_preview))
             println(io)
         end
     end

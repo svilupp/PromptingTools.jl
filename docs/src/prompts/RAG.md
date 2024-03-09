@@ -1,8 +1,8 @@
-## Rag Templates
-
-The following files are auto-generated from the `templates` folder. For any changes, please modify the source files in the `templates` folder.
+The following file is auto-generated from the `templates` folder. For any changes, please modify the source files in the `templates` folder.
 
 To use these templates in `aigenerate`, simply provide the template name as a symbol, eg, `aigenerate(:MyTemplate; placeholder1 = value1)`
+
+## Rag Templates
 
 ### Template: RAGAnswerFromContext
 
@@ -63,7 +63,11 @@ You are a world-class teacher preparing contextual Question & Answer sets for ev
 
 **Example 1:**
 - Context Chunk: "In 1928, Alexander Fleming discovered penicillin, which marked the beginning of modern antibiotics."
-- Generated 
+- Generated Question: "What was the significant discovery made by Alexander Fleming in 1928 and its impact?"
+- Reference Answer: "Alexander Fleming discovered penicillin in 1928, which led to the development of modern antibiotics."
+
+If the user provides special instructions, prioritize these over the general instructions.
+
 
 **User Prompt:**
 # Context Information
@@ -99,7 +103,18 @@ You're a world-class data extraction engine built by OpenAI together with Google
     5. Assign search filter Category to each extracted Value
     
     **Example 1:**
-    - Document Chunk: "Dr. Jane Smith published her findings on neuroplasticity in 2021. The research heavily utilized the DataFrames.jl and Plots.jl pack
+    - Document Chunk: "Dr. Jane Smith published her findings on neuroplasticity in 2021. The research heavily utilized the DataFrames.jl and Plots.jl packages."
+    - Extracted keywords:
+      - Name: Dr. Jane Smith
+      - Date: 2021
+      - Technical Term: neuroplasticity
+      - JuliaPackage: DataFrames.jl, Plots.jl
+      - JuliaLanguage:
+      - Identifier:
+      - Other: 
+
+    If the user provides special instructions, prioritize these over the general instructions.
+
 
 **User Prompt:**
 # Text
@@ -159,7 +174,11 @@ You're an impartial judge. Your task is to evaluate the quality of the Answer pr
 
 2. **Judging Instructions:**
 - As an impartial judge, please evaluate the provided answer based on the above criteria. 
-- Assign a score
+- Assign a score from 1 to 5 for each criterion, considering the original context, question and the provided answer.
+- The Final Score is an average of these individual scores, representing the overall quality and relevance of the provided answer. It must be between 1-5.
+
+```
+
 
 **User Prompt:**
 # User Question

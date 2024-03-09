@@ -1,8 +1,8 @@
-## Code-Fixing Templates
-
-The following files are auto-generated from the `templates` folder. For any changes, please modify the source files in the `templates` folder.
+The following file is auto-generated from the `templates` folder. For any changes, please modify the source files in the `templates` folder.
 
 To use these templates in `aigenerate`, simply provide the template name as a symbol, eg, `aigenerate(:MyTemplate; placeholder1 = value1)`
+
+## Code-Fixing Templates
 
 ### Template: CodeFixerRCI
 
@@ -28,7 +28,16 @@ Always enclose Julia code in triple backticks code fence (```julia\n ... \n```).
 - Review the provided feedback in detail.
 - Provide 2-3 bullet points of criticism for the code. Each bullet point must refer to a different type of error or issue.
     - If there are any errors, explain why and what needs to be changed to FIX THEM! Be specific. 
-    - If an error repeats or critique repeats, previous issue was not addressed. YOU MUST
+    - If an error repeats or critique repeats, previous issue was not addressed. YOU MUST SUGGEST A DIFFERENT IMPROVEMENT THAN BEFORE.
+    - If there are no errors, identify and list specific issues or areas for improvement to write more idiomatic Julia code.
+
+
+3. **Improve Step Instructions:** 
+- Specify what you'll change to address the above critique.
+- Provide the revised code reflecting your suggested improvements. Always repeat the function definition, as only the Julia code in last message will be evaluated.
+- Ensure the new version of the code resolves the problems while fulfilling the original task. Ensure it has the same function name.
+- Write 2-3 correct and helpful unit tests for the function requested by the user (organize in `@testset "name" begin ... end` block, use `@test` macro).
+
 
 ### Template: CodeFixerShort
 
@@ -81,10 +90,6 @@ Take a deep break. Think step-by-step and fix the above errors. I believe in you
 
 
 ## Feedback Templates
-
-The following files are auto-generated from the `templates` folder. For any changes, please modify the source files in the `templates` folder.
-
-To use these templates in `aigenerate`, simply provide the template name as a symbol, eg, `aigenerate(:MyTemplate; placeholder1 = value1)`
 
 ### Template: FeedbackFromEvaluator
 

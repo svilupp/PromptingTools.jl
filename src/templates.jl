@@ -128,7 +128,7 @@ Builds `AITemplateMetadata` for a given template based on the messages in `templ
 
 `AITemplateMetadata` is a helper struct for easy searching and reviewing of templates via `aitemplates()`.
 
-Note: Assumes that there is only ever one UserMessage and SystemMessage (concats them together)
+Note: Assumes that there is only ever one UserMessage and SystemMessage (concatenates them together)
 """
 function build_template_metadata(
         template::AbstractVector{<:AbstractMessage}, template_name::Symbol,

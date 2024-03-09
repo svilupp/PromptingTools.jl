@@ -1,8 +1,8 @@
-## Visual Templates
-
-The following files are auto-generated from the `templates` folder. For any changes, please modify the source files in the `templates` folder.
+The following file is auto-generated from the `templates` folder. For any changes, please modify the source files in the `templates` folder.
 
 To use these templates in `aigenerate`, simply provide the template name as a symbol, eg, `aigenerate(:MyTemplate; placeholder1 = value1)`
+
+## Visual Templates
 
 ### Template: OCRTask
 

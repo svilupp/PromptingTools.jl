@@ -1,16 +1,16 @@
-## General Templates
-
-The following files are auto-generated from the `templates` folder. For any changes, please modify the source files in the `templates` folder.
+The following file is auto-generated from the `templates` folder. For any changes, please modify the source files in the `templates` folder.
 
 To use these templates in `aigenerate`, simply provide the template name as a symbol, eg, `aigenerate(:MyTemplate; placeholder1 = value1)`
 
+## General Templates
+
 ### Template: BlankSystemUser
 
-- Description: Blank template for easy of prompt entry without the `Message` objects. Simply provide keyword arguments for `system` (=system prompt/persona) and `user` (=user/task/data prompt). Placeholders: `system`, `user`
+- Description: Blank template for easy prompt entry without the `*Message` objects. Simply provide keyword arguments for `system` (=system prompt/persona) and `user` (=user/task/data prompt). Placeholders: `system`, `user`
 - Placeholders: `system`, `user`
 - Word count: 18
 - Source: 
-- Version: 1
+- Version: 1.1
 
 **System Prompt:**
 {{system}}
