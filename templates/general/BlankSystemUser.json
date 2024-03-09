@@ -1,8 +1,8 @@
 [
     {
         "content": "Template Metadata",
-        "description": "Blank template for easy of prompt entry without the `Message` objects. Simply provide keyword arguments for `system` (=system prompt/persona) and `user` (=user/task/data prompt). Placeholders: `system`, `user`",
-        "version": "1",
+        "description": "Blank template for easy prompt entry without the `*Message` objects. Simply provide keyword arguments for `system` (=system prompt/persona) and `user` (=user/task/data prompt). Placeholders: `system`, `user`",
+        "version": "1.1",
         "source": "",
         "_type": "metadatamessage"
     },

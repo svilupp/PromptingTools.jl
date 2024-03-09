@@ -1,10 +1,17 @@
 using Documenter, DocumenterVitepress
 using PromptingTools
+const PT = PromptingTools
 using SparseArrays, LinearAlgebra, Markdown
 using PromptingTools.Experimental.RAGTools
 using PromptingTools.Experimental.AgentTools
 using JSON3, Serialization, DataFramesMeta
 using Statistics: mean
+
+## Generate the prompt documentation
+include("generate_prompt_library.jl")
+
+# Enable debugging for vitepress
+ENV["DEBUG"] = "vitepress:*"
 
 DocMeta.setdocmeta!(PromptingTools,
     :DocTestSetup,
@@ -55,6 +62,15 @@ makedocs(;
             "APITools" => "extra_tools/api_tools_intro.md"
         ],
         "F.A.Q." => "frequently_asked_questions.md",
+        "Prompt Templates" => [
+            "General" => "prompts/general.md",
+            "Persona-Task" => "prompts/persona-task.md",
+            "Visual" => "prompts/visual.md",
+            "Classification" => "prompts/classification.md",
+            "Extraction" => "prompts/extraction.md",
+            "Agents" => "prompts/agents.md",
+            "RAG" => "prompts/RAG.md"
+        ],
         "Reference" => [
             "PromptingTools.jl" => "reference.md",
             "Experimental Modules" => "reference_experimental.md",
