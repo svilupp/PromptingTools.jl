@@ -14,6 +14,10 @@ using AbstractTrees: print_tree, PreOrderDFS, PostOrderDFS
 using Random
 using Test
 
+# re-export
+export AICode, last_output, last_message # extended in lazy_types.jl
+using PromptingTools: last_output, last_message, AICode
+
 export print_tree, PreOrderDFS, PostOrderDFS
 include("utils.jl")
 
@@ -24,7 +28,7 @@ export aicodefixer_feedback, error_feedback, score_feedback
 include("code_feedback.jl")
 
 export AICall, AIGenerate, AIExtract, AIEmbed, AIClassify, AIScan
-export RetryConfig, last_output, last_message
+export RetryConfig
 export AICodeFixer, run!
 include("lazy_types.jl")
 

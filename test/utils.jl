@@ -1,5 +1,5 @@
-using PromptingTools: split_by_length, wrap_string, replace_words,
-                      length_longest_common_subsequence
+using PromptingTools: recursive_splitter, wrap_string, replace_words,
+                      length_longest_common_subsequence, distance_longest_common_subsequence
 using PromptingTools: _extract_handlebar_variables, call_cost, call_cost_alternative,
                       _report_stats
 using PromptingTools: _string_to_vector, _encode_local_image
@@ -18,33 +18,33 @@ using PromptingTools: push_conversation!,
           "XYZ is a great model"
 end
 
-@testset "split_by_length" begin
+@testset "recursive_splitter" begin
     text = "Hello world. How are you?"
-    chunks = split_by_length(text, max_length = 100)
+    chunks = recursive_splitter(text, max_length = 100)
     @test length(chunks) == 1
     @test chunks[1] == text
-    chunks = split_by_length(text, max_length = 25)
+    chunks = recursive_splitter(text, max_length = 25)
     @test length(chunks) == 1
     @test chunks[1] == text
     @test maximum(length.(chunks)) <= 25
-    chunks = split_by_length(text, max_length = 10)
+    chunks = recursive_splitter(text, max_length = 10)
     @test length(chunks) == 4
     @test maximum(length.(chunks)) <= 10
-    chunks = split_by_length(text, max_length = 11)
+    chunks = recursive_splitter(text, max_length = 11)
     @test length(chunks) == 3
     @test maximum(length.(chunks)) <= 11
     @test join(chunks, "") == text
 
     # Test with empty text
-    chunks = split_by_length("")
+    chunks = recursive_splitter("")
     @test chunks == [""]
 
     # Test custom separator
     text = "Hello,World,"^50
-    chunks = split_by_length(text, separator = ",", max_length = length(text))
+    chunks = recursive_splitter(text, separator = ",", max_length = length(text))
     @test length(chunks) == 1
     @test chunks[1] == text
-    chunks = split_by_length(text, separator = ",", max_length = 20)
+    chunks = recursive_splitter(text, separator = ",", max_length = 20)
     @test length(chunks) == 34
     @test maximum(length.(chunks)) <= 20
     @test join(chunks, "") == text
@@ -52,14 +52,14 @@ end
     ### Multiple separators
     # Single separator
     text = "First sentence. Second sentence. Third sentence."
-    chunks = split_by_length(text, ["."], max_length = 15)
+    chunks = recursive_splitter(text, ["."], max_length = 15)
     @test length(chunks) == 3
     @test chunks == ["First sentence.", " Second sentence.", " Third sentence."]
 
     # Multiple separators
     text = "Paragraph 1\n\nParagraph 2. Sentence 1. Sentence 2.\nParagraph 3"
     separators = ["\n\n", ". ", "\n"]
-    chunks = split_by_length(text, separators, max_length = 20)
+    chunks = recursive_splitter(text, separators, max_length = 20)
     @test length(chunks) == 5
     @test chunks[1] == "Paragraph 1\n\n"
     @test chunks[2] == "Paragraph 2. "
@@ -69,12 +69,12 @@ end
 
     # empty separators
     text = "Some text without separators."
-    @test_throws AssertionError split_by_length(text, String[], max_length = 10)
+    @test_throws AssertionError recursive_splitter(text, String[], max_length = 10)
 
     # edge cases
     text = "Short text"
     separators = ["\n\n", ". ", "\n"]
-    chunks = split_by_length(text, separators, max_length = 50)
+    chunks = recursive_splitter(text, separators, max_length = 50)
     @test length(chunks) == 1
     @test chunks[1] == text
 
@@ -82,9 +82,9 @@ end
     text = "Paragraph 1\n\nParagraph 2. Sentence 1. Sentence 2.\nParagraph 3"
     separators = ["\n\n", ". ", "\n"]
     sep_length = length(separators)
-    chunks = split_by_length(text, separators, max_length = 20)
-    chunks = split_by_length(text, separators, max_length = 20)
-    chunks = split_by_length(text, separators, max_length = 20)
+    chunks = recursive_splitter(text, separators, max_length = 20)
+    chunks = recursive_splitter(text, separators, max_length = 20)
+    chunks = recursive_splitter(text, separators, max_length = 20)
     @test length(separators) == sep_length
 end
 
@@ -117,6 +117,40 @@ end
 
     # Test for common subsequence with repeated characters
     @test length_longest_common_subsequence("abc-abc----", "___ab_c__abc") == 6
+end
+
+@testset "distance_longest_common_subsequence" begin
+    # Test for equal strings
+    @test distance_longest_common_subsequence("abcde", "abcde") == 0
+
+    # test for different strings
+    @test distance_longest_common_subsequence("xyzut", "abced") == 1
+    @test distance_longest_common_subsequence("xyzut", "") == 1
+
+    # Test for empty string, they are the same, but we need to treat them as different
+    @test_broken distance_longest_common_subsequence("", "") == 0.0
+
+    # Test for partial common subsequence -> full match for seq2
+    @test distance_longest_common_subsequence("abcde", "ace") == 0.0
+
+    # Test for common subsequence with repeated characters
+    @test distance_longest_common_subsequence("abc-abc----", "___ab_c__abc")≈0.45 atol=0.01
+
+    # array dispatch
+    context = [
+        "The enigmatic stranger vanished as swiftly as a wisp of smoke, leaving behind a trail of unanswered questions.",
+        "Beneath the shimmering moonlight, the ocean whispered secrets only the stars could hear.",
+        "The ancient tree stood as a silent guardian, its gnarled branches reaching for the heavens.",
+        "The melody danced through the air, painting a vibrant tapestry of emotions.",
+        "Time flowed like a relentless river, carrying away memories and leaving imprints in its wake."]
+
+    story = """
+        Beneath the shimmering moonlight, the ocean whispered secrets only the stars could hear.
+
+        Under the celestial tapestry, the vast ocean whispered its secrets to the indifferent stars. Each ripple, a murmured confidence, each wave, a whispered lament. The glittering celestial bodies listened in silent complicity, their enigmatic gaze reflecting the ocean's unspoken truths. The cosmic dance between the sea and the sky, a symphony of shared secrets, forever echoing in the ethereal expanse.
+        """
+    dist = distance_longest_common_subsequence(story, context)
+    @test dist[2] == 0.0
 end
 
 @testset "extract_handlebar_variables" begin

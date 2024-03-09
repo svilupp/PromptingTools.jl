@@ -1,6 +1,7 @@
-using PromptingTools: AIMessage, SystemMessage, MetadataMessage
+using PromptingTools: AIMessage, SystemMessage, MetadataMessage, AbstractMessage
 using PromptingTools: UserMessage, UserMessageWithImages, DataMessage
-using PromptingTools: _encode_local_image, attach_images_to_user_message
+using PromptingTools: _encode_local_image, attach_images_to_user_message, last_message,
+                      last_output
 using PromptingTools: isusermessage, issystemmessage, isdatamessage, isaimessage
 
 @testset "Message constructors" begin
@@ -92,4 +93,21 @@ end
     # no UserMessages
     msg = UserMessageWithImages(content; image_url) # unclear where to add the new images!
     @test_throws AssertionError attach_images_to_user_message(msg; image_url)
+end
+
+@testset "last_message,last_output" begin
+    # on a conversation
+    msgs = [UserMessage("Hello, world 1!"), UserMessage("Hello, world 2!")]
+    @test last_message(msgs) == msgs[end]
+    @test last_output(msgs) == "Hello, world 2!"
+
+    # on an empty conversation
+    msgs = AbstractMessage[]
+    @test last_message(msgs) == nothing
+    @test last_output(msgs) == nothing
+
+    # On a message
+    msg = UserMessage("Hello, world 2!")
+    @test last_message(msg) == msg
+    @test last_output(msg) == "Hello, world 2!"
 end
