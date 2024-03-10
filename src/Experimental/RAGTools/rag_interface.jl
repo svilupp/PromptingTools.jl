@@ -59,29 +59,105 @@
 # Defines three key types for RAG: ChunkIndex, MultiIndex, and CandidateChunks
 # In addition, RAGContext is defined for debugging purposes
 
-# ## Preparation Stage
+# ## Overarching
 
-abstract type AbstractDocumentIndex end
-abstract type AbstractMultiIndex <: AbstractDocumentIndex end
-abstract type AbstractChunkIndex <: AbstractDocumentIndex end
+# Dispatch type for airag
+abstract type AbstractRAGConfig end
 
-abstract type AbstractCandidateChunks end
-
-# supertype for RAGDetails
+# supertype for RAGDetails, return_type for retrieve and generate (and optionally airag)
 abstract type AbstractRAGResult end
 
+# ## Preparation Stage
+
+# Main supertype for all customizations of the indexing process
+abstract type AbstractIndexingMethod end
+
+"""
+    AbstractIndexBuilder
+
+Abstract type for building an index with `build_index` (use to change the process / return type of `build_index`).
+
+# Required Fields
+- `chunker::AbstractChunker`: the chunking method, dispatching `get_chunks`
+- `embedder::AbstractEmbedder`: the embedding method, dispatching `get_embeddings`
+- `tagger::AbstractTagger`: the tagging method, dispatching `get_tags`
+"""
+abstract type AbstractIndexBuilder <: AbstractIndexingMethod end
+
+# For get_chunks function
+abstract type AbstractChunker <: AbstractIndexingMethod end
+# For get_embeddings function
+abstract type AbstractEmbedder <: AbstractIndexingMethod end
+# For get_tags function
+abstract type AbstractTagger <: AbstractIndexingMethod end
+
+### Index itself - return type of `build_index`
+abstract type AbstractDocumentIndex end
+
+"""
+    AbstractMultiIndex <: AbstractDocumentIndex
+
+Experimental abstract type for storing multiple document indexes. Not yet implemented.
+"""
+abstract type AbstractMultiIndex <: AbstractDocumentIndex end
+
+"""
+    AbstractChunkIndex <: AbstractDocumentIndex
+
+Main abstract type for storing document chunks and their embeddings. It also stores tags and sources for each chunk.
+
+# Required Fields
+- `id::Symbol`: unique identifier of each index (to ensure we're using the right index with `CandidateChunks`)
+- `chunks::Vector{<:AbstractString}`: underlying document chunks / snippets
+- `embeddings::Union{Nothing, Matrix{<:Real}}`: for semantic search
+- `tags::Union{Nothing, AbstractMatrix{<:Bool}}`: for exact search, filtering, etc. This is often a sparse matrix indicating which chunks have the given `tag` (see `tag_vocab` for the position lookup)
+- `tags_vocab::Union{Nothing, Vector{<:AbstractString}}`: vocabulary for the `tags` matrix (each column in `tags` is one item in `tags_vocab` and rows are the chunks)
+- `sources::Vector{<:AbstractString}`: sources of the chunks
+- `extras::Union{Nothing, AbstractVector}`: additional data, eg, metadata, source code, etc.
+"""
+abstract type AbstractChunkIndex <: AbstractDocumentIndex end
+
 # ## Retrieval stage
-# Main dispatch type for `retrieve`
+
+"""
+    AbstractCandidateChunks
+
+Abstract type for storing candidate chunks, ie, references to items in a `AbstractChunkIndex`.
+
+Return type from `find_closest` and `find_tags` functions.
+
+# Required Fields
+- `index_id::Symbol`: the id of the index from which the candidates are drawn
+- `positions::Vector{Int}`: the positions of the candidates in the index
+- `distances::Vector{Float32}`: the distances of the candidates from the query
+"""
+abstract type AbstractCandidateChunks end
+
+# Main supertype for retrieval customizations
 abstract type AbstractRetrievalMethod end
+
+# Main dispatch type for `retrieve`
+"""
+    AbstractRetriever <: AbstractRetrievalMethod
+
+Abstract type for retrieving chunks from an index with `retrieve` (use to change the process / return type of `retrieve`).
+
+# Required Fields
+- `rephraser::AbstractRephraser`: the rephrasing method, dispatching `rephrase`
+- `similarity_search::AbstractSimilaritySearch`: the similarity search method, dispatching `find_closest`
+- `tag_match::AbstractTagMatch`: the tag matching method, dispatching `find_tags`
+- `reranker::AbstractReranker`: the reranking method, dispatching `rerank`
+"""
+abstract type AbstractRetriever <: AbstractRetrievalMethod end
 
 # Main dispatch type for `rephrase`
 abstract type AbstractRephraser <: AbstractRetrievalMethod end
 
 # Main dispatch type for `find_closest`
-abstract type AbstractSimilaritySearch <: AbstractRetrievalMethod end
+abstract type AbstractSimilarityFinder <: AbstractRetrievalMethod end
 
 # Main dispatch type for `find_tags`
-abstract type AbstractTagMatch <: AbstractRetrievalMethod end
+abstract type AbstractTagFilter <: AbstractRetrievalMethod end
 
 # Main dispatch type for `rerank`
 abstract type AbstractReranker <: AbstractRetrievalMethod end
@@ -89,8 +165,11 @@ abstract type AbstractReranker <: AbstractRetrievalMethod end
 # ## Generation stage
 abstract type AbstractGenerationMethod end
 
-# Main dispatch type for: `format_context`
-abstract type AbstractContextFormater <: AbstractGenerationMethod end
+# Main dispatch type for: `generate`
+abstract type AbstractGenerator <: AbstractGenerationMethod end
+
+# Main dispatch type for: `build_context`
+abstract type AbstractContextBuilder <: AbstractGenerationMethod end
 
 # Main dispatch type for: `refine`
 abstract type AbstractRefiner <: AbstractGenerationMethod end
@@ -102,3 +181,24 @@ abstract type AbstractAnnotater end
 
 abstract type AbstractAnnotatedNode end
 abstract type AbstractAnnotationStyler end
+
+# ## Main Functions
+
+# Builds the index from provided data, dispatch via `indexer::AbstractIndexer`.
+function build_index end
+function get_chunks end
+function get_embeddings end
+function get_tags end
+# Sub-routing of get_tags, extended in ext/RAGToolsExperimentalExt.jl
+"Builds a matrix of tags and a vocabulary list. REQUIRES SparseArrays and LinearAlgebra packages to be loaded!!"
+function build_tags end
+
+function retrieve end
+function rephrase end
+function find_closest end
+function find_tags end
+function rerank end
+
+function generate end
+function format_context end
+function refine end

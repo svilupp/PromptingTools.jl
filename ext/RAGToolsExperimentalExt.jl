@@ -5,12 +5,13 @@ using LinearAlgebra: normalize
 const PT = PromptingTools
 
 using PromptingTools.Experimental.RAGTools
+const RT = PromptingTools.Experimental.RAGTools
 
 # forward to LinearAlgebra.normalize
-PromptingTools.Experimental.RAGTools._normalize(arr::AbstractArray) = normalize(arr)
+RT._normalize(arr::AbstractArray) = normalize(arr)
 
 # "Builds a sparse matrix of tags and a vocabulary from the given vector of chunk metadata. Requires SparseArrays.jl to be loaded."
-function PromptingTools.Experimental.RAGTools.build_tags(chunk_metadata::Vector{
+function RT.build_tags(tagger::RT.AbstractTagger, chunk_metadata::Vector{
         Vector{String},
 })
     tags_vocab_ = vcat(chunk_metadata...) |> unique |> sort
@@ -31,4 +32,4 @@ function PromptingTools.Experimental.RAGTools.build_tags(chunk_metadata::Vector{
     return tags_, tags_vocab_
 end
 
-end
+end # end of module

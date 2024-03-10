@@ -1,5 +1,10 @@
-# stub to be replaced within the package extension
-function _normalize end
+## Generation Types
+
+@kwdef mutable struct RAGConfig <: AbstractRAGConfig
+    indexer::AbstractIndexBuilder = SimpleIndexer()
+    retriever::AbstractRetriever = SimilaritySearch()
+    generator::AbstractGenerator = ContextFormater()
+end
 
 """
     build_context(index::AbstractChunkIndex, reranked_candidates::CandidateChunks; chunks_window_margin::Tuple{Int, Int}) -> Vector{String}
@@ -35,6 +40,8 @@ function build_context(index::AbstractChunkIndex, reranked_candidates::Candidate
     end
     return context
 end
+
+### Overarching
 
 """
     airag(index::AbstractChunkIndex, rag_template::Symbol = :RAGAnswerFromContext;
@@ -115,7 +122,8 @@ PT.pprint(details)
 
 See also `build_index`, `build_context`, `CandidateChunks`, `find_closest`, `find_tags`, `rerank`, `annotate_support`
 """
-function airag(index::AbstractChunkIndex, rag_template::Symbol = :RAGAnswerFromContext;
+function airag(cfg::AbstractRAGConfig, index::AbstractChunkIndex,
+        rag_template::Symbol = :RAGAnswerFromContext;
         question::AbstractString,
         top_k::Int = 100, top_n::Int = 5, minimum_similarity::AbstractFloat = -1.0,
         tag_filter::Union{Symbol, Vector{String}, Regex, Nothing} = :auto,
