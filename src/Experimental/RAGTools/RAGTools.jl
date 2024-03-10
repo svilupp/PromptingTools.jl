@@ -25,16 +25,18 @@ include("api_services.jl")
 
 include("rag_interface.jl")
 
-export ChunkIndex, CandidateChunks # MultiIndex
+export ChunkIndex, CandidateChunks
+# export MultiIndex # not ready yet
 include("types.jl")
 
-export build_index, build_tags
+export build_index, get_chunks, get_embeddings, get_tags
 include("preparation.jl")
 
+export retrieve
 export find_closest, find_tags, rerank
 include("retrieval.jl")
 
-export airag, build_context
+export airag, format_context
 include("generation.jl")
 
 export annotate_support
