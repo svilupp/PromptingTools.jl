@@ -133,7 +133,7 @@ Resources:
 
 You can also set the API key in `LocalPreferences.toml`, so it persists across sessions and projects.
 
-Use: `PromptingTools.set_preferences!("OPENAI_API_KEY"="your-api-key")`
+Use: `PromptingTools.set_preferences!("OPENAI_API_KEY"=>"your-api-key")`
 
 To double-check, run `PromptingTools.get_preferences("OPENAI_API_KEY")` and you should see your key!
 
