@@ -96,11 +96,11 @@ end
     ## if TP is Int, then positions are indices into the index
     ## if TP is CandidateChunks, then positions are indices into the positions of the child index in MultiIndex
     positions::Vector{TP} = Int[]
-    distances::Vector{TD} = Float32[]
+    scores::Vector{TD} = Float32[]
 end
 Base.length(cc::CandidateChunks) = length(cc.positions)
 function Base.first(cc::CandidateChunks, k::Integer)
-    CandidateChunks(cc.index_id, first(cc.positions, k), first(cc.distances, k))
+    CandidateChunks(cc.index_id, first(cc.positions, k), first(cc.scores, k))
 end
 
 # join and sort two candidate chunks
@@ -116,29 +116,29 @@ function Base.vcat(cc1::CandidateChunks{TP1, TD1},
 
     positions = vcat(cc1.positions, cc2.positions)
     # operates on maximum similarity principle, ie, take the max similarity
-    distances = if !isempty(cc1.distances) && !isempty(cc2.distances)
-        vcat(cc1.distances, cc2.distances)
+    scores = if !isempty(cc1.scores) && !isempty(cc2.scores)
+        vcat(cc1.scores, cc2.scores)
     else
         Float32[]
     end
 
-    if !isempty(distances)
-        ## Get sorted by maximum similarity (distances are similarity)
-        sorted_idxs = sortperm(distances, rev = true)
+    if !isempty(scores)
+        ## Get sorted by maximum similarity (scores are similarity)
+        sorted_idxs = sortperm(scores, rev = true)
         positions_sorted = @view(positions[sorted_idxs])
         ## get the positions of unique elements
         unique_idxs = unique(i -> positions_sorted[i], eachindex(positions_sorted))
         positions = positions_sorted[unique_idxs]
         ## apply the sorting and then the filtering
-        distances = @view(distances[sorted_idxs])[unique_idxs]
+        scores = @view(scores[sorted_idxs])[unique_idxs]
     else
         positions = unique(positions)
     end
 
-    CandidateChunks(cc1.index_id, positions, distances)
+    CandidateChunks(cc1.index_id, positions, scores)
 end
 
-# combine/intersect two candidate chunks. average the score if available
+# combine/intersect two candidate chunks. take the maximum of the score if available
 function Base.var"&"(cc1::AbstractCandidateChunks,
         cc2::AbstractCandidateChunks)
     throw(ArgumentError("Not implemented for type $(typeof(cc1)) and $(typeof(cc2))"))
@@ -149,14 +149,17 @@ function Base.var"&"(cc1::CandidateChunks{TP1, TD1},
     ##
     cc1.index_id != cc2.index_id && return CandidateChunks(; index_id = cc1.index_id)
 
-    positions = intersect(cc1.positions, cc2.positions)
-    # TODO: validate - this seems like a bug! distances should not be using positions directly
-    distances = if !isempty(cc1.distances) && !isempty(cc2.distances)
-        (cc1.distances[positions] .+ cc2.distances[positions]) ./ 2
+    valid_positions = intersect(cc1.positions, cc2.positions)
+
+    # TODO: validate - this seems like a bug! scores should not be using positions directly
+    scores = if !isempty(cc1.scores) && !isempty(cc2.scores)
+        ## 
+        (cc1.scores[positions] .+ cc2.scores[positions]) ./ 2
     else
         Float32[]
     end
-    CandidateChunks(cc1.index_id, positions, distances)
+    ## Sort
+    CandidateChunks(cc1.index_id, positions, scores)
 end
 
 function Base.getindex(ci::AbstractDocumentIndex,
@@ -241,8 +244,8 @@ A struct for debugging RAG answers. It contains the question, answer, context, a
 @kwdef mutable struct RAGResult <: AbstractRAGResult
     question::AbstractString
     rephrased_questions::AbstractVector{<:AbstractString}
-    answer::AbstractString
-    refined_answer::AbstractString
+    answer::Union{Nothing, AbstractString} = nothing
+    refined_answer::Union{Nothing, AbstractString} = nothing
     context::Vector{<:AbstractString}
     sources::Vector{<:AbstractString}
     emb_candidates::CandidateChunks
@@ -254,12 +257,13 @@ A struct for debugging RAG answers. It contains the question, answer, context, a
 end
 # Simplification of the RAGDetails struct
 function RAGResult(
-        question, answer, context; sources = ["Source $i" for i in 1:length(context)])
+        question::AbstractString, answer::AbstractString, context::Vector{<:AbstractString};
+        sources = ["Source $i" for i in 1:length(context)])
     return RAGResult(question, [question], answer, answer, context, sources,
-        CandidateChunks(index_id = :index, positions = Int[], distances = Float32[]),
+        CandidateChunks(index_id = :index, positions = Int[], scores = Float32[]),
         nothing,
-        CandidateChunks(index_id = :index, positions = Int[], distances = Float32[]),
-        CandidateChunks(index_id = :index, positions = Int[], distances = Float32[]),
+        CandidateChunks(index_id = :index, positions = Int[], scores = Float32[]),
+        CandidateChunks(index_id = :index, positions = Int[], scores = Float32[]),
         Dict{Symbol, Vector{<:AbstractMessage}}())
 end
 
