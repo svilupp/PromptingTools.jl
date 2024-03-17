@@ -30,13 +30,16 @@ No-op implementation for `find_tags`, which simply returns all chunks.
 struct NoTagFilter <: AbstractTagFilter end
 
 """
-    TagFilter <: AbstractTagFilter
+    AnyTagFilter <: AbstractTagFilter
 
-Finds the chunks that have the specified tag(s).
+Finds the chunks that have ANY OF the specified tag(s).
 """
-struct TagFilter <: AbstractTagFilter end
+struct AnyTagFilter <: AbstractTagFilter end
 
 ### Functions
+function rephrase(::AbstractRephraser, question::AbstractString; kwargs...)
+    throw(ArgumentError("Not implemented yet for type $(typeof(rephraser))"))
+end
 
 # No-op, simple passthrough
 function rephrase(rephraser::NoRephraser, question::AbstractString; kwargs...)
@@ -61,6 +64,13 @@ function rephrase(rephraser::SimpleRephraser, question::AbstractString;
     return [question, new_question]
 end
 
+# General fallback
+function find_closest(
+        finder::AbstractSimilarityFinder, emb::AbstractMatrix{<:Real},
+        query_emb::AbstractVector{<:Real}; kwargs...)
+    throw(ArgumentError("Not implemented yet for type $(typeof(finder))"))
+end
+
 """
     find_closest(finder::CosineSimilarity, emb::AbstractMatrix{<:Real},
         query_emb::AbstractVector{<:Real};
@@ -68,10 +78,10 @@ end
 
 Finds the indices of chunks (represented by embeddings in `emb`) that are closest (in cosine similarity for `CosineSimilarity()`) to query embedding (`query_emb`). 
 
+`finder` is the logic used for the similarity search. Default is `CosineSimilarity`.
+
 If `minimum_similarity` is provided, only indices with similarity greater than or equal to it are returned. 
 Similarity can be between -1 and 1 (-1 = completely opposite, 1 = exactly the same).
-
-`finder` is the logic used for the similarity search. Default is `CosineSimilarity`.
 
 Returns only `top_k` closest indices.
 """
@@ -89,16 +99,36 @@ function find_closest(
     return positions, distances[positions]
 end
 
+"""
+    find_closest(
+        finder::AbstractSimilarityFinder, index::AbstractChunkIndex,
+        query_emb::AbstractVector{<:Real};
+        top_k::Int = 100, kwargs...)
+
+Finds the indices of chunks (represented by embeddings in `index`) that are closest to query embedding (`query_emb`).
+
+Returns only `top_k` closest indices.
+"""
 function find_closest(
         finder::AbstractSimilarityFinder, index::AbstractChunkIndex,
         query_emb::AbstractVector{<:Real};
-        top_k::Int = 100, minimum_similarity::AbstractFloat = -1.0)
+        top_k::Int = 100, kwargs...)
     isnothing(embeddings(index)) && CandidateChunks(; index_id = index.id)
     positions, distances = find_closest(finder, embeddings(index),
         query_emb;
-        top_k,
-        minimum_similarity)
+        top_k, kwargs...)
     return CandidateChunks(index.id, positions, Float32.(distances))
+end
+
+# Dispatch to find similarities for multiple embeddings
+function find_closest(
+        finder::AbstractSimilarityFinder, index::AbstractChunkIndex,
+        query_emb::AbstractMatrix{<:Real};
+        top_k::Int = 100, kwargs...)
+    isnothing(embeddings(index)) && CandidateChunks(; index_id = index.id)
+    ## simply vcat together (gets sorted from the highest similarity to the lowest)
+    mapreduce(
+        c -> find_closest(finder, index, c; top_k, kwargs...), vcat, eachcol(query_emb))
 end
 
 ## TODO: Implement for MultiIndex
@@ -122,16 +152,23 @@ end
 ##         all_distances[top_k_order])
 ## end
 
+### TAG Filtering
+
+function find_tags(::AbstractTagFilter, index::AbstractChunkIndex,
+        tag::Union{AbstractString, Regex})
+    throw(ArgumentError("Not implemented yet for type $(typeof(filter))"))
+end
+
 """
-    find_tags(method::AbstractTagFilter = TagFilter(), index::AbstractChunkIndex,
+    find_tags(method::AnyTagFilter, index::AbstractChunkIndex,
         tag::Union{AbstractString, Regex})
 
-    find_tags(method::AbstractTagMatcher, index::AbstractChunkIndex,
-        tags::Vector{<:AbstractString})
+    find_tags(method::AnyTagFilter, index::AbstractChunkIndex,
+        tags::Vector{T}) where {T <: Union{AbstractString, Regex}}
 
-Finds the indices of chunks (represented by tags in `index`) that have the specified `tag` or `tags`.
+Finds the indices of chunks (represented by tags in `index`) that have ANY OF the specified `tag` or `tags`.
 """
-function find_tags(method::AbstractTagFilter, index::AbstractChunkIndex,
+function find_tags(method::AnyTagFilter, index::AbstractChunkIndex,
         tag::Union{AbstractString, Regex})
     isnothing(tags(index)) && CandidateChunks(; index_id = index.id)
     tag_idx = if tag isa AbstractString
@@ -145,18 +182,27 @@ function find_tags(method::AbstractTagFilter, index::AbstractChunkIndex,
     return CandidateChunks(index.id, match_row_idx, ones(Float32, length(match_row_idx)))
 end
 
-function find_tags(method::AbstractTagFilter, index::AbstractChunkIndex,
-        tags::Vector{<:AbstractString})
+# Method for multiple tags
+function find_tags(method::AnyTagFilter, index::AbstractChunkIndex,
+        tags::Vector{T}) where {T <: Union{AbstractString, Regex}}
     pos = [find_tags(method, index, tag).positions for tag in tags] |>
           Base.Splat(vcat) |> unique |> x -> convert(Vector{Int}, x)
     return CandidateChunks(index.id, pos, ones(Float32, length(pos)))
 end
 
+"""
+    find_tags(method::NoTagFilter, index::AbstractChunkIndex,
+        tags)
+
+Returns all chunks in the index, ie, no filtering.
+"""
 function find_tags(method::NoTagFilter, index::AbstractChunkIndex,
         tags)
     return CandidateChunks(
         index.id, 1:length(index.chunks), ones(Float32, length(index.chunks)))
 end
+
+### Reranking
 
 """
     NoReranker <: AbstractReranker
@@ -183,7 +229,8 @@ function rerank(reranker::NoReranker,
         candidate_chunks;
         top_n::Integer = length(candidate_chunks),
         kwargs...)
-    # Since this is a Passthrough strategy, it returns the candidate_chunks unchanged
+    # Since this is almost a passthrough strategy, it returns the candidate_chunks unchanged
+    # but it truncates to `top_n` if necessary
     return first(candidate_chunks, top_n)
 end
 
@@ -264,11 +311,21 @@ end
 
 Default implementation for `retrieve`. It does a simple similarity search via `CosineSimilarity` and returns the results.
 
-It uses `NoRephraser`, `CosineSimilarity`, `NoTagFilter` and `NoReranker` as default `rephraser`, `finder`, `filter`, and `reranker`.
+Make sure to use consistent `embedder` and `tagger` with the Preparation Stage (`build_index`)!
+
+# Fields
+- `rephraser::AbstractRephraser`: the rephrasing method, dispatching `rephrase`
+- `embedder::AbstractEmbedder`: the embedding method, dispatching `get_embeddings` (see Preparation Stage for more details)
+- `finder::AbstractSimilarityFinder`: the similarity search method, dispatching `find_closest`
+- `tagger::AbstractTagger`: the tag generating method, dispatching `get_tags` (see Preparation Stage for more details)
+- `filter::AbstractTagFilter`: the tag matching method, dispatching `find_tags`
+- `reranker::AbstractReranker`: the reranking method, dispatching `rerank`
 """
 @kwdef mutable struct SimpleRetriever <: AbstractRetriever
     rephraser::AbstractRephraser = NoRephraser()
+    embedder::AbstractEmbedder = BatchEmbedder()
     finder::AbstractSimilarityFinder = CosineSimilarity()
+    tagger::AbstractTagger = NoTagger()
     filter::AbstractTagFilter = NoTagFilter()
     reranker::AbstractReranker = NoReranker()
 end
@@ -279,47 +336,206 @@ end
 Dispatch for `retrieve` with advanced retrieval methods to improve result quality.
 Compared to SimpleRetriever, it adds rephrasing the query and reranking the results.
 
-It uses `NoRephraser`, `CosineSimilarity`, `NoTagFilter` and `NoReranker` as default `rephraser`, `finder`, `filter`, and `reranker`.
+# Fields
+- `rephraser::AbstractRephraser`: the rephrasing method, dispatching `rephrase`
+- `embedder::AbstractEmbedder`: the embedding method, dispatching `get_embeddings` (see Preparation Stage for more details)
+- `finder::AbstractSimilarityFinder`: the similarity search method, dispatching `find_closest`
+- `tagger::AbstractTagger`: the tag generating method, dispatching `get_tags` (see Preparation Stage for more details)
+- `filter::AbstractTagFilter`: the tag matching method, dispatching `find_tags`
+- `reranker::AbstractReranker`: the reranking method, dispatching `rerank`
 """
 @kwdef mutable struct AdvancedRetriever <: AbstractRetriever
     rephraser::AbstractRephraser = SimpleRephraser()
+    embedder::AbstractEmbedder = BatchEmbedder()
     finder::AbstractSimilarityFinder = CosineSimilarity()
+    tagger::AbstractTagger = NoTagger()
     filter::AbstractTagFilter = NoTagFilter()
     reranker::AbstractReranker = CohereReranker()
 end
 
+"""
+    retrieve(retriever::AbstractRetriever,
+        index::AbstractChunkIndex,
+        question::AbstractString;
+        verbose::Integer = 1,
+        top_k::Integer = 100,
+        top_n::Integer = 5,
+        api_kwargs::NamedTuple = NamedTuple(),
+        rephraser::AbstractRephraser = retriever.rephraser,
+        rephraser_kwargs::NamedTuple = NamedTuple(),
+        embedder::AbstractEmbedder = retriever.embedder,
+        embedder_kwargs::NamedTuple = NamedTuple(),
+        finder::AbstractSimilarityFinder = retriever.finder,
+        finder_kwargs::NamedTuple = NamedTuple(),
+        tagger::AbstractTagger = retriever.tagger,
+        tagger_kwargs::NamedTuple = NamedTuple(),
+        filter::AbstractTagFilter = retriever.filter,
+        filter_kwargs::NamedTuple = NamedTuple(),
+        reranker::AbstractReranker = retriever.reranker,
+        reranker_kwargs::NamedTuple = NamedTuple(),
+        cost_tracker = Threads.Atomic{Float64}(0.0),
+        kwargs...)
+
+
+# Arguments
+- `retriever`: The retrieval method to use. Default is `SimpleRetriever`.
+- `index`: The index that holds the chunks and sources to be retrieved from.
+- `question`: The question to be used for the retrieval.
+- `verbose`: If `>0`, it prints out verbose logging. Default is `1`.
+- `top_k`: The TOTAL number of closest chunks to return from `find_closest`. Default is `100`.
+   If there are multiple rephrased questions, the number of chunks per each item will be `top_k ÷ number_of_rephrased_questions`.
+- `top_n`: The TOTAL number of most relevant chunks to return for the context (from `rerank` step). Default is `5`.
+- `api_kwargs`: Additional keyword arguments to be passed to the API calls (shared by all `ai*` calls).
+- `rephraser`: Transform the question into one or more questions. Default is `retriever.rephraser`.
+- `rephraser_kwargs`: Additional keyword arguments to be passed to the rephraser.
+- `embedder`: The embedding method to use. Default is `retriever.embedder`.
+- `embedder_kwargs`: Additional keyword arguments to be passed to the embedder.
+- `finder`: The similarity search method to use. Default is `retriever.finder`, often `CosineSimilarity`.
+- `finder_kwargs`: Additional keyword arguments to be passed to the similarity finder.
+- `tagger`: The tag generating method to use. Default is `retriever.tagger`.
+- `tagger_kwargs`: Additional keyword arguments to be passed to the tagger. Noteworthy arguments:
+    - `tags`: Directly provide the tags to use for filtering (can be String, Regex, or Vector{String}). Useful for `tagger = PassthroughTagger`.
+- `filter`: The tag matching method to use. Default is `retriever.filter`.
+- `filter_kwargs`: Additional keyword arguments to be passed to the tag filter.
+- `reranker`: The reranking method to use. Default is `retriever.reranker`.
+- `reranker_kwargs`: Additional keyword arguments to be passed to the reranker.
+- `cost_tracker`: An atomic counter to track the cost of the retrieval. Default is `Threads.Atomic{Float64}(0.0)`.
+"""
 function retrieve(retriever::AbstractRetriever,
         index::AbstractChunkIndex,
         question::AbstractString;
+        verbose::Integer = 1,
         top_k::Integer = 100,
-        tag_filter::Union{Nothing, AbstractVector{<:AbstractString}} = nothing,
-        verbose::Bool = false,
+        top_n::Integer = 5,
+        api_kwargs::NamedTuple = NamedTuple(),
+        rephraser::AbstractRephraser = retriever.rephraser,
+        rephraser_kwargs::NamedTuple = NamedTuple(),
+        embedder::AbstractEmbedder = retriever.embedder,
+        embedder_kwargs::NamedTuple = NamedTuple(),
+        finder::AbstractSimilarityFinder = retriever.finder,
+        finder_kwargs::NamedTuple = NamedTuple(),
+        tagger::AbstractTagger = retriever.tagger,
+        tagger_kwargs::NamedTuple = NamedTuple(),
+        filter::AbstractTagFilter = retriever.filter,
+        filter_kwargs::NamedTuple = NamedTuple(),
+        reranker::AbstractReranker = retriever.reranker,
+        reranker_kwargs::NamedTuple = NamedTuple(),
+        cost_tracker = Threads.Atomic{Float64}(0.0),
         kwargs...)
-    ## Rephrase
-    rephrased_questions = rephrase(retriever.rephraser, question)
-    verbose && @info "Rephrased questions: $(rephrased_questions)"
-    ## Embed
-    # TODO: handle multiple rephrased questions as output
-    emb_candidates = CandidateChunks[]
-    for rq in rephrased_questions
-        emb_candidates = vcat(emb_candidates,
-            find_closest(retriever.similarity_searcher, index, rq;
-                top_k = top_k, kwargs...))
-    end
-    verbose && @info "Emb candidates: $(emb_candidates)"
-    ## Tag
-    tag_candidates = if isnothing(tag_filter)
+    ## Rephrase into one or more questions
+    rephraser_kwargs_ = isempty(api_kwargs) ? rephraser_kwargs :
+                        merge(rephraser_kwargs, (; api_kwargs))
+    rephrased_questions = rephrase(
+        rephraser, question; verbose = (verbose > 1), cost_tracker, rephraser_kwargs_...)
+
+    ## Embed one or more rephrased questions
+    embedder_kwargs_ = isempty(api_kwargs) ? embedder_kwargs :
+                       merge(embedder_kwargs, (; api_kwargs))
+    embeddings = get_embeddings(embedder, rephrased_questions;
+        verbose = (verbose > 1), cost_tracker, embedder_kwargs_...)
+
+    finder_kwargs_ = isempty(api_kwargs) ? finder_kwargs :
+                     merge(finder_kwargs, (; api_kwargs))
+    emb_candidates = find_closest(finder, index, embeddings;
+        top_k, finder_kwargs_...)
+
+    # TODO: continue here!
+
+    ## Tagging - if you provide them explicitly, use tagger `PassthroughTagger` and `tagger_kwargs = (;tags = ...)`
+    tagger_kwargs_ = isempty(api_kwargs) ? tagger_kwargs :
+                     merge(tagger_kwargs, (; api_kwargs))
+    tags = get_tags(tagger, rephrased_questions; tagger_kwargs_...)
+
+    tag_candidates = find_tags(filter, index, tag_filter)
+
+    filtered_candidates = isnothing(tag_candidates) ? emb_candidates :
+                          (emb_candidates & tag_candidates)
+    reranked_candidates = rerank(rerank_strategy,
+        index,
+        question,
+        filtered_candidates;
+        top_n,
+        verbose = false, rerank_kwargs...)
+
+    verbose && @info "Filtered candidates: $(filtered_candidates)"
+    ## Rerank
+    reranked_candidates = rerank(retriever.reranker, index, question, filtered_candidates;
+        top_n, verbose, kwargs...)
+    verbose && @info "Reranked candidates: $(reranked_candidates)"
+
+    ## Note: Supports only single ChunkIndex for now
+    ## Checks
+    @assert !(tag_filter isa Symbol && tag_filter != :auto) "Only `:auto`, `Vector{String}`, or `Regex` are supported for `tag_filter`"
+    @assert chunks_window_margin[1] >= 0&&chunks_window_margin[2] >= 0 "Both `chunks_window_margin` values must be non-negative"
+    placeholders = only(aitemplates(rag_template)).variables # only one template should be found
+    @assert (:question in placeholders)&&(:context in placeholders) "Provided RAG Template $(rag_template) is not suitable. It must have placeholders: `question` and `context`."
+
+    ## Embedding
+    joined_kwargs = isempty(api_kwargs) ? aiembed_kwargs :
+                    merge(aiembed_kwargs, (; api_kwargs))
+    question_emb = aiembed(question,
+        _normalize;
+        model = model_embedding,
+        verbose, joined_kwargs...).content .|> Float32 # no need for Float64
+    emb_candidates = find_closest(index, question_emb; top_k, minimum_similarity)
+
+    tag_candidates = if tag_filter == :auto && !isnothing(tags(index)) &&
+                        !isempty(model_metadata)
+        _check_aiextract_capability(model_metadata)
+        joined_kwargs = isempty(api_kwargs) ? aiextract_kwargs :
+                        merge(aiextract_kwargs, (; api_kwargs))
+        # extract metadata via LLM call
+        metadata_ = try
+            msg = aiextract(metadata_template; return_type = MaybeMetadataItems,
+                text = question,
+                instructions = "In addition to extracted items, suggest 2-3 filter keywords that could be relevant to answer this question.",
+                verbose, model = model_metadata, joined_kwargs...)
+            ## eg, ["software:::pandas", "language:::python", "julia_package:::dataframes"]
+            ## we split it and take only the keyword, not the category
+            metadata_extract(msg.content.items) |>
+            x -> split.(x, ":::") |> x -> getindex.(x, 2)
+        catch e
+            String[]
+        end
+        find_tags(index, metadata_)
+    elseif tag_filter isa Union{Vector{String}, Regex}
+        find_tags(index, tag_filter)
+    elseif isnothing(tag_filter)
         nothing
     else
-        find_tags(retriever.tag_matcher, index, tag_filter)
+        ## not filtering -- use all rows and ignore this
+        nothing
     end
-    verbose && @info "Tag candidates: $(tag_candidates)"
-    ## Filter
-    filtered_candidates = if isnothing(tag_candidates)
-        emb_candidates
-    else
-        filter_candidates(emb_candidates, tag_candidates)
-    end
-    verbose && @info "Filtered candidates: $(filtered_candidates)"
+
+    filtered_candidates = isnothing(tag_candidates) ? emb_candidates :
+                          (emb_candidates & tag_candidates)
+    reranked_candidates = rerank(rerank_strategy,
+        index,
+        question,
+        filtered_candidates;
+        top_n,
+        verbose = false, rerank_kwargs...)
     return filtered_candidates
+
+    result = RAGResult(;
+        question,
+        rephrased_questions = [question],
+        answer = msg.content,
+        refined_answer = msg.content,
+        context,
+        sources = sources(index)[reranked_candidates.positions],
+        emb_candidates,
+        tag_candidates,
+        filtered_candidates,
+        reranked_candidates)
+
+    return result
+end
+
+# Set default behavior
+DEFAULT_RETRIEVER = SimpleRetriever()
+function retrieve(index::AbstractChunkIndex, question::AbstractString;
+        kwargs...)
+    return retrieve(DEFAULT_RETRIEVER, index, question;
+        kwargs...)
 end
