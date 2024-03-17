@@ -136,7 +136,7 @@ Return type from `find_closest` and `find_tags` functions.
 # Required Fields
 - `index_id::Symbol`: the id of the index from which the candidates are drawn
 - `positions::Vector{Int}`: the positions of the candidates in the index
-- `distances::Vector{Float32}`: the distances of the candidates from the query
+- `scores::Vector{Float32}`: the similarity scores of the candidates from the query (higher is better)
 """
 abstract type AbstractCandidateChunks end
 

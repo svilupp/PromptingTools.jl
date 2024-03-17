@@ -74,7 +74,7 @@ end
 """
     find_closest(finder::CosineSimilarity, emb::AbstractMatrix{<:Real},
         query_emb::AbstractVector{<:Real};
-        top_k::Int = 100, minimum_similarity::AbstractFloat = -1.0)
+        top_k::Int = 100, minimum_similarity::AbstractFloat = -1.0, kwargs...)
 
 Finds the indices of chunks (represented by embeddings in `emb`) that are closest (in cosine similarity for `CosineSimilarity()`) to query embedding (`query_emb`). 
 
@@ -88,15 +88,15 @@ Returns only `top_k` closest indices.
 function find_closest(
         finder::CosineSimilarity, emb::AbstractMatrix{<:Real},
         query_emb::AbstractVector{<:Real};
-        top_k::Int = 100, minimum_similarity::AbstractFloat = -1.0)
+        top_k::Int = 100, minimum_similarity::AbstractFloat = -1.0, kwargs...)
     # emb is an embedding matrix where the first dimension is the embedding dimension
-    distances = query_emb' * emb |> vec
-    positions = distances |> sortperm |> reverse |> x -> first(x, top_k)
+    scores = query_emb' * emb |> vec
+    positions = scores |> sortperm |> reverse |> x -> first(x, top_k)
     if minimum_similarity > -1.0
-        mask = distances[positions] .>= minimum_similarity
+        mask = scores[positions] .>= minimum_similarity
         positions = positions[mask]
     end
-    return positions, distances[positions]
+    return positions, scores[positions]
 end
 
 """
@@ -114,13 +114,13 @@ function find_closest(
         query_emb::AbstractVector{<:Real};
         top_k::Int = 100, kwargs...)
     isnothing(embeddings(index)) && CandidateChunks(; index_id = index.id)
-    positions, distances = find_closest(finder, embeddings(index),
+    positions, scores = find_closest(finder, embeddings(index),
         query_emb;
         top_k, kwargs...)
-    return CandidateChunks(index.id, positions, Float32.(distances))
+    return CandidateChunks(index.id, positions, Float32.(scores))
 end
 
-# Dispatch to find similarities for multiple embeddings
+# Dispatch to find scores for multiple embeddings
 function find_closest(
         finder::AbstractSimilarityFinder, index::AbstractChunkIndex,
         query_emb::AbstractMatrix{<:Real};
@@ -155,21 +155,21 @@ end
 ### TAG Filtering
 
 function find_tags(::AbstractTagFilter, index::AbstractChunkIndex,
-        tag::Union{AbstractString, Regex})
+        tag::Union{AbstractString, Regex}; kwargs...)
     throw(ArgumentError("Not implemented yet for type $(typeof(filter))"))
 end
 
 """
     find_tags(method::AnyTagFilter, index::AbstractChunkIndex,
-        tag::Union{AbstractString, Regex})
+        tag::Union{AbstractString, Regex}; kwargs...)
 
     find_tags(method::AnyTagFilter, index::AbstractChunkIndex,
-        tags::Vector{T}) where {T <: Union{AbstractString, Regex}}
+        tags::Vector{T}; kwargs...) where {T <: Union{AbstractString, Regex}}
 
 Finds the indices of chunks (represented by tags in `index`) that have ANY OF the specified `tag` or `tags`.
 """
 function find_tags(method::AnyTagFilter, index::AbstractChunkIndex,
-        tag::Union{AbstractString, Regex})
+        tag::Union{AbstractString, Regex}; kwargs...)
     isnothing(tags(index)) && CandidateChunks(; index_id = index.id)
     tag_idx = if tag isa AbstractString
         findall(tags_vocab(index) .== tag)
@@ -184,7 +184,7 @@ end
 
 # Method for multiple tags
 function find_tags(method::AnyTagFilter, index::AbstractChunkIndex,
-        tags::Vector{T}) where {T <: Union{AbstractString, Regex}}
+        tags::Vector{T}; kwargs...) where {T <: Union{AbstractString, Regex}}
     pos = [find_tags(method, index, tag).positions for tag in tags] |>
           Base.Splat(vcat) |> unique |> x -> convert(Vector{Int}, x)
     return CandidateChunks(index.id, pos, ones(Float32, length(pos)))
@@ -192,14 +192,14 @@ end
 
 """
     find_tags(method::NoTagFilter, index::AbstractChunkIndex,
-        tags)
+        tags; kwargs...)
 
 Returns all chunks in the index, ie, no filtering.
 """
 function find_tags(method::NoTagFilter, index::AbstractChunkIndex,
-        tags)
+        tags; kwargs...)
     return CandidateChunks(
-        index.id, 1:length(index.chunks), ones(Float32, length(index.chunks)))
+        index.id, collect(1:length(index.chunks)), zeros(Float32, length(index.chunks)))
 end
 
 ### Reranking
@@ -219,57 +219,63 @@ Rerank strategy using the Cohere Rerank API. Requires an API key.
 struct CohereReranker <: AbstractReranker end
 
 function rerank(reranker::AbstractReranker,
-        index::AbstractDocumentIndex, args...; kwargs...)
+        index::AbstractDocumentIndex, question::AbstractString, candidates::AbstractCandidateChunks; kwargs...)
     throw(ArgumentError("Not implemented yet"))
 end
 
 function rerank(reranker::NoReranker,
-        index,
-        question,
-        candidate_chunks;
-        top_n::Integer = length(candidate_chunks),
+        index::AbstractChunkIndex,
+        question::AbstractString,
+        candidates::AbstractCandidateChunks;
+        top_n::Integer = length(candidates),
         kwargs...)
     # Since this is almost a passthrough strategy, it returns the candidate_chunks unchanged
     # but it truncates to `top_n` if necessary
-    return first(candidate_chunks, top_n)
+    return first(candidates, top_n)
 end
 
 """
-    rerank(reranker::CohereReranker, index::AbstractChunkIndex, question,
-        candidate_chunks;
+    rerank(
+        reranker::CohereReranker, index::AbstractChunkIndex, question::AbstractString,
+        candidates::AbstractCandidateChunks;
         verbose::Bool = false,
         api_key::AbstractString = PT.COHERE_API_KEY,
-        top_n::Integer = length(candidate_chunks.distances),
+        top_n::Integer = length(candidates.scores),
         model::AbstractString = "rerank-english-v2.0",
         return_documents::Bool = false,
+        cost_tracker = Threads.Atomic{Float64}(0.0),
         kwargs...)
+
 
 Re-ranks a list of candidate chunks using the Cohere Rerank API. See https://cohere.com/rerank for more details. 
 
 # Arguments
-- `query`: The query to be used for the search.
-- `documents`: A vector of documents to be reranked. 
-    The total max chunks (`length of documents * max_chunks_per_doc`) must be less than 10000. We recommend less than 1000 documents for optimal performance.
+- `reranker`: Using Cohere API
+- `index`: The index that holds the underlying chunks to be re-ranked.
+- `question`: The query to be used for the search.
+- `candidates`: The candidate chunks to be re-ranked.
 - `top_n`: The number of most relevant documents to return. Default is `length(documents)`.
 - `model`: The model to use for reranking. Default is `rerank-english-v2.0`.
 - `return_documents`: A boolean flag indicating whether to return the reranked documents in the response. Default is `false`.
-- `max_chunks_per_doc`: The maximum number of chunks to use per document. Default is `10`.
 - `verbose`: A boolean flag indicating whether to print verbose logging. Default is `false`.
+- `cost_tracker`: An atomic counter to track the cost of the retrieval. Default is `Threads.Atomic{Float64}(0.0)`. Not currently tracked (cost unclear).
     
 """
-function rerank(reranker::CohereReranker, index::AbstractChunkIndex, question,
-        candidate_chunks;
+function rerank(
+        reranker::CohereReranker, index::AbstractChunkIndex, question::AbstractString,
+        candidates::AbstractCandidateChunks;
         verbose::Bool = false,
         api_key::AbstractString = PT.COHERE_API_KEY,
-        top_n::Integer = length(candidate_chunks.distances),
+        top_n::Integer = length(candidates.scores),
         model::AbstractString = "rerank-english-v2.0",
         return_documents::Bool = false,
+        cost_tracker = Threads.Atomic{Float64}(0.0),
         kwargs...)
     @assert top_n>0 "top_n must be a positive integer."
-    @assert index.id==candidate_chunks.index_id "The index id of the index and candidate_chunks must match."
+    @assert index.id==candidates.index_id "The index id of the index and `candidates` must match."
 
     ## Call the API
-    documents = index[candidate_chunks, :chunks]
+    documents = index[candidates, :chunks]
     verbose &&
         @info "Calling Cohere Rerank API with $(length(documents)) candidate chunks..."
     r = cohere_api(;
@@ -284,11 +290,11 @@ function rerank(reranker::CohereReranker, index::AbstractChunkIndex, question,
 
     ## Unwrap re-ranked positions
     positions = Vector{Int}(undef, length(r.response[:results]))
-    distances = Vector{Float32}(undef, length(r.response[:results]))
+    scores = Vector{Float32}(undef, length(r.response[:results]))
     for i in eachindex(r.response[:results])
         doc = r.response[:results][i]
-        positions[i] = candidate_chunks.positions[doc[:index] + 1]
-        distances[i] = doc[:relevance_score]
+        positions[i] = candidates.positions[doc[:index] + 1]
+        scores[i] = doc[:relevance_score]
     end
 
     ## Check the cost
@@ -302,7 +308,7 @@ function rerank(reranker::CohereReranker, index::AbstractChunkIndex, question,
     end
     verbose && @info "Reranking done. $search_units_str"
 
-    return CandidateChunks(index.id, positions, distances)
+    return CandidateChunks(index.id, positions, scores)
 end
 
 ### Overall types for `retrieve`
@@ -439,90 +445,33 @@ function retrieve(retriever::AbstractRetriever,
     emb_candidates = find_closest(finder, index, embeddings;
         top_k, finder_kwargs_...)
 
-    # TODO: continue here!
-
     ## Tagging - if you provide them explicitly, use tagger `PassthroughTagger` and `tagger_kwargs = (;tags = ...)`
     tagger_kwargs_ = isempty(api_kwargs) ? tagger_kwargs :
                      merge(tagger_kwargs, (; api_kwargs))
-    tags = get_tags(tagger, rephrased_questions; tagger_kwargs_...)
+    tags = get_tags(tagger, rephrased_questions; verbose = (verbose > 1),
+        cost_tracker, tagger_kwargs_...)
 
-    tag_candidates = find_tags(filter, index, tag_filter)
+    filter_kwargs_ = isempty(api_kwargs) ? filter_kwargs :
+                     merge(filter_kwargs, (; api_kwargs))
+    tag_candidates = find_tags(filter, index, tags; filter_kwargs_...)
 
+    ## Combine the two sets of candidates, looks for intersection (hard filter)!
     filtered_candidates = isnothing(tag_candidates) ? emb_candidates :
                           (emb_candidates & tag_candidates)
-    reranked_candidates = rerank(rerank_strategy,
-        index,
-        question,
-        filtered_candidates;
-        top_n,
-        verbose = false, rerank_kwargs...)
 
-    verbose && @info "Filtered candidates: $(filtered_candidates)"
-    ## Rerank
-    reranked_candidates = rerank(retriever.reranker, index, question, filtered_candidates;
-        top_n, verbose, kwargs...)
-    verbose && @info "Reranked candidates: $(reranked_candidates)"
+    ## Reranking
+    reranker_kwargs_ = isempty(api_kwargs) ? reranker_kwargs :
+                       merge(reranker_kwargs, (; api_kwargs))
+    reranked_candidates = rerank(reranker, index, question, filtered_candidates;
+        top_n, verbose = (verbose > 1), cost_tracker, reranker_kwargs_...)
 
-    ## Note: Supports only single ChunkIndex for now
-    ## Checks
-    @assert !(tag_filter isa Symbol && tag_filter != :auto) "Only `:auto`, `Vector{String}`, or `Regex` are supported for `tag_filter`"
-    @assert chunks_window_margin[1] >= 0&&chunks_window_margin[2] >= 0 "Both `chunks_window_margin` values must be non-negative"
-    placeholders = only(aitemplates(rag_template)).variables # only one template should be found
-    @assert (:question in placeholders)&&(:context in placeholders) "Provided RAG Template $(rag_template) is not suitable. It must have placeholders: `question` and `context`."
-
-    ## Embedding
-    joined_kwargs = isempty(api_kwargs) ? aiembed_kwargs :
-                    merge(aiembed_kwargs, (; api_kwargs))
-    question_emb = aiembed(question,
-        _normalize;
-        model = model_embedding,
-        verbose, joined_kwargs...).content .|> Float32 # no need for Float64
-    emb_candidates = find_closest(index, question_emb; top_k, minimum_similarity)
-
-    tag_candidates = if tag_filter == :auto && !isnothing(tags(index)) &&
-                        !isempty(model_metadata)
-        _check_aiextract_capability(model_metadata)
-        joined_kwargs = isempty(api_kwargs) ? aiextract_kwargs :
-                        merge(aiextract_kwargs, (; api_kwargs))
-        # extract metadata via LLM call
-        metadata_ = try
-            msg = aiextract(metadata_template; return_type = MaybeMetadataItems,
-                text = question,
-                instructions = "In addition to extracted items, suggest 2-3 filter keywords that could be relevant to answer this question.",
-                verbose, model = model_metadata, joined_kwargs...)
-            ## eg, ["software:::pandas", "language:::python", "julia_package:::dataframes"]
-            ## we split it and take only the keyword, not the category
-            metadata_extract(msg.content.items) |>
-            x -> split.(x, ":::") |> x -> getindex.(x, 2)
-        catch e
-            String[]
-        end
-        find_tags(index, metadata_)
-    elseif tag_filter isa Union{Vector{String}, Regex}
-        find_tags(index, tag_filter)
-    elseif isnothing(tag_filter)
-        nothing
-    else
-        ## not filtering -- use all rows and ignore this
-        nothing
-    end
-
-    filtered_candidates = isnothing(tag_candidates) ? emb_candidates :
-                          (emb_candidates & tag_candidates)
-    reranked_candidates = rerank(rerank_strategy,
-        index,
-        question,
-        filtered_candidates;
-        top_n,
-        verbose = false, rerank_kwargs...)
-    return filtered_candidates
-
+    ## Return
     result = RAGResult(;
         question,
-        rephrased_questions = [question],
-        answer = msg.content,
-        refined_answer = msg.content,
-        context,
+        answer = nothing,
+        rephrased_questions,
+        refined_answer = nothing,
+        context = chunks(index)[reranked_candidates.positions],
         sources = sources(index)[reranked_candidates.positions],
         emb_candidates,
         tag_candidates,

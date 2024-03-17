@@ -40,7 +40,9 @@ function build_context(contexter::ContextEnumerator,
         index::AbstractChunkIndex, candidates::CandidateChunks;
         verbose::Bool = true,
         chunks_window_margin::Tuple{Int, Int} = (1, 1), kwargs...)
+    ## Checks
     @assert chunks_window_margin[1] >= 0&&chunks_window_margin[2] >= 0 "Both `chunks_window_margin` values must be non-negative"
+
     context = String[]
     for (i, position) in enumerate(candidates.positions)
         chunks_ = chunks(index)[max(1, position - chunks_window_margin[1]):min(end,
@@ -102,7 +104,6 @@ Generates an answer using the `aigenerate` function with the provided `result.co
 - `template::Symbol`: The template to use for the `aigenerate` function. Defaults to `:RAGAnswerFromContext`.
 - `cost_tracker`: An atomic counter to track the cost of the operation.
 
-
 """
 function answer!(
         answerer::SimpleAnswerer, index::AbstractChunkIndex, result::AbstractRAGResult;
@@ -110,6 +111,10 @@ function answer!(
         template::Symbol = :RAGAnswerFromContext,
         cost_tracker = Threads.Atomic{Float64}(0.0),
         kwargs...)
+    ## Checks
+    placeholders = only(aitemplates(template)).variables # only one template should be found
+    @assert (:question in placeholders)&&(:context in placeholders) "Provided RAG Template $(template) is not suitable. It must have placeholders: `question` and `context`."
+    ##
     (; context, question) = result
     conv = aigenerate(template; question,
         context = join(context, "\n\n"), model, verbose = false,
