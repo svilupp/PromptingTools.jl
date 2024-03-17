@@ -102,10 +102,46 @@ Base.length(cc::CandidateChunks) = length(cc.positions)
 function Base.first(cc::CandidateChunks, k::Integer)
     CandidateChunks(cc.index_id, first(cc.positions, k), first(cc.distances, k))
 end
+
+# join and sort two candidate chunks
+function Base.vcat(cc1::AbstractCandidateChunks, cc2::AbstractCandidateChunks)
+    throw(ArgumentError("Not implemented for type $(typeof(cc1)) and $(typeof(cc2))"))
+end
+function Base.vcat(cc1::CandidateChunks{TP1, TD1},
+        cc2::CandidateChunks{TP2, TD2}) where {
+        TP1 <: Integer, TP2 <: Integer, TD1 <: Real, TD2 <: Real}
+    ## Check validity
+    cc1.index_id != cc2.index_id &&
+        throw(ArgumentError("Index ids must match (provided: $(cc1.index_id) and $(cc2.index_id))"))
+
+    positions = vcat(cc1.positions, cc2.positions)
+    # operates on maximum similarity principle, ie, take the max similarity
+    distances = if !isempty(cc1.distances) && !isempty(cc2.distances)
+        vcat(cc1.distances, cc2.distances)
+    else
+        Float32[]
+    end
+
+    if !isempty(distances)
+        ## Get sorted by maximum similarity (distances are similarity)
+        sorted_idxs = sortperm(distances, rev = true)
+        positions_sorted = @view(positions[sorted_idxs])
+        ## get the positions of unique elements
+        unique_idxs = unique(i -> positions_sorted[i], eachindex(positions_sorted))
+        positions = positions_sorted[unique_idxs]
+        ## apply the sorting and then the filtering
+        distances = @view(distances[sorted_idxs])[unique_idxs]
+    else
+        positions = unique(positions)
+    end
+
+    CandidateChunks(cc1.index_id, positions, distances)
+end
+
 # combine/intersect two candidate chunks. average the score if available
 function Base.var"&"(cc1::AbstractCandidateChunks,
         cc2::AbstractCandidateChunks)
-    throw(ArgumentError("Not implemented"))
+    throw(ArgumentError("Not implemented for type $(typeof(cc1)) and $(typeof(cc2))"))
 end
 function Base.var"&"(cc1::CandidateChunks{TP1, TD1},
         cc2::CandidateChunks{TP2, TD2}) where
@@ -114,6 +150,7 @@ function Base.var"&"(cc1::CandidateChunks{TP1, TD1},
     cc1.index_id != cc2.index_id && return CandidateChunks(; index_id = cc1.index_id)
 
     positions = intersect(cc1.positions, cc2.positions)
+    # TODO: validate - this seems like a bug! distances should not be using positions directly
     distances = if !isempty(cc1.distances) && !isempty(cc2.distances)
         (cc1.distances[positions] .+ cc2.distances[positions]) ./ 2
     else
@@ -187,10 +224,23 @@ end
     RAGDetails
 
 A struct for debugging RAG answers. It contains the question, answer, context, and the candidate chunks at each step of the RAG pipeline.
+
+# Fields
+- `question::AbstractString`: the original question
+- `rephrased_questions::Vector{<:AbstractString}`: a vector of rephrased questions (eg, HyDe, Multihop, etc.)
+- `answer::AbstractString`: the generated answer
+- `refined_answer::AbstractString`: the refined answer (eg, after CorrectiveRAG), also considered the FINAL answer (it must be always available)
+- `context::Vector{<:AbstractString}`: the context used for retrieval (ie, the vector of chunks and their surrounding window if applicable)
+- `sources::Vector{<:AbstractString}`: the sources of the context (for the original matched chunks)
+- `emb_candidates::CandidateChunks`: the candidate chunks from the embedding index (from `find_closest`)
+- `tag_candidates::Union{Nothing, CandidateChunks}`: the candidate chunks from the tag index (from `find_tags`)
+- `filtered_candidates::CandidateChunks`: the filtered candidate chunks (intersection of `emb_candidates` and `tag_candidates`)
+- `reranked_candidates::CandidateChunks`: the reranked candidate chunks (from `rerank`)
+- `conversations::Dict{Symbol,Vector{<:AbstractMessage}}`: the conversation history for AI steps of the RAG pipeline, use keys that correspond to the function names, eg, `:answer` or `:refine`
 """
-@kwdef mutable struct RAGDetails <: AbstractRAGResult
+@kwdef mutable struct RAGResult <: AbstractRAGResult
     question::AbstractString
-    rephrased_question::AbstractVector{<:AbstractString}
+    rephrased_questions::AbstractVector{<:AbstractString}
     answer::AbstractString
     refined_answer::AbstractString
     context::Vector{<:AbstractString}
@@ -199,15 +249,26 @@ A struct for debugging RAG answers. It contains the question, answer, context, a
     tag_candidates::Union{Nothing, CandidateChunks}
     filtered_candidates::CandidateChunks
     reranked_candidates::CandidateChunks
+    conversations::Dict{Symbol, Vector{<:AbstractMessage}} = Dict{
+        Symbol, Vector{<:AbstractMessage}}()
 end
 # Simplification of the RAGDetails struct
-function RAGDetails(
+function RAGResult(
         question, answer, context; sources = ["Source $i" for i in 1:length(context)])
-    return RAGDetails(question, [question], answer, answer, context, sources,
-        CandidateChunks(index_id = :emb, positions = Int[], distances = Float32[]),
+    return RAGResult(question, [question], answer, answer, context, sources,
+        CandidateChunks(index_id = :index, positions = Int[], distances = Float32[]),
         nothing,
-        CandidateChunks(index_id = :emb, positions = Int[], distances = Float32[]),
-        CandidateChunks(index_id = :emb, positions = Int[], distances = Float32[]))
+        CandidateChunks(index_id = :index, positions = Int[], distances = Float32[]),
+        CandidateChunks(index_id = :index, positions = Int[], distances = Float32[]),
+        Dict{Symbol, Vector{<:AbstractMessage}}())
+end
+
+function Base.var"=="(r1::T, r2::T) where {T <: AbstractRAGResult}
+    all(f -> getfield(r1, f) == getfield(r2, f),
+        fieldnames(T))
+end
+function Base.copy(r::T) where {T <: AbstractRAGResult}
+    T(copy(getfield(r, f)) for f in fieldnames(T))
 end
 
 # Structured show method for easier reading (each kwarg on a new line)
@@ -217,10 +278,11 @@ function Base.show(io::IO,
 end
 
 # Pretty print
+# TODO: add more customizations, eg, context itself
 function PT.pprint(
         io::IO, r::AbstractRAGResult; text_width::Int = displaysize(io)[2])
-    if !isempty(r.rephrased_question)
-        content = PT.wrap_string("- " * join(r.rephrased_question, "\n- "), text_width)
+    if !isempty(r.rephrased_questions)
+        content = PT.wrap_string("- " * join(r.rephrased_questions, "\n- "), text_width)
         print(io, "-"^20, "\n")
         printstyled(io, "QUESTION(s)", color = :blue, bold = true)
         print(io, "\n", "-"^20, "\n")

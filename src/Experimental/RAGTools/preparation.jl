@@ -37,6 +37,13 @@ No-op tagger for `get_tags` functions. It returns (`nothing`, `nothing`).
 struct NoTagger <: AbstractTagger end
 
 """
+    PassthroughTagger <: AbstractTagger
+
+Tagger for `get_tags` functions, which passes `tags` directly as Vector of Vectors of strings (ie, `tags[i]` is the tags for `docs[i]`).
+"""
+struct PassthroughTagger <: AbstractTagger end
+
+"""
     OpenTagger <: AbstractTagger
 
 Tagger for `get_tags` functions, which generates possible tags for each chunk via `aiextract`. 
@@ -150,8 +157,13 @@ function get_chunks(chunker::AbstractChunker,
     return output_chunks, output_sources
 end
 
+function get_embeddings(
+        ::AbstractEmbedder, docs::AbstractVector{<:AbstractString}; kwargs...)
+    throw(ArgumentError("Not implemented for embedder $(typeof(embedder))"))
+end
+
 """
-    get_embeddings(embedder::AbstractEmbedder = BatchEmbedder(), docs::Vector{<:AbstractString};
+    get_embeddings(embedder::BatchEmbedder, docs::AbstractVector{<:AbstractString};
         verbose::Bool = true,
         cost_tracker = Threads.Atomic{Float64}(0.0),
         target_batch_size_length::Int = 80_000,
@@ -178,7 +190,7 @@ Embeds a vector of `docs` using the provided model (kwarg `model`) in a batched 
 - `ntasks`: The number of tasks to use for asyncmap. Default is 4 * Threads.nthreads().
 
 """
-function get_embeddings(embedder::AbstractEmbedder, docs::Vector{<:AbstractString};
+function get_embeddings(embedder::BatchEmbedder, docs::AbstractVector{<:AbstractString};
         verbose::Bool = true,
         model::AbstractString = PT.MODEL_EMBEDDING,
         cost_tracker = Threads.Atomic{Float64}(0.0),
@@ -214,6 +226,11 @@ end
 
 ### Tag Extraction
 
+function get_tags(tagger::AbstractTagger, docs::AbstractVector{<:AbstractString};
+        kwargs...)
+    throw(ArgumentError("Not implemented for tagger $(typeof(tagger))"))
+end
+
 """
     tags_extract(item::Tag)
     tags_extract(tags::Vector{Tag})
@@ -234,18 +251,33 @@ tags_extract(items::Nothing) = String[]
 tags_extract(items::Vector{Tag}) = metadata_extract.(items)
 
 """
-    get_tags(tagger::NoTagger, docs::Vector{<:AbstractString};
+    get_tags(tagger::NoTagger, docs::AbstractVector{<:AbstractString};
         kwargs...)
 
 Simple no-op that skips any tagging of the documents
 """
-function get_tags(tagger::NoTagger, docs::Vector{<:AbstractString};
+function get_tags(tagger::NoTagger, docs::AbstractVector{<:AbstractString};
         kwargs...)
-    nothing, nothing
+    nothing
 end
 
 """
-    get_tags(tagger::AbstractTagger = OpenTagger(), docs::Vector{<:AbstractString};
+    get_tags(tagger::PassthroughTagger, docs::AbstractVector{<:AbstractString};
+        tags::AbstractVector{<:AbstractVector{<:AbstractString}},
+        kwargs...)
+
+Pass `tags` directly as Vector of Vectors of strings (ie, `tags[i]` is the tags for `docs[i]`).
+It then builds the vocabulary from the tags and returns both the tags in matrix form and the vocabulary.
+"""
+function get_tags(tagger::PassthroughTagger, docs::AbstractVector{<:AbstractString};
+        tags::AbstractVector{<:AbstractVector{<:AbstractString}},
+        kwargs...)
+    @assert length(docs)==length(tags) "Length of `docs` must match length of `tags`"
+    return tags
+end
+
+"""
+    get_tags(tagger::OpenTagger, docs::AbstractVector{<:AbstractString};
         verbose::Bool = true,
         cost_tracker = Threads.Atomic{Float64}(0.0),
         kwargs...)
@@ -258,15 +290,19 @@ Extracts "tags" (metadata/keywords) from a vector of `docs` using the provided m
 - `model`: The model to use for tags extraction. Default is `PT.MODEL_CHAT`.
 - `template`: A template to be used for tags extraction. Default is `:RAGExtractMetadataShort`.
 - `cost_tracker`: A `Threads.Atomic{Float64}` object to track the total cost of the API calls. Useful to pass the total cost to the parent call.
-
 """
-function get_tags(tagger::AbstractTagger, docs::Vector{<:AbstractString};
+function get_tags(tagger::OpenTagger, docs::AbstractVector{<:AbstractString};
         verbose::Bool = true,
         model::AbstractString = PT.MODEL_CHAT,
         template::Symbol = :RAGExtractMetadataShort,
         cost_tracker = Threads.Atomic{Float64}(0.0),
         kwargs...)
     _check_aiextract_capability(model)
+    ## check if extension is available
+    ext = Base.get_extension(PromptingTools, :RAGToolsExperimentalExt)
+    if isnothing(ext)
+        error("You need to also import LinearAlgebra and SparseArrays to use this function")
+    end
     verbose && @info "Extracting metadata from $(length(docs)) documents..."
     tags_extracted = asyncmap(docs) do docs_chunk
         try
@@ -283,13 +319,21 @@ function get_tags(tagger::AbstractTagger, docs::Vector{<:AbstractString};
         end
     end
 
-    # Build the sparse matrix and the vocabulary
-    tags, tags_vocab = build_tags(tagger, tags_extracted)
-
     verbose &&
-        @info "Done extracting the metadata. Total cost: \$$(round(cost_tracker[],digits=3))"
+        @info "Done extracting the tags. Total cost: \$$(round(cost_tracker[],digits=3))"
 
-    return tags, tags_vocab
+    return tags_extracted
+end
+
+"""
+    build_tags(tagger::AbstractTagger, chunk_tags::Nothing; kwargs...)
+
+No-op that skips any tag building, returning `nothing, nothing`
+
+Otherwise, it would build the sparse matrix and the vocabulary (requires `SparseArrays` and `LinearAlgebra` packages to be loaded).
+"""
+function build_tags(tagger::AbstractTagger, chunk_tags::Nothing; kwargs...)
+    nothing, nothing
 end
 
 """
@@ -325,10 +369,11 @@ Define your own methods via `indexer` and its subcomponents (`chunker`, `embedde
 - `embedder`: The embedder logic to use for embedding the chunks. Default is `BatchEmbedder()`.
 - `embedder_kwargs`: Parameters to be provided to the `get_embeddings` function. Useful to change the `target_batch_size_length` or reduce asyncmap tasks `ntasks`.
   - `model`: The model to use for embedding. Default is `PT.MODEL_EMBEDDING`.
-- `tagger`: The tagger logic to use for extracting tags from the chunks. Default is `NoTagger()`, ie, skip tag extraction.
+- `tagger`: The tagger logic to use for extracting tags from the chunks. Default is `NoTagger()`, ie, skip tag extraction. There are also `PassthroughTagger` and `OpenTagger`.
 - `tagger_kwargs`: Parameters to be provided to the `get_tags` function.
   - `model`: The model to use for tags extraction. Default is `PT.MODEL_CHAT`.
   - `template`: A template to be used for tags extraction. Default is `:RAGExtractMetadataShort`.
+  - `tags`: A vector of vectors of strings directly providing the tags for each chunk. Applicable for `tagger::PasstroughTagger`.
 - `api_kwargs`: Parameters to be provided to the API endpoint. Shared across all API calls if provided.
 - `cost_tracker`: A `Threads.Atomic{Float64}` object to track the total cost of the API calls. Useful to pass the total cost to the parent call.
 
@@ -381,14 +426,22 @@ function build_index(
         api_kwargs, embedder_kwargs...)
 
     ## Extract tags
-    tags, tags_vocab = get_tags(tagger, chunks;
+    tags_extracted = get_tags(tagger, chunks;
         verbose = (verbose > 1),
         cost_tracker,
         api_kwargs, tagger_kwargs...)
+    # Build the sparse matrix and the vocabulary
+    tags, tags_vocab = build_tags(tagger, tags_extracted)
 
     (verbose > 0) && @info "Index built! (cost: \$$(round(cost_tracker[], digits=3)))"
 
     index = ChunkIndex(; id = index_id, embeddings, tags, tags_vocab,
         chunks, sources, extras)
     return index
+end
+
+# Default dispatch
+const DEFAULT_INDEXER = SimpleIndexer()
+function build_index(files_or_docs::Vector{<:AbstractString}; kwargs...)
+    build_index(DEFAULT_INDEXER, files_or_docs; kwargs...)
 end

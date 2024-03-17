@@ -8,8 +8,8 @@
 #
 # This system is designed for information retrieval and response generation, structured in three main phases:
 # - Preparation, when you create an instance of `AbstractIndex`
-# - Retrieval, when you surface the top most relevant chunks/items in the `index` 
-# - Generation, when you generate an answer based on the retrieved chunks
+# - Retrieval, when you surface the top most relevant chunks/items in the `index`
+# - Generation, when you generate an answer based on the context built from the retrieved chunks
 #
 # The system is designed to be hackable and extensible at almost every entry point.
 # You just need to define the corresponding concrete type (struct XYZ <: AbstractXYZ end) and the corresponding method.
@@ -22,16 +22,16 @@
 #   flow: get_chunks -> get_embeddings -> get_tags
 # 
 # airag: 
-#   signature: () -> AIMessage or (AIMessage, RAGDetails)
+#   signature: () -> AIMessage or (AIMessage, RAGResult)
 #   flow: retrieve -> generate
 #
 # retrieve:
-#   signature: () -> RAGContext
+#   signature: () -> RAGResult
 #   flow: rephrase -> aiembed -> find_closest -> find_tags -> rerank
 #
 # generate:
-#  signature: () -> AIMessage or (AIMessage, RAGContext)
-#  flow: format_context -> aigenerate -> refine   
+#  signature: () -> AIMessage or (AIMessage, RAGResult)
+#  flow: build_context -> answer -> refine -> postprocess
 #
 ### Deepdive
 #
@@ -39,15 +39,22 @@
 # - Begins with `build_index`, which creates a user-defined index type from an abstract chunk index using specified models and function strategies.
 # - `get_chunks` then divides the indexed data into manageable pieces based on a chunking strategy.
 # - `get_embeddings` generates embeddings for each chunk using an embedding strategy to facilitate similarity searches.
-# - Finally, `get_metadata` extracts relevant metadata from each chunk using a metadata strategy, enabling metadata-based filtering.
+# - Finally, `get_tags` extracts relevant metadata from each chunk, enabling tag-based filtering (hybrid search index).
 #
-# Generation/E2E Phase:
-# - Starts with `airag`, initiating the response generation process using a custom index to potentially alter the high-level structure.
+# Retrieval Phase:
 # - The `retrieve` step employs a retrieval strategy to fetch relevant data, which can be modified by a rephrase strategy for better query matching.
-# - `aiembed` generates embeddings for the rephrased query, which are used in `find_closest` to identify the most relevant chunks using a similarity strategy.
-# - Optional tag filtering (`aiextract + find_exact`) can be applied before candidates are re-ranked using a reranking strategy.
-# - `format_context` constructs the context for response generation based on a context strategy, leading to the `aigenerate` step that produces the final answer.
-# - The process concludes with `Refine`, applying a refine strategy for any final adjustments or re-evaluation.
+# - `rephrase` is called first, if we want to rephrase the query
+# - `aiembed` generates embeddings for the original + rephrased query
+# - `find_closest` looks up the most relevant candidates (`CandidateChunks`) using a similarity search strategy.
+# - Optional tag filtering is applied (`aiextract + find_tags`) can be applied
+# - Then we apply a reranking strategy via `rerank` to get the final list of candidates.
+#
+#
+# Generation Phase:
+# - Given the `RAGDetails`, `generate` uses a generation strategy to produce a response, potentially using some strategy to refine the response.
+# - `build_context` constructs the context for response generation based on a context strategy and applies the necessary formatting
+# - `aigenerate` generates the response based on the context and the query
+# - `refine` is called to refine the response (optional, defaults to passthrough)
 #
 
 ### Types
@@ -144,8 +151,8 @@ Abstract type for retrieving chunks from an index with `retrieve` (use to change
 
 # Required Fields
 - `rephraser::AbstractRephraser`: the rephrasing method, dispatching `rephrase`
-- `similarity_search::AbstractSimilaritySearch`: the similarity search method, dispatching `find_closest`
-- `tag_match::AbstractTagMatch`: the tag matching method, dispatching `find_tags`
+- `finder::AbstractSimilarityFinder`: the similarity search method, dispatching `find_closest`
+- `filter::AbstractTagFilter`: the tag matching method, dispatching `find_tags`
 - `reranker::AbstractReranker`: the reranking method, dispatching `rerank`
 """
 abstract type AbstractRetriever <: AbstractRetrievalMethod end
@@ -165,14 +172,31 @@ abstract type AbstractReranker <: AbstractRetrievalMethod end
 # ## Generation stage
 abstract type AbstractGenerationMethod end
 
-# Main dispatch type for: `generate`
+# Main dispatch type for: `generate!`
+"""
+    AbstractGenerator <: AbstractGenerationMethod
+
+Abstract type for generating an answer with `generate!` (use to change the process / return type of `generate`).
+
+# Required Fields
+- `contexter::AbstractContextBuilder`: the context building method, dispatching `build_context!
+- `answerer::AbstractAnswerer`: the answer generation method, dispatching `answer!`
+- `refiner::AbstractRefiner`: the answer refining method, dispatching `refine!`
+- `postprocessor::AbstractPostprocessor`: the postprocessing method, dispatching `postprocess!`
+"""
 abstract type AbstractGenerator <: AbstractGenerationMethod end
 
-# Main dispatch type for: `build_context`
+# Main dispatch type for: `build_context!`
 abstract type AbstractContextBuilder <: AbstractGenerationMethod end
 
-# Main dispatch type for: `refine`
+# Main dispatch type for: `answer!`
+abstract type AbstractAnswerer <: AbstractGenerationMethod end
+
+# Main dispatch type for: `refine!`
 abstract type AbstractRefiner <: AbstractGenerationMethod end
+
+# Main dispatch type for: `postprocess!`
+abstract type AbstractPostprocessor <: AbstractGenerationMethod end
 
 # ## Exploration/Display stage
 
@@ -193,12 +217,16 @@ function get_tags end
 "Builds a matrix of tags and a vocabulary list. REQUIRES SparseArrays and LinearAlgebra packages to be loaded!!"
 function build_tags end
 
+# Retrieval stage -> ultimately returns `RAGResult`
 function retrieve end
 function rephrase end
 function find_closest end
 function find_tags end
 function rerank end
 
-function generate end
-function format_context end
-function refine end
+# Generation stage -> returns mutated `RAGResult`
+function generate! end
+function build_context! end
+function answer! end
+function refine! end
+function postprocess! end

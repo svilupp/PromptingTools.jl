@@ -10,7 +10,7 @@ This module is experimental and may change at any time. It is intended to be mov
 module RAGTools
 
 using PromptingTools
-using PromptingTools: pprint
+using PromptingTools: pprint, AbstractMessage
 using HTTP, JSON3
 using AbstractTrees
 using AbstractTrees: PreOrderDFS
