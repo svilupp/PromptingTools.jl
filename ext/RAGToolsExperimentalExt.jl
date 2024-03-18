@@ -10,7 +10,14 @@ const RT = PromptingTools.Experimental.RAGTools
 # forward to LinearAlgebra.normalize
 RT._normalize(arr::AbstractArray) = normalize(arr)
 
-# "Builds a sparse matrix of tags and a vocabulary from the given vector of chunk metadata. Requires SparseArrays.jl to be loaded."
+"""
+    RT.build_tags(
+        tagger::RT.AbstractTagger, chunk_metadata::AbstractVector{
+            <:AbstractVector{String},
+        })
+
+Builds a sparse matrix of tags and a vocabulary from the given vector of chunk metadata.
+"""
 function RT.build_tags(
         tagger::RT.AbstractTagger, chunk_metadata::AbstractVector{
             <:AbstractVector{String},

@@ -57,7 +57,7 @@ What does it do?
   - [OPTIONAL] extracts any potential tags/filters from the question and applies them to filter down the potential candidates (use `extract_metadata=true` in `build_index`, you can also provide some filters explicitly via `tag_filter`)
   - [OPTIONAL] re-ranks the candidate chunks (define and provide your own `rerank_strategy`, eg Cohere ReRank API)
   - build a context from the closest chunks (use `chunks_window_margin` to tweak if we include preceding and succeeding chunks as well, see `?build_context` for more details)
-- generate an answer from the closest chunks (use `return_details=true` to see under the hood and debug your application)
+- generate an answer from the closest chunks (use `return_all=true` to see under the hood and debug your application)
 
 You should save the index for later to avoid re-embedding / re-extracting the document chunks!
 
@@ -124,7 +124,7 @@ Let's evaluate this QA item with a "judge model" (often GPT-4 is used as a judge
 
 ````julia
 # Note: that we used the same question, but generated a different context and answer via `airag`
-msg, ctx = airag(index; evals[1].question, return_details = true);
+ctx = airag(index; evals[1].question, return_all = true);
 # ctx is a RAGContext object that keeps all intermediate states of the RAG pipeline for easy evaluation
 judged = aiextract(:RAGJudgeAnswerFromContext;
     ctx.context,
@@ -173,7 +173,7 @@ Let's run each question & answer through our eval loop in async (we do it only f
 ````julia
 results = asyncmap(evals[1:10]) do qa_item
     # Generate an answer -- often you want the model_judge to be the highest quality possible, eg, "GPT-4 Turbo" (alias "gpt4t)
-    msg, ctx = airag(index; qa_item.question, return_details = true,
+    msg, ctx = airag(index; qa_item.question, return_all = true,
         top_k = 3, verbose = false, model_judge = "gpt4t")
     # Evaluate the response
     # Note: you can log key parameters for easier analysis later

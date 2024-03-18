@@ -489,6 +489,6 @@ function annotate_support(
         add_sources::Bool = true,
         add_scores::Bool = true, kwargs...)
     return annotate_support(
-        annotater, result.refined_answer, result.context; min_score, skip_trigrams,
+        annotater, result.final_answer, result.context; min_score, skip_trigrams,
         hashed, result.sources, min_source_score, add_sources, add_scores, kwargs...)
 end

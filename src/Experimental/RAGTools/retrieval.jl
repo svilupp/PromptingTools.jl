@@ -37,7 +37,7 @@ Finds the chunks that have ANY OF the specified tag(s).
 struct AnyTagFilter <: AbstractTagFilter end
 
 ### Functions
-function rephrase(::AbstractRephraser, question::AbstractString; kwargs...)
+function rephrase(rephraser::AbstractRephraser, question::AbstractString; kwargs...)
     throw(ArgumentError("Not implemented yet for type $(typeof(rephraser))"))
 end
 
@@ -458,6 +458,8 @@ function retrieve(retriever::AbstractRetriever,
     ## Combine the two sets of candidates, looks for intersection (hard filter)!
     filtered_candidates = isnothing(tag_candidates) ? emb_candidates :
                           (emb_candidates & tag_candidates)
+    ## Future implementation should be to apply tag filtering BEFORE the find_closest,
+    ## but that requires implementing `IndexView` to provide only a subset of the embeddings to the subsequent functionality.
 
     ## Reranking
     reranker_kwargs_ = isempty(api_kwargs) ? reranker_kwargs :

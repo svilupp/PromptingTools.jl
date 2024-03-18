@@ -15,37 +15,37 @@ using PromptingTools: UserMessage, UserMessageWithImages, DataMessage, _encode_l
     messages = [UserMessage("I am {{name}}")]
     expected_output = [
         Dict("role" => "system", "content" => "Act as a helpful AI assistant"),
-        Dict("role" => "user", "content" => "I am John Doe"),
+        Dict("role" => "user", "content" => "I am John Doe")
     ]
     @test render(schema, messages; name = "John Doe") == expected_output
 
     # Test message rendering with system and user messages
     messages = [
         SystemMessage("This is a system generated message."),
-        UserMessage("A user generated reply."),
+        UserMessage("A user generated reply.")
     ]
     expected_output = [
         Dict("role" => "system", "content" => "This is a system generated message."),
-        Dict("role" => "user", "content" => "A user generated reply."),
+        Dict("role" => "user", "content" => "A user generated reply.")
     ]
     @test render(schema, messages) == expected_output
 
     # Test message rendering with images
     messages = [
         UserMessageWithImages("User message with an image";
-            image_url = ["https://example.com/image.jpg"]),
+        image_url = ["https://example.com/image.jpg"])
     ]
     expected_output = [
         Dict("role" => "system", "content" => "Act as a helpful AI assistant"),
         Dict("role" => "user",
             "content" => "User message with an image",
-            "images" => ["https://example.com/image.jpg"]),
+            "images" => ["https://example.com/image.jpg"])
     ]
     @test render(schema, messages) == expected_output
     # Test message with local image
     messages = [
         UserMessageWithImages("User message with an image";
-            image_path = joinpath(@__DIR__, "data", "julia.png"), base64_only = true),
+        image_path = joinpath(@__DIR__, "data", "julia.png"), base64_only = true)
     ]
     raw_img = _encode_local_image(joinpath(@__DIR__, "data", "julia.png");
         base64_only = true)
@@ -53,7 +53,7 @@ using PromptingTools: UserMessage, UserMessageWithImages, DataMessage, _encode_l
         Dict("role" => "system", "content" => "Act as a helpful AI assistant"),
         Dict("role" => "user",
             "content" => "User message with an image",
-            "images" => [raw_img]),
+            "images" => [raw_img])
     ]
     @test render(schema, messages) == expected_output
 end
@@ -103,7 +103,7 @@ end
     conversation = [SystemMessage("Today's weather is {{weather}}.")]
     # Mock dry run replacing the template variable
     expected_convo_output = [
-        SystemMessage(; content = "Today's weather is sunny.", variables = [:weather]),
+        SystemMessage(; content = "Today's weather is sunny.", variables = [:weather])
     ]
     @test aigenerate(schema,
         conversation;
@@ -140,7 +140,7 @@ end
             "content" => "hi",
             "images" => [
                 _encode_local_image(joinpath(@__DIR__, "data", "julia.png"),
-                    base64_only = true),
+                base64_only = true)
             ])]
     @test_throws AssertionError aiscan(schema,
         "hi";

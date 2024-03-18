@@ -98,7 +98,7 @@ function load_text(chunker::AbstractChunker, input;
 end
 function load_text(chunker::FileChunker, input::AbstractString;
         source::AbstractString = input, kwargs...)
-    @assert all(isfile, input) "Path $input does not exist"
+    @assert isfile(input) "Path $input does not exist"
     return read(input, String), source
 end
 function load_text(chunker::TextChunker, input::AbstractString;
@@ -158,7 +158,7 @@ function get_chunks(chunker::AbstractChunker,
 end
 
 function get_embeddings(
-        ::AbstractEmbedder, docs::AbstractVector{<:AbstractString}; kwargs...)
+        embedder::AbstractEmbedder, docs::AbstractVector{<:AbstractString}; kwargs...)
     throw(ArgumentError("Not implemented for embedder $(typeof(embedder))"))
 end
 
@@ -248,7 +248,7 @@ function tags_extract(item::Tag)
     x -> replace(x, " " => "_")
 end
 tags_extract(items::Nothing) = String[]
-tags_extract(items::Vector{Tag}) = metadata_extract.(items)
+tags_extract(items::Vector{Tag}) = tags_extract.(items)
 
 """
     get_tags(tagger::NoTagger, docs::AbstractVector{<:AbstractString};
@@ -351,9 +351,11 @@ end
         api_kwargs::NamedTuple = NamedTuple(),
         cost_tracker = Threads.Atomic{Float64}(0.0))
 
-Build an index for RAG (Retriever-Augmented Generation) applications from the provided file paths. 
-The function processes each file, splits its content into chunks, embeds these chunks, 
-optionally extracts metadata, and then compiles this information into a retrievable index.
+Build an INDEX for RAG (Retriever-Augmented Generation) applications from the provided file paths. 
+INDEX is a object storing the document chunks and their embeddings (and potentially other information).
+
+The function processes each file or document (depending on `chunker`), splits its content into chunks, embeds these chunks, 
+optionally extracts metadata, and then combines this information into a retrievable index.
 
 Define your own methods via `indexer` and its subcomponents (`chunker`, `embedder`, `tagger`).
 
