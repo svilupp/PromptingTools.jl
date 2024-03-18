@@ -162,9 +162,9 @@ Simple no-op function for `refine`. It simply copies the `result.answer` and `re
 function refine!(
         refiner::NoRefiner, index::AbstractChunkIndex, result::AbstractRAGResult;
         kwargs...)
-    result.refined_answer = result.answer
+    result.final_answer = result.answer
     if haskey(result.conversations, :answer)
-        result.conversations[:refined_answer] = result.conversations[:answer]
+        result.conversations[:final_answer] = result.conversations[:answer]
     end
     return result
 end
@@ -177,7 +177,7 @@ end
 Give model a chance to refine the answer (using the same context previously provided).
 
 # Returns
-- Mutated `result` with `result.refined_answer` and the full conversation saved in `result.conversations[:refined_answer]`
+- Mutated `result` with `result.final_answer` and the full conversation saved in `result.conversations[:final_answer]`
 
 # Arguments
 - `refiner::SimpleRefiner`: The method to use for refining the answer. Uses `aigenerate`.
@@ -203,8 +203,8 @@ function refine!(
         return_all = true,
         kwargs...)
     msg = conv[end]
-    result.refined_answer = msg.content
-    result.conversations[:refined_answer] = conv
+    result.final_answer = msg.content
+    result.conversations[:final_answer] = conv
 
     ## Increment the cost
     Threads.atomic_add!(cost_tracker, msg.cost)
@@ -280,7 +280,7 @@ end
 
 Generate the response using the provided `generator` and the `index` and `result`.
 
-Returns the mutated `result` with the `result.refined_answer` and the full conversation saved in `result.conversations[:refined_answer]`.
+Returns the mutated `result` with the `result.final_answer` and the full conversation saved in `result.conversations[:final_answer]`.
 
 `refiner` step allows the LLM to critique itself and refine its own answer.
 `postprocessor` step allows for additional processing of the answer, eg, logging, saving conversations, etc.
@@ -377,7 +377,7 @@ end
         model_metadata::String = PT.MODEL_CHAT,
         metadata_template::Symbol = :RAGExtractMetadataShort,
         chunks_window_margin::Tuple{Int, Int} = (1, 1),
-        return_details::Bool = false, verbose::Bool = true,
+        return_all::Bool = false, verbose::Bool = true,
         rerank_kwargs::NamedTuple = NamedTuple(),
         api_kwargs::NamedTuple = NamedTuple(),
         aiembed_kwargs::NamedTuple = NamedTuple(),
@@ -409,7 +409,7 @@ The function selects relevant chunks from an `ChunkIndex`, optionally filters th
 - `model_metadata::String`: Model used for extracting metadata, default is `PT.MODEL_CHAT`.
 - `metadata_template::Symbol`: Template for the metadata extraction process from the question, defaults to: `:RAGExtractMetadataShort`
 - `chunks_window_margin::Tuple{Int,Int}`: The window size around each chunk to consider for context building. See `?build_context` for more information.
-- `return_details::Bool`: If `true`, returns the details used for RAG along with the response.
+- `return_all::Bool`: If `true`, returns the details used for RAG along with the response.
 - `verbose::Bool`: If `true`, enables verbose logging.
 - `api_kwargs`: API parameters that will be forwarded to ALL of the API calls (`aiembed`, `aigenerate`, and `aiextract`).
 - `aiembed_kwargs`: API parameters that will be forwarded to the `aiembed` call. If you need to provide `api_kwargs` only to this function, simply add them as a keyword argument, eg, `aiembed_kwargs = (; api_kwargs = (; x=1))`.
@@ -417,8 +417,8 @@ The function selects relevant chunks from an `ChunkIndex`, optionally filters th
 - `aiextract_kwargs`: API parameters that will be forwarded to the `aiextract` call for the metadata extraction.
 
 # Returns
-- If `return_details` is `false`, returns the generated message (`msg`).
-- If `return_details` is `true`, returns a tuple of the generated message (`msg`) and the `RAGDetails` for context (`rag_details`).
+- If `return_all` is `false`, returns the generated message (`msg`).
+- If `return_all` is `true`, returns a tuple of the generated message (`msg`) and the `RAGDetails` for context (`rag_details`).
 
 # Notes
 - The function first finds the closest chunks to the question embedding, then optionally filters these based on tags. After that, it reranks the candidates and builds a context for the RAG model.
@@ -438,9 +438,9 @@ msg = airag(index, :RAGAnswerFromContext; question)
 msg = airag(index; question)
 ```
 
-To understand the details of the RAG process, use `return_details=true`
+To understand the details of the RAG process, use `return_all=true`
 ```julia
-msg, details = airag(index; question, return_details = true)
+msg, details = airag(index; question, return_all = true)
 # details is a RAGDetails object with all the internal steps of the `airag` function
 ```
 
@@ -480,9 +480,9 @@ function airag(cfg::AbstractRAGConfig, index::AbstractChunkIndex;
     ## Return `RAGResult` or more user-friendly `AIMessage`
     output = if return_all
         result
-    elseif haskey(result.conversations, :refined_answer) &&
-           !isempty(result.conversations[:refined_answer])
-        result.conversations[:refined_answer][end]
+    elseif haskey(result.conversations, :final_answer) &&
+           !isempty(result.conversations[:final_answer])
+        result.conversations[:final_answer][end]
     elseif haskey(result.conversations, :answer) &&
            !isempty(result.conversations[:answer])
         result.conversations[:answer][end]

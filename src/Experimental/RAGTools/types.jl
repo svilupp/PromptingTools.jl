@@ -68,7 +68,10 @@ function Base.vcat(i1::ChunkIndex, i2::ChunkIndex)
         sources = vcat(i1.sources, i2.sources))
 end
 
-"Composite index that stores multiple ChunkIndex objects and their embeddings"
+## TODO: implement a view(), make sure to recover the output positions correctly
+## TODO: fields: parent, positions
+
+"Composite index that stores multiple ChunkIndex objects and their embeddings. It's not yet fully implemented."
 @kwdef struct MultiIndex <: AbstractMultiIndex
     id::Symbol = gensym("MultiIndex")
     indexes::Vector{<:AbstractChunkIndex}
@@ -90,6 +93,17 @@ function Base.var"=="(i1::MultiIndex, i2::MultiIndex)
     return true
 end
 
+"""
+    CandidateChunks
+
+A struct for storing references to chunks in the given index (identified by `index_id`) called `positions` and `scores` holding the strength of similarity (=1 is the highest, most similar).
+It's the result of the retrieval stage of RAG.
+
+# Fields
+- `index_id::Symbol`: the id of the index from which the candidates are drawn
+- `positions::Vector{Int}`: the positions of the candidates in the index (ie, `5` refers to the 5th chunk in the index - `chunks(index)[5]`)
+- `scores::Vector{Float32}`: the similarity scores of the candidates from the query (higher is better)
+"""
 @kwdef struct CandidateChunks{TP <: Union{Integer, AbstractCandidateChunks}, TD <: Real} <:
               AbstractCandidateChunks
     index_id::Symbol
@@ -98,9 +112,23 @@ end
     positions::Vector{TP} = Int[]
     scores::Vector{TD} = Float32[]
 end
+## TODO: disabled nested CandidateChunks for now
+## TODO: create MultiCandidateChunks for use with MultiIndex, they will have extra field subindex_id
+
 Base.length(cc::CandidateChunks) = length(cc.positions)
 function Base.first(cc::CandidateChunks, k::Integer)
-    CandidateChunks(cc.index_id, first(cc.positions, k), first(cc.scores, k))
+    sorted_idxs = sortperm(cc.scores, rev = true) |> x -> first(x, k)
+    CandidateChunks(cc.index_id, cc.positions[sorted_idxs], cc.scores[sorted_idxs])
+end
+function Base.copy(cc::CandidateChunks{TP, TD}) where {TP <: Integer, TD <: Real}
+    CandidateChunks{TP, TD}(cc.index_id, copy(cc.positions), copy(cc.scores))
+end
+function Base.isempty(cc::CandidateChunks)
+    isempty(cc.positions)
+end
+function Base.var"=="(cc1::CandidateChunks, cc2::CandidateChunks)
+    all(
+        getfield(cc1, f) == getfield(cc2, f) for f in fieldnames(CandidateChunks))
 end
 
 # join and sort two candidate chunks
@@ -119,7 +147,7 @@ function Base.vcat(cc1::CandidateChunks{TP1, TD1},
     scores = if !isempty(cc1.scores) && !isempty(cc2.scores)
         vcat(cc1.scores, cc2.scores)
     else
-        Float32[]
+        TD1[]
     end
 
     if !isempty(scores)
@@ -149,16 +177,38 @@ function Base.var"&"(cc1::CandidateChunks{TP1, TD1},
     ##
     cc1.index_id != cc2.index_id && return CandidateChunks(; index_id = cc1.index_id)
 
-    valid_positions = intersect(cc1.positions, cc2.positions)
+    positions = intersect(cc1.positions, cc2.positions)
 
-    # TODO: validate - this seems like a bug! scores should not be using positions directly
     scores = if !isempty(cc1.scores) && !isempty(cc2.scores)
-        ## 
-        (cc1.scores[positions] .+ cc2.scores[positions]) ./ 2
+        valid_scores = fill(TD1(-1), length(positions))
+        # identify maximum scores from each CC
+        # scan the first CC
+        for i in eachindex(cc1.positions, cc1.scores)
+            pos = cc1.positions[i]
+            idx = findfirst(==(pos), positions)
+            if !isnothing(idx)
+                valid_scores[idx] = max(valid_scores[idx], cc1.scores[i])
+            end
+        end
+        # scan the second CC
+        for i in eachindex(cc2.positions, cc2.scores)
+            pos = cc2.positions[i]
+            idx = findfirst(==(pos), positions)
+            if !isnothing(idx)
+                valid_scores[idx] = max(valid_scores[idx], cc2.scores[i])
+            end
+        end
+        valid_scores
     else
-        Float32[]
+        TD1[]
     end
-    ## Sort
+    ## Sort by maximum similarity
+    if !isempty(scores)
+        sorted_idxs = sortperm(scores, rev = true)
+        positions = positions[sorted_idxs]
+        scores = scores[sorted_idxs]
+    end
+
     CandidateChunks(cc1.index_id, positions, scores)
 end
 
@@ -224,7 +274,7 @@ function Base.getindex(mi::MultiIndex,
 end
 
 """
-    RAGDetails
+    RAGResult
 
 A struct for debugging RAG answers. It contains the question, answer, context, and the candidate chunks at each step of the RAG pipeline.
 
@@ -232,7 +282,7 @@ A struct for debugging RAG answers. It contains the question, answer, context, a
 - `question::AbstractString`: the original question
 - `rephrased_questions::Vector{<:AbstractString}`: a vector of rephrased questions (eg, HyDe, Multihop, etc.)
 - `answer::AbstractString`: the generated answer
-- `refined_answer::AbstractString`: the refined answer (eg, after CorrectiveRAG), also considered the FINAL answer (it must be always available)
+- `final_answer::AbstractString`: the refined final answer (eg, after CorrectiveRAG), also considered the FINAL answer (it must be always available)
 - `context::Vector{<:AbstractString}`: the context used for retrieval (ie, the vector of chunks and their surrounding window if applicable)
 - `sources::Vector{<:AbstractString}`: the sources of the context (for the original matched chunks)
 - `emb_candidates::CandidateChunks`: the candidate chunks from the embedding index (from `find_closest`)
@@ -245,7 +295,7 @@ A struct for debugging RAG answers. It contains the question, answer, context, a
     question::AbstractString
     rephrased_questions::AbstractVector{<:AbstractString}
     answer::Union{Nothing, AbstractString} = nothing
-    refined_answer::Union{Nothing, AbstractString} = nothing
+    final_answer::Union{Nothing, AbstractString} = nothing
     context::Vector{<:AbstractString}
     sources::Vector{<:AbstractString}
     emb_candidates::CandidateChunks
@@ -292,7 +342,7 @@ function PT.pprint(
         print(io, "\n", "-"^20, "\n")
         print(io, content, "\n\n")
     end
-    if !isempty(r.refined_answer)
+    if !isempty(r.final_answer)
         annotater = TrigramAnnotater()
         root = annotate_support(annotater, r)
         print(io, "-"^20, "\n")

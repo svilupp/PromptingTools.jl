@@ -1,7 +1,7 @@
 using PromptingTools.Experimental.RAGTools: QAItem, QAEvalItem, QAEvalResult
 using PromptingTools.Experimental.RAGTools: score_retrieval_hit, score_retrieval_rank
 using PromptingTools.Experimental.RAGTools: build_qa_evals, run_qa_evals, chunks, sources
-using PromptingTools.Experimental.RAGTools: JudgeAllScores, MetadataItem, MaybeMetadataItems
+using PromptingTools.Experimental.RAGTools: JudgeAllScores, Tag, MaybeTags
 
 @testset "QAEvalItem" begin
     empty_qa = QAEvalItem()
@@ -75,7 +75,7 @@ end
 
 @testset "build_qa_evals" begin
     # test with a mock server
-    PORT = rand(10000:40000)
+    PORT = rand(10001:40001)
     PT.register_model!(; name = "mock-emb", schema = PT.CustomOpenAISchema())
     PT.register_model!(; name = "mock-meta", schema = PT.CustomOpenAISchema())
     PT.register_model!(; name = "mock-gen", schema = PT.CustomOpenAISchema())
@@ -107,8 +107,8 @@ end
                 :choices => [
                     Dict(:finish_reason => "stop",
                     :message => Dict(:tool_calls => [
-                        Dict(:function => Dict(:arguments => JSON3.write(MaybeMetadataItems([
-                        MetadataItem("yes", "category")
+                        Dict(:function => Dict(:arguments => JSON3.write(MaybeTags([
+                        Tag("yes", "category")
                     ]))))]))],
                 :model => content[:model],
                 :usage => Dict(:total_tokens => length(user_msg[:content]),
@@ -176,12 +176,12 @@ end
         String[]; qa_template = :BlankSystemUser)
 
     # Test run_qa_evals on 1 item
-    msg, ctx = airag(index; question = qa_evals[1].question, model_embedding = "mock-emb",
+    result = airag(index; question = qa_evals[1].question, model_embedding = "mock-emb",
         model_chat = "mock-gen",
         model_metadata = "mock-meta", api_kwargs = (; url = "http://localhost:$(PORT)"),
         tag_filter = :auto,
         extract_metadata = false, verbose = false,
-        return_details = true)
+        return_all = true)
 
     result = run_qa_evals(qa_evals[1], ctx;
         model_judge = "mock-judge",

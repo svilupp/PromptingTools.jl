@@ -1,5 +1,34 @@
-using PromptingTools.Experimental.RAGTools: find_closest, find_tags
-using PromptingTools.Experimental.RAGTools: Passthrough, rerank, CohereRerank
+using PromptingTools.Experimental.RAGTools: ContextEnumerator, NoRephraser, SimpleRephraser,
+                                            CosineSimilarity, NoTagFilter, AnyTagFilter,
+                                            SimpleRetriever, AdvancedRetriever
+using PromptingTools.Experimental.RAGTools: AbstractRephraser, AbstractTagFilter,
+                                            AbstractSimilarityFinder, AbstractReranker
+using PromptingTools.Experimental.RAGTools: find_closest, find_tags, rerank, rephrase,
+                                            retrieve
+using PromptingTools.Experimental.RAGTools: NoReranker, CohereReranker
+
+@testset "rephrase" begin
+    # Test rephrase with NoRephraser, simple passthrough
+    @test rephrase(NoRephraser(), "test") == ["test"]
+
+    # Test rephrase with SimpleRephraser
+    response = Dict(
+        :choices => [
+            Dict(:message => Dict(:content => "new question"), :finish_reason => "stop")
+        ],
+        :usage => Dict(:total_tokens => 3,
+            :prompt_tokens => 2,
+            :completion_tokens => 1))
+    schema = TestEchoOpenAISchema(; response, status = 200)
+    PT.register_model!(; name = "mock-gen", schema)
+    output = rephrase(
+        SimpleRephraser(), "old question", model = "mock-gen")
+    @test output == ["old question", "new question"]
+
+    # with unknown rephraser
+    struct UnknownRephraser123 <: AbstractRephraser end
+    @test_throws ArgumentError rephrase(UnknownRephraser123(), "test question")
+end
 
 @testset "find_closest" begin
     test_embeddings = [1.0 2.0 -1.0; 3.0 4.0 -3.0; 5.0 6.0 -6.0] |>
@@ -9,7 +38,7 @@ using PromptingTools.Experimental.RAGTools: Passthrough, rerank, CohereRerank
     # The query vector should be closer to the first embedding
     @test positions == [1, 2]
     @test isapprox(distances, [0.9975694083904584
-            0.9939123761133188], atol = 1e-3)
+                               0.9939123761133188], atol = 1e-3)
 
     # Test when top_k is more than available embeddings
     positions, _ = find_closest(test_embeddings, query_embedding, top_k = 5)

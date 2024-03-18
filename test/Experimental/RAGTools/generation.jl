@@ -100,7 +100,7 @@ end
         model_chat = "mock-gen",
         model_metadata = "mock-meta", api_kwargs = (; url = "http://localhost:$(PORT)"),
         tag_filter = ["yes"],
-        return_details = false)
+        return_all = false)
     @test occursin("Time?", msg.content)
 
     # test kwargs passing
@@ -109,7 +109,7 @@ end
         model_chat = "mock-gen",
         model_metadata = "mock-meta",
         tag_filter = ["yes"],
-        return_details = false, aiembed_kwargs = (; api_kwargs),
+        return_all = false, aiembed_kwargs = (; api_kwargs),
         aigenerate_kwargs = (; api_kwargs), aiextract_kwargs = (; api_kwargs))
     @test occursin("Time?", msg.content)
 
@@ -119,7 +119,7 @@ end
         model_metadata = "mock-meta", api_kwargs = (; url = "http://localhost:$(PORT)"),
         tag_filter = :auto,
         extract_metadata = false, verbose = false,
-        return_details = true)
+        return_all = true)
     @test details.context == ["1. a\nb\nc", "2. a\nb"]
     @test details.emb_candidates.positions == [3, 2, 1]
     @test details.emb_candidates.distances == zeros(3)
@@ -135,7 +135,7 @@ end
         model_chat = "mock-gen",
         model_metadata = "mock-meta", api_kwargs = (; url = "http://localhost:$(PORT)"),
         tag_filter = nothing,
-        return_details = true)
+        return_all = true)
     @test details.context == ["1. b\nc", "2. a\nb\nc", "3. a\nb"]
     @test details.emb_candidates.positions == [3, 2, 1]
     @test details.emb_candidates.distances == zeros(3)
@@ -148,7 +148,7 @@ end
         model_chat = "mock-gen",
         model_metadata = "mock-meta", api_kwargs = (; url = "http://localhost:$(PORT)"),
         tag_filter = nothing,
-        return_details = true)
+        return_all = true)
     io = IOBuffer()
     PT.pprint(io, result)
     result_str = String(take!(io))

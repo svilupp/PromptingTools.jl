@@ -1,5 +1,6 @@
 module PromptingTools
 
+import AbstractTrees
 using Base64: base64encode
 using Logging
 using OpenAI

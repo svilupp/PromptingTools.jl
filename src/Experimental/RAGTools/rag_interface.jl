@@ -227,6 +227,7 @@ function rerank end
 # Generation stage -> returns mutated `RAGResult`
 function generate! end
 function build_context! end
+function build_context end
 function answer! end
 function refine! end
 function postprocess! end
