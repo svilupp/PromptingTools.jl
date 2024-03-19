@@ -15,6 +15,18 @@ Rephraser implemented using the provided AI Template (eg, `...`) and standard ch
 struct SimpleRephraser <: AbstractRephraser end
 
 """
+    HyDERephraser <: AbstractRephraser
+
+Rephraser implemented using the provided AI Template (eg, `...`) and standard chat model.
+
+It uses a prompt-based rephrasing method called HyDE (Hypothetical Document Embedding), where instead of looking for an embedding of the question, 
+we look for the documents most similar to a synthetic passage that _would be_ a good answer to our question.
+
+Reference: [Arxiv paper](https://arxiv.org/abs/2212.10496).
+"""
+struct HyDERephraser <: AbstractRephraser end
+
+"""
     CosineSimilarity <: AbstractSimilarityFinder
 
 Finds the closest chunks to a query embedding by measuring the cosine similarity between the query and the chunks' embeddings.
@@ -41,27 +53,71 @@ function rephrase(rephraser::AbstractRephraser, question::AbstractString; kwargs
     throw(ArgumentError("Not implemented yet for type $(typeof(rephraser))"))
 end
 
-# No-op, simple passthrough
+"""
+    rephrase(rephraser::NoRephraser, question::AbstractString; kwargs...)
+
+No-op, simple passthrough.
+"""
 function rephrase(rephraser::NoRephraser, question::AbstractString; kwargs...)
     return [question]
 end
 
 """
     rephrase(rephraser::SimpleRephraser, question::AbstractString;
-        model::String = PT.MODEL_CHAT, template::Symbol = :SimpleQuestionRephraser)
+        verbose::Bool = true,
+        model::String = PT.MODEL_CHAT, template::Symbol = :RAGQueryOptimizer,
+        cost_tracker = Threads.Atomic{Float64}(0.0), kwargs...)
 
 Rephrases the `question` using the provided rephraser `template`.
+
+Returns both the original and the rephrased question.
+
+# Arguments
+- `rephraser`: Type that dictates the logic of rephrasing step.
+- `question`: The question to be rephrased.
+- `model`: The model to use for rephrasing. Default is `PT.MODEL_CHAT`.
+- `template`: The rephrasing template to use. Default is `:RAGQueryOptimizer`. Find more with `aitemplates("rephrase")`.
+- `verbose`: A boolean flag indicating whether to print verbose logging. Default is `true`.
 """
 function rephrase(rephraser::SimpleRephraser, question::AbstractString;
         verbose::Bool = true,
-        model::String = PT.MODEL_CHAT, template::Symbol = :SimpleQuestionRephraser,
-        cost_tracker = Threads.Atomic{Float64}(0.0))
-    # TODO: Implement rephrasing, add template
-    msg = aigenerate(template; question, verbose, model)
+        model::String = PT.MODEL_CHAT, template::Symbol = :RAGQueryOptimizer,
+        cost_tracker = Threads.Atomic{Float64}(0.0), kwargs...)
+    ## checks
+    placeholders = only(aitemplates(template)).variables # only one template should be found
+    @assert (:query in placeholders) "Provided RAG Template $(template) is not suitable. It must have a placeholder: `query`."
+
+    msg = aigenerate(template; query = question, verbose, model, kwargs...)
     Threads.atomic_add!(cost_tracker, msg.cost)
-    # TODO: add clean up
-    new_question = msg.content
+    new_question = strip(msg.content)
     return [question, new_question]
+end
+
+"""
+    rephrase(rephraser::SimpleRephraser, question::AbstractString;
+        verbose::Bool = true,
+        model::String = PT.MODEL_CHAT, template::Symbol = :RAGQueryHyDE,
+        cost_tracker = Threads.Atomic{Float64}(0.0))
+
+Rephrases the `question` using the provided rephraser `template = RAGQueryHyDE`.
+
+Special flavor of rephrasing using HyDE (Hypothetical Document Embedding) method, 
+which aims to find the documents most similar to a synthetic passage that _would be_ a good answer to our question.
+
+Returns both the original and the rephrased question.
+
+# Arguments
+- `rephraser`: Type that dictates the logic of rephrasing step.
+- `question`: The question to be rephrased.
+- `model`: The model to use for rephrasing. Default is `PT.MODEL_CHAT`.
+- `template`: The rephrasing template to use. Default is `:RAGQueryHyDE`. Find more with `aitemplates("rephrase")`.
+- `verbose`: A boolean flag indicating whether to print verbose logging. Default is `true`.
+"""
+function rephrase(rephraser::HyDERephraser, question::AbstractString;
+        verbose::Bool = true,
+        model::String = PT.MODEL_CHAT, template::Symbol = :RAGQueryHyDE,
+        cost_tracker = Threads.Atomic{Float64}(0.0), kwargs...)
+    rephrase(SimpleRephraser(), question; verbose, model, template, cost_tracker, kwargs...)
 end
 
 # General fallback
@@ -113,7 +169,7 @@ function find_closest(
         finder::AbstractSimilarityFinder, index::AbstractChunkIndex,
         query_emb::AbstractVector{<:Real};
         top_k::Int = 100, kwargs...)
-    isnothing(embeddings(index)) && CandidateChunks(; index_id = index.id)
+    isnothing(embeddings(index)) && return CandidateChunks(; index_id = index.id)
     positions, scores = find_closest(finder, embeddings(index),
         query_emb;
         top_k, kwargs...)
@@ -126,9 +182,11 @@ function find_closest(
         query_emb::AbstractMatrix{<:Real};
         top_k::Int = 100, kwargs...)
     isnothing(embeddings(index)) && CandidateChunks(; index_id = index.id)
+    ## reduce top_k since we have more than one query
+    top_k_ = top_k ÷ size(query_emb, 2)
     ## simply vcat together (gets sorted from the highest similarity to the lowest)
     mapreduce(
-        c -> find_closest(finder, index, c; top_k, kwargs...), vcat, eachcol(query_emb))
+        c -> find_closest(finder, index, c; top_k = top_k_, kwargs...), vcat, eachcol(query_emb))
 end
 
 ## TODO: Implement for MultiIndex
@@ -155,7 +213,8 @@ end
 ### TAG Filtering
 
 function find_tags(::AbstractTagFilter, index::AbstractChunkIndex,
-        tag::Union{AbstractString, Regex}; kwargs...)
+        tag::Union{T, AbstractVector{<:T}}; kwargs...) where {T <:
+                                                              Union{AbstractString, Regex}}
     throw(ArgumentError("Not implemented yet for type $(typeof(filter))"))
 end
 
@@ -197,7 +256,9 @@ end
 Returns all chunks in the index, ie, no filtering.
 """
 function find_tags(method::NoTagFilter, index::AbstractChunkIndex,
-        tags; kwargs...)
+        tags::Union{Nothing, T, AbstractVector{<:T}}; kwargs...) where {T <:
+                                                                        Union{
+        AbstractString, Regex}}
     return CandidateChunks(
         index.id, collect(1:length(index.chunks)), zeros(Float32, length(index.chunks)))
 end
@@ -320,12 +381,12 @@ Default implementation for `retrieve`. It does a simple similarity search via `C
 Make sure to use consistent `embedder` and `tagger` with the Preparation Stage (`build_index`)!
 
 # Fields
-- `rephraser::AbstractRephraser`: the rephrasing method, dispatching `rephrase`
-- `embedder::AbstractEmbedder`: the embedding method, dispatching `get_embeddings` (see Preparation Stage for more details)
-- `finder::AbstractSimilarityFinder`: the similarity search method, dispatching `find_closest`
-- `tagger::AbstractTagger`: the tag generating method, dispatching `get_tags` (see Preparation Stage for more details)
-- `filter::AbstractTagFilter`: the tag matching method, dispatching `find_tags`
-- `reranker::AbstractReranker`: the reranking method, dispatching `rerank`
+- `rephraser::AbstractRephraser`: the rephrasing method, dispatching `rephrase` - uses `NoRephraser`
+- `embedder::AbstractEmbedder`: the embedding method, dispatching `get_embeddings` (see Preparation Stage for more details) - uses `BatchEmbedder`
+- `finder::AbstractSimilarityFinder`: the similarity search method, dispatching `find_closest` - uses `CosineSimilarity`
+- `tagger::AbstractTagger`: the tag generating method, dispatching `get_tags` (see Preparation Stage for more details) - uses `NoTagger`
+- `filter::AbstractTagFilter`: the tag matching method, dispatching `find_tags` - uses `NoTagFilter`
+- `reranker::AbstractReranker`: the reranking method, dispatching `rerank` - uses `NoReranker`
 """
 @kwdef mutable struct SimpleRetriever <: AbstractRetriever
     rephraser::AbstractRephraser = NoRephraser()
@@ -343,15 +404,15 @@ Dispatch for `retrieve` with advanced retrieval methods to improve result qualit
 Compared to SimpleRetriever, it adds rephrasing the query and reranking the results.
 
 # Fields
-- `rephraser::AbstractRephraser`: the rephrasing method, dispatching `rephrase`
-- `embedder::AbstractEmbedder`: the embedding method, dispatching `get_embeddings` (see Preparation Stage for more details)
-- `finder::AbstractSimilarityFinder`: the similarity search method, dispatching `find_closest`
-- `tagger::AbstractTagger`: the tag generating method, dispatching `get_tags` (see Preparation Stage for more details)
-- `filter::AbstractTagFilter`: the tag matching method, dispatching `find_tags`
-- `reranker::AbstractReranker`: the reranking method, dispatching `rerank`
+- `rephraser::AbstractRephraser`: the rephrasing method, dispatching `rephrase` - uses `HyDERephraser`
+- `embedder::AbstractEmbedder`: the embedding method, dispatching `get_embeddings` (see Preparation Stage for more details) - uses `BatchEmbedder`
+- `finder::AbstractSimilarityFinder`: the similarity search method, dispatching `find_closest` - uses `CosineSimilarity`
+- `tagger::AbstractTagger`: the tag generating method, dispatching `get_tags` (see Preparation Stage for more details) - uses `NoTagger`
+- `filter::AbstractTagFilter`: the tag matching method, dispatching `find_tags` - uses `NoTagFilter`
+- `reranker::AbstractReranker`: the reranking method, dispatching `rerank` - uses `CohereReranker`
 """
 @kwdef mutable struct AdvancedRetriever <: AbstractRetriever
-    rephraser::AbstractRephraser = SimpleRephraser()
+    rephraser::AbstractRephraser = HyDERephraser()
     embedder::AbstractEmbedder = BatchEmbedder()
     finder::AbstractSimilarityFinder = CosineSimilarity()
     tagger::AbstractTagger = NoTagger()
@@ -382,18 +443,32 @@ end
         cost_tracker = Threads.Atomic{Float64}(0.0),
         kwargs...)
 
+Retrieves the most relevant chunks from the index for the given question and returns them in `RAGResult` object.
+
+This is the main entry point for the retrieval stage of the RAG pipeline.
+
+The arguments correspond to the steps of the retrieval process (rephrasing, embedding, finding similar docs, tagging, filtering by tags, reranking).
+You can customize each step by providing a new custom type that dispatches the corresponding function, 
+    eg, create your own type `struct MyReranker<:AbstractReranker end` and define the custom method for it `rerank(::MyReranker,...) = ...`.
+
+Note: Discover available retrieval sub-types for each step with `subtypes(AbstractRephraser)` and similar for other abstract types.
+
+If you're using locally-hosted models, you can pass the `api_kwargs` with the `url` field set to the model's URL and make sure to provide corresponding 
+    `model` kwargs to `rephraser`, `embedder`, and `tagger` to use the custom models (they make AI calls).
 
 # Arguments
 - `retriever`: The retrieval method to use. Default is `SimpleRetriever`.
 - `index`: The index that holds the chunks and sources to be retrieved from.
 - `question`: The question to be used for the retrieval.
-- `verbose`: If `>0`, it prints out verbose logging. Default is `1`.
+- `verbose`: If `>0`, it prints out verbose logging. Default is `1`. If you set it to `2`, it will print out logs for each sub-function.
 - `top_k`: The TOTAL number of closest chunks to return from `find_closest`. Default is `100`.
    If there are multiple rephrased questions, the number of chunks per each item will be `top_k ÷ number_of_rephrased_questions`.
 - `top_n`: The TOTAL number of most relevant chunks to return for the context (from `rerank` step). Default is `5`.
 - `api_kwargs`: Additional keyword arguments to be passed to the API calls (shared by all `ai*` calls).
 - `rephraser`: Transform the question into one or more questions. Default is `retriever.rephraser`.
 - `rephraser_kwargs`: Additional keyword arguments to be passed to the rephraser.
+    - `model`: The model to use for rephrasing. Default is `PT.MODEL_CHAT`.
+    - `template`: The rephrasing template to use. Default is `:RAGQueryOptimizer` or `:RAGQueryHyDE` (depending on the `rephraser` selected).
 - `embedder`: The embedding method to use. Default is `retriever.embedder`.
 - `embedder_kwargs`: Additional keyword arguments to be passed to the embedder.
 - `finder`: The similarity search method to use. Default is `retriever.finder`, often `CosineSimilarity`.
@@ -405,7 +480,48 @@ end
 - `filter_kwargs`: Additional keyword arguments to be passed to the tag filter.
 - `reranker`: The reranking method to use. Default is `retriever.reranker`.
 - `reranker_kwargs`: Additional keyword arguments to be passed to the reranker.
+    - `model`: The model to use for reranking. Default is `rerank-english-v2.0` if you use `reranker = CohereReranker()`.
 - `cost_tracker`: An atomic counter to track the cost of the retrieval. Default is `Threads.Atomic{Float64}(0.0)`.
+
+# Examples
+
+Find the 5 most relevant chunks from the index for the given question.
+```julia
+# assumes you have an existing index `index`
+retriever = SimpleRetriever()
+
+result = retrieve(retriever,
+    index,
+    "What is the capital of France?",
+    top_n = 5)
+
+# or use the default retriever (same as above)
+result = retrieve(retriever,
+    index,
+    "What is the capital of France?",
+    top_n = 5)
+```
+
+Apply more advanced retrieval with question rephrasing and reranking (requires `COHERE_API_KEY`).
+We will obtain top 100 chunks from embeddings (`top_k`) and top 5 chunks from reranking (`top_n`).
+
+```julia
+retriever = AdvancedRetriever()
+
+result = retrieve(retriever, index, question; top_k=100, top_n=5)
+```
+
+You can use the `retriever` to customize your retrieval strategy or directly change the strategy types in the `retrieve` kwargs!
+
+Example of using locally-hosted model hosted on `localhost:8080`:
+```julia
+retriever = SimpleRetriever()
+result = retrieve(retriever, index, question;
+    rephraser_kwargs = (; model = "custom"),
+    embedder_kwargs = (; model = "custom"),
+    tagger_kwargs = (; model = "custom"), api_kwargs = (;
+        url = "http://localhost:8080"))
+```
 """
 function retrieve(retriever::AbstractRetriever,
         index::AbstractChunkIndex,
@@ -443,7 +559,7 @@ function retrieve(retriever::AbstractRetriever,
     finder_kwargs_ = isempty(api_kwargs) ? finder_kwargs :
                      merge(finder_kwargs, (; api_kwargs))
     emb_candidates = find_closest(finder, index, embeddings;
-        top_k, finder_kwargs_...)
+        verbose = (verbose > 1), top_k, finder_kwargs_...)
 
     ## Tagging - if you provide them explicitly, use tagger `PassthroughTagger` and `tagger_kwargs = (;tags = ...)`
     tagger_kwargs_ = isempty(api_kwargs) ? tagger_kwargs :
@@ -453,13 +569,15 @@ function retrieve(retriever::AbstractRetriever,
 
     filter_kwargs_ = isempty(api_kwargs) ? filter_kwargs :
                      merge(filter_kwargs, (; api_kwargs))
-    tag_candidates = find_tags(filter, index, tags; filter_kwargs_...)
+    tag_candidates = find_tags(
+        filter, index, tags; verbose = (verbose > 1), filter_kwargs_...)
 
     ## Combine the two sets of candidates, looks for intersection (hard filter)!
     filtered_candidates = isnothing(tag_candidates) ? emb_candidates :
                           (emb_candidates & tag_candidates)
-    ## Future implementation should be to apply tag filtering BEFORE the find_closest,
-    ## but that requires implementing `IndexView` to provide only a subset of the embeddings to the subsequent functionality.
+    ## TODO: Future implementation should be to apply tag filtering BEFORE the find_closest,
+    ## but that requires implementing `view(::Index,...)` to provide only a subset of the embeddings to the subsequent functionality.
+    ## Also, find_closest is so fast & cheap that it doesn't matter at current scale/maturity of the use cases
 
     ## Reranking
     reranker_kwargs_ = isempty(api_kwargs) ? reranker_kwargs :
@@ -467,12 +585,15 @@ function retrieve(retriever::AbstractRetriever,
     reranked_candidates = rerank(reranker, index, question, filtered_candidates;
         top_n, verbose = (verbose > 1), cost_tracker, reranker_kwargs_...)
 
+    verbose > 0 &&
+        @info "Retrieval done. Identified $(length(reranked_candidates.positions)) chunks, total cost: \$$(cost_tracker[])."
+
     ## Return
     result = RAGResult(;
         question,
         answer = nothing,
         rephrased_questions,
-        refined_answer = nothing,
+        final_answer = nothing,
         context = chunks(index)[reranked_candidates.positions],
         sources = sources(index)[reranked_candidates.positions],
         emb_candidates,

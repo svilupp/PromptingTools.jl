@@ -247,7 +247,6 @@ end
       ```
       and `inline code`."""
     sentences, group_ids = split_into_code_and_sentences(input)
-    sentences
     @test sentences == ["Here is a code block: \n", "```julia", "\n",
         "code here", "\n", "```", "\n", "and ", "`inline code`", "."]
     @test join(sentences, "") == input
