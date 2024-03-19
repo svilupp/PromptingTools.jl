@@ -33,10 +33,10 @@ export build_index, get_chunks, get_embeddings, get_tags
 include("preparation.jl")
 
 export retrieve
-export find_closest, find_tags, rerank
+export find_closest, find_tags, rerank, rephrase
 include("retrieval.jl")
 
-export airag, format_context
+export airag, build_context, generate!, refine!, answer!, postprocess!
 include("generation.jl")
 
 export annotate_support

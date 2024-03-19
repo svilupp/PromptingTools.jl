@@ -293,6 +293,16 @@ end
     @test result.emb_candidates.positions == [2, 1, 4]
     @test result.reranked_candidates.positions == [2, 1]
 
+    # with default dispatch
+    result = retrieve(index, question;
+        top_n = 2, top_k = 3,
+        rephraser_kwargs = (; model = "mock-gen"),
+        embedder_kwargs = (; model = "mock-emb"),
+        tagger_kwargs = (; model = "mock-meta"), api_kwargs = (;
+            url = "http://localhost:$(PORT)"))
+    @test result.emb_candidates.positions == [2, 1, 4]
+    @test result.reranked_candidates.positions == [2, 1]
+
     ## AdvancedRetriever
     adv = AdvancedRetriever()
     result = retrieve(adv, index, question;

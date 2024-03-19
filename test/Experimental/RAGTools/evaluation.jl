@@ -75,7 +75,7 @@ end
 
 @testset "build_qa_evals" begin
     # test with a mock server
-    PORT = rand(10001:40001)
+    PORT = rand(10005:40001)
     PT.register_model!(; name = "mock-emb", schema = PT.CustomOpenAISchema())
     PT.register_model!(; name = "mock-meta", schema = PT.CustomOpenAISchema())
     PT.register_model!(; name = "mock-gen", schema = PT.CustomOpenAISchema())
@@ -176,19 +176,24 @@ end
         String[]; qa_template = :BlankSystemUser)
 
     # Test run_qa_evals on 1 item
-    result = airag(index; question = qa_evals[1].question, model_embedding = "mock-emb",
-        model_chat = "mock-gen",
-        model_metadata = "mock-meta", api_kwargs = (; url = "http://localhost:$(PORT)"),
-        tag_filter = :auto,
-        extract_metadata = false, verbose = false,
+    airag_kwargs = (;
+        retriever_kwargs = (;
+            tagger_kwargs = (; model = "mock-gen", tag = ["yes"]), embedder_kwargs = (;
+                model = "mock-emb")),
+        generator_kwargs = (;
+            answerer_kwargs = (; model = "mock-gen"), embedder_kwargs = (;
+                model = "mock-emb")))
+    result = airag(RAGConfig(), index; question = qa_evals[1].question,
+        airag_kwargs...,
+        api_kwargs = (; url = "http://localhost:$(PORT)"),
         return_all = true)
 
-    result = run_qa_evals(qa_evals[1], ctx;
+    result = run_qa_evals(qa_evals[1], result;
         model_judge = "mock-judge",
         api_kwargs = (; url = "http://localhost:$(PORT)"),
         parameters_dict = Dict(:key1 => "value1", :key2 => 2))
     @test result.retrieval_score == 1.0
-    @test result.retrieval_rank == 1
+    @test result.retrieval_rank == 2
     @test result.answer_score == 5
     @test result.parameters == Dict(:key1 => "value1", :key2 => 2)
 
@@ -196,17 +201,14 @@ end
     # results = run_qa_evals(index, qa_evals; model_judge = "mock-judge",
     #     api_kwargs = (; url = "http://localhost:$(PORT)"))
     results = run_qa_evals(index, qa_evals;
-        airag_kwargs = (;
-            model_embedding = "mock-emb",
-            model_chat = "mock-gen",
-            model_metadata = "mock-meta"),
+        airag_kwargs,
         qa_evals_kwargs = (; model_judge = "mock-judge"),
         api_kwargs = (; url = "http://localhost:$(PORT)"),
         parameters_dict = Dict(:key1 => "value1", :key2 => 2))
 
     @test length(results) == length(qa_evals)
     @test all(getproperty.(results, :retrieval_score) .== 1.0)
-    @test all(getproperty.(results, :retrieval_rank) .== 1)
+    @test all(x -> x.retrieval_rank in [1, 2], results)
     @test all(getproperty.(results, :answer_score) .== 5)
     @test all(getproperty.(results, :parameters) .==
               Ref(Dict(:key1 => "value1", :key2 => 2)))
