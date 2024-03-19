@@ -119,10 +119,10 @@ function answer!(
     conv = aigenerate(template; question,
         context = join(context, "\n\n"), model, verbose = false,
         return_all = true,
-        kwargs_...)
+        kwargs...)
     msg = conv[end]
     result.answer = strip(msg.content)
-    result.conversation[:answer] = conv
+    result.conversations[:answer] = conv
     ## Increment the cost tracker
     Threads.atomic_add!(cost_tracker, msg.cost)
     verbose &&
@@ -232,7 +232,7 @@ Overload this method to add custom postprocessing steps, eg, logging, saving con
 """
 struct NoPostprocessor <: AbstractPostprocessor end
 
-function postprocess!(::AbstractPostprocessor, index::AbstractChunkIndex,
+function postprocess!(postprocessor::AbstractPostprocessor, index::AbstractChunkIndex,
         result::AbstractRAGResult; kwargs...)
     throw(ArgumentError("Postprocessor $(typeof(postprocessor)) not implemented"))
 end
@@ -477,12 +477,12 @@ function airag(cfg::AbstractRAGConfig, index::AbstractChunkIndex;
     retriever_kwargs_ = isempty(api_kwargs) ? retriever_kwargs :
                         merge(retriever_kwargs, (; api_kwargs))
     result = retrieve(
-        retriever, index, question; verbose, cost_tracker, retriever_kwargs_...)
+        retriever, index, question; verbose = verbose - 1, cost_tracker, retriever_kwargs_...)
 
     ## Generate the response
     generator_kwargs_ = isempty(api_kwargs) ? generator_kwargs :
                         merge(generator_kwargs, (; api_kwargs))
-    result = generate!(generator, index, result; verbose, cost_tracker,
+    result = generate!(generator, index, result; verbose = verbose - 1, cost_tracker,
         generator_kwargs_...)
 
     verbose > 0 &&

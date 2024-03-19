@@ -193,7 +193,7 @@ function run_qa_evals(qa_item::QAEvalItem, ctx::RAGResult;
         msg = aiextract(judge_template; model = model_judge, verbose,
             ctx.context,
             ctx.question,
-            ctx.answer,
+            answer = ctx.final_answer,
             return_type = JudgeAllScores, api_kwargs)
         final_rating = if msg.content isa AbstractDict && haskey(msg.content, :final_rating)
             # if return type parsing failed
@@ -211,7 +211,7 @@ function run_qa_evals(qa_item::QAEvalItem, ctx::RAGResult;
         qa_item.source,
         qa_item.context,
         qa_item.question,
-        ctx.answer,
+        answer = ctx.final_answer,
         retrieval_score,
         retrieval_rank,
         answer_score,
