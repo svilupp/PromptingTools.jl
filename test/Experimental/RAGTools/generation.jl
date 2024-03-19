@@ -1,6 +1,6 @@
 using PromptingTools.Experimental.RAGTools: ChunkIndex,
                                             CandidateChunks, build_context, airag
-using PromptingTools.Experimental.RAGTools: MaybeMetadataItems, MetadataItem
+using PromptingTools.Experimental.RAGTools: MaybeTags, Tag
 
 @testset "build_context" begin
     index = ChunkIndex(;
@@ -61,8 +61,8 @@ end
                 :choices => [
                     Dict(:finish_reason => "stop",
                     :message => Dict(:tool_calls => [
-                        Dict(:function => Dict(:arguments => JSON3.write(MaybeMetadataItems([
-                        MetadataItem("yes", "category")
+                        Dict(:function => Dict(:arguments => JSON3.write(MaybeTags([
+                        Tag("yes", "category")
                     ]))))]))],
                 :model => content[:model],
                 :usage => Dict(:total_tokens => length(user_msg[:content]),
@@ -86,10 +86,10 @@ end
         model = "mock-emb",
         api_kwargs = (; url = "http://localhost:$(PORT)"))
     @test question_emb.content == ones(128)
-    metadata_msg = aiextract(:RAGExtractMetadataShort; return_type = MaybeMetadataItems,
+    metadata_msg = aiextract(:RAGExtractMetadataShort; return_type = MaybeTags,
         text = "x",
         model = "mock-meta", api_kwargs = (; url = "http://localhost:$(PORT)"))
-    @test metadata_msg.content.items == [MetadataItem("yes", "category")]
+    @test metadata_msg.content.items == [Tag("yes", "category")]
     answer_msg = aigenerate(:RAGAnswerFromContext;
         question = "Time?",
         context = "XYZ",

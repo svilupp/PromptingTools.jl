@@ -448,7 +448,12 @@ registry = Dict{String, ModelSpec}(
         LocalServerOpenAISchema(),
         0.0,
         0.0,
-        "Local server, eg, powered by [Llama.jl](https://github.com/marcom/Llama.jl). Model is specified when instantiating the server itself."),
+        "Local server, eg, powered by [Llama.jl](https://github.com/marcom/Llama.jl). Model is specified when instantiating the server itself. It will be automatically pointed to the address in `LOCAL_SERVER`."),
+    "custom" => ModelSpec("custom",
+        LocalServerOpenAISchema(),
+        0.0,
+        0.0,
+        "Send a generic request to a custom server. Make sure to explicitly define the `api_kwargs = (; url = ...)` when calling the model."),
     "gemini-pro" => ModelSpec("gemini-pro",
         GoogleSchema(),
         0.0, #unknown, expected 1.25e-7

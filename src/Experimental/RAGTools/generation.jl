@@ -121,7 +121,7 @@ function answer!(
         return_all = true,
         kwargs_...)
     msg = conv[end]
-    result.answer = msg.content
+    result.answer = strip(msg.content)
     result.conversation[:answer] = conv
     ## Increment the cost tracker
     Threads.atomic_add!(cost_tracker, msg.cost)
@@ -172,9 +172,15 @@ end
 """
     refine!(
         refiner::SimpleRefiner, index::AbstractChunkIndex, result::AbstractRAGResult;
+        verbose::Bool = true,
+        model::AbstractString = PT.MODEL_CHAT,
+        template::Symbol = :RAGAnswerRefiner,
+        cost_tracker = Threads.Atomic{Float64}(0.0),
         kwargs...)
     
-Give model a chance to refine the answer (using the same context previously provided).
+Give model a chance to refine the answer (using the same or different context than previously provided).
+
+This method uses the same context as the original answer, however, it can be modified to do additional retrieval and use a different context.
 
 # Returns
 - Mutated `result` with `result.final_answer` and the full conversation saved in `result.conversations[:final_answer]`
@@ -185,25 +191,28 @@ Give model a chance to refine the answer (using the same context previously prov
 - `result::AbstractRAGResult`: The result containing the context and question to generate the answer for.
 - `model::AbstractString`: The model to use for generating the answer. Defaults to `PT.MODEL_CHAT`.
 - `verbose::Bool`: If `true`, enables verbose logging.
-- `template::Symbol`: The template to use for the `aigenerate` function. Defaults to `:RAGExtractMetadataShort`.
+- `template::Symbol`: The template to use for the `aigenerate` function. Defaults to `:RAGAnswerRefiner`.
 - `cost_tracker`: An atomic counter to track the cost of the operation.
 """
 function refine!(
         refiner::SimpleRefiner, index::AbstractChunkIndex, result::AbstractRAGResult;
         verbose::Bool = true,
         model::AbstractString = PT.MODEL_CHAT,
-        template::Symbol = :RAGExtractMetadataShort,
+        template::Symbol = :RAGAnswerRefiner,
         cost_tracker = Threads.Atomic{Float64}(0.0),
         kwargs...)
+    ## Checks
+    placeholders = only(aitemplates(template)).variables # only one template should be found
+    @assert (:query in placeholders)&&(:answer in placeholders) &&
+            (:context in placeholders) "Provided RAG Template $(template) is not suitable. It must have placeholders: `query`, `answer` and `context`."
     ##
     (; answer, question, context) = result
-    # TODO: add a template
-    conv = aigenerate(template; question,
+    conv = aigenerate(template; query = question,
         context = join(context, "\n\n"), answer, model, verbose = false,
         return_all = true,
         kwargs...)
     msg = conv[end]
-    result.final_answer = msg.content
+    result.final_answer = strip(msg.content)
     result.conversations[:final_answer] = conv
 
     ## Increment the cost
@@ -219,7 +228,7 @@ end
 
 Default method for `postprocess!` method. A passthrough option that returns the `result` without any changes.
 
-Overload this method to add custom postprocessing steps, eg, logging, saving conversations, etc.
+Overload this method to add custom postprocessing steps, eg, logging, saving conversations to disk, etc.
 """
 struct NoPostprocessor <: AbstractPostprocessor end
 
@@ -299,6 +308,8 @@ Returns the mutated `result` with the `result.final_answer` and the full convers
    - `template`: The template to use for the `aigenerate` function. Defaults to `:RAGAnswerFromContext`.
 - `refiner::AbstractRefiner`: The method to use for refining the answer. Defaults to `generator.refiner`.
 - `refiner_kwargs::NamedTuple`: API parameters that will be forwarded to the `refiner` call.
+   - `model`: The model to use for generating the answer. Defaults to `PT.MODEL_CHAT`.
+    - `template`: The template to use for the `aigenerate` function. Defaults to `:RAGAnswerRefiner`.
 - `postprocessor::AbstractPostprocessor`: The method to use for postprocessing the answer. Defaults to `generator.postprocessor`.
 - `postprocessor_kwargs::NamedTuple`: API parameters that will be forwarded to the `postprocessor` call.
 - `cost_tracker`: An atomic counter to track the total cost of the operations.
