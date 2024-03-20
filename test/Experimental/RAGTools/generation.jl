@@ -7,7 +7,8 @@ using PromptingTools.Experimental.RAGTools: SimpleAnswerer, AbstractAnswerer, an
                                             refine!
 using PromptingTools.Experimental.RAGTools: NoPostprocessor, AbstractPostprocessor,
                                             postprocess!, SimpleGenerator,
-                                            AdvancedGenerator, generate!, airag, RAGConfig
+                                            AdvancedGenerator, generate!, airag, RAGConfig,
+                                            RAGResult
 
 @testset "build_context!" begin
     index = ChunkIndex(;
@@ -37,6 +38,7 @@ using PromptingTools.Experimental.RAGTools: NoPostprocessor, AbstractPostprocess
         chunks_window_margin = (-1, 0))
 
     # From result/index
+    question = "why?"
     result = RAGResult(;
         question, rephrased_questions = [question], emb_candidates = candidates,
         tag_candidates = candidates, filtered_candidates = candidates, reranked_candidates = candidates,
@@ -180,7 +182,8 @@ end
     @test output.final_answer == "answer"
 
     # with defaults 
-    output = generate!(index, result)
+    output = generate!(index, result;
+        answerer_kwargs = (; model = "mock-gen"))
     @test output.answer == "answer"
     @test output.final_answer == "answer"
 

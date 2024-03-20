@@ -256,9 +256,14 @@ end
 Returns all chunks in the index, ie, no filtering.
 """
 function find_tags(method::NoTagFilter, index::AbstractChunkIndex,
-        tags::Union{Nothing, T, AbstractVector{<:T}}; kwargs...) where {T <:
-                                                                        Union{
+        tags::Union{T, AbstractVector{<:T}}; kwargs...) where {T <:
+                                                               Union{
         AbstractString, Regex}}
+    return CandidateChunks(
+        index.id, collect(1:length(index.chunks)), zeros(Float32, length(index.chunks)))
+end
+function find_tags(method::NoTagFilter, index::AbstractChunkIndex,
+        tags::Nothing; kwargs...)
     return CandidateChunks(
         index.id, collect(1:length(index.chunks)), zeros(Float32, length(index.chunks)))
 end

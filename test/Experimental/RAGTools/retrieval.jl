@@ -148,6 +148,10 @@ end
     @test cc.positions == [1, 2]
     @test cc.scores == [0.0, 0.0]
 
+    cc = find_tags(NoTagFilter(), index, nothing)
+    @test cc.positions == [1, 2]
+    @test cc.scores == [0.0, 0.0]
+
     # Unknown type
     struct RandomTagFilter123 <: AbstractTagFilter end
     @test_throws ArgumentError find_tags(RandomTagFilter123(), index, "hello")
@@ -166,11 +170,11 @@ end
 
     # Passthrough Strategy
     ranker = NoReranker()
-    reranked = rerank(ranker, index, question, cc1)
+    reranked = rerank(ranker, ci1, question, cc1)
     @test reranked.positions == [2, 1] # gets resorted by score
     @test reranked.scores == [0.4, 0.3]
 
-    reranked = rerank(ranker, index, question, cc1; top_n = 1)
+    reranked = rerank(ranker, ci1, question, cc1; top_n = 1)
     @test reranked.positions == [2] # gets resorted by score
     @test reranked.scores == [0.4]
 
