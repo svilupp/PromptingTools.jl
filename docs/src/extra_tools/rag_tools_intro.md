@@ -173,6 +173,12 @@ RT.rerank(::MyReranker, index, candidates) = ...
 ```
 And then you'd ask for the `retrive` step to use your custom `MyReranker`, eg, `retrieve(....; reranker = MyReranker())` (or customize the main dispatching `AbstractRetriever` struct).
 
+The overarching principles are:
+- Always dispatch / customize the behavior by defining a new `Struct` and the corresponding method for the existing functions (eg, `rerank` function for the re-ranking step).
+- Custom types are provided as the first argument (the high-level functions will work without them as we provide some defaults).
+- Custom types do NOT have any internal fields or DATA (with the exception of managing sub-steps of the pipeline like `AbstractRetriever` or `RAGConfig`). 
+- Additional data should be passed around as keyword arguments (eg, `chunker_kwargs` in `build_index` to pass data to the chunking step). The intention was to have some clearly documented default values in the docstrings of each step + to have the various options all in one place.
+
 ### RAG Diagram
 
 The main functions are:
