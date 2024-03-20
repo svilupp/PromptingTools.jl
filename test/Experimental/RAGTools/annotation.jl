@@ -5,7 +5,7 @@ using PromptingTools.Experimental.RAGTools: AnnotatedNode, AbstractAnnotater,
                                             HTMLStyler,
                                             pprint
 using PromptingTools.Experimental.RAGTools: trigram_support!, add_node_metadata!,
-                                            annotate_support, RAGDetails, text_to_trigrams
+                                            annotate_support, RAGResult, text_to_trigrams
 
 @testset "AnnotatedNode" begin
     # Test node creation with default values
@@ -328,10 +328,16 @@ end
     @test occursin("\nSOURCES\n", output)
     @test occursin("1. Source 1", output)
 
+    # Catch empty context
+    answer = "This is a test answer."
+    @test_throws AssertionError annotated_root=annotate_support(
+        annotater, answer, String[])
+
     ## RAG Details dispatch
     answer = "This is a test answer."
-    r = RAGDetails(
-        "?", answer, context; sources = ["Source 1", "Source 2", "Source 3"])
+    r = RAGResult(;
+        question = "?", final_answer = answer, context, sources = [
+            "Source 1", "Source 2", "Source 3"])
     annotated_root = annotate_support(annotater, r)
     io = IOBuffer()
     pprint(io, annotated_root)

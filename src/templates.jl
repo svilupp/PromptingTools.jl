@@ -398,6 +398,7 @@ If `load_as` is provided, it registers the template in the `TEMPLATE_STORE` and 
 # Examples
 
 Let's generate a quick template for a simple conversation (only one placeholder: name)
+
 ```julia
 # first system message, then user message (or use kwargs)
 tpl=PT.create_template("You must speak like a pirate", "Say hi to {{name}}")
@@ -422,6 +423,7 @@ PT.save_template("templates/GreatingPirate.json", tpl; version="1.0") # optional
 It will be saved and accessed under its basename, ie, `GreatingPirate`.
 
 Now you can load it like all the other templates (provide the template directory):
+
 ```julia
 PT.load_templates!("templates") # it will remember the folder after the first run
 # Note: If you save it again, overwrite it, etc., you need to explicitly reload all templates again!
@@ -450,13 +452,14 @@ aigenerate(:GreatingPirate; name="Jack Sparrow")
 ```
 
 If you do not need to save this template as a file, but you want to make it accessible in the template store for all `ai*` functions, you can use the `load_as` (= template name) keyword argument:
+
 ```julia
 # this will not only create the template, but also register it for immediate use
 tpl=PT.create_template("You must speak like a pirate", "Say hi to {{name}}"; load_as="GreatingPirate")
 
 # you can now use it like any other template
 aiextract(:GreatingPirate; name="Jack Sparrow")
-````
+```
 """
 function create_template(
         system::AbstractString,

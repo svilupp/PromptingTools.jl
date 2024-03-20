@@ -10,11 +10,14 @@ This module is experimental and may change at any time. It is intended to be mov
 module RAGTools
 
 using PromptingTools
-using PromptingTools: pprint
+using PromptingTools: pprint, AbstractMessage
 using HTTP, JSON3
 using AbstractTrees
 using AbstractTrees: PreOrderDFS
 const PT = PromptingTools
+
+# reexport
+export pprint
 
 ## export trigrams, trigrams_hashed, text_to_trigrams, text_to_trigrams_hashed
 ## export STOPWORDS, tokenize, split_into_code_and_sentences
@@ -25,19 +28,22 @@ include("api_services.jl")
 
 include("rag_interface.jl")
 
-export ChunkIndex, CandidateChunks # MultiIndex
+export ChunkIndex, CandidateChunks, RAGResult
+# export MultiIndex # not ready yet
 include("types.jl")
 
-export build_index, build_tags
+export build_index, get_chunks, get_embeddings, get_tags
 include("preparation.jl")
 
-export find_closest, find_tags, rerank
+export retrieve, SimpleRetriever, AdvancedRetriever
+export find_closest, find_tags, rerank, rephrase
 include("retrieval.jl")
 
-export airag, build_context
+export airag, build_context!, generate!, refine!, answer!, postprocess!
+export SimpleGenerator, AdvancedGenerator, RAGConfig
 include("generation.jl")
 
-export annotate_support
+export annotate_support, TrigramAnnotater
 include("annotation.jl")
 
 export build_qa_evals, run_qa_evals
