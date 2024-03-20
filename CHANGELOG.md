@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added a new documentation section "Extra Tools" to highlight key functionality in various modules, eg, the available text utilities, which were previously hard to discover.
 - Extended documentation FAQ with tips on tackling rate limits and other common issues with OpenAI API.
 - Extended documentation with all available prompt templates. See section "Prompt Templates" in the documentation.
-- Added new RAG interface underneath `airag` in `PromptingTools.RAGTools.Experimental`. Each step now has a dedicated function and a type that can be customized to achieve arbitrary logic. `airag` breaks the flow into `retrieve` and `generate!` step, you can use them separately or together. See `?airag` for more information.
+- Added new RAG interface underneath `airag` in `PromptingTools.RAGTools.Experimental`. Each step now has a dedicated function and a type that can be customized to achieve arbitrary logic (via defining methods for your own types). `airag` is split in two main steps: `retrieve` and `generate!`. You can use them separately or together. See `?airag` for more information.
 
 ### Updated
 - Renamed `split_by_length` text splitter to `recursive_splitter` to make it easier to discover and understand its purpose. `split_by_length` is still available as a deprecated alias.
