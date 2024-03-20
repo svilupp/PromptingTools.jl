@@ -159,7 +159,7 @@ _temp = get(ENV, "FIREWORKS_API_KEY", "")
 const FIREWORKS_API_KEY::String = @load_preference("FIREWORKS_API_KEY",
     default=_temp);
 
-_temp = get(ENV, "LOCAL_SERVER", "")
+_temp = get(ENV, "LOCAL_SERVER", "http://localhost:10897/v1")
 ## Address of the local server
 const LOCAL_SERVER::String = @load_preference("LOCAL_SERVER",
     default=_temp);

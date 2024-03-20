@@ -1,70 +1,81 @@
 ############################
-### THIS IS WORK IN PROGRESS
+### RAG Interface Write-up
 ############################
 
 # This is the outline of the current RAG interface.
 #
-### System Overview
-#
-# This system is designed for information retrieval and response generation, structured in three main phases:
-# - Preparation, when you create an instance of `AbstractIndex`
-# - Retrieval, when you surface the top most relevant chunks/items in the `index`
-# - Generation, when you generate an answer based on the context built from the retrieved chunks
-#
-# The system is designed to be hackable and extensible at almost every entry point.
-# You just need to define the corresponding concrete type (struct XYZ <: AbstractXYZ end) and the corresponding method.
-# Then you pass the instance of this new type via kwargs, eg, `annotater=TrigramAnnotater()`
-#
-### RAG Diagram
-#
-# build_index
-#   signature: () -> AbstractChunkIndex
-#   flow: get_chunks -> get_embeddings -> get_tags
-# 
-# airag: 
-#   signature: () -> AIMessage or (AIMessage, RAGResult)
-#   flow: retrieve -> generate
-#
-# retrieve:
-#   signature: () -> RAGResult
-#   flow: rephrase -> aiembed -> find_closest -> find_tags -> rerank
-#
-# generate:
-#  signature: () -> AIMessage or (AIMessage, RAGResult)
-#  flow: build_context -> answer -> refine -> postprocess
-#
-### Deepdive
-#
-# Preparation Phase:
-# - Begins with `build_index`, which creates a user-defined index type from an abstract chunk index using specified models and function strategies.
-# - `get_chunks` then divides the indexed data into manageable pieces based on a chunking strategy.
-# - `get_embeddings` generates embeddings for each chunk using an embedding strategy to facilitate similarity searches.
-# - Finally, `get_tags` extracts relevant metadata from each chunk, enabling tag-based filtering (hybrid search index).
-#
-# Retrieval Phase:
-# - The `retrieve` step employs a retrieval strategy to fetch relevant data, which can be modified by a rephrase strategy for better query matching.
-# - `rephrase` is called first, if we want to rephrase the query
-# - `aiembed` generates embeddings for the original + rephrased query
-# - `find_closest` looks up the most relevant candidates (`CandidateChunks`) using a similarity search strategy.
-# - Optional tag filtering is applied (`aiextract + find_tags`) can be applied
-# - Then we apply a reranking strategy via `rerank` to get the final list of candidates.
-#
-#
-# Generation Phase:
-# - Given the `RAGDetails`, `generate` uses a generation strategy to produce a response, potentially using some strategy to refine the response.
-# - `build_context` constructs the context for response generation based on a context strategy and applies the necessary formatting
-# - `aigenerate` generates the response based on the context and the query
-# - `refine` is called to refine the response (optional, defaults to passthrough)
-#
+## # System Overview
+##
+## This system is designed for information retrieval and response generation, structured in three main phases:
+## - Preparation, when you create an instance of `AbstractIndex`
+## - Retrieval, when you surface the top most relevant chunks/items in the `index` and return `AbstractRAGResult`, which contains the references to the chunks (`AbstractCandidateChunks`)
+## - Generation, when you generate an answer based on the context built from the retrieved chunks, return either `AIMessage` or `AbstractRAGResult`
+##
+## The system is designed to be hackable and extensible at almost every entry point.
+## If you want to customize the behavior of any step, you can do so by defining a new type and defining a new method for the step you're changing, eg, 
+## ```julia
+## struct MyReranker <: AbstractReranker end
+## RT.rerank(::MyReranker, index, candidates) = ...
+## ```
+## And then you'd ask for the `retrive` step to use your custom `MyReranker`, eg, `retrieve(....; reranker = MyReranker())` (or customize the main dispatching `AbstractRetriever` struct).
+##
+## # RAG Diagram
+##
+## The main functions are:
+##
+## `build_index`:
+## - signature: `(indexer::AbstractIndexBuilder, files_or_docs::Vector{<:AbstractString}) -> AbstractChunkIndex`
+## - flow: `get_chunks` -> `get_embeddings` -> `get_tags` -> `build_tags`
+## - dispatch types: `AbstractIndexBuilder`, `AbstractChunker`, `AbstractEmbedder`, `AbstractTagger`
+##
+## `airag`: 
+## - signature: `(cfg::AbstractRAGConfig, index::AbstractChunkIndex; question::AbstractString)` -> `AIMessage` or `AbstractRAGResult`
+## - flow: `retrieve` -> `generate!`
+## - dispatch types: `AbstractRAGConfig`, `AbstractRetriever`, `AbstractGenerator`
+##
+## `retrieve`:
+## - signature: `(retriever::AbstractRetriever, index::AbstractChunkIndex, question::AbstractString) -> AbstractRAGResult`
+## - flow: `rephrase` -> `get_embeddings` -> `find_closest` -> `get_tags` -> `find_tags` -> `rerank`
+## - dispatch types: `AbstractRAGConfig`, `AbstractRephraser`, `AbstractEmbedder`, `AbstractSimilarityFinder`, `AbstractTagger`, `AbstractTagFilter`, `AbstractReranker`
+##
+## `generate!`:
+## - signature: `(generator::AbstractGenerator, index::AbstractChunkIndex, result::AbstractRAGResult)` -> `AIMessage` or `AbstractRAGResult`
+## - flow: `build_context!` -> `answer!` -> `refine!` -> `postprocess!`
+## - dispatch types: `AbstractGenerator`, `AbstractContextBuilder`, `AbstractAnswerer`, `AbstractRefiner`, `AbstractPostprocessor`
+##
+## To discover the currently available implementations, use `subtypes` function, eg, `subtypes(AbstractReranker)`.
+##
+## # Deepdive
+##
+## **Preparation Phase:**
+## - Begins with `build_index`, which creates a user-defined index type from an abstract chunk index using specified dels and function strategies.
+## - `get_chunks` then divides the indexed data into manageable pieces based on a chunking strategy.
+## - `get_embeddings` generates embeddings for each chunk using an embedding strategy to facilitate similarity arches.
+## - Finally, `get_tags` extracts relevant metadata from each chunk, enabling tag-based filtering (hybrid search index). If there are `tags` available, `build_tags` is called to build the corresponding sparse matrix for filtering with tags.
 
-### Types
+## **Retrieval Phase:**
+## - The `retrieve` step is intended to find the most relevant chunks in the `index`.
+## - `rephrase` is called first, if we want to rephrase the query (methods like `HyDE` can improve retrieval quite a bit)!
+## - `get_embeddings` generates embeddings for the original + rephrased query
+## - `find_closest` looks up the most relevant candidates (`CandidateChunks`) using a similarity search strategy.
+## - `get_tags` extracts the potential tags (can be provided as part of the `airag` call, eg, when we want to use only some small part of the indexed chunks)
+## - `find_tags` filters the candidates to strictly match _at least one_ of the tags (if provided)
+## - `rerank` is called to rerank the candidates based on the reranking strategy (ie, to improve the ordering of the chunks in context).
+
+## **Generation Phase:**
+## - The `generate` step is intended to generate a response based on the retrieved chunks, provided via `AbstractRAGResult` (eg, `RAGResult`).
+## - `build_context!` constructs the context for response generation based on a context strategy and applies the necessary formatting
+## - `answer!` generates the response based on the context and the query
+## - `refine!` is called to refine the response (optional, defaults to passthrough)
+## - `postprocessing!` is available for any final touches to the response or to potentially save or format the results (eg, automatically save to the disk)
+
+## Note that all generation steps are mutating the `RAGResult` object.
+
 ############################
-### NOT READY!!!
+### TYPES
 ############################
 
-#
-# Defines three key types for RAG: ChunkIndex, MultiIndex, and CandidateChunks
-# In addition, RAGContext is defined for debugging purposes
+# Defines the main abstract types used in our RAG system.
 
 # ## Overarching
 
@@ -205,6 +216,10 @@ abstract type AbstractAnnotater end
 
 abstract type AbstractAnnotatedNode end
 abstract type AbstractAnnotationStyler end
+
+############################
+### FUNCTIONS
+############################
 
 # ## Main Functions
 

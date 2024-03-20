@@ -288,32 +288,54 @@ end
         kwargs...)
 
 Generate the response using the provided `generator` and the `index` and `result`.
+It is the second step in the RAG pipeline (after `retrieve`)
 
 Returns the mutated `result` with the `result.final_answer` and the full conversation saved in `result.conversations[:final_answer]`.
 
-`refiner` step allows the LLM to critique itself and refine its own answer.
-`postprocessor` step allows for additional processing of the answer, eg, logging, saving conversations, etc.
+# Notes
+- The default flow is `build_context!` -> `answer!` -> `refine!` -> `postprocess!`.
+- `contexter` is the method to use for building the context, eg, simply enumerate the context chunks with `ContextEnumerator`.
+- `answerer` is the standard answer generation step with LLMs.
+- `refiner` step allows the LLM to critique itself and refine its own answer.
+- `postprocessor` step allows for additional processing of the answer, eg, logging, saving conversations, etc.
+- All of its sub-routines operate by mutating the `result` object (and adding their part).
+- Discover available sub-types for each step with `subtypes(AbstractRefiner)` and similar for other abstract types.
 
 # Arguments
-- `generator::AbstractGenerator`: The generator to use for generating the answer. Uses `aigenerate`.
+- `generator::AbstractGenerator`: The `generator` to use for generating the answer. Can be `SimpleGenerator` or `AdvancedGenerator`.
 - `index::AbstractChunkIndex`: The index containing chunks and sources.
 - `result::AbstractRAGResult`: The result containing the context and question to generate the answer for.
 - `verbose::Integer`: If >0, enables verbose logging.
 - `api_kwargs::NamedTuple`: API parameters that will be forwarded to ALL of the API calls (`aiembed`, `aigenerate`, and `aiextract`).
-- `contexter::AbstractContextBuilder`: The method to use for building the context. Defaults to `generator.contexter`.
+- `contexter::AbstractContextBuilder`: The method to use for building the context. Defaults to `generator.contexter`, eg, `ContextEnumerator`.
 - `contexter_kwargs::NamedTuple`: API parameters that will be forwarded to the `contexter` call.
-- `answerer::AbstractAnswerer`: The method to use for generating the answer. Defaults to `generator.answerer`.
+- `answerer::AbstractAnswerer`: The method to use for generating the answer. Defaults to `generator.answerer`, eg, `SimpleAnswerer`.
 - `answerer_kwargs::NamedTuple`: API parameters that will be forwarded to the `answerer` call. Examples:
-   - `model`: The model to use for generating the answer. Defaults to `PT.MODEL_CHAT`.
-   - `template`: The template to use for the `aigenerate` function. Defaults to `:RAGAnswerFromContext`.
-- `refiner::AbstractRefiner`: The method to use for refining the answer. Defaults to `generator.refiner`.
+    - `model`: The model to use for generating the answer. Defaults to `PT.MODEL_CHAT`.
+    - `template`: The template to use for the `aigenerate` function. Defaults to `:RAGAnswerFromContext`.
+- `refiner::AbstractRefiner`: The method to use for refining the answer. Defaults to `generator.refiner`, eg, `NoRefiner`.
 - `refiner_kwargs::NamedTuple`: API parameters that will be forwarded to the `refiner` call.
-   - `model`: The model to use for generating the answer. Defaults to `PT.MODEL_CHAT`.
+    - `model`: The model to use for generating the answer. Defaults to `PT.MODEL_CHAT`.
     - `template`: The template to use for the `aigenerate` function. Defaults to `:RAGAnswerRefiner`.
-- `postprocessor::AbstractPostprocessor`: The method to use for postprocessing the answer. Defaults to `generator.postprocessor`.
+- `postprocessor::AbstractPostprocessor`: The method to use for postprocessing the answer. Defaults to `generator.postprocessor`, eg, `NoPostprocessor`.
 - `postprocessor_kwargs::NamedTuple`: API parameters that will be forwarded to the `postprocessor` call.
 - `cost_tracker`: An atomic counter to track the total cost of the operations.
 
+See also: `retrieve`, `build_context!`, `ContextEnumerator`, `answer!`, `SimpleAnswerer`, `refine!`, `NoRefiner`, `SimpleRefiner`, `postprocess!`, `NoPostprocessor`
+
+# Examples
+```julia
+Assume we already have `index`
+
+question = "What are the best practices for parallel computing in Julia?"
+
+# Retrieve the relevant chunks - returns RAGResult
+result = retrieve(index, question)
+
+# Generate the answer using the default generator, mutates the same result
+result = generate!(index, result)
+
+```
 """
 function generate!(
         generator::AbstractGenerator, index::AbstractChunkIndex, result::AbstractRAGResult;
@@ -379,63 +401,52 @@ To customize the components, replace corresponding fields for each step of the R
 end
 
 """
-    airag(index::AbstractChunkIndex, rag_template::Symbol = :RAGAnswerFromContext;
+    airag(cfg::AbstractRAGConfig, index::AbstractChunkIndex;
         question::AbstractString,
-        top_k::Int = 100, top_n::Int = 5, minimum_similarity::AbstractFloat = -1.0,
-        tag_filter::Union{Symbol, Vector{String}, Regex, Nothing} = :auto,
-        rerank_strategy::AbstractReranker = Passthrough(),
-        model_embedding::String = PT.MODEL_EMBEDDING, model_chat::String = PT.MODEL_CHAT,
-        model_metadata::String = PT.MODEL_CHAT,
-        metadata_template::Symbol = :RAGExtractMetadataShort,
-        chunks_window_margin::Tuple{Int, Int} = (1, 1),
-        return_all::Bool = false, verbose::Bool = true,
-        rerank_kwargs::NamedTuple = NamedTuple(),
+        verbose::Integer = 1, return_all::Bool = false,
         api_kwargs::NamedTuple = NamedTuple(),
-        aiembed_kwargs::NamedTuple = NamedTuple(),
-        aigenerate_kwargs::NamedTuple = NamedTuple(),
-        aiextract_kwargs::NamedTuple = NamedTuple(),
-        kwargs...)
+        retriever::AbstractRetriever = cfg.retriever,
+        retriever_kwargs::NamedTuple = NamedTuple(),
+        generator::AbstractGenerator = cfg.generator,
+        generator_kwargs::NamedTuple = NamedTuple(),
+        cost_tracker = Threads.Atomic{Float64}(0.0))
 
-Lightweight wrapper around functions `retrieve` and `generate` to perform Retrieval-Augmented Generation (RAG).
+High-level wrapper for Retrieval-Augmented Generation (RAG), it combines together the `retrieve` and `generate!` steps which you can customize if needed.
 
-It means it first finds the relevant chunks in `index` for the `question` and then sends these chunks to the AI model to help with generating a response to the `question`.
+The simplest version first finds the relevant chunks in `index` for the `question` and then sends these chunks to the AI model to help with generating a response to the `question`.
 
-To customize the components, replace the types (`retriever`, `generator`) of the corresponding step of the RAG pipeline.
-
+To customize the components, replace the types (`retriever`, `generator`) of the corresponding step of the RAG pipeline - or go into sub-routines within the steps.
 Eg, use `subtypes(AbstractRetriever)` to find the available options.
 
-The function selects relevant chunks from an `ChunkIndex`, optionally filters them based on metadata tags, reranks them, and then uses these chunks to construct a context for generating a response.
-
 # Arguments
+- `cfg::AbstractRAGConfig`: The configuration for the RAG pipeline. Defaults to `RAGConfig()`, where you can swap sub-types to customize the pipeline.
 - `index::AbstractChunkIndex`: The chunk index to search for relevant text.
-- `rag_template::Symbol`: Template for the RAG model, defaults to `:RAGAnswerFromContext`.
 - `question::AbstractString`: The question to be answered.
-- `top_k::Int`: Number of top candidates to retrieve based on embedding similarity.
-- `top_n::Int`: Number of candidates to return after reranking.
-- `minimum_similarity::AbstractFloat`: Minimum similarity threshold (between -1 and 1) for filtering chunks based on embedding similarity. Defaults to -1.0.
-- `tag_filter::Union{Symbol, Vector{String}, Regex}`: Mechanism for filtering chunks based on tags (either automatically detected, specific tags, or a regex pattern). Disabled by setting to `nothing`.
-- `rerank_strategy::AbstractReranker`: Strategy for reranking the retrieved chunks. Defaults to `Passthrough()`. Use `CohereRerank` for better results (requires `COHERE_API_KEY` to be set)
-- `model_embedding::String`: Model used for embedding the question, default is `PT.MODEL_EMBEDDING`.
-- `model_chat::String`: Model used for generating the final response, default is `PT.MODEL_CHAT`.
-- `model_metadata::String`: Model used for extracting metadata, default is `PT.MODEL_CHAT`.
-- `metadata_template::Symbol`: Template for the metadata extraction process from the question, defaults to: `:RAGExtractMetadataShort`
-- `chunks_window_margin::Tuple{Int,Int}`: The window size around each chunk to consider for context building. See `?build_context` for more information.
 - `return_all::Bool`: If `true`, returns the details used for RAG along with the response.
-- `verbose::Bool`: If `true`, enables verbose logging.
+- `verbose::Integer`: If `>0`, enables verbose logging. The higher the number, the more nested functions will log.
 - `api_kwargs`: API parameters that will be forwarded to ALL of the API calls (`aiembed`, `aigenerate`, and `aiextract`).
-- `aiembed_kwargs`: API parameters that will be forwarded to the `aiembed` call. If you need to provide `api_kwargs` only to this function, simply add them as a keyword argument, eg, `aiembed_kwargs = (; api_kwargs = (; x=1))`.
-- `aigenerate_kwargs`: API parameters that will be forwarded to the `aigenerate` call. If you need to provide `api_kwargs` only to this function, simply add them as a keyword argument, eg, `aigenerate_kwargs = (; api_kwargs = (; temperature=0.3))`.
-- `aiextract_kwargs`: API parameters that will be forwarded to the `aiextract` call for the metadata extraction.
+- `retriever::AbstractRetriever`: The retriever to use for finding relevant chunks. Defaults to `cfg.retriever`, eg, `SimpleRetriever` (with no question rephrasing).
+- `retriever_kwargs::NamedTuple`: API parameters that will be forwarded to the `retriever` call. Examples of important ones:
+    - `top_k::Int`: Number of top candidates to retrieve based on embedding similarity.
+    - `top_n::Int`: Number of candidates to return after reranking.
+    - `tagger::AbstractTagger`: Tagger to use for tagging the chunks. Defaults to `NoTagger()`.
+    - `tagger_kwargs::NamedTuple`: API parameters that will be forwarded to the `tagger` call. You could provide the explicit tags directly with `PassthroughTagger` and `tagger_kwargs = (; tags = ["tag1", "tag2"])`.
+- `generator::AbstractGenerator`: The generator to use for generating the answer. Defaults to `cfg.generator`, eg, `SimpleGenerator`.
+- `generator_kwargs::NamedTuple`: API parameters that will be forwarded to the `generator` call. Examples of important ones:
+    - `answerer_kwargs::NamedTuple`: API parameters that will be forwarded to the `answerer` call. Examples:
+        - `model`: The model to use for generating the answer. Defaults to `PT.MODEL_CHAT`.
+        - `template`: The template to use for the `aigenerate` function. Defaults to `:RAGAnswerFromContext`.
+    - `refiner::AbstractRefiner`: The method to use for refining the answer. Defaults to `generator.refiner`, eg, `NoRefiner`.
+    - `refiner_kwargs::NamedTuple`: API parameters that will be forwarded to the `refiner` call.
+        - `model`: The model to use for generating the answer. Defaults to `PT.MODEL_CHAT`.
+        - `template`: The template to use for the `aigenerate` function. Defaults to `:RAGAnswerRefiner`.
+- `cost_tracker`: An atomic counter to track the total cost of the operations (if you want to track the cost of multiple pipeline runs - it passed around in the pipeline).
 
 # Returns
 - If `return_all` is `false`, returns the generated message (`msg`).
-- If `return_all` is `true`, returns a tuple of the generated message (`msg`) and the `RAGDetails` for context (`rag_details`).
+- If `return_all` is `true`, returns the detail of the full pipeline in `RAGResult` (see the docs).
 
-# Notes
-- The function first finds the closest chunks to the question embedding, then optionally filters these based on tags. After that, it reranks the candidates and builds a context for the RAG model.
-- The `tag_filter` can be used to refine the search. If set to `:auto`, it attempts to automatically determine relevant tags (if `index` has them available).
-- The `chunks_window_margin` allows including surrounding chunks for richer context, considering they are from the same source.
-- The function currently supports only single `ChunkIndex`. 
+See also `build_index`, `retrieve`, `generate!`, `RAGResult`
 
 # Examples
 
@@ -443,9 +454,6 @@ Using `airag` to get a response for a question:
 ```julia
 index = build_index(...)  # create an index
 question = "How to make a barplot in Makie.jl?"
-msg = airag(index, :RAGAnswerFromContext; question)
-
-# or simply
 msg = airag(index; question)
 ```
 
@@ -461,7 +469,35 @@ It also includes annotations of which context was used for each part of the resp
 PT.pprint(details)
 ```
 
-See also `build_index`, `build_context`, `CandidateChunks`, `find_closest`, `find_tags`, `rerank`, `annotate_support`
+Example with advanced retrieval (with question rephrasing and reranking (requires `COHERE_API_KEY`).
+We will obtain top 100 chunks from embeddings (`top_k`) and top 5 chunks from reranking (`top_n`).
+In addition, it will be done with a "custom" locally-hosted model.
+
+```julia
+cfg = RAGConfig(; retriever = AdvancedRetriever())
+
+# kwargs will be big and nested, let's prepare them upfront
+# we specify "custom" model for each component that calls LLM
+kwargs = (
+    retriever_kwargs = (;
+        top_k = 100,
+        top_n = 5,
+        rephraser_kwargs = (;
+            model = "custom"),
+        embedder_kwargs = (;
+            model = "custom"),
+        tagger_kwargs = (;
+            model = "custom")),
+    generator_kwargs = (;
+        answerer_kwargs = (;
+            model = "custom"),
+        refiner_kwargs = (;
+            model = "custom")),
+    api_kwargs = (;
+        url = "http://localhost:8080"))
+
+result = airag(cfg, index, question; kwargs...)
+```
 """
 function airag(cfg::AbstractRAGConfig, index::AbstractChunkIndex;
         question::AbstractString,

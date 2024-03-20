@@ -66,10 +66,10 @@ end
 
 Default implementation for `build_index`.
 
-It uses `FileChunker`, `BatchEmbedder`, and `NoTagger` as default chunker, embedder, and tagger.
+It uses `TextChunker`, `BatchEmbedder`, and `NoTagger` as default chunker, embedder, and tagger.
 """
 @kwdef mutable struct SimpleIndexer <: AbstractIndexBuilder
-    chunker::AbstractChunker = FileChunker()
+    chunker::AbstractChunker = TextChunker()
     embedder::AbstractEmbedder = BatchEmbedder()
     tagger::AbstractTagger = NoTagger()
 end
@@ -361,11 +361,11 @@ Define your own methods via `indexer` and its subcomponents (`chunker`, `embedde
 
 # Arguments
 - `indexer::AbstractIndexBuilder`: The indexing logic to use. Default is `SimpleIndexer()`.
-- `files_or_docs`: A vector of valid file paths OR string documents to be indexed (chunked and embedded).
+- `files_or_docs`: A vector of valid file paths OR string documents to be indexed (chunked and embedded). Specify which mode to use via `chunker`.
 - `verbose`: An Integer specifying the verbosity of the logs. Default is `1` (high-level logging). `0` is disabled.
 - `extras`: An optional vector of extra information to be stored with each chunk. Default is `nothing`.
 - `index_id`: A unique identifier for the index. Default is a generated symbol.
-- `chunker`: The chunker logic to use for splitting the documents. Default is `FileChunker()`.
+- `chunker`: The chunker logic to use for splitting the documents. Default is `TextChunker()`.
 - `chunker_kwargs`: Parameters to be provided to the `get_chunks` function. Useful to change the `separators` or `max_length`.
   - `sources`: A vector of strings indicating the source of each chunk. Default is equal to `files_or_docs`.
 - `embedder`: The embedder logic to use for embedding the chunks. Default is `BatchEmbedder()`.
@@ -382,17 +382,17 @@ Define your own methods via `indexer` and its subcomponents (`chunker`, `embedde
 # Returns
 - `ChunkIndex`: An object containing the compiled index of chunks, embeddings, tags, vocabulary, and sources.
 
-See also: `ChunkIndex`, `get_chunks`, `get_embeddings`, `get_tags`, `CandidateChunks`, `find_closest`, `find_tags`, `rerank`, `airag`
+See also: `ChunkIndex`, `get_chunks`, `get_embeddings`, `get_tags`, `CandidateChunks`, `find_closest`, `find_tags`, `rerank`, `retrieve`, `generate!`, `airag`
 
 # Examples
 ```julia
-
-# Assuming `test_files` is a vector of file paths
-index = build_index(SimpleIndexer(), test_files; chunker_kwargs = (; max_length=10))
+# Default is loading a vector of strings and chunking them (`TextChunker()`)
+index = build_index(SimpleIndexer(), texts; chunker_kwargs = (; max_length=10))
 
 # Another example with tags extraction, splitting only sentences and verbose output
-indexer = SimpleIndexer(chunker=TextChunker(), tagger=OpenTagger())
-index = build_index(indexer, texts; 
+# Assuming `test_files` is a vector of file paths
+indexer = SimpleIndexer(chunker=FileChunker(), tagger=OpenTagger())
+index = build_index(indexer, test_files; 
         chunker_kwargs(; separators=[". "]), verbose=true)
 ```
 

@@ -278,6 +278,8 @@ end
 
 A struct for debugging RAG answers. It contains the question, answer, context, and the candidate chunks at each step of the RAG pipeline.
 
+Think of the flow as `question` -> `rephrased_questions` -> `answer` -> `final_answer` with the context and candidate chunks helping along the way.
+
 # Fields
 - `question::AbstractString`: the original question
 - `rephrased_questions::Vector{<:AbstractString}`: a vector of rephrased questions (eg, HyDe, Multihop, etc.)
@@ -290,39 +292,47 @@ A struct for debugging RAG answers. It contains the question, answer, context, a
 - `filtered_candidates::CandidateChunks`: the filtered candidate chunks (intersection of `emb_candidates` and `tag_candidates`)
 - `reranked_candidates::CandidateChunks`: the reranked candidate chunks (from `rerank`)
 - `conversations::Dict{Symbol,Vector{<:AbstractMessage}}`: the conversation history for AI steps of the RAG pipeline, use keys that correspond to the function names, eg, `:answer` or `:refine`
+
+See also: `pprint` (pretty printing), `annotate_support` (for annotating the answer)
 """
 @kwdef mutable struct RAGResult <: AbstractRAGResult
     question::AbstractString
-    rephrased_questions::AbstractVector{<:AbstractString}
+    rephrased_questions::AbstractVector{<:AbstractString} = [question]
     answer::Union{Nothing, AbstractString} = nothing
     final_answer::Union{Nothing, AbstractString} = nothing
-    context::Vector{<:AbstractString}
-    sources::Vector{<:AbstractString}
-    emb_candidates::CandidateChunks
-    tag_candidates::Union{Nothing, CandidateChunks}
-    filtered_candidates::CandidateChunks
-    reranked_candidates::CandidateChunks
+    context::Vector{<:AbstractString} = String[]
+    sources::Vector{<:AbstractString} = String[]
+    emb_candidates::CandidateChunks = CandidateChunks(
+        index_id = :NOTINDEX, positions = Int[], scores = Float32[])
+    tag_candidates::Union{Nothing, CandidateChunks} = CandidateChunks(
+        index_id = :NOTINDEX, positions = Int[], scores = Float32[])
+    filtered_candidates::CandidateChunks = CandidateChunks(
+        index_id = :NOTINDEX, positions = Int[], scores = Float32[])
+    reranked_candidates::CandidateChunks = CandidateChunks(
+        index_id = :NOTINDEX, positions = Int[], scores = Float32[])
     conversations::Dict{Symbol, Vector{<:AbstractMessage}} = Dict{
         Symbol, Vector{<:AbstractMessage}}()
 end
 # Simplification of the RAGDetails struct
-function RAGResult(
-        question::AbstractString, answer::AbstractString, context::Vector{<:AbstractString};
-        sources = ["Source $i" for i in 1:length(context)])
-    return RAGResult(question, [question], answer, answer, context, sources,
-        CandidateChunks(index_id = :index, positions = Int[], scores = Float32[]),
-        nothing,
-        CandidateChunks(index_id = :index, positions = Int[], scores = Float32[]),
-        CandidateChunks(index_id = :index, positions = Int[], scores = Float32[]),
-        Dict{Symbol, Vector{<:AbstractMessage}}())
-end
+## function RAGResult(
+##         question::AbstractString, answer::AbstractString, context::Vector{<:AbstractString};
+##         sources = ["Source $i" for i in 1:length(context)])
+##     return RAGResult(question, [question], answer, answer, context, sources,
+##         CandidateChunks(index_id = :index, positions = Int[], scores = Float32[]),
+##         nothing,
+##         CandidateChunks(index_id = :index, positions = Int[], scores = Float32[]),
+##         CandidateChunks(index_id = :index, positions = Int[], scores = Float32[]),
+##         Dict{Symbol, Vector{<:AbstractMessage}}())
+## end
 
 function Base.var"=="(r1::T, r2::T) where {T <: AbstractRAGResult}
     all(f -> getfield(r1, f) == getfield(r2, f),
         fieldnames(T))
 end
 function Base.copy(r::T) where {T <: AbstractRAGResult}
-    T(copy(getfield(r, f)) for f in fieldnames(T))
+    T([deepcopy(getfield(r, f))
+
+       for f in fieldnames(T)]...)
 end
 
 # Structured show method for easier reading (each kwarg on a new line)
@@ -333,8 +343,20 @@ end
 
 # Pretty print
 # TODO: add more customizations, eg, context itself
+"""
+    PT.pprint(
+        io::IO, r::AbstractRAGResult; add_context::Bool = false,
+        text_width::Int = displaysize(io)[2], annotater_kwargs...)
+
+Pretty print the RAG result `r` to the given `io` stream. 
+
+If `add_context` is `true`, the context will be printed as well. The `text_width` parameter can be used to control the width of the output.
+
+You can provide additional keyword arguments to the annotater, eg, `add_sources`, `add_scores`, `min_score`, etc. See `annotate_support` for more details.
+"""
 function PT.pprint(
-        io::IO, r::AbstractRAGResult; text_width::Int = displaysize(io)[2])
+        io::IO, r::AbstractRAGResult; add_context::Bool = false,
+        text_width::Int = displaysize(io)[2], annotater_kwargs...)
     if !isempty(r.rephrased_questions)
         content = PT.wrap_string("- " * join(r.rephrased_questions, "\n- "), text_width)
         print(io, "-"^20, "\n")
@@ -344,10 +366,19 @@ function PT.pprint(
     end
     if !isempty(r.final_answer)
         annotater = TrigramAnnotater()
-        root = annotate_support(annotater, r)
+        root = annotate_support(annotater, r; annotater_kwargs...)
         print(io, "-"^20, "\n")
         printstyled(io, "ANSWER", color = :blue, bold = true)
         print(io, "\n", "-"^20, "\n")
         pprint(io, root; text_width)
+    end
+    if add_context
+        print(io, "-"^20, "\n")
+        printstyled(io, "CONTEXT", color = :blue, bold = true)
+        print(io, "\n", "-"^20, "\n")
+        for (i, ctx) in enumerate(r.context)
+            print(io, "$(i). ", PT.wrap_string(ctx, text_width))
+            print(io, "\n", "-"^20, "\n")
+        end
     end
 end

@@ -224,7 +224,8 @@ end
     write(tmp, text)
     mini_files = [tmp, tmp]
     indexer = SimpleIndexer()
-    index = build_index(indexer, mini_files; chunker_kwargs = (; max_length = 10),
+    index = build_index(
+        indexer, mini_files; chunker = FileChunker(), chunker_kwargs = (; max_length = 10),
         embedder_kwargs = (; model = "mock-emb"),
         tagger_kwargs = (; model = "mock-meta"), api_kwargs = (;
             url = "http://localhost:$(PORT)"))
@@ -237,7 +238,7 @@ end
     @test index.tags_vocab == nothing
 
     ## With metadata
-    indexer = SimpleIndexer(; tagger = OpenTagger())
+    indexer = SimpleIndexer(; chunker = FileChunker(), tagger = OpenTagger())
     index = build_index(indexer, mini_files; chunker_kwargs = (; max_length = 10),
         embedder_kwargs = (; model = "mock-emb"),
         tagger_kwargs = (; model = "mock-meta"), api_kwargs = (;
@@ -261,6 +262,20 @@ end
     @test index.tags == nothing
     @test index.tags_vocab == nothing
 
+    # Test default behavior - text chunker
+    index = build_index([text, text];
+        chunker_kwargs = (;
+            sources = ["x", "x"], max_length = 10),
+        embedder_kwargs = (; model = "mock-emb"),
+        tagger_kwargs = (; model = "mock-meta"), api_kwargs = (;
+            url = "http://localhost:$(PORT)"))
+    @test index.embeddings ==
+          hcat(fill(normalize(ones(Float32, 128)), length(index.chunks))...)
+    @test index.chunks[begin:(length(index.chunks) ÷ 2)] ==
+          index.chunks[((length(index.chunks) ÷ 2) + 1):end]
+    @test index.sources == fill("x", length(index.chunks))
+    @test index.tags == nothing
+    @test index.tags_vocab == nothing
     # clean up
     close(echo_server)
 end

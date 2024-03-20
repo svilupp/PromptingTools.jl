@@ -44,7 +44,8 @@ Tokenizes provided `input` by spaces, special characters or Julia symbols (eg, `
 Unlike other tokenizers, it aims to lossless - ie, keep both the separated text and the separators.
 """
 function tokenize(input::Union{String, SubString{String}})
-    pattern = r"(\s+|=>|\(;|,|\.|\(|\)|\{|\}|\[|\]|;|:|\+|-|\*|/|<|>|=|&|\||!|@|#|\$|%|\^|~|`|\"|'|\w+)"
+    # specific to Julia language pattern, eg, capture macros (@xyz) or common operators (=>)
+    pattern = r"(\s+|=>|\(;|,|\.|\(|\)|\{|\}|\[|\]|;|:|\+|-|\*|/|<|>|=|&|\||!|@\w+|@|#|\$|%|\^|~|`|\"|'|\w+)"
     SubString{String}[m.match for m in eachmatch(pattern, input)]
 end
 
@@ -204,7 +205,7 @@ function split_into_code_and_sentences(input::Union{String, SubString{String}})
     pattern = r"(```[\s\S]+?```)|(`[^`]*?`)|([^`]+)"
 
     ## Patterns for sentences: newline, tab, bullet, enumerate list, sentence, any left out characters
-    sentence_pattern = r"(\n|\t|^\s*[*+-]\s*|^\s*\d+\.\s+|[^\n\t*+\-.!?]+[\n\t*+\-.!?]*|[*+\-.!?])"ms
+    sentence_pattern = r"(\n|\t|^\s*[*+-]\s*|^\s*\d+\.\s+|[^\n\t\.!?]+[\.!?]*|[*+\-\.!?])"ms
 
     # Initialize an empty array to store the split sentences
     sentences = SubString{String}[]

@@ -323,21 +323,25 @@ function add_node_metadata!(annotater::TrigramAnnotater,
     i = 1
     source_scores = Dict{Int, Float64}()
     source_lengths = Dict{Int, Int}()
+    non_source_length = 0
     previous_group_id = children[1].group_id
     while i <= length(children)
         child = children[i]
         # Check if group_id has changed or it's the last child to record source
         if (child.group_id != previous_group_id) && !isempty(source_scores)
             # Add a metadata node for the previous group
-            src, score_sum = maximum(source_scores)
-            score = score_sum / source_lengths[src] # average score, length weighted
+            score_sum, src = findmax(source_scores)
+            # average score weighted by the length of ALL text
+            # the goal is to show the match of top source across all text, not just the tokens that matched - it could be misleading
+            # the goal is "how confident are we that this source is the best match for the whole text"
+            score = score_sum / (sum(values(source_lengths)) + non_source_length)
             metadata_content = string("[",
                 add_sources ? src : "",
                 add_sources ? "," : "",
                 add_scores ? round(score, digits = 2) : "",
                 "]")
             ## Check if there is any content, then add it
-            if length(metadata_content) > 2
+            if length(metadata_content) > 3
                 src_node = AnnotatedNode(; parent = root, group_id = previous_group_id,
                     content = metadata_content)
                 insert!(children, i, src_node)
@@ -356,15 +360,19 @@ function add_node_metadata!(annotater::TrigramAnnotater,
             len = length(child.content)
             source_scores[src] = get(source_scores, src, 0) + child.score * len
             source_lengths[src] = get(source_lengths, src, 0) + len
+        elseif !isnothing(child.score)
+            ## track the low match tokens without any source allocated
+            non_source_length += length(child.content)
         end
+
         # Next round
         i += 1
     end
     ## Run for the last item
     if !isempty(source_scores)
         # Add a metadata node for the previous group
-        src, score_sum = maximum(source_scores)
-        score = score_sum / source_lengths[src] # average score, length weighted
+        score_sum, src = findmax(source_scores)
+        score = score_sum / (sum(values(source_lengths)) + non_source_length)
         metadata_content = string("[",
             add_sources ? src : "",
             add_sources ? "," : "",
@@ -441,6 +449,7 @@ function annotate_support(annotater::TrigramAnnotater, answer::AbstractString,
         min_source_score::Float64 = 0.25,
         add_sources::Bool = true,
         add_scores::Bool = true, kwargs...)
+    @assert !isempty(context) "Context cannot be empty"
     ## use hashed trigrams by default (more efficient for larger sequences)
     if hashed
         trigram_func = trigrams_hashed
@@ -482,13 +491,34 @@ function annotate_support(annotater::TrigramAnnotater, answer::AbstractString,
 end
 
 # Dispatch for RAGResult
-function annotate_support(
+"""
+    annotate_support(
         annotater::TrigramAnnotater, result::AbstractRAGResult; min_score::Float64 = 0.5,
-        skip_trigrams::Bool = true, hashed::Bool = false,
+        skip_trigrams::Bool = true, hashed::Bool = true,
         min_source_score::Float64 = 0.25,
         add_sources::Bool = true,
         add_scores::Bool = true, kwargs...)
+
+Dispatch for `annotate_support` for `AbstractRAGResult` type. It extracts the `final_answer` and `context` from the `result` and calls `annotate_support` with them.
+
+See `annotate_support` for more details.
+
+# Example
+```julia
+res = RAGResult(; question = "", final_answer = "This is a test.",
+    context = ["Test context.", "Completely different"])
+annotated_root = annotate_support(annotater, res)
+PT.pprint(annotated_root)
+```
+"""
+function annotate_support(
+        annotater::TrigramAnnotater, result::AbstractRAGResult; min_score::Float64 = 0.5,
+        skip_trigrams::Bool = true, hashed::Bool = true,
+        min_source_score::Float64 = 0.25,
+        add_sources::Bool = true,
+        add_scores::Bool = true, kwargs...)
+    final_answer = isnothing(result.final_answer) ? result.answer : result.final_answer
     return annotate_support(
-        annotater, result.final_answer, result.context; min_score, skip_trigrams,
+        annotater, final_answer, result.context; min_score, skip_trigrams,
         hashed, result.sources, min_source_score, add_sources, add_scores, kwargs...)
 end
