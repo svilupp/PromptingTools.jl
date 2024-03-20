@@ -1,5 +1,7 @@
-using PromptingTools.Experimental.RAGTools: ChunkIndex, MultiIndex, CandidateChunks
-using PromptingTools.Experimental.RAGTools: embeddings, chunks, tags, tags_vocab, sources
+using PromptingTools.Experimental.RAGTools: ChunkIndex, MultiIndex, CandidateChunks,
+                                            AbstractCandidateChunks
+using PromptingTools.Experimental.RAGTools: embeddings, chunks, tags, tags_vocab, sources,
+                                            RAGResult
 
 @testset "ChunkIndex" begin
     # Test constructors and basic accessors
@@ -101,20 +103,63 @@ end
     chunk_sym = Symbol("TestChunkIndex")
     cc1 = CandidateChunks(index_id = chunk_sym,
         positions = [1, 3],
-        distances = [0.1, 0.2])
+        scores = [0.1, 0.2])
     @test Base.length(cc1) == 2
+    out = Base.first(cc1, 1)
+    @test out.positions == [3]
+    @test out.scores == [0.2]
 
     # Test intersection &
     cc2 = CandidateChunks(index_id = chunk_sym,
         positions = [2, 4],
-        distances = [0.3, 0.4])
+        scores = [0.3, 0.4])
     @test isempty((cc1 & cc2).positions)
     cc3 = CandidateChunks(index_id = chunk_sym,
         positions = [1, 4],
-        distances = [0.3, 0.4])
+        scores = [0.3, 0.5])
     joint = (cc1 & cc3)
     @test joint.positions == [1]
-    @test joint.distances == [0.2]
+    @test joint.scores == [0.3]
+    joint2 = (cc2 & cc3)
+    @test joint2.positions == [4]
+    @test joint2.scores == [0.5]
+
+    # long positions intersection
+    cc5 = CandidateChunks(index_id = chunk_sym,
+        positions = [5, 6, 7, 8, 9, 10, 4],
+        scores = 0.1 * ones(7))
+    joint5 = (cc2 & cc5)
+    @test joint5.positions == [4]
+    @test joint5.scores == [0.4]
+
+    # wrong index
+    cc4 = CandidateChunks(index_id = :xyz,
+        positions = [2, 4],
+        scores = [0.3, 0.4])
+    joint4 = (cc2 & cc4)
+    @test isempty(joint4.positions)
+    @test isempty(joint4.scores)
+    @test isempty(joint4) == true
+
+    # Test unknown type
+    struct RandomCandidateChunks123 <: AbstractCandidateChunks end
+    @test_throws ArgumentError (cc1&RandomCandidateChunks123())
+
+    # Test vcat
+    vcat1 = vcat(cc1, cc2)
+    @test Base.length(vcat1) == 4
+    vcat2 = vcat(cc1, cc3)
+    @test vcat2.positions == [4, 1, 3]
+    @test vcat2.scores == [0.5, 0.3, 0.2]
+    # wrong index
+    @test_throws ArgumentError vcat(cc1, cc4)
+    # uknown type
+    @test_throws ArgumentError vcat(cc1, RandomCandidateChunks123())
+
+    # Test copy
+    cc1_copy = copy(cc1)
+    @test cc1 == cc1_copy
+    @test cc1.positions !== cc1_copy.positions # not the same array
 end
 
 @testset "getindex with CandidateChunks" begin
@@ -134,7 +179,7 @@ end
     # Test to get chunks based on valid CandidateChunks
     candidate_chunks = CandidateChunks(index_id = chunk_sym,
         positions = [1, 3],
-        distances = [0.1, 0.2])
+        scores = [0.1, 0.2])
     @test collect(test_chunk_index[candidate_chunks]) == ["First chunk", "Third chunk"]
     @test collect(test_chunk_index[candidate_chunks, :chunks]) ==
           ["First chunk", "Third chunk"]
@@ -146,7 +191,7 @@ end
     # Test with empty positions, which should result in an empty array
     candidate_chunks_empty = CandidateChunks(index_id = chunk_sym,
         positions = Int[],
-        distances = Float32[])
+        scores = Float32[])
     @test isempty(test_chunk_index[candidate_chunks_empty])
     @test isempty(test_chunk_index[candidate_chunks_empty, :chunks])
     @test isempty(test_chunk_index[candidate_chunks_empty, :embeddings])
@@ -155,14 +200,14 @@ end
     # Test with positions out of bounds, should handle gracefully without errors
     candidate_chunks_oob = CandidateChunks(index_id = chunk_sym,
         positions = [10, -1],
-        distances = [0.5, 0.6])
+        scores = [0.5, 0.6])
     @test_throws AssertionError test_chunk_index[candidate_chunks_oob]
 
     # Test with an incorrect index_id, which should also result in an empty array
     wrong_sym = Symbol("InvalidIndex")
     candidate_chunks_wrong_id = CandidateChunks(index_id = wrong_sym,
         positions = [1, 2],
-        distances = [0.3, 0.4])
+        scores = [0.3, 0.4])
     @test isempty(test_chunk_index[candidate_chunks_wrong_id])
 
     # Test when chunks are requested from a MultiIndex, only chunks from the corresponding ChunkIndex should be returned
@@ -187,11 +232,11 @@ end
     # Multi-Candidate CandidateChunks
     cc1 = CandidateChunks(index_id = :TestChunkIndex1,
         positions = [1, 2],
-        distances = [0.3, 0.4])
+        scores = [0.3, 0.4])
     cc2 = CandidateChunks(index_id = :TestChunkIndex2,
         positions = [2],
-        distances = [0.1])
-    cc = CandidateChunks(; index_id = :multi, positions = [cc1, cc2], distances = zeros(2))
+        scores = [0.1])
+    cc = CandidateChunks(; index_id = :multi, positions = [cc1, cc2], scores = zeros(2))
     ci1 = ChunkIndex(id = :TestChunkIndex1,
         chunks = ["chunk1", "chunk2"],
         sources = ["source1", "source2"])
@@ -204,4 +249,32 @@ end
     # with MultiIndex
     mi = MultiIndex(; id = :multi, indexes = [ci1, ci2])
     @test mi[cc] == ["chunk1", "chunk2", "chunk2"]
+end
+
+@testset "RAGResult" begin
+    result = RAGResult(; question = "a", answer = "b", final_answer = "c")
+    result2 = RAGResult(; question = "a", answer = "b", final_answer = "c")
+    @test result == result2
+
+    result3 = copy(result)
+    @test result == result3
+    @test result !== result3
+
+    ## pprint checks - empty context fails
+    io = IOBuffer()
+    @test_throws AssertionError PT.pprint(io, result)
+
+    ## RAG Details dispatch
+    answer = "This is a test answer."
+    sources_ = ["Source 1", "Source 2", "Source 3"]
+    result = RAGResult(;
+        question = "?", final_answer = answer, context = sources_, sources = sources_)
+    io = IOBuffer()
+    PT.pprint(io, result; add_context = true)
+    output = String(take!(io))
+    @test occursin("This is a test answer.", output)
+    @test occursin("\nQUESTION", output)
+    @test occursin("\nSOURCES\n", output)
+    @test occursin("\nCONTEXT\n", output)
+    @test occursin("1. Source 1", output)
 end

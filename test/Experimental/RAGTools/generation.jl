@@ -1,8 +1,16 @@
 using PromptingTools.Experimental.RAGTools: ChunkIndex,
-                                            CandidateChunks, build_context, airag
-using PromptingTools.Experimental.RAGTools: MaybeMetadataItems, MetadataItem
+                                            CandidateChunks, build_context, build_context!
+using PromptingTools.Experimental.RAGTools: MaybeTags, Tag, ContextEnumerator,
+                                            AbstractContextBuilder
+using PromptingTools.Experimental.RAGTools: SimpleAnswerer, AbstractAnswerer, answer!,
+                                            NoRefiner, SimpleRefiner, AbstractRefiner,
+                                            refine!
+using PromptingTools.Experimental.RAGTools: NoPostprocessor, AbstractPostprocessor,
+                                            postprocess!, SimpleGenerator,
+                                            AdvancedGenerator, generate!, airag, RAGConfig,
+                                            RAGResult
 
-@testset "build_context" begin
+@testset "build_context!" begin
     index = ChunkIndex(;
         sources = [".", ".", "."],
         chunks = ["a", "b", "c"],
@@ -12,26 +20,184 @@ using PromptingTools.Experimental.RAGTools: MaybeMetadataItems, MetadataItem
     candidates = CandidateChunks(index.id, [1, 2], [0.1, 0.2])
 
     # Standard Case
-    context = build_context(index, candidates)
+    contexter = ContextEnumerator()
+    context = build_context(contexter, index, candidates)
     expected_output = ["1. a\nb",
         "2. a\nb\nc"]
     @test context == expected_output
 
     # No Surrounding Chunks
-    context = build_context(index, candidates; chunks_window_margin = (0, 0))
+    context = build_context(contexter, index, candidates; chunks_window_margin = (0, 0))
     expected_output = ["1. a",
         "2. b"]
     @test context == expected_output
 
     # Wrong inputs
-    @test_throws AssertionError build_context(index,
+    @test_throws AssertionError build_context(contexter, index,
         candidates;
         chunks_window_margin = (-1, 0))
+
+    # From result/index
+    question = "why?"
+    result = RAGResult(;
+        question, rephrased_questions = [question], emb_candidates = candidates,
+        tag_candidates = candidates, filtered_candidates = candidates, reranked_candidates = candidates,
+        context = String[], sources = String[])
+    build_context!(contexter, index, result)
+    expected_output = ["1. a\nb",
+        "2. a\nb\nc"]
+    @test result.context == expected_output
+
+    # Unknown type
+    struct RandomContextEnumerator123 <: AbstractContextBuilder end
+    @test_throws ArgumentError build_context!(
+        RandomContextEnumerator123(), index, result)
+end
+
+@testset "answer!" begin
+    # Setup
+    index = ChunkIndex(id = :TestChunkIndex1,
+        chunks = ["chunk1", "chunk2"],
+        sources = ["source1", "source2"],
+        embeddings = ones(Float32, 2, 2))
+
+    question = "why?"
+    cc1 = CandidateChunks(index_id = :TestChunkIndex1)
+
+    result = RAGResult(; question, rephrased_questions = [question], emb_candidates = cc1,
+        tag_candidates = cc1, filtered_candidates = cc1, reranked_candidates = cc1,
+        context = String["a", "b"], sources = String[])
+
+    # Test refine with SimpleAnswerer
+    response = Dict(
+        :choices => [
+            Dict(:message => Dict(:content => "answer"), :finish_reason => "stop")
+        ],
+        :usage => Dict(:total_tokens => 3,
+            :prompt_tokens => 2,
+            :completion_tokens => 1))
+    schema = TestEchoOpenAISchema(; response, status = 200)
+    PT.register_model!(; name = "mock-gen", schema)
+
+    output = answer!(
+        SimpleAnswerer(), index, result; model = "mock-gen")
+    @test result.answer == "answer"
+    @test result.conversations[:answer][end].content == "answer"
+
+    # with unknown rephraser
+    struct UnknownAnswerer123 <: AbstractAnswerer end
+    @test_throws ArgumentError answer!(UnknownAnswerer123(), index, result)
+end
+
+@testset "refine!" begin
+    # Setup
+    index = ChunkIndex(id = :TestChunkIndex1,
+        chunks = ["chunk1", "chunk2"],
+        sources = ["source1", "source2"],
+        embeddings = ones(Float32, 2, 2))
+
+    question = "why?"
+    cc1 = CandidateChunks(index_id = :TestChunkIndex1)
+
+    # Test refine with NoRefiner, simple passthrough
+    result = RAGResult(; question, rephrased_questions = [question], emb_candidates = cc1,
+        tag_candidates = cc1, filtered_candidates = cc1, reranked_candidates = cc1,
+        context = String[], sources = String[], answer = "ABC",
+        conversations = Dict(:answer => [PT.UserMessage("MESSAGE")]))
+
+    result = refine!(NoRefiner(), index, result)
+    @test result.final_answer == "ABC"
+    @test result.conversations[:final_answer] == [PT.UserMessage("MESSAGE")]
+
+    # Test refine with SimpleRefiner
+    response = Dict(
+        :choices => [
+            Dict(:message => Dict(:content => "new answer"), :finish_reason => "stop")
+        ],
+        :usage => Dict(:total_tokens => 3,
+            :prompt_tokens => 2,
+            :completion_tokens => 1))
+    schema = TestEchoOpenAISchema(; response, status = 200)
+    PT.register_model!(; name = "mock-gen", schema)
+    result = RAGResult(; question, rephrased_questions = [question], emb_candidates = cc1,
+        tag_candidates = cc1, filtered_candidates = cc1, reranked_candidates = cc1,
+        context = String[], sources = String[], answer = "ABC",
+        conversations = Dict(:answer => [PT.UserMessage("MESSAGE")]))
+
+    output = refine!(
+        SimpleRefiner(), index, result; model = "mock-gen")
+    @test result.final_answer == "new answer"
+    @test result.conversations[:final_answer][end].content == "new answer"
+
+    # with unknown rephraser
+    struct UnknownRefiner123 <: AbstractRefiner end
+    @test_throws ArgumentError refine!(UnknownRefiner123(), index, result)
+end
+
+@testset "postprocess!" begin
+    question = "why?"
+    cc1 = CandidateChunks(index_id = :TestChunkIndex1)
+    result = RAGResult(; question, rephrased_questions = [question], emb_candidates = cc1,
+        tag_candidates = cc1, filtered_candidates = cc1, reranked_candidates = cc1,
+        context = String[], sources = String[])
+    index = ChunkIndex(id = :TestChunkIndex1,
+        chunks = ["chunk1", "chunk2"],
+        sources = ["source1", "source2"],
+        embeddings = ones(Float32, 2, 2))
+
+    # passthrough
+    @test postprocess!(NoPostprocessor(), index, result) == result
+    # Unknown type
+    struct RandomPostprocessor123 <: AbstractPostprocessor end
+    @test_throws ArgumentError postprocess!(RandomPostprocessor123(), index, result)
+end
+
+@testset "generate!" begin
+    response = Dict(
+        :choices => [
+            Dict(:message => Dict(:content => "answer"), :finish_reason => "stop")
+        ],
+        :usage => Dict(:total_tokens => 3,
+            :prompt_tokens => 2,
+            :completion_tokens => 1))
+    schema = TestEchoOpenAISchema(; response, status = 200)
+    PT.register_model!(; name = "mock-gen", schema)
+
+    index = ChunkIndex(id = :TestChunkIndex1,
+        chunks = ["chunk1", "chunk2"],
+        sources = ["source1", "source2"],
+        embeddings = ones(Float32, 2, 2))
+
+    question = "why?"
+    cc1 = CandidateChunks(index_id = :TestChunkIndex1)
+
+    result = RAGResult(; question, rephrased_questions = [question], emb_candidates = cc1,
+        tag_candidates = cc1, filtered_candidates = cc1, reranked_candidates = cc1,
+        context = String["a", "b"], sources = String[])
+
+    # SimpleGenerator - no refinement
+    output = generate!(SimpleGenerator(), index, result;
+        answerer_kwargs = (; model = "mock-gen"))
+    @test output.answer == "answer"
+    @test output.final_answer == "answer"
+
+    # with defaults 
+    output = generate!(index, result;
+        answerer_kwargs = (; model = "mock-gen"))
+    @test output.answer == "answer"
+    @test output.final_answer == "answer"
+
+    # Test with refinement - AdvancedGenerator
+    output = generate!(AdvancedGenerator(), index, result;
+        answerer_kwargs = (; model = "mock-gen"),
+        refiner_kwargs = (; model = "mock-gen"))
+    @test output.answer == "answer"
+    @test output.final_answer == "answer"
 end
 
 @testset "airag" begin
     # test with a mock server
-    PORT = rand(20000:40000)
+    PORT = rand(20010:40001)
     PT.register_model!(; name = "mock-emb", schema = PT.CustomOpenAISchema())
     PT.register_model!(; name = "mock-meta", schema = PT.CustomOpenAISchema())
     PT.register_model!(; name = "mock-gen", schema = PT.CustomOpenAISchema())
@@ -61,8 +227,8 @@ end
                 :choices => [
                     Dict(:finish_reason => "stop",
                     :message => Dict(:tool_calls => [
-                        Dict(:function => Dict(:arguments => JSON3.write(MaybeMetadataItems([
-                        MetadataItem("yes", "category")
+                        Dict(:function => Dict(:arguments => JSON3.write(MaybeTags([
+                        Tag("yes", "category")
                     ]))))]))],
                 :model => content[:model],
                 :usage => Dict(:total_tokens => length(user_msg[:content]),
@@ -86,69 +252,53 @@ end
         model = "mock-emb",
         api_kwargs = (; url = "http://localhost:$(PORT)"))
     @test question_emb.content == ones(128)
-    metadata_msg = aiextract(:RAGExtractMetadataShort; return_type = MaybeMetadataItems,
+    metadata_msg = aiextract(:RAGExtractMetadataShort; return_type = MaybeTags,
         text = "x",
         model = "mock-meta", api_kwargs = (; url = "http://localhost:$(PORT)"))
-    @test metadata_msg.content.items == [MetadataItem("yes", "category")]
+    @test metadata_msg.content.items == [Tag("yes", "category")]
     answer_msg = aigenerate(:RAGAnswerFromContext;
         question = "Time?",
         context = "XYZ",
         model = "mock-gen", api_kwargs = (; url = "http://localhost:$(PORT)"))
     @test occursin("Time?", answer_msg.content)
-    ## E2E
-    msg = airag(index; question = "Time?", model_embedding = "mock-emb",
-        model_chat = "mock-gen",
-        model_metadata = "mock-meta", api_kwargs = (; url = "http://localhost:$(PORT)"),
-        tag_filter = ["yes"],
-        return_details = false)
+    ## E2E - default type
+    msg = airag(index; question = "Time?",
+        retriever_kwargs = (;
+            tagger_kwargs = (; model = "mock-gen", tag = ["yes"]), embedder_kwargs = (;
+                model = "mock-emb")),
+        generator_kwargs = (;
+            answerer_kwargs = (; model = "mock-gen"), embedder_kwargs = (;
+                model = "mock-emb")),
+        api_kwargs = (; url = "http://localhost:$(PORT)"),
+        return_all = false)
     @test occursin("Time?", msg.content)
 
-    # test kwargs passing
-    api_kwargs = (; url = "http://localhost:$(PORT)")
-    msg = airag(index; question = "Time?", model_embedding = "mock-emb",
-        model_chat = "mock-gen",
-        model_metadata = "mock-meta",
-        tag_filter = ["yes"],
-        return_details = false, aiembed_kwargs = (; api_kwargs),
-        aigenerate_kwargs = (; api_kwargs), aiextract_kwargs = (; api_kwargs))
+    ## E2E - with type
+    msg = airag(RAGConfig(), index; question = "Time?",
+        retriever_kwargs = (;
+            tagger_kwargs = (; model = "mock-gen", tag = ["yes"]), embedder_kwargs = (;
+                model = "mock-emb")),
+        generator_kwargs = (;
+            answerer_kwargs = (; model = "mock-gen"), embedder_kwargs = (;
+                model = "mock-emb")),
+        api_kwargs = (; url = "http://localhost:$(PORT)"),
+        return_all = false)
     @test occursin("Time?", msg.content)
 
-    ## Test different kwargs
-    msg, details = airag(index; question = "Time?", model_embedding = "mock-emb",
-        model_chat = "mock-gen",
-        model_metadata = "mock-meta", api_kwargs = (; url = "http://localhost:$(PORT)"),
-        tag_filter = :auto,
-        extract_metadata = false, verbose = false,
-        return_details = true)
-    @test details.context == ["1. a\nb\nc", "2. a\nb"]
-    @test details.emb_candidates.positions == [3, 2, 1]
-    @test details.emb_candidates.distances == zeros(3)
-    @test details.tag_candidates.positions == [1, 2]
-    @test details.tag_candidates.distances == ones(2)
-    @test details.filtered_candidates.positions == [2, 1] #re-sort
-    @test details.filtered_candidates.distances == 0.5ones(2)
-    @test details.reranked_candidates.positions == [2, 1] # no change
-    @test details.reranked_candidates.distances == 0.5ones(2) # no change
-
-    ## Not tag filter
-    msg, details = airag(index; question = "Time?", model_embedding = "mock-emb",
-        model_chat = "mock-gen",
-        model_metadata = "mock-meta", api_kwargs = (; url = "http://localhost:$(PORT)"),
-        tag_filter = nothing,
-        return_details = true)
-    @test details.context == ["1. b\nc", "2. a\nb\nc", "3. a\nb"]
-    @test details.emb_candidates.positions == [3, 2, 1]
-    @test details.emb_candidates.distances == zeros(3)
-    @test details.tag_candidates == nothing
-    @test details.filtered_candidates.positions == [3, 2, 1] #re-sort
-    @test details.reranked_candidates.positions == [3, 2, 1] # no change
+    ## Return RAG result
+    result = airag(RAGConfig(), index; question = "Time?",
+        retriever_kwargs = (;
+            tagger_kwargs = (; model = "mock-gen", tag = ["yes"]), embedder_kwargs = (;
+                model = "mock-emb")),
+        generator_kwargs = (;
+            answerer_kwargs = (; model = "mock-gen"), embedder_kwargs = (;
+                model = "mock-emb")),
+        api_kwargs = (; url = "http://localhost:$(PORT)"),
+        return_all = true)
+    @test occursin("Time?", result.answer)
+    @test occursin("Time?", result.final_answer)
 
     ## Pretty printing
-    result = airag(index; question = "Time?", model_embedding = "mock-emb",
-        model_chat = "mock-gen",
-        model_metadata = "mock-meta", api_kwargs = (; url = "http://localhost:$(PORT)"),
-        tag_filter = nothing,
-        return_details = true)
     io = IOBuffer()
     PT.pprint(io, result)
     result_str = String(take!(io))
