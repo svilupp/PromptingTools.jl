@@ -1,5 +1,6 @@
 module PromptingTools
 
+import AbstractTrees
 using Base64: base64encode
 using Logging
 using OpenAI
@@ -28,6 +29,7 @@ const RESERVED_KWARGS = [
 
 # export replace_words, recursive_splitter, split_by_length, call_cost, auth_header # for debugging only
 # export length_longest_common_subsequence, distance_longest_common_subsequence
+# export pprint
 include("utils.jl")
 
 export aigenerate, aiembed, aiclassify, aiextract, aiscan, aiimage

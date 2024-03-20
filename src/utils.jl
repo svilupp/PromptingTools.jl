@@ -608,8 +608,8 @@ function pprint(io::IO, anything::Any; text_width::Int = displaysize(io)[2])
 end
 
 function pprint(anything::Any;
-        text_width = displaysize(stdout)[2])
-    pprint(stdout, anything; text_width)
+        text_width = displaysize(stdout)[2], kwargs...)
+    pprint(stdout, anything; text_width, kwargs...)
 end
 
 """

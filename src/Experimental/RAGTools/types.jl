@@ -68,7 +68,10 @@ function Base.vcat(i1::ChunkIndex, i2::ChunkIndex)
         sources = vcat(i1.sources, i2.sources))
 end
 
-"Composite index that stores multiple ChunkIndex objects and their embeddings"
+## TODO: implement a view(), make sure to recover the output positions correctly
+## TODO: fields: parent, positions
+
+"Composite index that stores multiple ChunkIndex objects and their embeddings. It's not yet fully implemented."
 @kwdef struct MultiIndex <: AbstractMultiIndex
     id::Symbol = gensym("MultiIndex")
     indexes::Vector{<:AbstractChunkIndex}
@@ -90,22 +93,83 @@ function Base.var"=="(i1::MultiIndex, i2::MultiIndex)
     return true
 end
 
+"""
+    CandidateChunks
+
+A struct for storing references to chunks in the given index (identified by `index_id`) called `positions` and `scores` holding the strength of similarity (=1 is the highest, most similar).
+It's the result of the retrieval stage of RAG.
+
+# Fields
+- `index_id::Symbol`: the id of the index from which the candidates are drawn
+- `positions::Vector{Int}`: the positions of the candidates in the index (ie, `5` refers to the 5th chunk in the index - `chunks(index)[5]`)
+- `scores::Vector{Float32}`: the similarity scores of the candidates from the query (higher is better)
+"""
 @kwdef struct CandidateChunks{TP <: Union{Integer, AbstractCandidateChunks}, TD <: Real} <:
               AbstractCandidateChunks
     index_id::Symbol
     ## if TP is Int, then positions are indices into the index
     ## if TP is CandidateChunks, then positions are indices into the positions of the child index in MultiIndex
     positions::Vector{TP} = Int[]
-    distances::Vector{TD} = Float32[]
+    scores::Vector{TD} = Float32[]
 end
+## TODO: disabled nested CandidateChunks for now
+## TODO: create MultiCandidateChunks for use with MultiIndex, they will have extra field subindex_id
+
 Base.length(cc::CandidateChunks) = length(cc.positions)
 function Base.first(cc::CandidateChunks, k::Integer)
-    CandidateChunks(cc.index_id, first(cc.positions, k), first(cc.distances, k))
+    sorted_idxs = sortperm(cc.scores, rev = true) |> x -> first(x, k)
+    CandidateChunks(cc.index_id, cc.positions[sorted_idxs], cc.scores[sorted_idxs])
 end
-# combine/intersect two candidate chunks. average the score if available
+function Base.copy(cc::CandidateChunks{TP, TD}) where {TP <: Integer, TD <: Real}
+    CandidateChunks{TP, TD}(cc.index_id, copy(cc.positions), copy(cc.scores))
+end
+function Base.isempty(cc::CandidateChunks)
+    isempty(cc.positions)
+end
+function Base.var"=="(cc1::CandidateChunks, cc2::CandidateChunks)
+    all(
+        getfield(cc1, f) == getfield(cc2, f) for f in fieldnames(CandidateChunks))
+end
+
+# join and sort two candidate chunks
+function Base.vcat(cc1::AbstractCandidateChunks, cc2::AbstractCandidateChunks)
+    throw(ArgumentError("Not implemented for type $(typeof(cc1)) and $(typeof(cc2))"))
+end
+function Base.vcat(cc1::CandidateChunks{TP1, TD1},
+        cc2::CandidateChunks{TP2, TD2}) where {
+        TP1 <: Integer, TP2 <: Integer, TD1 <: Real, TD2 <: Real}
+    ## Check validity
+    cc1.index_id != cc2.index_id &&
+        throw(ArgumentError("Index ids must match (provided: $(cc1.index_id) and $(cc2.index_id))"))
+
+    positions = vcat(cc1.positions, cc2.positions)
+    # operates on maximum similarity principle, ie, take the max similarity
+    scores = if !isempty(cc1.scores) && !isempty(cc2.scores)
+        vcat(cc1.scores, cc2.scores)
+    else
+        TD1[]
+    end
+
+    if !isempty(scores)
+        ## Get sorted by maximum similarity (scores are similarity)
+        sorted_idxs = sortperm(scores, rev = true)
+        positions_sorted = @view(positions[sorted_idxs])
+        ## get the positions of unique elements
+        unique_idxs = unique(i -> positions_sorted[i], eachindex(positions_sorted))
+        positions = positions_sorted[unique_idxs]
+        ## apply the sorting and then the filtering
+        scores = @view(scores[sorted_idxs])[unique_idxs]
+    else
+        positions = unique(positions)
+    end
+
+    CandidateChunks(cc1.index_id, positions, scores)
+end
+
+# combine/intersect two candidate chunks. take the maximum of the score if available
 function Base.var"&"(cc1::AbstractCandidateChunks,
         cc2::AbstractCandidateChunks)
-    throw(ArgumentError("Not implemented"))
+    throw(ArgumentError("Not implemented for type $(typeof(cc1)) and $(typeof(cc2))"))
 end
 function Base.var"&"(cc1::CandidateChunks{TP1, TD1},
         cc2::CandidateChunks{TP2, TD2}) where
@@ -114,12 +178,38 @@ function Base.var"&"(cc1::CandidateChunks{TP1, TD1},
     cc1.index_id != cc2.index_id && return CandidateChunks(; index_id = cc1.index_id)
 
     positions = intersect(cc1.positions, cc2.positions)
-    distances = if !isempty(cc1.distances) && !isempty(cc2.distances)
-        (cc1.distances[positions] .+ cc2.distances[positions]) ./ 2
+
+    scores = if !isempty(cc1.scores) && !isempty(cc2.scores)
+        valid_scores = fill(TD1(-1), length(positions))
+        # identify maximum scores from each CC
+        # scan the first CC
+        for i in eachindex(cc1.positions, cc1.scores)
+            pos = cc1.positions[i]
+            idx = findfirst(==(pos), positions)
+            if !isnothing(idx)
+                valid_scores[idx] = max(valid_scores[idx], cc1.scores[i])
+            end
+        end
+        # scan the second CC
+        for i in eachindex(cc2.positions, cc2.scores)
+            pos = cc2.positions[i]
+            idx = findfirst(==(pos), positions)
+            if !isnothing(idx)
+                valid_scores[idx] = max(valid_scores[idx], cc2.scores[i])
+            end
+        end
+        valid_scores
     else
-        Float32[]
+        TD1[]
     end
-    CandidateChunks(cc1.index_id, positions, distances)
+    ## Sort by maximum similarity
+    if !isempty(scores)
+        sorted_idxs = sortperm(scores, rev = true)
+        positions = positions[sorted_idxs]
+        scores = scores[sorted_idxs]
+    end
+
+    CandidateChunks(cc1.index_id, positions, scores)
 end
 
 function Base.getindex(ci::AbstractDocumentIndex,
@@ -184,30 +274,65 @@ function Base.getindex(mi::MultiIndex,
 end
 
 """
-    RAGDetails
+    RAGResult
 
 A struct for debugging RAG answers. It contains the question, answer, context, and the candidate chunks at each step of the RAG pipeline.
+
+Think of the flow as `question` -> `rephrased_questions` -> `answer` -> `final_answer` with the context and candidate chunks helping along the way.
+
+# Fields
+- `question::AbstractString`: the original question
+- `rephrased_questions::Vector{<:AbstractString}`: a vector of rephrased questions (eg, HyDe, Multihop, etc.)
+- `answer::AbstractString`: the generated answer
+- `final_answer::AbstractString`: the refined final answer (eg, after CorrectiveRAG), also considered the FINAL answer (it must be always available)
+- `context::Vector{<:AbstractString}`: the context used for retrieval (ie, the vector of chunks and their surrounding window if applicable)
+- `sources::Vector{<:AbstractString}`: the sources of the context (for the original matched chunks)
+- `emb_candidates::CandidateChunks`: the candidate chunks from the embedding index (from `find_closest`)
+- `tag_candidates::Union{Nothing, CandidateChunks}`: the candidate chunks from the tag index (from `find_tags`)
+- `filtered_candidates::CandidateChunks`: the filtered candidate chunks (intersection of `emb_candidates` and `tag_candidates`)
+- `reranked_candidates::CandidateChunks`: the reranked candidate chunks (from `rerank`)
+- `conversations::Dict{Symbol,Vector{<:AbstractMessage}}`: the conversation history for AI steps of the RAG pipeline, use keys that correspond to the function names, eg, `:answer` or `:refine`
+
+See also: `pprint` (pretty printing), `annotate_support` (for annotating the answer)
 """
-@kwdef mutable struct RAGDetails <: AbstractRAGResult
+@kwdef mutable struct RAGResult <: AbstractRAGResult
     question::AbstractString
-    rephrased_question::AbstractVector{<:AbstractString}
-    answer::AbstractString
-    refined_answer::AbstractString
-    context::Vector{<:AbstractString}
-    sources::Vector{<:AbstractString}
-    emb_candidates::CandidateChunks
-    tag_candidates::Union{Nothing, CandidateChunks}
-    filtered_candidates::CandidateChunks
-    reranked_candidates::CandidateChunks
+    rephrased_questions::AbstractVector{<:AbstractString} = [question]
+    answer::Union{Nothing, AbstractString} = nothing
+    final_answer::Union{Nothing, AbstractString} = nothing
+    context::Vector{<:AbstractString} = String[]
+    sources::Vector{<:AbstractString} = String[]
+    emb_candidates::CandidateChunks = CandidateChunks(
+        index_id = :NOTINDEX, positions = Int[], scores = Float32[])
+    tag_candidates::Union{Nothing, CandidateChunks} = CandidateChunks(
+        index_id = :NOTINDEX, positions = Int[], scores = Float32[])
+    filtered_candidates::CandidateChunks = CandidateChunks(
+        index_id = :NOTINDEX, positions = Int[], scores = Float32[])
+    reranked_candidates::CandidateChunks = CandidateChunks(
+        index_id = :NOTINDEX, positions = Int[], scores = Float32[])
+    conversations::Dict{Symbol, Vector{<:AbstractMessage}} = Dict{
+        Symbol, Vector{<:AbstractMessage}}()
 end
 # Simplification of the RAGDetails struct
-function RAGDetails(
-        question, answer, context; sources = ["Source $i" for i in 1:length(context)])
-    return RAGDetails(question, [question], answer, answer, context, sources,
-        CandidateChunks(index_id = :emb, positions = Int[], distances = Float32[]),
-        nothing,
-        CandidateChunks(index_id = :emb, positions = Int[], distances = Float32[]),
-        CandidateChunks(index_id = :emb, positions = Int[], distances = Float32[]))
+## function RAGResult(
+##         question::AbstractString, answer::AbstractString, context::Vector{<:AbstractString};
+##         sources = ["Source $i" for i in 1:length(context)])
+##     return RAGResult(question, [question], answer, answer, context, sources,
+##         CandidateChunks(index_id = :index, positions = Int[], scores = Float32[]),
+##         nothing,
+##         CandidateChunks(index_id = :index, positions = Int[], scores = Float32[]),
+##         CandidateChunks(index_id = :index, positions = Int[], scores = Float32[]),
+##         Dict{Symbol, Vector{<:AbstractMessage}}())
+## end
+
+function Base.var"=="(r1::T, r2::T) where {T <: AbstractRAGResult}
+    all(f -> getfield(r1, f) == getfield(r2, f),
+        fieldnames(T))
+end
+function Base.copy(r::T) where {T <: AbstractRAGResult}
+    T([deepcopy(getfield(r, f))
+
+       for f in fieldnames(T)]...)
 end
 
 # Structured show method for easier reading (each kwarg on a new line)
@@ -217,21 +342,43 @@ function Base.show(io::IO,
 end
 
 # Pretty print
+# TODO: add more customizations, eg, context itself
+"""
+    PT.pprint(
+        io::IO, r::AbstractRAGResult; add_context::Bool = false,
+        text_width::Int = displaysize(io)[2], annotater_kwargs...)
+
+Pretty print the RAG result `r` to the given `io` stream. 
+
+If `add_context` is `true`, the context will be printed as well. The `text_width` parameter can be used to control the width of the output.
+
+You can provide additional keyword arguments to the annotater, eg, `add_sources`, `add_scores`, `min_score`, etc. See `annotate_support` for more details.
+"""
 function PT.pprint(
-        io::IO, r::AbstractRAGResult; text_width::Int = displaysize(io)[2])
-    if !isempty(r.rephrased_question)
-        content = PT.wrap_string("- " * join(r.rephrased_question, "\n- "), text_width)
+        io::IO, r::AbstractRAGResult; add_context::Bool = false,
+        text_width::Int = displaysize(io)[2], annotater_kwargs...)
+    if !isempty(r.rephrased_questions)
+        content = PT.wrap_string("- " * join(r.rephrased_questions, "\n- "), text_width)
         print(io, "-"^20, "\n")
         printstyled(io, "QUESTION(s)", color = :blue, bold = true)
         print(io, "\n", "-"^20, "\n")
         print(io, content, "\n\n")
     end
-    if !isempty(r.refined_answer)
+    if !isempty(r.final_answer)
         annotater = TrigramAnnotater()
-        root = annotate_support(annotater, r)
+        root = annotate_support(annotater, r; annotater_kwargs...)
         print(io, "-"^20, "\n")
         printstyled(io, "ANSWER", color = :blue, bold = true)
         print(io, "\n", "-"^20, "\n")
         pprint(io, root; text_width)
+    end
+    if add_context
+        print(io, "-"^20, "\n")
+        printstyled(io, "CONTEXT", color = :blue, bold = true)
+        print(io, "\n", "-"^20, "\n")
+        for (i, ctx) in enumerate(r.context)
+            print(io, "$(i). ", PT.wrap_string(ctx, text_width))
+            print(io, "\n", "-"^20, "\n")
+        end
     end
 end

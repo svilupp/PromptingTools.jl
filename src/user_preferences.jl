@@ -159,7 +159,7 @@ _temp = get(ENV, "FIREWORKS_API_KEY", "")
 const FIREWORKS_API_KEY::String = @load_preference("FIREWORKS_API_KEY",
     default=_temp);
 
-_temp = get(ENV, "LOCAL_SERVER", "")
+_temp = get(ENV, "LOCAL_SERVER", "http://localhost:10897/v1")
 ## Address of the local server
 const LOCAL_SERVER::String = @load_preference("LOCAL_SERVER",
     default=_temp);
@@ -448,7 +448,12 @@ registry = Dict{String, ModelSpec}(
         LocalServerOpenAISchema(),
         0.0,
         0.0,
-        "Local server, eg, powered by [Llama.jl](https://github.com/marcom/Llama.jl). Model is specified when instantiating the server itself."),
+        "Local server, eg, powered by [Llama.jl](https://github.com/marcom/Llama.jl). Model is specified when instantiating the server itself. It will be automatically pointed to the address in `LOCAL_SERVER`."),
+    "custom" => ModelSpec("custom",
+        LocalServerOpenAISchema(),
+        0.0,
+        0.0,
+        "Send a generic request to a custom server. Make sure to explicitly define the `api_kwargs = (; url = ...)` when calling the model."),
     "gemini-pro" => ModelSpec("gemini-pro",
         GoogleSchema(),
         0.0, #unknown, expected 1.25e-7
