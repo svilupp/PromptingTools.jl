@@ -247,10 +247,10 @@ end
       ```
       and `inline code`."""
     sentences, group_ids = split_into_code_and_sentences(input)
-    @test sentences == ["Here is a code block: \n", "```julia", "\n",
+    @test sentences == ["Here is a code block: ", "\n", "```julia", "\n",
         "code here", "\n", "```", "\n", "and ", "`inline code`", "."]
     @test join(sentences, "") == input
-    @test group_ids == [1, 2, 2, 2, 2, 2, 3, 4, 5, 6]
+    @test group_ids == [1, 2, 3, 3, 3, 3, 3, 4, 5, 6, 7]
 
     ## Multi-faceted code
     input = """Here is a code block: 
@@ -270,11 +270,12 @@ end
     """
     sentences, group_ids = split_into_code_and_sentences(input)
     @test sentences ==
-          ["Here is a code block: \n", "```julia", "\n", "code here", "\n", "```", "\n",
-        "and ", "`inline code`", ".", "\n", "Sentences here.\n", "Bullets:\n-",
-        " I like this\n-", " But does it work?\n", "```julia", "\n", "another code",
-        "\n", "```", "\n", "1. ", "Tester\n", "Third sentence -", " but what happened.\n"]
+          [
+        "Here is a code block: ", "\n", "```julia", "\n", "code here", "\n", "```", "\n",
+        "and ", "`inline code`", ".", "\n", "Sentences here.", "\n", "Bullets:", "\n", "- ",
+        "I like this", "\n", "- ", "But does it work?", "\n", "```julia", "\n", "another code",
+        "\n", "```", "\n", "1. ", "Tester", "\n", "Third sentence - but what happened.", "\n"]
     @test join(sentences, "") == input
-    @test group_ids == [
-        1, 2, 2, 2, 2, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 12, 12, 12, 12, 13, 14, 15, 16, 17]
+    @test group_ids == [1, 2, 3, 3, 3, 3, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
+        15, 16, 17, 18, 19, 19, 19, 19, 19, 20, 21, 22, 23, 24, 25]
 end

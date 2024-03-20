@@ -328,10 +328,16 @@ end
     @test occursin("\nSOURCES\n", output)
     @test occursin("1. Source 1", output)
 
+    # Catch empty context
+    answer = "This is a test answer."
+    @test_throws AssertionError annotated_root=annotate_support(
+        annotater, answer, String[])
+
     ## RAG Details dispatch
     answer = "This is a test answer."
-    r = RAGResult(
-        "?", answer, context; sources = ["Source 1", "Source 2", "Source 3"])
+    r = RAGResult(;
+        question = "?", final_answer = answer, context, sources = [
+            "Source 1", "Source 2", "Source 3"])
     annotated_root = annotate_support(annotater, r)
     io = IOBuffer()
     pprint(io, annotated_root)

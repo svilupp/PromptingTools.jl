@@ -448,9 +448,12 @@ end
         cost_tracker = Threads.Atomic{Float64}(0.0),
         kwargs...)
 
-Retrieves the most relevant chunks from the index for the given question and returns them in `RAGResult` object.
+Retrieves the most relevant chunks from the index for the given question and returns them in the `RAGResult` object.
 
-This is the main entry point for the retrieval stage of the RAG pipeline.
+This is the main entry point for the retrieval stage of the RAG pipeline. It is often followed by `generate!` step.
+
+Notes:
+- The default flow is `build_context!` -> `answer!` -> `refine!` -> `postprocess!`.
 
 The arguments correspond to the steps of the retrieval process (rephrasing, embedding, finding similar docs, tagging, filtering by tags, reranking).
 You can customize each step by providing a new custom type that dispatches the corresponding function, 
@@ -462,7 +465,7 @@ If you're using locally-hosted models, you can pass the `api_kwargs` with the `u
     `model` kwargs to `rephraser`, `embedder`, and `tagger` to use the custom models (they make AI calls).
 
 # Arguments
-- `retriever`: The retrieval method to use. Default is `SimpleRetriever`.
+- `retriever`: The retrieval method to use. Default is `SimpleRetriever` but could be `AdvancedRetriever` for more advanced retrieval.
 - `index`: The index that holds the chunks and sources to be retrieved from.
 - `question`: The question to be used for the retrieval.
 - `verbose`: If `>0`, it prints out verbose logging. Default is `1`. If you set it to `2`, it will print out logs for each sub-function.
@@ -487,6 +490,8 @@ If you're using locally-hosted models, you can pass the `api_kwargs` with the `u
 - `reranker_kwargs`: Additional keyword arguments to be passed to the reranker.
     - `model`: The model to use for reranking. Default is `rerank-english-v2.0` if you use `reranker = CohereReranker()`.
 - `cost_tracker`: An atomic counter to track the cost of the retrieval. Default is `Threads.Atomic{Float64}(0.0)`.
+
+See also: `SimpleRetriever`, `AdvancedRetriever`, `build_index`, `rephrase`, `get_embeddings`, `find_closest`, `get_tags`, `find_tags`, `rerank`, `RAGResult`.
 
 # Examples
 

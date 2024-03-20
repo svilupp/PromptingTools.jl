@@ -24,8 +24,8 @@ files = [
     joinpath("examples", "data", "database_style_joins.txt"),
     joinpath("examples", "data", "what_is_dataframes.txt")
 ]
-## Build an index of chunks, embed them, and create a lookup index of metadata/tags for each chunk
-index = build_index(files; extract_metadata = false)
+## Build an index of chunks and embed them
+index = build_index(files)
 
 # Let's ask a question
 ## Embeds the question, finds the closest chunks in the index, and generates an answer from the closest chunks
@@ -37,12 +37,17 @@ answer = airag(index; question = "I like dplyr, what is the equivalent in Julia?
 # - `build_index` will chunk the documents into smaller pieces, embed them into numbers (to be able to judge the similarity of chunks) and, optionally, create a lookup index of metadata/tags for each chunk)
 #   - `index` is the result of this step and it holds your chunks, embeddings, and other metadata! Just show it :)
 # - `airag` will
-#   - embed your question
-#   - find the closest chunks in the index (use parameters `top_k` and `minimum_similarity` to tweak the "relevant" chunks)
-#   - [OPTIONAL] extracts any potential tags/filters from the question and applies them to filter down the potential candidates (use `extract_metadata=true` in `build_index`, you can also provide some filters explicitly via `tag_filter`)
-#   - [OPTIONAL] re-ranks the candidate chunks (define and provide your own `rerank_strategy`, eg Cohere ReRank API)
-#   - build a context from the closest chunks (use `chunks_window_margin` to tweak if we include preceding and succeeding chunks as well, see `?build_context` for more details)
-# - generate an answer from the closest chunks (use `return_all=true` to see under the hood and debug your application)
+#   - retrieve the best chunks from your index (based on the similarity of the question to the chunks)
+#     - rephrase the question into a more "searchable" form
+#     - embed your question
+#     - find the closest chunks in the index (use parameters `top_k` and `minimum_similarity` to tweak the "relevant" chunks)
+#     - [OPTIONAL] extract any potential tags/filters from the question and applies them to filter down the potential candidates (use `extract_metadata=true` in `build_index`, you can also provide some filters explicitly via `tag_filter`)
+#     - [OPTIONAL] re-rank the candidate chunks (define and provide your own `rerank_strategy`, eg Cohere ReRank API)
+#   - generate an answer from the closest chunks (use `return_all=true` to see under the hood and debug your application)
+#     - build a context from the closest chunks (use `chunks_window_margin` to tweak if we include preceding and succeeding chunks as well, see `?build_context` for more details)
+#     - answer the question with LLM
+#     - [OPTIONAL] refine the answer (with the same or new context)
+#    
 
 # You should save the index for later to avoid re-embedding / re-extracting the document chunks!
 serialize("examples/index.jls", index)
@@ -136,8 +141,8 @@ first(df, 5)
 
 # # What would we do next?
 # - Review your evaluation golden data set and keep only the good items
-# - Play with the chunk sizes (max_length in build_index) and see how it affects the quality
-# - Explore using metadata/key filters (`extract_metadata=true` in build_index)
+# - Play with the chunk sizes (max_length in `build_index.chunker`) and see how it affects the quality
+# - Explore using metadata/key filters (`tagger` step in `build_index`)
 # - Add filtering for semantic similarity (embedding distance) to make sure we don't pick up irrelevant chunks in the context
 # - Use multiple indices or a hybrid index (add a simple BM25 lookup from TextAnalysis.jl)
 # - Data processing is the most important step - properly parsed and split text could make wonders
