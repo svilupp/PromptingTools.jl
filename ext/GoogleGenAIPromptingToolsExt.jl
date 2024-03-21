@@ -11,7 +11,7 @@ function PromptingTools.ggi_generate_content(prompt_schema::PT.AbstractGoogleSch
         conversation; http_kwargs, api_kwargs...)
     ## Build the provider
     provider = GoogleGenAI.GoogleProvider(; api_key)
-    url = "$(provider.base_url)/models/$model_name:generateContent?key=$(provider.api_key)"
+    url = "$(provider.base_url)/$(provider.api_version)/models/$model_name:generateContent?key=$(provider.api_key)"
     generation_config = Dict{String, Any}()
     for (key, value) in api_kwargs
         generation_config[string(key)] = value
