@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.16.1]
+
+### Fixed
+- Fixed a bug where `set_node_style!` was not accepting any Stylers expect for the vanilla `Styler`.
+
 ## [0.16.0]
 
 ### Added

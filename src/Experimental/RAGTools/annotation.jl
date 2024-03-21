@@ -42,8 +42,8 @@ end
 Defines styling via classes (attribute `class`) and styles (attribute `style`) for HTML formatting of `AbstractAnnotatedNode`
 """
 @kwdef mutable struct HTMLStyler <: AbstractAnnotationStyler
-    classes::AbstractString
-    styles::AbstractString
+    classes::AbstractString = ""
+    styles::AbstractString = ""
 end
 Base.var"=="(a::AbstractAnnotationStyler, b::AbstractAnnotationStyler) = false
 function Base.var"=="(a::T, b::T) where {T <: AbstractAnnotationStyler}
@@ -142,18 +142,18 @@ struct TrigramAnnotater <: AbstractAnnotater end
 """
     set_node_style!(::TrigramAnnotater, node::AnnotatedNode;
         low_threshold::Float64 = 0.0, medium_threshold::Float64 = 0.5, high_threshold::Float64 = 1.0,
-        low_styler::Styler = Styler(color = :magenta, bold = false),
-        medium_styler::Styler = Styler(color = :blue, bold = false),
-        high_styler::Styler = Styler(color = :nothing, bold = false),
+        low_styler::AbstractAnnotationStyler = Styler(color = :magenta, bold = false),
+        medium_styler::AbstractAnnotationStyler = Styler(color = :blue, bold = false),
+        high_styler::AbstractAnnotationStyler = Styler(color = :nothing, bold = false),
         bold_multihits::Bool = false)
 
 Sets style of `node` based on the provided rules
 """
 function set_node_style!(::TrigramAnnotater, node::AnnotatedNode;
         low_threshold::Float64 = 0.0, medium_threshold::Float64 = 0.5, high_threshold::Float64 = 1.0,
-        low_styler::Styler = Styler(color = :magenta, bold = false),
-        medium_styler::Styler = Styler(color = :blue, bold = false),
-        high_styler::Styler = Styler(color = :nothing, bold = false),
+        low_styler::AbstractAnnotationStyler = Styler(color = :magenta, bold = false),
+        medium_styler::AbstractAnnotationStyler = Styler(color = :blue, bold = false),
+        high_styler::AbstractAnnotationStyler = Styler(color = :nothing, bold = false),
         bold_multihits::Bool = false)
     node.style = if isnothing(node.score)
         ## skip for now
