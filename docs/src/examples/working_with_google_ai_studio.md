@@ -12,6 +12,14 @@ We'll need `GoogleGenAI.jl` package:
 using Pkg; Pkg.add(url="https://github.com/tylerjthomas9/GoogleGenAI.jl/")
 ````
 
+> [!WARNING]
+> This tutorial is DISABLED FOR NOW, because GoogleGenAI.jl is NOT a registered package yet and, hence, we cannot have an extension for it.
+> 
+> If you want to use Google models, you need to install GoogleGenAI and add the following file to `[extensions]` section in Project.toml:
+> `GoogleGenAIPromptingToolsExt = ["GoogleGenAI"]
+>
+> Save the Project.toml changes and restart Julia. You can now use GoogleGenAI models with PromptingTools as shown below.
+
 You can now use the Gemini-1.0-Pro model like any other model in PromptingTools. We **only support `aigenerate`** at the moment.
 
 Let's import PromptingTools:
@@ -38,7 +46,7 @@ AIMessage("Hi there! As a helpful AI assistant, I'm here to help you with any qu
 You could achieve the same with a string macro (notice the "gemini" at the end to specify which model to use):
 
 ````julia
-@ai"Say hi!"gemini
+ai"Say hi!"gemini
 ````
 
 ### Advanced Prompts
