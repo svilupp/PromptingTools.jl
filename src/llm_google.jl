@@ -157,12 +157,6 @@ function aigenerate(prompt_schema::AbstractGoogleSchema, prompt::ALLOWED_PROMPT_
     ##
     global MODEL_ALIASES
 
-    ## Check that package GoogleGenAI is loaded
-    ext = Base.get_extension(PromptingTools, :GoogleGenAIPromptingToolsExt)
-    if isnothing(ext) && !(prompt_schema isa TestEchoGoogleSchema)
-        throw(ArgumentError("You need to also import GoogleGenAI package to use this function"))
-    end
-
     ## Find the unique ID for the model alias provided
     model_id = get(MODEL_ALIASES, model, model)
     conv_rendered = render(prompt_schema, prompt; conversation, kwargs...)
@@ -197,4 +191,48 @@ function aigenerate(prompt_schema::AbstractGoogleSchema, prompt::ALLOWED_PROMPT_
         kwargs...)
 
     return output
+end
+
+struct GoogleTextResponse
+    candidates::Vector{Dict{Symbol,Any}}
+    safety_ratings::Dict{Pair{Symbol,String},Pair{Symbol,String}}
+    text::String
+    response_status::Int
+    finish_reason::String
+end
+
+function _parse_response(response::HTTP.Messages.Response)
+    parsed_response = JSON3.read(response.body)
+    all_texts = String[]
+    for candidate in parsed_response.candidates
+        candidate_text = join([part.text for part in candidate.content.parts], "")
+        push!(all_texts, candidate_text)
+    end
+    concatenated_texts = join(all_texts, "")
+    candidates = [Dict(i) for i in parsed_response[:candidates]]
+    finish_reason = candidates[end][:finishReason]
+    safety_rating = Dict(parsed_response.promptFeedback.safetyRatings)
+    return GoogleTextResponse(
+        candidates, safety_rating, concatenated_texts, response.status, finish_reason
+    )
+end
+
+function PromptingTools.ggi_generate_content(prompt_schema::PromptingTools.AbstractGoogleSchema,
+        api_key::AbstractString, model_name::AbstractString,
+        conversation; http_kwargs, api_kwargs...)
+    url = "https://generativelanguage.googleapis.com/v1beta/models/$model_name:generateContent?key=$(api_key)"
+    generation_config = Dict{String, Any}()
+    for (key, value) in api_kwargs
+        generation_config[string(key)] = value
+    end
+
+    body = Dict("contents" => conversation,
+        "generationConfig" => generation_config)
+    response = HTTP.post(url; headers = Dict("Content-Type" => "application/json"),
+        body = JSON3.write(body), http_kwargs...)
+    if response.status >= 200 && response.status < 300
+        return _parse_response(response)
+    else
+        error("Request failed with status $(response.status): $(String(response.body))")
+    end
 end
