@@ -5,8 +5,8 @@ var __publicField = (obj, key, value) => {
   return value;
 };
 import { Y as __vitePreload, h as ref, y as watch, al as unrefElement, am as tryOnScopeDispose, d as defineComponent, H as shallowRef, an as computedAsync, k as computed, ao as useSessionStorage, ap as useLocalStorage, z as watchEffect, aq as watchDebounced, l as onMounted, U as nextTick, S as onKeyStroke, ar as useRouter, as as useEventListener, Z as useScrollLock, j as inBrowser, at as onBeforeUnmount, o as openBlock, b as createBlock, m as createBaseVNode, a2 as withModifiers, p as unref, au as withDirectives, av as vModelText, aw as isRef, c as createElementBlock, n as normalizeClass, e as createCommentVNode, G as renderList, F as Fragment, a as createTextVNode, t as toDisplayString, ax as Teleport, q as pushScopeId, s as popScopeId, ay as markRaw, az as createApp, ab as dataSymbol, ah as pathToFile, aA as escapeRegExp, _ as _export_sfc } from "./framework.C9IUtwDK.js";
-import { u as useData, c as createSearchTranslate } from "./theme.Ddx38Iep.js";
-const localSearchIndex = { "root": () => __vitePreload(() => import("./@localSearchIndexroot.C2FhK2r1.js"), true ? __vite__mapDeps([]) : void 0) };
+import { u as useData, c as createSearchTranslate } from "./theme.BoijqKDb.js";
+const localSearchIndex = { "root": () => __vitePreload(() => import("./@localSearchIndexroot.CQKVL2Jl.js"), true ? __vite__mapDeps([]) : void 0) };
 /*!
 * tabbable 6.2.0
 * @license MIT, https://github.com/focus-trap/tabbable/blob/master/LICENSE
