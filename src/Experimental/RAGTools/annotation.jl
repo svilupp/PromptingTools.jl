@@ -42,12 +42,12 @@ end
 Defines styling via classes (attribute `class`) and styles (attribute `style`) for HTML formatting of `AbstractAnnotatedNode`
 """
 @kwdef mutable struct HTMLStyler <: AbstractAnnotationStyler
-    classes::AbstractString
-    styles::AbstractString
+    classes::AbstractString = ""
+    styles::AbstractString = ""
 end
 Base.var"=="(a::AbstractAnnotationStyler, b::AbstractAnnotationStyler) = false
 function Base.var"=="(a::T, b::T) where {T <: AbstractAnnotationStyler}
-    all(x -> getfield(a, x) == getfield(b, x), fieldnames(Styler))
+    all(x -> getfield(a, x) == getfield(b, x), fieldnames(T))
 end
 
 """
@@ -103,12 +103,14 @@ end
         io::IO, node::AbstractAnnotatedNode; text_width::Int = displaysize(io)[2])
 
 Pretty print the `node` to the `io` stream, including all its children
+
+Supports only `node.style::Styler` for now.
 """
 function PromptingTools.pprint(
         io::IO, node::AbstractAnnotatedNode; text_width::Int = displaysize(io)[2])
     for node in AbstractTrees.PreOrderDFS(node)
         ## print out text only for leaf nodes (ie, with no children)
-        if isempty(node.children)
+        if isempty(node.children) && node.style isa Styler
             @static if VERSION ≥ v"1.10"
                 printstyled(io, node.content; node.style.bold, node.style.color,
                     node.style.underline, node.style.italic)
@@ -118,6 +120,9 @@ function PromptingTools.pprint(
                 printstyled(io, node.content; node.style.bold, node.style.color,
                     node.style.underline)
             end
+        elseif isempty(node.children)
+            ## print without styling, we support only Styler for now
+            print(io, node.content)
         end
     end
     return nothing
@@ -142,22 +147,24 @@ struct TrigramAnnotater <: AbstractAnnotater end
 """
     set_node_style!(::TrigramAnnotater, node::AnnotatedNode;
         low_threshold::Float64 = 0.0, medium_threshold::Float64 = 0.5, high_threshold::Float64 = 1.0,
-        low_styler::Styler = Styler(color = :magenta, bold = false),
-        medium_styler::Styler = Styler(color = :blue, bold = false),
-        high_styler::Styler = Styler(color = :nothing, bold = false),
+        default_styler::AbstractAnnotationStyler = Styler(),
+        low_styler::AbstractAnnotationStyler = Styler(color = :magenta, bold = false),
+        medium_styler::AbstractAnnotationStyler = Styler(color = :blue, bold = false),
+        high_styler::AbstractAnnotationStyler = Styler(color = :nothing, bold = false),
         bold_multihits::Bool = false)
 
 Sets style of `node` based on the provided rules
 """
 function set_node_style!(::TrigramAnnotater, node::AnnotatedNode;
         low_threshold::Float64 = 0.0, medium_threshold::Float64 = 0.5, high_threshold::Float64 = 1.0,
-        low_styler::Styler = Styler(color = :magenta, bold = false),
-        medium_styler::Styler = Styler(color = :blue, bold = false),
-        high_styler::Styler = Styler(color = :nothing, bold = false),
+        default_styler::AbstractAnnotationStyler = Styler(),
+        low_styler::AbstractAnnotationStyler = Styler(color = :magenta, bold = false),
+        medium_styler::AbstractAnnotationStyler = Styler(color = :blue, bold = false),
+        high_styler::AbstractAnnotationStyler = Styler(color = :nothing, bold = false),
         bold_multihits::Bool = false)
     node.style = if isnothing(node.score)
         ## skip for now
-        Styler()
+        default_styler
     elseif node.score >= high_threshold
         high_styler
     elseif node.score >= medium_threshold
@@ -165,10 +172,14 @@ function set_node_style!(::TrigramAnnotater, node::AnnotatedNode;
     elseif node.score >= low_threshold
         low_styler
     else
-        Styler()
+        default_styler
     end
     if node.hits > 1 && bold_multihits
-        node.style.bold = true
+        if hasproperty(node.style, :bold)
+            node.style.bold = true
+        else
+            @warn "Cannot boldify the node, as it doesn't support bold (styler: $(typeof(node.style)))"
+        end
     end
     return node
 end
