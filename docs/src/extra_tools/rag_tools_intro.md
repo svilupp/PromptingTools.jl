@@ -165,13 +165,23 @@ This system is designed for information retrieval and response generation, struc
 - Retrieval, when you surface the top most relevant chunks/items in the `index` and return `AbstractRAGResult`, which contains the references to the chunks (`AbstractCandidateChunks`)
 - Generation, when you generate an answer based on the context built from the retrieved chunks, return either `AIMessage` or `AbstractRAGResult`
 
+The corresponding functions are `build_index`, `retrieve`, and `generate!`, respectively.
+Here is the high-level diagram that shows the signature of the main functions:
+
+![RAG Diagram High-level](../diagrams/rag_diagram_highlevel.png)
+
+Notice that the first argument is a custom type for multiple dispatch. 
+In addition, observe the "kwargs" names, that's how the keyword arguments for each function are passed down from the higher-level functions (eg, `build_index(...; chunker_kwargs=(; separators=...)))`). It's the simplest way to customize some step of the pipeline (eg, set a custom model with a `model` kwarg or prompt template with `template` kwarg).
+
 The system is designed to be hackable and extensible at almost every entry point.
 If you want to customize the behavior of any step, you can do so by defining a new type and defining a new method for the step you're changing, eg, 
 ```julia
+PromptingTools.Experimental.RAGTools: rerank
+
 struct MyReranker <: AbstractReranker end
-RT.rerank(::MyReranker, index, candidates) = ...
+rerank(::MyReranker, index, candidates) = ...
 ```
-And then you'd ask for the `retrive` step to use your custom `MyReranker`, eg, `retrieve(....; reranker = MyReranker())` (or customize the main dispatching `AbstractRetriever` struct).
+And then you would set the `retrive` step to use your custom `MyReranker` via `reranker` kwarg, eg, `retrieve(....; reranker = MyReranker())` (or customize the main dispatching `AbstractRetriever` struct).
 
 The overarching principles are:
 - Always dispatch / customize the behavior by defining a new `Struct` and the corresponding method for the existing functions (eg, `rerank` function for the re-ranking step).
@@ -181,29 +191,83 @@ The overarching principles are:
 
 ### RAG Diagram
 
-The main functions are:
+![RAG Diagram Detailed](../diagrams/rag_diagram_detailed.png)
 
-`build_index`:
+**The main functions are**:
+
+Prepare your document index with `build_index`:
 - signature: `(indexer::AbstractIndexBuilder, files_or_docs::Vector{<:AbstractString}) -> AbstractChunkIndex`
 - flow: `get_chunks` -> `get_embeddings` -> `get_tags` -> `build_tags`
 - dispatch types: `AbstractIndexBuilder`, `AbstractChunker`, `AbstractEmbedder`, `AbstractTagger`
 
-`airag`: 
+Run E2E RAG with `airag`: 
 - signature: `(cfg::AbstractRAGConfig, index::AbstractChunkIndex; question::AbstractString)` -> `AIMessage` or `AbstractRAGResult`
 - flow: `retrieve` -> `generate!`
 - dispatch types: `AbstractRAGConfig`, `AbstractRetriever`, `AbstractGenerator`
 
-`retrieve`:
+Retrieve relevant chunks with `retrieve`:
 - signature: `(retriever::AbstractRetriever, index::AbstractChunkIndex, question::AbstractString) -> AbstractRAGResult`
 - flow: `rephrase` -> `get_embeddings` -> `find_closest` -> `get_tags` -> `find_tags` -> `rerank`
 - dispatch types: `AbstractRAGConfig`, `AbstractRephraser`, `AbstractEmbedder`, `AbstractSimilarityFinder`, `AbstractTagger`, `AbstractTagFilter`, `AbstractReranker`
 
-`generate!`:
+Generate an answer from relevant chunks with `generate!`:
 - signature: `(generator::AbstractGenerator, index::AbstractChunkIndex, result::AbstractRAGResult)` -> `AIMessage` or `AbstractRAGResult`
 - flow: `build_context!` -> `answer!` -> `refine!` -> `postprocess!`
 - dispatch types: `AbstractGenerator`, `AbstractContextBuilder`, `AbstractAnswerer`, `AbstractRefiner`, `AbstractPostprocessor`
 
 To discover the currently available implementations, use `subtypes` function, eg, `subtypes(AbstractReranker)`.
+
+#### Passing Keyword Arguments
+If you need to pass keyword arguments, use the nested kwargs corresponding to the dispatch type names (`rephrase` step, has `rephraser` dispatch type and `rephraser_kwargs` for its keyword arguments).
+
+For example:
+
+```julia
+cfg = RAGConfig(; retriever = AdvancedRetriever())
+
+# kwargs will be big and nested, let's prepare them upfront
+# we specify "custom" model for each component that calls LLM
+kwargs = (
+    retriever = AdvancedRetriever(),
+    retriever_kwargs = (;
+        top_k = 100,
+        top_n = 5,
+        # notice that this is effectively: retriever_kwargs/rephraser_kwargs/template
+        rephraser_kwargs = (;
+            template = :RAGQueryHyDE,
+            model = "custom")),
+    generator_kwargs = (;
+        # pass kwargs to `answer!` step defined by the `answerer` -> we're setting `answerer_kwargs`
+        answerer_kwargs = (;
+            model = "custom"),
+    # api_kwargs can be shared across all components
+    api_kwargs = (;
+        url = "http://localhost:8080")))
+
+result = airag(cfg, index, question; kwargs...)
+```
+
+If you were one level deeper in the pipeline, working with retriever directly, you would pass:
+
+```julia
+retriever_kwargs = (;
+    top_k = 100,
+    top_n = 5,
+    # notice that this is effectively: rephraser_kwargs/template
+    rephraser_kwargs = (;
+      template = :RAGQueryHyDE,
+      model = "custom"),
+  # api_kwargs can be shared across all components
+  api_kwargs = (;
+      url = "http://localhost:8080"))
+
+result = retrieve(AdvancedRetriever(), index, question; retriever_kwargs...)
+```
+
+And going even deeper, you would provide the `rephraser_kwargs` directly to the `rephrase` step, eg,
+```julia
+rephrase(SimpleRephraser(), question; model="custom", template = :RAGQueryHyDE, api_kwargs = (; url = "http://localhost:8080"))
+```
 
 ### Deepdive
 
@@ -223,7 +287,7 @@ To discover the currently available implementations, use `subtypes` function, eg
 - `rerank` is called to rerank the candidates based on the reranking strategy (ie, to improve the ordering of the chunks in context).
 
 **Generation Phase:**
-- The `generate` step is intended to generate a response based on the retrieved chunks, provided via `AbstractRAGResult` (eg, `RAGResult`).
+- The `generate!` step is intended to generate a response based on the retrieved chunks, provided via `AbstractRAGResult` (eg, `RAGResult`).
 - `build_context!` constructs the context for response generation based on a context strategy and applies the necessary formatting
 - `answer!` generates the response based on the context and the query
 - `refine!` is called to refine the response (optional, defaults to passthrough)
@@ -238,6 +302,8 @@ See more details and corresponding functions and types in `src/Experimental/RAGT
 ```@docs; canonical=false
 build_index
 airag
+retrieve
+generate!
 annotate_support
 build_qa_evals
 ```
