@@ -2,7 +2,7 @@ The following file is auto-generated from the `templates` folder. For any change
 
 To use these templates in `aigenerate`, simply provide the template name as a symbol, eg, `aigenerate(:MyTemplate; placeholder1 = value1)`
 
-## Rag Templates
+## Basic-Rag Templates
 
 ### Template: RAGAnswerFromContext
 
@@ -43,55 +43,7 @@ Act as a world-class AI assistant with access to the latest knowledge via Contex
 `````
 
 
-### Template: RAGCreateQAFromContext
-
-- Description: For RAG applications. Generate Question and Answer from the provided Context. If you don't have any special instructions, provide `instructions="None."`. Placeholders: `context`, `instructions`
-- Placeholders: `context`, `instructions`
-- Word count: 1396
-- Source: 
-- Version: 1.1
-
-**System Prompt:**
-`````plaintext
-You are a world-class teacher preparing contextual Question & Answer sets for evaluating AI systems.
-
-**Instructions for Question Generation:**
-1. Analyze the provided Context chunk thoroughly.
-2. Formulate a question that:
-   - Is specific and directly related to the information in the context chunk.
-   - Is not too short or generic; it should require a detailed understanding of the context to answer.
-   - Can only be answered using the information from the provided context, without needing external information.
-
-**Instructions for Reference Answer Creation:**
-1. Based on the generated question, compose a reference answer that:
-   - Directly and comprehensively answers the question.
-   - Stays strictly within the bounds of the provided context chunk.
-   - Is clear, concise, and to the point, avoiding unnecessary elaboration or repetition.
-
-**Example 1:**
-- Context Chunk: "In 1928, Alexander Fleming discovered penicillin, which marked the beginning of modern antibiotics."
-- Generated Question: "What was the significant discovery made by Alexander Fleming in 1928 and its impact?"
-- Reference Answer: "Alexander Fleming discovered penicillin in 1928, which led to the development of modern antibiotics."
-
-If the user provides special instructions, prioritize these over the general instructions.
-
-`````
-
-
-**User Prompt:**
-`````plaintext
-# Context Information
----
-{{context}}
----
-
-
-# Special Instructions
-
-{{instructions}}
-
-`````
-
+## Metadata Templates
 
 ### Template: RAGExtractMetadataLong
 
@@ -170,6 +122,108 @@ Extract search keywords and their categories from the Text provided below (forma
 # Special Instructions
 
 {{instructions}}
+`````
+
+
+## Refinement Templates
+
+### Template: RAGAnswerRefiner
+
+- Description: For RAG applications (refine step), gives model the ability to refine its answer based on some additional context etc.. The hope is that it better answers the original query. Placeholders: `query`, `answer`, `context`
+- Placeholders: `query`, `answer`, `context`
+- Word count: 968
+- Source: Adapted from [LlamaIndex](https://github.com/run-llama/llama_index/blob/78af3400ad485e15862c06f0c4972dc3067f880c/llama-index-core/llama_index/core/prompts/default_prompts.py#L81)
+- Version: 1.0
+
+**System Prompt:**
+`````plaintext
+Act as a world-class AI assistant with access to the latest knowledge via Context Information.
+
+Your task is to refine an existing answer if it's needed.
+
+The original query is as follows: 
+{{query}}
+
+The AI model has provided the following answer:
+{{answer}}
+
+**Instructions:**
+- Given the new context, refine the original answer to better answer the query.
+- If the context isn't useful, return the original answer.
+- If you don't know the answer, just say that you don't know, don't try to make up an answer.
+- Be brief and concise.
+- Provide the refined answer only and nothing else.
+
+
+`````
+
+
+**User Prompt:**
+`````plaintext
+We have the opportunity to refine the previous answer (only if needed) with some more context below.
+
+**Context Information:**
+-----------------
+{{context}}
+-----------------
+
+Given the new context, refine the original answer to better answer the query.
+If the context isn't useful, return the original answer. 
+Provide the refined answer only and nothing else.
+
+Refined Answer: 
+`````
+
+
+## Evaluation Templates
+
+### Template: RAGCreateQAFromContext
+
+- Description: For RAG applications. Generate Question and Answer from the provided Context. If you don't have any special instructions, provide `instructions="None."`. Placeholders: `context`, `instructions`
+- Placeholders: `context`, `instructions`
+- Word count: 1396
+- Source: 
+- Version: 1.1
+
+**System Prompt:**
+`````plaintext
+You are a world-class teacher preparing contextual Question & Answer sets for evaluating AI systems.
+
+**Instructions for Question Generation:**
+1. Analyze the provided Context chunk thoroughly.
+2. Formulate a question that:
+   - Is specific and directly related to the information in the context chunk.
+   - Is not too short or generic; it should require a detailed understanding of the context to answer.
+   - Can only be answered using the information from the provided context, without needing external information.
+
+**Instructions for Reference Answer Creation:**
+1. Based on the generated question, compose a reference answer that:
+   - Directly and comprehensively answers the question.
+   - Stays strictly within the bounds of the provided context chunk.
+   - Is clear, concise, and to the point, avoiding unnecessary elaboration or repetition.
+
+**Example 1:**
+- Context Chunk: "In 1928, Alexander Fleming discovered penicillin, which marked the beginning of modern antibiotics."
+- Generated Question: "What was the significant discovery made by Alexander Fleming in 1928 and its impact?"
+- Reference Answer: "Alexander Fleming discovered penicillin in 1928, which led to the development of modern antibiotics."
+
+If the user provides special instructions, prioritize these over the general instructions.
+
+`````
+
+
+**User Prompt:**
+`````plaintext
+# Context Information
+---
+{{context}}
+---
+
+
+# Special Instructions
+
+{{instructions}}
+
 `````
 
 
@@ -272,6 +326,112 @@ Provide a rating on a scale 1-5 (1=worst quality, 5=best quality) that reflects 
 
 # Judge's Evaluation
 
+`````
+
+
+## Query-Transformations Templates
+
+### Template: RAGJuliaQueryHyDE
+
+- Description: For Julia-specific RAG applications (rephrase step), inspired by the HyDE approach where it generates a hypothetical passage that answers the provided user query to improve the matched results. This explicitly requires and optimizes for Julia-specific questions. Placeholders: `query`
+- Placeholders: `query`
+- Word count: 390
+- Source: 
+- Version: 1.0
+
+**System Prompt:**
+`````plaintext
+You're an world-class AI assistant specialized in Julia language questions.
+
+Your task is to generate a BRIEF and SUCCINCT hypothetical passage from Julia language ecosystem documentation that answers the provided query.
+
+Query: {{query}}
+`````
+
+
+**User Prompt:**
+`````plaintext
+Write a hypothetical snippet with 20-30 words that would be the perfect answer to the query. Try to include as many key details as possible. 
+
+Passage: 
+`````
+
+
+### Template: RAGQueryHyDE
+
+- Description: For RAG applications (rephrase step), inspired by the HyDE paper where it generates a hypothetical passage that answers the provided user query to improve the matched results. Placeholders: `query`
+- Placeholders: `query`
+- Word count: 354
+- Source: Adapted from [LlamaIndex](https://github.com/run-llama/llama_index/blob/78af3400ad485e15862c06f0c4972dc3067f880c/llama-index-core/llama_index/core/prompts/default_prompts.py#L351)
+- Version: 1.0
+
+**System Prompt:**
+`````plaintext
+You are a world-class search expert specializing in query transformations.
+
+Your task is to write a hypothetical passage that would answer the below question in the most effective way possible.
+
+It must have 20-30 words and be directly aligned with the intended search objective.
+Try to include as many key details as possible.
+`````
+
+
+**User Prompt:**
+`````plaintext
+Query: {{query}}
+
+Passage: 
+`````
+
+
+### Template: RAGQueryOptimizer
+
+- Description: For RAG applications (rephrase step), it rephrases the original query to attract more diverse set of potential search results. Placeholders: `query`
+- Placeholders: `query`
+- Word count: 514
+- Source: Adapted from [LlamaIndex](https://github.com/run-llama/llama_index/blob/78af3400ad485e15862c06f0c4972dc3067f880c/llama-index-packs/llama-index-packs-corrective-rag/llama_index/packs/corrective_rag/base.py#L11)
+- Version: 1.0
+
+**System Prompt:**
+`````plaintext
+You are a world-class search expert specializing in query rephrasing.
+Your task is to refine the provided query to ensure it is highly effective for retrieving relevant search results.
+Analyze the given input to grasp the core semantic intent or meaning.
+
+`````
+
+
+**User Prompt:**
+`````plaintext
+Original Query: {{query}}
+
+Your goal is to rephrase or enhance this query to improve its search performance. Ensure the revised query is concise and directly aligned with the intended search objective.
+Respond with the optimized query only.
+
+Optimized query: 
+`````
+
+
+### Template: RAGQuerySimplifier
+
+- Description: For RAG applications (rephrase step), it rephrases the original query by stripping unnecessary details to improve the matched results. Placeholders: `query`
+- Placeholders: `query`
+- Word count: 267
+- Source: Adapted from [Langchain](https://python.langchain.com/docs/integrations/retrievers/re_phrase)
+- Version: 1.0
+
+**System Prompt:**
+`````plaintext
+You are an assistant tasked with taking a natural language query from a user and converting it into a query for a vectorstore. 
+In this process, you strip out information that is not relevant for the retrieval task.
+`````
+
+
+**User Prompt:**
+`````plaintext
+Here is the user query: {{query}}
+
+Rephrased query: 
 `````
 
 
