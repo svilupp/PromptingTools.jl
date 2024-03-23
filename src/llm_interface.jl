@@ -6,6 +6,14 @@
 #
 # Ideally, each new interface would be defined in a separate `llm_<interface>.jl` file (eg, `llm_chatml.jl`).
 
+# Add exports for each schema
+export NoSchema
+export OpenAISchema, CustomOpenAISchema, LocalServerOpenAISchema, DatabricksOpenAISchema
+export MistralOpenAISchema
+export OllamaManagedSchema, OllamaSchema
+export ChatMLSchema
+export GoogleSchema
+
 ## Main Functions
 function render end
 function aigenerate end
