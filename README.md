@@ -24,7 +24,7 @@ For a quick start, simply set it via `ENV["OPENAI_API_KEY"] = "your-api-key"`
 Install PromptingTools:
 ```julia
 using Pkg
-Pkg.add("PromptingTools.jl")
+Pkg.add("PromptingTools")
 ```
 
 And we're ready to go!
