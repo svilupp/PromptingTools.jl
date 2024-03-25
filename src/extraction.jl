@@ -206,9 +206,7 @@ ANTHROPIC_TOOL_PROMPT = """
 
   Here are the tools available:
   <tools>
-  <tool_description>
   {{tool_description}}
-  </tool_description>
   </tools>
   """
 ANTHROPIC_TOOL_PROMPT_LIST_EXTRA = """
