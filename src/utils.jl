@@ -614,16 +614,29 @@ end
 
 """
     auth_header(api_key::Union{Nothing, AbstractString};
-        extra_headers::AbstractVector{Pair{String, String}} = Vector{Pair{String, String}}[],
-        kwargs...)
-
-Creates the authentication headers for any API request. Assumes that the communication is done in JSON format.
-"""
-function auth_header(api_key::Union{Nothing, AbstractString};
+        bearer::Bool = true,
+        x_api_key::Bool = false,
         extra_headers::AbstractVector = Vector{
             Pair{String, String},
         }[],
         kwargs...)
+
+Creates the authentication headers for any API request. Assumes that the communication is done in JSON format.
+
+# Arguments
+- `api_key::Union{Nothing, AbstractString}`: The API key to be used for authentication. If `Nothing`, no authentication is used.
+- `bearer::Bool`: Provide the API key in the `Authorization: Bearer ABC` format. Defaults to `true`.
+- `x_api_key::Bool`: Provide the API key in the `Authorization: x-api-key: ABC` format. Defaults to `false`.
+"""
+function auth_header(api_key::Union{Nothing, AbstractString};
+        bearer::Bool = true,
+        x_api_key::Bool = false,
+        extra_headers::AbstractVector = Vector{
+            Pair{String, String},
+        }[],
+        kwargs...)
+    @assert !(bearer && x_api_key) "Cannot use both `bearer` and `x_api_key`. Select one format."
+    @assert (bearer||x_api_key) "At least one of `bearer` and `x_api_key` must be selected."
     !isnothing(api_key) && isempty(api_key) &&
         throw(ArgumentError("`api_key` cannot be empty"))
     headers = [
@@ -631,6 +644,9 @@ function auth_header(api_key::Union{Nothing, AbstractString};
         "Accept" => "application/json",
         extra_headers...
     ]
-    !isnothing(api_key) && pushfirst!(headers, "Authorization" => "Bearer $api_key")
+    !isnothing(api_key) && bearer &&
+        pushfirst!(headers, "Authorization" => "Bearer $api_key")
+    !isnothing(api_key) && x_api_key &&
+        pushfirst!(headers, "Authorization" => "x-api-key: $api_key")
     return headers
 end

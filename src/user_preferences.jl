@@ -4,8 +4,7 @@
 """
     PREFERENCES
 
-You can set preferences for PromptingTools by setting environment variables (for `OPENAI_API_KEY` only) 
-    or by using the `set_preferences!`.
+You can set preferences for PromptingTools by setting environment variables or by using the `set_preferences!`.
     It will create a `LocalPreferences.toml` file in your current directory and will reload your prefences from there.
 
 Check your preferences by calling `get_preferences(key::String)`.
@@ -18,6 +17,7 @@ Check your preferences by calling `get_preferences(key::String)`.
 - `DATABRICKS_HOST`: The host for the Databricks API. See [Databricks' documentation](https://docs.databricks.com/en/machine-learning/foundation-models/api-reference.html) for more information.
 - `TAVILY_API_KEY`: The API key for the Tavily Search API. Register [here](https://tavily.com/). See more information [here](https://docs.tavily.com/docs/tavily-api/rest_api).
 - `GOOGLE_API_KEY`: The API key for Google Gemini models. Get yours from [here](https://ai.google.dev/). If you see a documentation page ("Available languages and regions for Google AI Studio and Gemini API"), it means that it's not yet available in your region.
+- `ANTHROPIC_API_KEY`: The API key for the Anthropic API. Get yours from [here](https://www.anthropic.com/).
 - `MODEL_CHAT`: The default model to use for aigenerate and most ai* calls. See `MODEL_REGISTRY` for a list of available models or define your own.
 - `MODEL_EMBEDDING`: The default model to use for aiembed (embedding documents). See `MODEL_REGISTRY` for a list of available models or define your own.
 - `PROMPT_SCHEMA`: The default prompt schema to use for aigenerate and most ai* calls (if not specified in `MODEL_REGISTRY`). Set as a string, eg, `"OpenAISchema"`.
@@ -41,6 +41,7 @@ Define your `register_model!()` calls in your `startup.jl` file to make them ava
 - `DATABRICKS_HOST`: The host for the Databricks API.
 - `TAVILY_API_KEY`: The API key for the Tavily Search API. Register [here](https://tavily.com/). See more information [here](https://docs.tavily.com/docs/tavily-api/rest_api).
 - `GOOGLE_API_KEY`: The API key for Google Gemini models. Get yours from [here](https://ai.google.dev/). If you see a documentation page ("Available languages and regions for Google AI Studio and Gemini API"), it means that it's not yet available in your region.
+- `ANTHROPIC_API_KEY`: The API key for the Anthropic API. Get yours from [here](https://www.anthropic.com/).
 
 Preferences.jl takes priority over ENV variables, so if you set a preference, it will take precedence over the ENV variable.
 
@@ -56,6 +57,7 @@ const ALLOWED_PREFERENCES = ["MISTRALAI_API_KEY",
     "DATABRICKS_HOST",
     "TAVILY_API_KEY",
     "GOOGLE_API_KEY",
+    "ANTHROPIC_API_KEY",
     "MODEL_CHAT",
     "MODEL_EMBEDDING",
     "MODEL_ALIASES",
@@ -157,6 +159,10 @@ const TOGETHER_API_KEY::String = @load_preference("TOGETHER_API_KEY",
 
 _temp = get(ENV, "FIREWORKS_API_KEY", "")
 const FIREWORKS_API_KEY::String = @load_preference("FIREWORKS_API_KEY",
+    default=_temp);
+
+_temp = get(ENV, "ANTHROPIC_API_KEY", "")
+const ANTHROPIC_API_KEY::String = @load_preference("ANTHROPIC_API_KEY",
     default=_temp);
 
 _temp = get(ENV, "LOCAL_SERVER", "http://localhost:10897/v1")

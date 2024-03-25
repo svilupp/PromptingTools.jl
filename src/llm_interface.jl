@@ -251,6 +251,30 @@ struct GoogleSchema <: AbstractGoogleSchema end
     inputs::Any = nothing
 end
 
+abstract type AbstractAnthropicSchema <: AbstractPromptSchema end
+
+"""
+    AnthropicSchema <: AbstractAnthropicSchema
+
+AnthropicSchema is the default schema for Anthropic API models (eg, Claude). See more information [here](https://docs.anthropic.com/claude/reference/getting-started-with-the-api).
+
+It uses the following conversation template:
+```
+[Dict(role="system",content="..."),Dict(role="user",content="..."),Dict(role="assistant",content="...")]
+```
+
+It's recommended to separate sections in your prompt with XML markup (e.g. `<document>\n{{document}}\n</document>`). See [here](https://docs.anthropic.com/claude/docs/use-xml-tags).
+"""
+struct AnthropicSchema <: AbstractAnthropicSchema end
+
+"Echoes the user's input back to them. Used for testing the implementation"
+@kwdef mutable struct TestEchoAnthropicSchema <: AbstractAnthropicSchema
+    response::AbstractDict
+    status::Integer
+    model_id::String = ""
+    inputs::Any = nothing
+end
+
 ## Dispatch into a default schema (can be set by Preferences.jl)
 # Since we load it as strings, we need to convert it to a symbol and instantiate it
 global PROMPT_SCHEMA::AbstractPromptSchema = @load_preference("PROMPT_SCHEMA",
