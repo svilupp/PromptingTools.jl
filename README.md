@@ -2,6 +2,7 @@
 
 [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://svilupp.github.io/PromptingTools.jl/stable/)
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://svilupp.github.io/PromptingTools.jl/dev/)
+[![Slack](https://img.shields.io/badge/slack-%23generative--ai-brightgreen.svg?logo=slack)](https://julialang.slack.com/archives/C06G90C697X)
 [![Build Status](https://github.com/svilupp/PromptingTools.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/svilupp/PromptingTools.jl/actions/workflows/CI.yml?query=branch%3Amain)
 [![Coverage](https://codecov.io/gh/svilupp/PromptingTools.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/svilupp/PromptingTools.jl)
 [![Aqua](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl)
@@ -93,6 +94,7 @@ For more practical examples, see the `examples/` folder and the [Advanced Exampl
   - [Experimental Agent Workflows / Output Validation with `airetry!`](#experimental-agent-workflows--output-validation-with-airetry)
     - [Using Ollama models](#using-ollama-models)
     - [Using MistralAI API and other OpenAI-compatible APIs](#using-mistralai-api-and-other-openai-compatible-apis)
+    - [Using Anthropic Models](#using-anthropic-models)
     - [More Examples](#more-examples)
   - [Package Interface](#package-interface)
   - [Frequently Asked Questions](#frequently-asked-questions)
@@ -575,6 +577,30 @@ msg = aigenerate(PT.CustomOpenAISchema(), prompt; model="my_model", api_key, api
 As you can see, it also works for any local models that you might have running on your computer!
 
 Note: At the moment, we only support `aigenerate` and `aiembed` functions for MistralAI and other OpenAI-compatible APIs. We plan to extend the support in the future.
+
+### Using Anthropic Models
+
+Make sure the `ANTHROPIC_API_KEY` environment variable is set to your API key.
+
+```julia
+# cladeuh is alias for Claude 3 Haiku
+ai"Say hi!"claudeh 
+```
+
+Preset model aliases are `claudeo`, `claudes`, and `claudeh`, for Claude 3 Opus, Sonnet, and Haiku, respectively.
+
+The corresponding schema is `AnthropicSchema`.
+
+There are several prompt templates with `XML` in the name, suggesting that they use Anthropic-friendly XML formatting for separating sections.
+Find them with `aitemplates("XML")`.
+
+```julia
+# cladeo is alias for Claude 3 Opus
+msg = aigenerate(
+    :JuliaExpertAskXML, ask = "How to write a function to convert Date to Millisecond?",
+    model = "cladeo")
+```
+
 
 ### More Examples
 
