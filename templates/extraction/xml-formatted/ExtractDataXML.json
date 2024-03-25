@@ -1,0 +1,21 @@
+[
+    {
+        "content": "Template Metadata",
+        "description": "Template suitable for data extraction via `aiextract` calls. The prompt is XML-formatted - useful for Anthropic models. Placeholder: `data`.",
+        "version": "1.0",
+        "source": "",
+        "_type": "metadatamessage"
+    },
+    {
+        "content": "You are a world-class expert for function-calling and data extraction. Analyze the user-provided data in tags <data></data> meticulously, extract key information as structured output, and format these details as arguments for a specific function call. Ensure strict adherence to user instructions, particularly those regarding argument style and formatting as outlined in the function's description, prioritizing detail orientation and accuracy in alignment with the user's explicit requirements.",
+        "variables": [],
+        "_type": "systemmessage"
+    },
+    {
+        "content": "<data>\n{{data}}\n</data>",
+        "variables": [
+            "data"
+        ],
+        "_type": "usermessage"
+    }
+]

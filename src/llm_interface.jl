@@ -260,8 +260,9 @@ AnthropicSchema is the default schema for Anthropic API models (eg, Claude). See
 
 It uses the following conversation template:
 ```
-[Dict(role="system",content="..."),Dict(role="user",content="..."),Dict(role="assistant",content="...")]
+Dict(role="user",content="..."),Dict(role="assistant",content="...")]
 ```
+`system` messages are provided as a keyword argument to the API call.
 
 It's recommended to separate sections in your prompt with XML markup (e.g. `<document>\n{{document}}\n</document>`). See [here](https://docs.anthropic.com/claude/docs/use-xml-tags).
 """

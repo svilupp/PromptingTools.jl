@@ -353,4 +353,14 @@ end
     ]
     @test_throws ArgumentError auth_header("")
     @test length(auth_header(nothing)) == 2
+
+    # x-api-key format 
+    headers = auth_header("<my-api-key>"; x_api_key = true, bearer = false,
+        extra_headers = ["version" => "1.0"])
+    @test headers == [
+        "x-api-key" => "<my-api-key>",
+        "Content-Type" => "application/json",
+        "Accept" => "application/json",
+        "version" => "1.0"
+    ]
 end

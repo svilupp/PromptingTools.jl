@@ -635,7 +635,7 @@ function auth_header(api_key::Union{Nothing, AbstractString};
             Pair{String, String},
         }[],
         kwargs...)
-    @assert !(bearer && x_api_key) "Cannot use both `bearer` and `x_api_key`. Select one format."
+    @assert !(bearer && x_api_key) "Cannot use both `bearer` and `x_api_key`. Select only one format."
     @assert (bearer||x_api_key) "At least one of `bearer` and `x_api_key` must be selected."
     !isnothing(api_key) && isempty(api_key) &&
         throw(ArgumentError("`api_key` cannot be empty"))
@@ -647,6 +647,6 @@ function auth_header(api_key::Union{Nothing, AbstractString};
     !isnothing(api_key) && bearer &&
         pushfirst!(headers, "Authorization" => "Bearer $api_key")
     !isnothing(api_key) && x_api_key &&
-        pushfirst!(headers, "Authorization" => "x-api-key: $api_key")
+        pushfirst!(headers, "x-api-key" => "$api_key")
     return headers
 end

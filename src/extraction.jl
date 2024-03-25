@@ -1,5 +1,15 @@
+########################
+# Extraction
+########################
 # These are utilities to support structured data extraction tasks through the OpenAI function calling interface (wrapped by `aiextract`)
 #
+# There are potential formats: 1) JSON-based for OpenAI compatible APIs, 2) XML-based for Anthropic compatible APIs (used also by Hermes-2-Pro model). 
+#
+
+######################
+# 1) OpenAI / JSON format
+######################
+
 to_json_type(s::Type{<:AbstractString}) = "string"
 to_json_type(n::Type{<:Real}) = "number"
 to_json_type(n::Type{<:Integer}) = "integer"
@@ -49,7 +59,8 @@ function to_json_schema(orig_type; max_description_length::Int = 100)
         ## extract the field names and types
         required_types = String[]
         for (field_name, field_type) in zip(fieldnames(type), fieldtypes(type))
-            schema["properties"][string(field_name)] = to_json_schema(remove_null_types(field_type);
+            schema["properties"][string(field_name)] = to_json_schema(
+                remove_null_types(field_type);
                 max_description_length)
             ## Hack: no null type (Nothing, Missing) implies it it is a required field
             is_required_field(field_type) && push!(required_types, string(field_name))
@@ -67,7 +78,8 @@ function to_json_schema(type::Type{<:AbstractString}; max_description_length::In
     Dict("type" => to_json_type(type))
 end
 function to_json_schema(type::Type{T};
-        max_description_length::Int = 100) where {T <: Union{AbstractSet, Tuple, AbstractArray}}
+        max_description_length::Int = 100) where {T <:
+                                                  Union{AbstractSet, Tuple, AbstractArray}}
     element_type = eltype(type)
     return Dict("type" => "array",
         "items" => to_json_schema(remove_null_types(element_type)))
@@ -167,6 +179,44 @@ function function_call_signature(datastructtype::Type; max_description_length::I
     end
     return schema
 end
+
+######################
+# 2) Anthropic / XML format
+######################
+
+"""
+Simple template to add to the System Message when doing data extraction with Anthropic models.
+
+It has 2 placeholders: `tool_name`, `tool_description` and `tool_parameters` that are filled with the tool's name, description and parameters.
+Source: https://docs.anthropic.com/claude/docs/functions-external-tools
+"""
+ANTHROPIC_TOOL_PROMPT = """
+  In this environment you have access to a specific tool you MUST use to answer the user's question.
+
+  You should call it like this:
+  <function_calls>
+  <invoke>
+  <tool_name>\$TOOL_NAME</tool_name>
+  <parameters>
+  <\$PARAMETER_NAME>\$PARAMETER_VALUE</\$PARAMETER_NAME>
+  ...
+  </parameters>
+  </invoke>
+  </function_calls>
+
+  Here are the tools available:
+  <tools>
+  <tool_description>
+  {{tool_description}}
+  </tool_description>
+  </tools>
+  """
+ANTHROPIC_TOOL_PROMPT_LIST_EXTRA = """
+  For any List[] types, include multiple <\$PARAMETER_NAME>\$PARAMETER_VALUE</\$PARAMETER_NAME> tags for each item in the list. XML tags should only contain the name of the parameter.
+  """
+######################
+# Useful Structs
+######################
 
 # This is kindly borrowed from the awesome Instructor package](https://github.com/jxnl/instructor/blob/main/instructor/dsl/maybe.py).
 """

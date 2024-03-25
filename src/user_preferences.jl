@@ -18,6 +18,7 @@ Check your preferences by calling `get_preferences(key::String)`.
 - `TAVILY_API_KEY`: The API key for the Tavily Search API. Register [here](https://tavily.com/). See more information [here](https://docs.tavily.com/docs/tavily-api/rest_api).
 - `GOOGLE_API_KEY`: The API key for Google Gemini models. Get yours from [here](https://ai.google.dev/). If you see a documentation page ("Available languages and regions for Google AI Studio and Gemini API"), it means that it's not yet available in your region.
 - `ANTHROPIC_API_KEY`: The API key for the Anthropic API. Get yours from [here](https://www.anthropic.com/).
+- `VOYAGE_API_KEY`: The API key for the Voyage API. Free tier is upto 50M tokens! Get yours from [here](https://dash.voyageai.com/api-keys).
 - `MODEL_CHAT`: The default model to use for aigenerate and most ai* calls. See `MODEL_REGISTRY` for a list of available models or define your own.
 - `MODEL_EMBEDDING`: The default model to use for aiembed (embedding documents). See `MODEL_REGISTRY` for a list of available models or define your own.
 - `PROMPT_SCHEMA`: The default prompt schema to use for aigenerate and most ai* calls (if not specified in `MODEL_REGISTRY`). Set as a string, eg, `"OpenAISchema"`.
@@ -42,6 +43,7 @@ Define your `register_model!()` calls in your `startup.jl` file to make them ava
 - `TAVILY_API_KEY`: The API key for the Tavily Search API. Register [here](https://tavily.com/). See more information [here](https://docs.tavily.com/docs/tavily-api/rest_api).
 - `GOOGLE_API_KEY`: The API key for Google Gemini models. Get yours from [here](https://ai.google.dev/). If you see a documentation page ("Available languages and regions for Google AI Studio and Gemini API"), it means that it's not yet available in your region.
 - `ANTHROPIC_API_KEY`: The API key for the Anthropic API. Get yours from [here](https://www.anthropic.com/).
+- `VOYAGE_API_KEY`: The API key for the Voyage API. Free tier is upto 50M tokens! Get yours from [here](https://dash.voyageai.com/api-keys).
 
 Preferences.jl takes priority over ENV variables, so if you set a preference, it will take precedence over the ENV variable.
 
@@ -58,6 +60,7 @@ const ALLOWED_PREFERENCES = ["MISTRALAI_API_KEY",
     "TAVILY_API_KEY",
     "GOOGLE_API_KEY",
     "ANTHROPIC_API_KEY",
+    "VOYAGE_API_KEY",
     "MODEL_CHAT",
     "MODEL_EMBEDDING",
     "MODEL_ALIASES",
@@ -308,7 +311,12 @@ aliases = merge(
         "mistral-large" => "mistral-large-latest",
         "mistrals" => "mistral-small-latest",
         "mistralm" => "mistral-medium-latest",
-        "mistrall" => "mistral-large-latest"),
+        "mistrall" => "mistral-large-latest",
+        ## Default to Sonnet as a the medium offering
+        "claude" => "claude-3-sonnet-20240229",
+        "claudeo" => "claude-3-opus-20240229",
+        "claudes" => "claude-3-sonnet-20240229",
+        "claudeh" => "claude-3-haiku-20240307"),
     ## Load aliases from preferences as well
     @load_preference("MODEL_ALIASES", default=Dict{String, String}()))
 
@@ -482,7 +490,28 @@ registry = Dict{String, ModelSpec}(
         TogetherOpenAISchema(),
         6e-7,
         6e-7,
-        "Mixtral (8x7b) from Mistral, hosted by Together.ai. For more information, see [models](https://docs.together.ai/docs/inference-models)."))
+        "Mixtral (8x7b) from Mistral, hosted by Together.ai. For more information, see [models](https://docs.together.ai/docs/inference-models)."),
+    ### Anthropic models
+    "claude-3-opus-20240229" => ModelSpec("claude-3-opus-20240229",
+        AnthropicSchema(),
+        1.5e-5,
+        7.5e-5,
+        "Anthropic's latest and strongest model Claude 3 Opus. Max output 4096 tokens, 200K context. See details [here](https://docs.anthropic.com/claude/docs/models-overview)"),
+    "claude-3-sonnet-20240229" => ModelSpec("claude-3-sonnet-20240229",
+        AnthropicSchema(),
+        3e-6,
+        1.5e-5,
+        "Anthropic's middle model Claude 3 Sonnet. Max output 4096 tokens, 200K context. See details [here](https://docs.anthropic.com/claude/docs/models-overview)"),
+    "claude-3-haiku-20240307" => ModelSpec("claude-3-haiku-20240307",
+        AnthropicSchema(),
+        2.5e-7,
+        1.25e-6,
+        "Anthropic's smallest and faster model Claude 3 Haiku. Max output 4096 tokens, 200K context. See details [here](https://docs.anthropic.com/claude/docs/models-overview)"),
+    "claude-2.1" => ModelSpec("claude-2.1",
+        AnthropicSchema(),
+        8e-6,
+        2.4e-5,
+        "Anthropic's Claude 2.1 model."))
 
 """
     ALTERNATIVE_GENERATION_COSTS
