@@ -31,6 +31,7 @@ RAGToolsExperimentalExt = ["SparseArrays", "LinearAlgebra"]
 AbstractTrees = "0.4"
 Aqua = "0.7"
 Base64 = "<0.0.1, 1"
+GoogleGenAI = "0.3"
 HTTP = "1"
 JSON3 = "1"
 LinearAlgebra = "<0.0.1, 1"
