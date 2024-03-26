@@ -99,6 +99,7 @@ For more practical examples, see the `examples/` folder and the [Advanced Exampl
   - [Package Interface](#package-interface)
   - [Frequently Asked Questions](#frequently-asked-questions)
     - [Why OpenAI](#why-openai)
+    - [What if I cannot access OpenAI?](#what-if-i-cannot-access-openai)
     - [Data Privacy and OpenAI](#data-privacy-and-openai)
     - [Creating OpenAI API Key](#creating-openai-api-key)
     - [Setting OpenAI Spending Limits](#setting-openai-spending-limits)
@@ -672,6 +673,13 @@ OpenAI's models are at the forefront of AI research and provide robust, state-of
 There will be situations not or cannot use it (eg, privacy, cost, etc.). In that case, you can use local models (eg, Ollama) or other APIs (eg, Anthropic).
 
 Note: To get started with [Ollama.ai](https://ollama.ai/), see the [Setup Guide for Ollama](#setup-guide-for-ollama) section below.
+
+### What if I cannot access OpenAI?
+
+There are many alternatives:
+
+- **Other APIs**: MistralAI, Anthropic, Google, Together, Fireworks, Voyager (the latter ones tend to give free credits upon joining!)
+- **Locally-hosted models**: Llama.cpp/Llama.jl, Ollama, vLLM (see the examples and the corresponding docs)
 
 ### Data Privacy and OpenAI
 
