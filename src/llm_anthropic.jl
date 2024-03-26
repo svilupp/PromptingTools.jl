@@ -260,3 +260,7 @@ function aiscan(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMPT_T
         kwargs...)
     error("Anthropic schema does not yet support aiscan. Please use OpenAISchema instead.")
 end
+function aiimage(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMPT_TYPE;
+        kwargs...)
+    error("Anthropic schema does not yet support aiimage. Please use OpenAISchema instead.")
+end

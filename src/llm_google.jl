@@ -20,7 +20,7 @@ function render(schema::AbstractGoogleSchema,
     messages_replaced = render(NoSchema(), messages; conversation, kwargs...)
 
     ## Second pass: convert to the OpenAI schema
-    conversation = Dict{String, Any}[]
+    conversation = Dict{Symbol, Any}[]
 
     # replace any handlebar variables in the messages
     for msg in messages_replaced
@@ -32,21 +32,21 @@ function render(schema::AbstractGoogleSchema,
         elseif msg isa AIMessage
             "model"
         end
-        push!(conversation, Dict("role" => role, "parts" => [Dict("text" => msg.content)]))
+        push!(conversation, Dict(:role => role, :parts => [Dict("text" => msg.content)]))
     end
     ## Merge any subsequent UserMessages
-    merged_conversation = Dict{String, Any}[]
+    merged_conversation = Dict{Symbol, Any}[]
     # run n-1 times, look at the current item and the next one
     i = 1
     while i <= (length(conversation) - 1)
         next_i = i + 1
-        if conversation[i]["role"] == "user" && conversation[next_i]["role"] == "user"
+        if conversation[i][:role] == "user" && conversation[next_i][:role] == "user"
             ## Concat the user messages to together, put two newlines
-            txt1 = conversation[i]["parts"][1]["text"]
-            txt2 = conversation[next_i]["parts"][1]["text"]
+            txt1 = conversation[i][:parts][1]["text"]
+            txt2 = conversation[next_i][:parts][1]["text"]
             merged_text = isempty(txt1) || isempty(txt2) ? txt1 * txt2 :
                           txt1 * "\n\n" * txt2
-            new_msg = Dict("role" => "user", "parts" => [Dict("text" => merged_text)])
+            new_msg = Dict(:role => "user", :parts => [Dict("text" => merged_text)])
             push!(merged_conversation, new_msg)
             i += 2
         else
@@ -178,7 +178,7 @@ function aigenerate(prompt_schema::AbstractGoogleSchema, prompt::ALLOWED_PROMPT_
         output_token_estimate = length(r.text)
         msg = AIMessage(;
             content = r.text |> strip,
-            status = 200,
+            status = convert(Int, r.response_status),
             ## for google it's CHARACTERS, not tokens
             tokens = (input_token_estimate, output_token_estimate),
             elapsed = time)
@@ -197,4 +197,25 @@ function aigenerate(prompt_schema::AbstractGoogleSchema, prompt::ALLOWED_PROMPT_
         kwargs...)
 
     return output
+end
+
+function aiembed(prompt_schema::AbstractGoogleSchema, prompt::ALLOWED_PROMPT_TYPE;
+        kwargs...)
+    error("Google schema does not yet support aiembed. Please use OpenAISchema instead.")
+end
+function aiclassify(prompt_schema::AbstractGoogleSchema, prompt::ALLOWED_PROMPT_TYPE;
+        kwargs...)
+    error("Google schema does not yet support aiclassify. Please use OpenAISchema instead.")
+end
+function aiextract(prompt_schema::AbstractGoogleSchema, prompt::ALLOWED_PROMPT_TYPE;
+        kwargs...)
+    error("Google schema does not yet support aiextract. Please use OpenAISchema instead.")
+end
+function aiscan(prompt_schema::AbstractGoogleSchema, prompt::ALLOWED_PROMPT_TYPE;
+        kwargs...)
+    error("Google schema does not yet support aiscan. Please use OpenAISchema instead.")
+end
+function aiimage(prompt_schema::AbstractGoogleSchema, prompt::ALLOWED_PROMPT_TYPE;
+        kwargs...)
+    error("Google schema does not yet support aiimage. Please use OpenAISchema instead.")
 end

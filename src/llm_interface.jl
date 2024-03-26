@@ -246,7 +246,7 @@ struct GoogleSchema <: AbstractGoogleSchema end
 "Echoes the user's input back to them. Used for testing the implementation"
 @kwdef mutable struct TestEchoGoogleSchema <: AbstractGoogleSchema
     text::Any
-    status::Integer
+    response_status::Integer
     model_id::String = ""
     inputs::Any = nothing
 end
