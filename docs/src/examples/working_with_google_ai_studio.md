@@ -6,19 +6,11 @@ Get an API key from [here](https://ai.google.dev/). If you see a documentation p
 
 Save the API key in your environment as `GOOGLE_API_KEY`.
 
-We'll need `GoogleGenAI.jl` package:
+We'll need `GoogleGenAI` package:
 
 ````julia
-using Pkg; Pkg.add(url="https://github.com/tylerjthomas9/GoogleGenAI.jl/")
+using Pkg; Pkg.add("GoogleGenAI")
 ````
-
-> [!WARNING]
-> This tutorial is DISABLED FOR NOW, because GoogleGenAI.jl is NOT a registered package yet and, hence, we cannot have an extension for it.
-> 
-> If you want to use Google models, you need to install GoogleGenAI and add the following file to `[extensions]` section in Project.toml:
-> `GoogleGenAIPromptingToolsExt = ["GoogleGenAI"]
->
-> Save the Project.toml changes and restart Julia. You can now use GoogleGenAI models with PromptingTools as shown below.
 
 You can now use the Gemini-1.0-Pro model like any other model in PromptingTools. We **only support `aigenerate`** at the moment.
 
