@@ -276,7 +276,7 @@ struct AnthropicSchema <: AbstractAnthropicSchema end
     inputs::Any = nothing
 end
 
-struct AbstractShareGPTSchema <: PT.AbstractPromptSchema end
+abstract type AbstractShareGPTSchema <: AbstractPromptSchema end
 
 """
     ShareGPTSchema <: AbstractShareGPTSchema

@@ -74,10 +74,20 @@ The format is JSON Lines, where each line is a JSON object representing one prov
 See also: `save_conversation`
 
 # Examples
+
+You must always provide a VECTOR of conversations
 ```julia
+messages = AbstractMessage[SystemMessage("System message 1"),
+    UserMessage("User message"),
+    AIMessage("AI message")]
+conversation = [messages] # vector of vectors
 
+dir = tempdir()
+fn = joinpath(dir, "conversations.jsonl")
+save_conversations(fn, conversation)
 
-
+# Content of the file (one line for each conversation)
+# {"conversations":[{"value":"System message 1","from":"system"},{"value":"User message","from":"human"},{"value":"AI message","from":"gpt"}]}
 ```
 """
 function save_conversations(schema::AbstractPromptSchema, filename::AbstractString,

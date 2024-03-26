@@ -6,7 +6,7 @@ sharegpt_role(::AIMessage) = "gpt"
 sharegpt_role(::UserMessage) = "human"
 sharegpt_role(::SystemMessage) = "system"
 
-function render(::AbstractShareGPTSchema, conv::AbstractVector{<:PT.AbstractMessage})
+function render(::AbstractShareGPTSchema, conv::AbstractVector{<:AbstractMessage})
     Dict("conversations" => [Dict("from" => sharegpt_role(msg), "value" => msg.content)
                              for msg in conv])
 end

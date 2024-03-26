@@ -38,14 +38,15 @@ end
     @test metadata[1].source == ""
 end
 
-## @testset "Serialization - Messages" begin
-# Test save_conversations
-messages = AbstractMessage[SystemMessage("System message 1"),
-    UserMessage("User message"),
-    AIMessage("AI message")]
-tmp, _ = mktemp()
-save_conversations(tmp, [messages])
-# Test load_conversation
-loaded_messages = load_conversation(tmp)
-@test loaded_messages == messages
-## end
+@testset "Serialization - Messages" begin
+    # Test save_conversations
+    messages = AbstractMessage[SystemMessage("System message 1"),
+        UserMessage("User message"),
+        AIMessage("AI message")]
+    dir = tempdir()
+    fn = joinpath(dir, "conversations.jsonl")
+    save_conversations(fn, [messages])
+    s = read(fn, String)
+    @test s ==
+          """{"conversations":[{"value":"System message 1","from":"system"},{"value":"User message","from":"human"},{"value":"AI message","from":"gpt"}]}"""
+end
