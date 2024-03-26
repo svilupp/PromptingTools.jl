@@ -1,6 +1,7 @@
 using PromptingTools: AIMessage,
-    SystemMessage, UserMessage, UserMessageWithImages, AbstractMessage, DataMessage
-using PromptingTools: save_conversation, load_conversation
+                      SystemMessage, UserMessage, UserMessageWithImages, AbstractMessage,
+                      DataMessage, ShareGPTSchema
+using PromptingTools: save_conversation, load_conversation, save_conversations
 using PromptingTools: save_template, load_template
 
 @testset "Serialization - Messages" begin
@@ -23,7 +24,7 @@ end
     version = "1.1"
     msgs = [
         SystemMessage("You are an impartial AI judge evaluting whether the provided statement is \"true\" or \"false\". Answer \"unknown\" if you cannot decide."),
-        UserMessage("# Statement\n\n{{it}}"),
+        UserMessage("# Statement\n\n{{it}}")
     ]
     tmp, _ = mktemp()
     save_template(tmp,
@@ -36,3 +37,15 @@ end
     @test metadata[1].content == "Template Metadata"
     @test metadata[1].source == ""
 end
+
+## @testset "Serialization - Messages" begin
+# Test save_conversations
+messages = AbstractMessage[SystemMessage("System message 1"),
+    UserMessage("User message"),
+    AIMessage("AI message")]
+tmp, _ = mktemp()
+save_conversations(tmp, [messages])
+# Test load_conversation
+loaded_messages = load_conversation(tmp)
+@test loaded_messages == messages
+## end

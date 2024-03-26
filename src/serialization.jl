@@ -60,3 +60,43 @@ Loads a conversation (`messages`) from `io_or_file`
 function load_conversation(io_or_file::Union{IO, AbstractString})
     messages = JSON3.read(io_or_file, Vector{AbstractMessage})
 end
+
+"""
+    save_conversations(schema::AbstractPromptSchema, filename::AbstractString,
+        conversations::Vector{<:AbstractVector{<:PT.AbstractMessage}})
+
+Saves provided conversations (vector of vectors of `messages`) to `filename` rendered in the particular `schema`. 
+
+Commonly used for finetuning models with `schema = ShareGPTSchema()`
+
+The format is JSON Lines, where each line is a JSON object representing one provided conversation.
+
+See also: `save_conversation`
+
+# Examples
+```julia
+
+
+
+```
+"""
+function save_conversations(schema::AbstractPromptSchema, filename::AbstractString,
+        conversations::Vector{<:AbstractVector{<:AbstractMessage}})
+    @assert endswith(filename, ".jsonl") "Filename must end with `.jsonl` (JSON Lines format)."
+    io = IOBuffer()
+    for i in eachindex(conversations)
+        conv = conversations[i]
+        rendered_conv = render(ShareGPTSchema(), conv)
+        JSON3.write(io, rendered_conv)
+        # separate each conversation by newline
+        i < length(conversations) && print(io, "\n")
+    end
+    write(filename, String(take!(io)))
+    return nothing
+end
+
+# shortcut for ShareGPTSchema
+function save_conversations(filename::AbstractString,
+        conversations::Vector{<:AbstractVector{<:AbstractMessage}})
+    save_conversations(ShareGPTSchema(), filename, conversations)
+end
