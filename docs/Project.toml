@@ -2,6 +2,7 @@
 DataFramesMeta = "1313f7d8-7da2-5740-9ea0-a2ca25f37964"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 DocumenterVitepress = "4710194d-e776-4893-9690-8d956a29c365"
+GoogleGenAI = "903d41d1-eaca-47dd-943b-fee3930375ab"
 HTTP = "cd3eb016-35fb-5094-929b-558a96fad6f3"
 JSON3 = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
