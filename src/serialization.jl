@@ -96,7 +96,7 @@ function save_conversations(schema::AbstractPromptSchema, filename::AbstractStri
     io = IOBuffer()
     for i in eachindex(conversations)
         conv = conversations[i]
-        rendered_conv = render(ShareGPTSchema(), conv)
+        rendered_conv = render(schema, conv)
         JSON3.write(io, rendered_conv)
         # separate each conversation by newline
         i < length(conversations) && print(io, "\n")
