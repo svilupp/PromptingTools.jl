@@ -109,6 +109,7 @@ For more practical examples, see the `examples/` folder and the [Advanced Exampl
     - [Instant Access from Anywhere](#instant-access-from-anywhere)
     - [Open Source Alternatives](#open-source-alternatives)
     - [Setup Guide for Ollama](#setup-guide-for-ollama)
+    - [How would I fine-tune a model?](#how-would-i-fine-tune-a-model)
   - [Roadmap](#roadmap)
 
 ## Why PromptingTools.jl
@@ -810,6 +811,16 @@ Download new models with `ollama pull <model_name>` (eg, `ollama pull openhermes
 Show currently available models with `ollama list`.
 
 See [Ollama.ai](https://ollama.ai/) for more information.
+
+### How would I fine-tune a model?
+
+Fine-tuning is a powerful technique to adapt a model to your specific use case (mostly the format/syntax/task). It requires a dataset of examples, which you can now easily generate with PromptingTools.jl!
+
+1. You can save any conversation (vector of messages) to a file with `PT.save_conversation("filename.json", conversation)`.
+
+2. Once the finetuning time comes, create a bundle of ShareGPT-formatted conversations (common finetuning format) in a single `.jsonl` file. Use `PT.save_conversations("dataset.jsonl", [conversation1, conversation2, ...])` (notice that plural "conversationS" in the function name).
+
+For an example of an end-to-end finetuning process, check out our sister project [JuliaLLMLeaderboard Finetuning experiment](https://github.com/svilupp/Julia-LLM-Leaderboard/blob/main/experiments/cheater-7b-finetune/README.md). It shows the process of finetuning for half a dollar with [Jarvislabs.ai](jarvislabs.ai) and [Axolotl](https://github.com/OpenAccess-AI-Collective/axolotl).
 
 ## Roadmap
 

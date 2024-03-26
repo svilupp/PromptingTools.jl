@@ -9,8 +9,8 @@ const PT = PromptingTools
 function PromptingTools.ggi_generate_content(prompt_schema::PT.AbstractGoogleSchema,
         api_key::AbstractString, model_name::AbstractString,
         conversation; http_kwargs, api_kwargs...)
-    ## TODO: Ignores http_kwargs for now, needs upstream change
-    r = GoogleGenAI.generate_content(api_key, model_name, conversation; api_kwargs...)
+    r = GoogleGenAI.generate_content(
+        api_key, model_name, conversation; api_kwargs, http_kwargs)
     return r
 end
 
