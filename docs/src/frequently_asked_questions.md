@@ -8,6 +8,13 @@ There will be situations not or cannot use it (eg, privacy, cost, etc.). In that
 
 Note: To get started with [Ollama.ai](https://ollama.ai/), see the [Setup Guide for Ollama](#setup-guide-for-ollama) section below.
 
+### What if I cannot access OpenAI?
+
+There are many alternatives:
+
+- **Other APIs**: MistralAI, Anthropic, Google, Together, Fireworks, Voyager (the latter ones tend to give free credits upon joining!)
+- **Locally-hosted models**: Llama.cpp/Llama.jl, Ollama, vLLM (see the examples and the corresponding docs)
+
 ## Data Privacy and OpenAI
 
 At the time of writing, OpenAI does NOT use the API calls for training their models.

@@ -154,3 +154,11 @@ end
     @test schema2.inputs.messages == [Dict("role" => "user", "content" => "Hello World")]
     @test schema2.model_id == "claude-3-sonnet-20240229"
 end
+
+@testset "not implemented ai* functions" begin
+    @test_throws ErrorException aiembed(AnthropicSchema(), "prompt")
+    @test_throws ErrorException aiextract(AnthropicSchema(), "prompt")
+    @test_throws ErrorException aiclassify(AnthropicSchema(), "prompt")
+    @test_throws ErrorException aiscan(AnthropicSchema(), "prompt")
+    @test_throws ErrorException aiimage(AnthropicSchema(), "prompt")
+end
