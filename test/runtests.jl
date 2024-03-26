@@ -22,6 +22,7 @@ end
     include("llm_ollama.jl")
     include("llm_google.jl")
     include("llm_anthropic.jl")
+    include("llm_sharegpt.jl")
     include("macros.jl")
     include("templates.jl")
     include("serialization.jl")

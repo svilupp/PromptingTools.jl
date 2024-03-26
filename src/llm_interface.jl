@@ -276,6 +276,15 @@ struct AnthropicSchema <: AbstractAnthropicSchema end
     inputs::Any = nothing
 end
 
+abstract type AbstractShareGPTSchema <: AbstractPromptSchema end
+
+"""
+    ShareGPTSchema <: AbstractShareGPTSchema
+
+Frequently used schema for finetuning LLMs. Conversations are recorded as a vector of dicts with keys `from` and `value` (similar to OpenAI).
+"""
+struct ShareGPTSchema <: AbstractShareGPTSchema end
+
 ## Dispatch into a default schema (can be set by Preferences.jl)
 # Since we load it as strings, we need to convert it to a symbol and instantiate it
 global PROMPT_SCHEMA::AbstractPromptSchema = @load_preference("PROMPT_SCHEMA",
