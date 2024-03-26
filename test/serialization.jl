@@ -1,6 +1,7 @@
 using PromptingTools: AIMessage,
-    SystemMessage, UserMessage, UserMessageWithImages, AbstractMessage, DataMessage
-using PromptingTools: save_conversation, load_conversation
+                      SystemMessage, UserMessage, UserMessageWithImages, AbstractMessage,
+                      DataMessage, ShareGPTSchema
+using PromptingTools: save_conversation, load_conversation, save_conversations
 using PromptingTools: save_template, load_template
 
 @testset "Serialization - Messages" begin
@@ -23,7 +24,7 @@ end
     version = "1.1"
     msgs = [
         SystemMessage("You are an impartial AI judge evaluting whether the provided statement is \"true\" or \"false\". Answer \"unknown\" if you cannot decide."),
-        UserMessage("# Statement\n\n{{it}}"),
+        UserMessage("# Statement\n\n{{it}}")
     ]
     tmp, _ = mktemp()
     save_template(tmp,
@@ -35,4 +36,17 @@ end
     @test metadata[1].version == version
     @test metadata[1].content == "Template Metadata"
     @test metadata[1].source == ""
+end
+
+@testset "Serialization - Messages" begin
+    # Test save_conversations
+    messages = AbstractMessage[SystemMessage("System message 1"),
+        UserMessage("User message"),
+        AIMessage("AI message")]
+    dir = tempdir()
+    fn = joinpath(dir, "conversations.jsonl")
+    save_conversations(fn, [messages])
+    s = read(fn, String)
+    @test s ==
+          """{"conversations":[{"value":"System message 1","from":"system"},{"value":"User message","from":"human"},{"value":"AI message","from":"gpt"}]}"""
 end
