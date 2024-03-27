@@ -407,4 +407,4 @@ Fine-tuning is a powerful technique to adapt a model to your specific use case (
 
 2. Once the finetuning time comes, create a bundle of ShareGPT-formatted conversations (common finetuning format) in a single `.jsonl` file. Use `PT.save_conversations("dataset.jsonl", [conversation1, conversation2, ...])` (notice that plural "conversationS" in the function name).
 
-For an example of an end-to-end finetuning process, check out our sister project [JuliaLLMLeaderboard Finetuning experiment](https://github.com/svilupp/Julia-LLM-Leaderboard/blob/main/experiments/cheater-7b-finetune/README.md). It shows the process of finetuning for half a dollar with [Jarvislabs.ai](jarvislabs.ai) and [Axolotl](https://github.com/OpenAccess-AI-Collective/axolotl).
+For an example of an end-to-end finetuning process, check out our sister project [JuliaLLMLeaderboard Finetuning experiment](https://github.com/svilupp/Julia-LLM-Leaderboard/blob/main/experiments/cheater-7b-finetune/README.md). It shows the process of finetuning for half a dollar with [JarvisLabs.ai](https://jarvislabs.ai/templates/axolotl) and [Axolotl](https://github.com/OpenAccess-AI-Collective/axolotl).
