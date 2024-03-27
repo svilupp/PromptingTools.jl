@@ -43,7 +43,7 @@ export airag, build_context!, generate!, refine!, answer!, postprocess!
 export SimpleGenerator, AdvancedGenerator, RAGConfig
 include("generation.jl")
 
-export annotate_support, TrigramAnnotater
+export annotate_support, TrigramAnnotater, print_html
 include("annotation.jl")
 
 export build_qa_evals, run_qa_evals
