@@ -145,6 +145,8 @@ SOURCES
 5. Doc9
 ```
 
+See `?print_html` for the HTML version of the pretty-printing and styling system, eg, when you want to display the results in a web application based on Genie.jl/Stipple.jl.
+
 **How to read the output**
 - Color legend:
   - No color: High match with the context, can be trusted more
