@@ -3,7 +3,7 @@ using PromptingTools.Experimental.RAGTools: AnnotatedNode, AbstractAnnotater,
                                             set_node_style!,
                                             align_node_styles!, TrigramAnnotater, Styler,
                                             HTMLStyler,
-                                            pprint
+                                            pprint, print_html
 using PromptingTools.Experimental.RAGTools: trigram_support!, add_node_metadata!,
                                             annotate_support, RAGResult, text_to_trigrams
 
@@ -350,4 +350,55 @@ end
     # Invalid types
     struct Random123Annotater <: AbstractAnnotater end
     @test_throws ArgumentError annotate_support(Random123Annotater(), "test", context)
+end
+
+@testset "print_html" begin
+    # Test for plain text without any HTML styler
+    node = AnnotatedNode(content = "text\nNew line", score = 0.5)
+    str = print_html(node)
+    @test str == "<div>text<br>New line</div>"
+
+    # Test for single HTMLStyler with no new lines
+    styler = HTMLStyler(styles = "font-weight:bold", classes = "highlight")
+    node = AnnotatedNode(content = "text\nNew line", score = 0.5, style = styler)
+    str = print_html(node)
+    @test str ==
+          "<div><span style=\"font-weight:bold\" class=\"highlight\">text<br>New line</span></div>"
+
+    # Test for HTMLStyler without styling
+    styler = HTMLStyler()
+    node = AnnotatedNode(content = "text\nNew line", score = 0.5, style = styler)
+    str = print_html(node)
+    @test str == "<div>text<br>New line</div>"
+
+    styler = HTMLStyler(styles = "color:red", classes = "error")
+    node = AnnotatedNode(
+        content = "Error message\nSecond line", score = 0.5, style = styler)
+    str = print_html(node)
+    @test str ==
+          "<div><span style=\"color:red\" class=\"error\">Error message<br>Second line</span></div>"
+
+    ## Test with proper highlighting of context and answer
+    styler_kwargs = (;
+        default_styler = HTMLStyler(),
+        low_styler = HTMLStyler(styles = "color:magenta", classes = ""),
+        medium_styler = HTMLStyler(styles = "color:blue", classes = ""),
+        high_styler = HTMLStyler(styles = "", classes = ""))
+
+    # annotate the text
+    context = [
+        "This is a test context.", "Another context sentence.", "Final piece of context."]
+    answer = "This is a test answer. It has multiple sentences."
+
+    parent_node = annotate_support(
+        TrigramAnnotater(), answer, context; add_sources = false, add_scores = false, styler_kwargs...)
+
+    # print the HTML
+    str = print_html(parent_node)
+    expected_output = "<div>This is a test <span style=\"color:magenta\">answer</span>. <span style=\"color:magenta\">It</span> has <span style=\"color:magenta\">multiple</span> <span style=\"color:blue\">sentences</span>.</div>"
+    @test str == expected_output
+    # Test RAGResult overload
+    rag = RAGResult(; context, final_answer = answer, question = "")
+    str = print_html(rag)
+    @test str == expected_output
 end
