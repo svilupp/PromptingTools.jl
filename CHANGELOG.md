@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.17.1]
+
+### Fixed
+- Fixed a bug in `print_html` where the custom kwargs were not being passed to the `HTML` constructor.
+
 ## [0.17.0]
 
 ### Added
