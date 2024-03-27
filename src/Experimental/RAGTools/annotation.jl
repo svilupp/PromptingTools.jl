@@ -645,6 +645,6 @@ end
 function print_html(
         rag_or_parent_node::Union{AbstractAnnotatedNode, AbstractRAGResult}; kwargs...)
     io = IOBuffer()
-    print_html(io, rag_or_parent_node)
+    print_html(io, rag_or_parent_node; kwargs...)
     String(take!(io))
 end
