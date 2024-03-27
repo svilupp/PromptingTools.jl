@@ -533,3 +533,118 @@ function annotate_support(
         annotater, final_answer, result.context; min_score, skip_trigrams,
         hashed, result.sources, min_source_score, add_sources, add_scores, kwargs...)
 end
+
+"""
+    print_html([io::IO,] parent_node::AbstractAnnotatedNode)
+
+    print_html([io::IO,] rag::AbstractRAGResult; add_sources::Bool = false,
+        add_scores::Bool = false, default_styler = HTMLStyler(),
+        low_styler = HTMLStyler(styles = "color:magenta", classes = ""),
+        medium_styler = HTMLStyler(styles = "color:blue", classes = ""),
+        high_styler = HTMLStyler(styles = "", classes = ""), styler_kwargs...)
+
+Pretty-prints the annotation `parent_node` (or `RAGResult`) to the `io` stream (or returns the string) in HTML format (assumes node is styled with styler `HTMLStyler`).
+
+It wraps each "token" into a span with requested styling (HTMLStyler's properties `classes` and `styles`).
+It also replaces new lines with `<br>` for better HTML formatting.
+
+For any non-HTML styler, it prints the content as plain text.
+
+# Returns 
+- `nothing` if `io` is provided
+- or the string with HTML-formatted text (if `io` is not provided, we print the result out)
+
+See also `HTMLStyler`, `annotate_support`, and `set_node_style!` for how the styling is applied and what the arguments mean.
+
+# Examples
+Note: `RT` is an alias for `PromptingTools.Experimental.RAGTools`
+
+Simple start directly with the `RAGResult`:
+```julia
+# set up the text/RAGResult
+context = [
+    "This is a test context.", "Another context sentence.", "Final piece of context."]
+answer = "This is a test answer. It has multiple sentences."
+rag = RT.RAGResult(; context, final_answer=answer, question="")
+
+# print the HTML
+print_html(rag)
+```
+
+Low-level control by creating our `AnnotatedNode`:
+```julia
+# prepare your HTML styling
+styler_kwargs = (;
+    default_styler=RT.HTMLStyler(),
+    low_styler=RT.HTMLStyler(styles="color:magenta", classes=""),
+    medium_styler=RT.HTMLStyler(styles="color:blue", classes=""),
+    high_styler=RT.HTMLStyler(styles="", classes=""))
+
+# annotate the text
+context = [
+    "This is a test context.", "Another context sentence.", "Final piece of context."]
+answer = "This is a test answer. It has multiple sentences."
+
+parent_node = RT.annotate_support(
+    RT.TrigramAnnotater(), answer, context; add_sources=false, add_scores=false, styler_kwargs...)
+
+# print the HTML
+print_html(parent_node)
+
+# or to accumulate more nodes
+io = IOBuffer()
+print_html(io, parent_node)
+```
+"""
+function print_html(io::IO, parent_node::AbstractAnnotatedNode)
+    print(io, "<div>")
+    for node in PreOrderDFS(parent_node)
+        ## print out text only for leaf nodes (ie, with no children)
+        if isempty(node.children)
+            # create HTML style new lines
+            content = replace(node.content, "\n" => "<br>")
+            if node.style isa HTMLStyler
+                # HTML styler -> wrap each token into a span with requested styling
+                style_str = isempty(node.style.styles) ? "" :
+                            " style=\"$(node.style.styles)\""
+                class_str = isempty(node.style.classes) ? "" :
+                            " class=\"$(node.style.classes)\""
+                if isempty(class_str) && isempty(style_str)
+                    print(io, content)
+                else
+                    print(io,
+                        "<span", style_str, class_str, ">$(content)</span>")
+                end
+            else
+                # print plain text
+                print(io, content)
+            end
+        end
+    end
+    print(io, "</div>")
+    return nothing
+end
+
+# utility for RAGResult
+function print_html(io::IO, rag::AbstractRAGResult; add_sources::Bool = false,
+        add_scores::Bool = false, default_styler = HTMLStyler(),
+        low_styler = HTMLStyler(styles = "color:magenta", classes = ""),
+        medium_styler = HTMLStyler(styles = "color:blue", classes = ""),
+        high_styler = HTMLStyler(styles = "", classes = ""), styler_kwargs...)
+
+    # Create the annotation
+    parent_node = annotate_support(
+        TrigramAnnotater(), rag; add_sources, add_scores, default_styler,
+        low_styler, medium_styler, high_styler, styler_kwargs...)
+
+    # Print the HTML
+    print_html(io, parent_node)
+end
+
+# Non-io dispatch
+function print_html(
+        rag_or_parent_node::Union{AbstractAnnotatedNode, AbstractRAGResult}; kwargs...)
+    io = IOBuffer()
+    print_html(io, rag_or_parent_node)
+    String(take!(io))
+end
