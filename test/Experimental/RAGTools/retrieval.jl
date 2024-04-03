@@ -1,10 +1,12 @@
 using PromptingTools.Experimental.RAGTools: ContextEnumerator, NoRephraser, SimpleRephraser,
                                             HyDERephraser,
-                                            CosineSimilarity, NoTagFilter, AnyTagFilter,
+                                            CosineSimilarity, BinaryCosineSimilarity,
+                                            NoTagFilter, AnyTagFilter,
                                             SimpleRetriever, AdvancedRetriever
 using PromptingTools.Experimental.RAGTools: AbstractRephraser, AbstractTagFilter,
                                             AbstractSimilarityFinder, AbstractReranker
-using PromptingTools.Experimental.RAGTools: find_closest, find_tags, rerank, rephrase,
+using PromptingTools.Experimental.RAGTools: find_closest, hamming_distance, find_tags,
+                                            rerank, rephrase,
                                             retrieve
 using PromptingTools.Experimental.RAGTools: NoReranker, CohereReranker
 
@@ -33,6 +35,18 @@ using PromptingTools.Experimental.RAGTools: NoReranker, CohereReranker
     # with unknown rephraser
     struct UnknownRephraser123 <: AbstractRephraser end
     @test_throws ArgumentError rephrase(UnknownRephraser123(), "test question")
+end
+
+@testset "hamming_distance" begin
+    # Test for matching number of rows
+    @test_throws ArgumentError hamming_distance(
+        [true false; false true], [true, false, true])
+
+    # Test for correct calculation of distances
+    @test hamming_distance([true false; false true], [true, false]) == [0, 1]
+    @test hamming_distance([true false; false true], [false, true]) == [1, 0]
+    @test hamming_distance([true false; false true], [true, true]) == [1, 1]
+    @test hamming_distance([true false; false true], [false, false]) == [2, 2]
 end
 
 @testset "find_closest" begin
@@ -113,6 +127,20 @@ end
     ## @test result isa CandidateChunks
     ## @test result.positions == [1, 2]
     ## @test all(1.0 .>= result.distances .>= -1.0)   # Assuming default minimum_similarity
+
+    ### For Binary embeddings
+    # Test for correct retrieval of closest positions and scores
+    emb = [true false; false true]
+    query_emb = [true, false]
+    positions, scores = find_closest(BinaryCosineSimilarity(), emb, query_emb)
+    @test positions == [1, 2]
+    @test scores ≈ [0.0, 1.0]
+
+    # Test for custom top_k and minimum_similarity values
+    positions, scores = find_closest(
+        BinaryCosineSimilarity(), emb, query_emb; top_k = 1, minimum_similarity = 0.5)
+    @test positions == [2]
+    @test scores ≈ [1.0]
 end
 
 @testset "find_tags" begin
