@@ -1,3 +1,4 @@
+using PromptingTools: TestEchoOpenAISchema
 using PromptingTools.Experimental.RAGTools: ContextEnumerator, NoRephraser, SimpleRephraser,
                                             HyDERephraser,
                                             CosineSimilarity, BinaryCosineSimilarity,
@@ -150,7 +151,7 @@ end
     positions, scores = find_closest(
         BinaryCosineSimilarity(), emb, query_emb; top_k = 1, minimum_similarity = 0.6)
     @test isempty(positions)
-    @test iesmpty(scores)
+    @test isempty(scores)
 end
 
 @testset "find_tags" begin
