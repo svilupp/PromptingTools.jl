@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Adds support to binary embeddings for RAGTools. Corresponding type is `finder=BinaryCosineSimilarity()`, but you can also just convert the embeddings to binary yourself (choose `Matrix{Bool}` for speed, not `BitMatrix`) and use without any changes (very little difference at the moment).
+- Adds support for binary embeddings in RAGTools (dispatch type for `find_closest` is `finder=BinaryCosineSimilarity()`), but you can also just convert the embeddings to binary yourself (always choose `Matrix{Bool}` for speed, not `BitMatrix`) and use without any changes (very little performance difference at the moment).
 - Added Ollama embedding models to the model registry ("nomic-embed-text", "mxbai-embed-large") and versioned MistralAI models.
 
 ### Fixed
