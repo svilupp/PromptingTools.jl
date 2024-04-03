@@ -43,10 +43,10 @@ end
         [true false; false true], [true, false, true])
 
     # Test for correct calculation of distances
-    @test hamming_distance([true false; false true], [true, false]) == [0, 1]
-    @test hamming_distance([true false; false true], [false, true]) == [1, 0]
+    @test hamming_distance([true false; false true], [true, false]) == [0, 2]
+    @test hamming_distance([true false; false true], [false, true]) == [2, 0]
     @test hamming_distance([true false; false true], [true, true]) == [1, 1]
-    @test hamming_distance([true false; false true], [false, false]) == [2, 2]
+    @test hamming_distance([true false; false true], [false, false]) == [1, 1]
 end
 
 @testset "find_closest" begin
@@ -134,13 +134,23 @@ end
     query_emb = [true, false]
     positions, scores = find_closest(BinaryCosineSimilarity(), emb, query_emb)
     @test positions == [1, 2]
-    @test scores ≈ [0.0, 1.0]
+    @test scores ≈ [1, 0] #query_emb' * emb[:, positions]
+
+    query_emb = [0.5, -0.5]
+    positions, scores = find_closest(BinaryCosineSimilarity(), emb, query_emb)
+    @test positions == [1, 2]
+    @test scores ≈ [0.5, -0.5] #query_emb' * emb[:, positions]
 
     # Test for custom top_k and minimum_similarity values
     positions, scores = find_closest(
         BinaryCosineSimilarity(), emb, query_emb; top_k = 1, minimum_similarity = 0.5)
-    @test positions == [2]
-    @test scores ≈ [1.0]
+    @test positions == [1]
+    @test scores ≈ [0.5]
+
+    positions, scores = find_closest(
+        BinaryCosineSimilarity(), emb, query_emb; top_k = 1, minimum_similarity = 0.6)
+    @test isempty(positions)
+    @test iesmpty(scores)
 end
 
 @testset "find_tags" begin
