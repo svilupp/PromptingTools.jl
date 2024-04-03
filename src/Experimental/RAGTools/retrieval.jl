@@ -34,6 +34,19 @@ Finds the closest chunks to a query embedding by measuring the cosine similarity
 struct CosineSimilarity <: AbstractSimilarityFinder end
 
 """
+    BinaryCosineSimilarity <: AbstractSimilarityFinder
+
+Finds the closest chunks to a query embedding by measuring the Hamming distance AND cosine similarity between the query and the chunks' embeddings in binary form.
+
+It follows the two-pass approach:
+- First pass: Hamming distance in binary form to get the `top_k * rescore_multiplier` (ie, more than top_k) candidates.
+- Second pass: Rescore the candidates with float embeddings and return the top_k.
+
+Reference: [HuggingFace: Embedding Quantization](https://huggingface.co/blog/embedding-quantization#binary-quantization-in-vector-databases).
+"""
+struct BinaryCosineSimilarity <: AbstractSimilarityFinder end
+
+"""
     NoTagFilter <: AbstractTagFilter
 
 
@@ -187,6 +200,76 @@ function find_closest(
     ## simply vcat together (gets sorted from the highest similarity to the lowest)
     mapreduce(
         c -> find_closest(finder, index, c; top_k = top_k_, kwargs...), vcat, eachcol(query_emb))
+end
+
+## For binary embeddings
+"""
+    hamming_distance(mat::AbstractMatrix{<:Bool}, vect::AbstractVector{<:Bool})
+
+Calculates the column-wise Hamming distance between a matrix of binary vectors `mat` and a single binary vector `vect`.
+
+This is the first-pass ranking for `BinaryCosineSimilarity` method.
+"""
+function hamming_distance(mat::AbstractMatrix{<:Bool}, vect::AbstractVector{<:Bool})
+    # Check if the number of rows matches
+    if size(mat, 1) != length(vect)
+        throw(ArgumentError("Matrix must have the same number of rows as the length of the Vector (provided: $(size(mat, 1)) vs $(length(vect)))"))
+    end
+
+    # Calculate number of different bits, the smaller the number, the more similar they are.
+    distances = zeros(Int, size(mat, 2))
+    @inbounds for j in axes(mat, 2)
+        cnt = 0
+        v = @view(mat[:, j])
+        @simd for i in eachindex(vect, v)
+            cnt += v[i] ⊻ vect[i]
+        end
+        distances[j] = cnt
+    end
+
+    return distances
+end
+
+"""
+    find_closest(
+        finder::BinaryCosineSimilarity, emb::AbstractMatrix{<:Bool},
+        query_emb::AbstractVector{<:Real};
+        top_k::Int = 100, rescore_multiplier::Int = 4, minimum_similarity::AbstractFloat = -1.0, kwargs...)
+
+Finds the indices of chunks (represented by embeddings in `emb`) that are closest to query embedding (`query_emb`) using binary embeddings (in the index).
+
+This is a two-pass approach:
+- First pass: Hamming distance in binary form to get the `top_k * rescore_multiplier` (ie, more than top_k) candidates.
+- Second pass: Rescore the candidates with float embeddings and return the top_k.
+
+Returns only `top_k` closest indices.
+
+Reference: [HuggingFace: Embedding Quantization](https://huggingface.co/blog/embedding-quantization#binary-quantization-in-vector-databases).
+
+# Examples
+
+Convert any Float embeddings to binary like this:
+```julia
+binary_emb = map(>(0), emb)
+```
+"""
+function find_closest(
+        finder::BinaryCosineSimilarity, emb::AbstractMatrix{<:Bool},
+        query_emb::AbstractVector{<:Real};
+        top_k::Int = 100, rescore_multiplier::Int = 4, minimum_similarity::AbstractFloat = -1.0, kwargs...)
+    # emb is an embedding matrix where the first dimension is the embedding dimension
+
+    ## First pass, both in binary with Hamming, get rescore_multiplier times top_k
+    binary_query_emb = map(>(0), query_emb)
+    scores = hamming_distance(emb, binary_query_emb)
+    positions = scores |> sortperm |> x -> first(x, top_k * rescore_multiplier)
+
+    ## Second pass, rescore with float embeddings and return top_k
+    new_positions, scores = find_closest(CosineSimilarity(), @view(emb[:, positions]),
+        query_emb; top_k, minimum_similarity, kwargs...)
+
+    ## translate to original indices
+    return positions[new_positions], scores
 end
 
 ## TODO: Implement for MultiIndex
