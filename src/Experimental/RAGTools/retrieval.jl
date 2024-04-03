@@ -42,7 +42,7 @@ It follows the two-pass approach:
 - First pass: Hamming distance in binary form to get the `top_k * rescore_multiplier` (ie, more than top_k) candidates.
 - Second pass: Rescore the candidates with float embeddings and return the top_k.
 
-Source: [HuggingFace: Embedding Quantization](https://huggingface.co/blog/embedding-quantization#binary-quantization-in-vector-databases).
+Reference: [HuggingFace: Embedding Quantization](https://huggingface.co/blog/embedding-quantization#binary-quantization-in-vector-databases).
 """
 struct BinaryCosineSimilarity <: AbstractSimilarityFinder end
 
@@ -243,6 +243,15 @@ This is a two-pass approach:
 - Second pass: Rescore the candidates with float embeddings and return the top_k.
 
 Returns only `top_k` closest indices.
+
+Reference: [HuggingFace: Embedding Quantization](https://huggingface.co/blog/embedding-quantization#binary-quantization-in-vector-databases).
+
+# Examples
+
+Convert any Float embeddings to binary like this:
+```julia
+binary_emb = map(>(0), emb)
+```
 """
 function find_closest(
         finder::BinaryCosineSimilarity, emb::AbstractMatrix{<:Bool},
