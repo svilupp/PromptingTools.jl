@@ -981,7 +981,7 @@ msg = aiextract("James is 30."; return_type=MyMeasurement)
 
 If there are multiple items you want to extract, define a wrapper struct to get a Vector of `MyMeasurement`:
 ```
-struct MyMeasurementWrapper
+struct ManyMeasurements
     measurements::Vector{MyMeasurement}
 end
 
@@ -1008,7 +1008,7 @@ Or if you want your extraction to fail gracefully when data isn't found, use `Ma
 ```
 using PromptingTools: MaybeExtract
 
-type = MaybeExtract{MyMeasurement}
+return_type = MaybeExtract{MyMeasurement}
 # Effectively the same as:
 # struct MaybeExtract{T}
 #     result::Union{T, Nothing} // The result of the extraction
@@ -1017,7 +1017,7 @@ type = MaybeExtract{MyMeasurement}
 # end
 
 # If LLM extraction fails, it will return a Dict with `error` and `message` fields instead of the result!
-msg = aiextract("Extract measurements from the text: I am giraffe", type)
+msg = aiextract("Extract measurements from the text: I am giraffe"; return_type)
 msg.content
 # MaybeExtract{MyMeasurement}(nothing, true, "I'm sorry, but I can only assist with human measurements.")
 ```
