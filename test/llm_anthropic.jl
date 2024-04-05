@@ -1,7 +1,7 @@
 using PromptingTools: TestEchoAnthropicSchema, render, AnthropicSchema
 using PromptingTools: AIMessage, SystemMessage, AbstractMessage
 using PromptingTools: UserMessage, UserMessageWithImages, DataMessage
-using PromptingTools: call_cost, anthropic_api
+using PromptingTools: call_cost, anthropic_api, function_call_signature
 
 @testset "render-Anthropic" begin
     schema = AnthropicSchema()
@@ -95,6 +95,28 @@ using PromptingTools: call_cost, anthropic_api
         UserMessageWithImages("User message"; image_url = "https://example.com/image.png")
     ]
     @test_throws Exception render(schema, messages)
+
+    ## Tool calling
+    "abc"
+    struct FruitCountX
+        fruit::String
+        count::Int
+    end
+    tools = [Dict("name" => "function_xyz", "description" => "ABC",
+        "input_schema" => "")]
+    messages = [
+        SystemMessage("Act as a helpful AI assistant"),
+        UserMessage("Hello, my name is {{name}}")
+    ]
+    conversation = render(schema, messages; tools, name = "John")
+    @test occursin("Use the function_xyz tool in your response.", conversation.system)
+
+    tools = [Dict("name" => "function_xyz", "description" => "ABC",
+            "input_schema" => ""),
+        Dict("name" => "function_abc", "description" => "ABC",
+            "input_schema" => "")]
+    @test_logs (:warn, r"Multiple tools provided") match_mode=:any render(
+        schema, messages; tools)
 end
 
 @testset "anthropic_api" begin
@@ -155,9 +177,58 @@ end
     @test schema2.model_id == "claude-3-sonnet-20240229"
 end
 
+@testset "aiextract-Anthropic" begin
+    # corresponds to Anthropic version 2023 June, v1 // tool beta!
+    struct Fruit
+        name::String
+    end
+    response = Dict(
+        :content => [
+            Dict(:type => "tool_use", :input => Dict("name" => "banana"))],
+        :stop_reason => "tool_use",
+        :usage => Dict(:input_tokens => 2, :output_tokens => 1))
+
+    # Real generation API
+    schema1 = TestEchoAnthropicSchema(; response, status = 200)
+    msg = aiextract(schema1, "Hello World! Banana"; model = "claudeo", return_type = Fruit)
+    expected_output = DataMessage(;
+        content = Fruit("banana"),
+        status = 200,
+        tokens = (2, 1),
+        finish_reason = "tool_use",
+        cost = msg.cost,
+        elapsed = msg.elapsed)
+    @test msg == expected_output
+    @test schema1.inputs.system ==
+          "Act as a helpful AI assistant\n\nUse the Fruit_extractor tool in your response."
+    @test schema1.inputs.messages ==
+          [Dict("role" => "user", "content" => "Hello World! Banana")]
+    @test schema1.model_id == "claude-3-opus-20240229"
+
+    # Test badly formatted response
+    response = Dict(
+        :content => [
+            Dict(:type => "tool_use", :input => Dict("namexxx" => "banana"))],
+        :stop_reason => "tool_use",
+        :usage => Dict(:input_tokens => 2, :output_tokens => 1))
+    schema2 = TestEchoAnthropicSchema(; response, status = 200)
+    msg = aiextract(schema2, "Hello World! Banana"; model = "claudeo", return_type = Fruit)
+    @test msg.content isa AbstractDict
+    @test msg.content[:namexxx] == "banana"
+
+    # Bad finish reason
+    response = Dict(
+        :content => [
+            Dict(:type => "text", :text => "No tools for you!")],
+        :stop_reason => "stop",
+        :usage => Dict(:input_tokens => 2, :output_tokens => 1))
+    schema3 = TestEchoAnthropicSchema(; response, status = 200)
+    msg = aiextract(schema3, "Hello World! Banana"; model = "claudeo", return_type = Fruit)
+    @test msg.content == "No tools for you!"
+end
+
 @testset "not implemented ai* functions" begin
     @test_throws ErrorException aiembed(AnthropicSchema(), "prompt")
-    @test_throws ErrorException aiextract(AnthropicSchema(), "prompt")
     @test_throws ErrorException aiclassify(AnthropicSchema(), "prompt")
     @test_throws ErrorException aiscan(AnthropicSchema(), "prompt")
     @test_throws ErrorException aiimage(AnthropicSchema(), "prompt")
