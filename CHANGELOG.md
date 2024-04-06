@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Adds references to `mistal-tiny` (7bn parameter model from MistralAI) to the model registry for completeness.
+- Adds references to `mistral-tiny` (7bn parameter model from MistralAI) to the model registry for completeness.
 
 ### Fixed
 
