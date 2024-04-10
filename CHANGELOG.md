@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.19.0]
+
+### Added
+- [BREAKING CHANGE] The default GPT-4 Turbo model alias ("gpt4t") now points to the official GPT-4 Turbo endpoint ("gpt-4-turbo").
+- Adds references to `mistral-tiny` (7bn parameter model from MistralAI) to the model registry for completeness.
+- Adds the new GPT-4 Turbo model (`"gpt-4-turbo-2024-04-09"`), but you can simply use alias `"gpt4t"` to access it.
+
 ## [0.18.0]
 
 ### Added
