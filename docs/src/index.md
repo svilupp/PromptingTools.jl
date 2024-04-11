@@ -29,10 +29,10 @@ features:
     details: 'Leverage prompt templates with placeholders to make complex prompts easy.'
   - icon: <img width="60" height="60" src="https://img.icons8.com/papercut/60/connected.png" alt="Integration"/>
     title: Effortless Integration
-    details: 'Fire quick questions with `@ai_str` macro and light wrapper types. Minimal dependencies for seamless integration.'
+    details: 'Fire quick questions with <pre>@ai_str</pre> macro and light wrapper types. Minimal dependencies for seamless integration.'
   - icon: <img width="64" height="64" src="https://img.icons8.com/dusk/64/search--v1.png" alt="Discoverability"/>
     title: Designed for Discoverability
-    details: 'Efficient access to cutting-edge models with intuitive `ai...` functions. Stay in the flow with minimal context switching.'
+    details: 'Efficient access to cutting-edge models with intuitive <pre>ai...</pre> functions. Stay in the flow with minimal context switching.'
 
 ---
 ```
