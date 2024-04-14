@@ -1,20 +1,12 @@
 # Tracing infrastructure for logging and other callbacks
 
-# similar to ALLOWED_PROMPT_TYPE but includes also templates!
-const ALLOW_TRACED_INPUTS = Union{
-    AbstractString,
-    AbstractMessage,
-    Vector{<:AbstractMessage},
-    Symbol,
-    AITemplate
-}
 # Simple passthrough, do nothing
 """
-    render(tracer_schema::AbstractTracerSchema, conv::ALLOW_TRACED_INPUTS; kwargs...)
+    render(tracer_schema::AbstractTracerSchema, conv::ALLOWED_PROMPT_TYPE; kwargs...)
 
 Passthrough. No changes.
 """
-function render(tracer_schema::AbstractTracerSchema, conv::ALLOW_TRACED_INPUTS; kwargs...)
+function render(tracer_schema::AbstractTracerSchema, conv::ALLOWED_PROMPT_TYPE; kwargs...)
     return conv
 end
 
@@ -63,7 +55,7 @@ function finalize_tracer(
 end
 
 """
-    aigenerate(tracer_schema::AbstractTracerSchema, prompt::ALLOW_TRACED_INPUTS;
+    aigenerate(tracer_schema::AbstractTracerSchema, prompt::ALLOWED_PROMPT_TYPE;
         tracer_kwargs = NamedTuple(), model = "", kwargs...)
 
 Wraps the normal `aigenerate` call in a tracing/callback system. Use `tracer_kwargs` to provide any information necessary to the tracer/callback system only (eg, `parent_id`, `thread_id`, `run_id`).
@@ -89,7 +81,7 @@ conv = aigenerate(wrap_schema, "Say hi!"; model = "gpt4t", return_all = true)
 all(PT.istracermessage, conv) #true
 ```
 """
-function aigenerate(tracer_schema::AbstractTracerSchema, prompt::ALLOW_TRACED_INPUTS;
+function aigenerate(tracer_schema::AbstractTracerSchema, prompt::ALLOWED_PROMPT_TYPE;
         tracer_kwargs = NamedTuple(), model = "", kwargs...)
     tracer = initialize_tracer(tracer_schema; model, tracer_kwargs, kwargs...)
     merged_kwargs = isempty(model) ? kwargs : (; model, kwargs...) # to not override default model for each schema if not provided
@@ -122,7 +114,7 @@ function aiembed(tracer_schema::AbstractTracerSchema,
 end
 
 """
-    aiclassify(tracer_schema::AbstractTracerSchema, prompt::ALLOW_TRACED_INPUTS;
+    aiclassify(tracer_schema::AbstractTracerSchema, prompt::ALLOWED_PROMPT_TYPE;
         tracer_kwargs = NamedTuple(), model = "", kwargs...)
 
 Wraps the normal `aiclassify` call in a tracing/callback system. Use `tracer_kwargs` to provide any information necessary to the tracer/callback system only (eg, `parent_id`, `thread_id`, `run_id`).
@@ -132,7 +124,7 @@ Logic:
 - calls `aiclassify` (with the `tracer_schema.schema`)
 - calls `finalize_tracer`
 """
-function aiclassify(tracer_schema::AbstractTracerSchema, prompt::ALLOW_TRACED_INPUTS;
+function aiclassify(tracer_schema::AbstractTracerSchema, prompt::ALLOWED_PROMPT_TYPE;
         tracer_kwargs = NamedTuple(), model = "", kwargs...)
     tracer = initialize_tracer(tracer_schema; model, tracer_kwargs..., kwargs...)
     merged_kwargs = isempty(model) ? kwargs : (; model, kwargs...) # to not override default model for each schema if not provided
@@ -142,7 +134,7 @@ function aiclassify(tracer_schema::AbstractTracerSchema, prompt::ALLOW_TRACED_IN
 end
 
 """
-    aiextract(tracer_schema::AbstractTracerSchema, prompt::ALLOW_TRACED_INPUTS;
+    aiextract(tracer_schema::AbstractTracerSchema, prompt::ALLOWED_PROMPT_TYPE;
         tracer_kwargs = NamedTuple(), model = "", kwargs...)
 
 Wraps the normal `aiextract` call in a tracing/callback system. Use `tracer_kwargs` to provide any information necessary to the tracer/callback system only (eg, `parent_id`, `thread_id`, `run_id`).
@@ -152,7 +144,7 @@ Logic:
 - calls `aiextract` (with the `tracer_schema.schema`)
 - calls `finalize_tracer`
 """
-function aiextract(tracer_schema::AbstractTracerSchema, prompt::ALLOW_TRACED_INPUTS;
+function aiextract(tracer_schema::AbstractTracerSchema, prompt::ALLOWED_PROMPT_TYPE;
         tracer_kwargs = NamedTuple(), model = "", kwargs...)
     tracer = initialize_tracer(tracer_schema; model, tracer_kwargs..., kwargs...)
     merged_kwargs = isempty(model) ? kwargs : (; model, kwargs...) # to not override default model for each schema if not provided
@@ -162,7 +154,7 @@ function aiextract(tracer_schema::AbstractTracerSchema, prompt::ALLOW_TRACED_INP
 end
 
 """
-    aiscan(tracer_schema::AbstractTracerSchema, prompt::ALLOW_TRACED_INPUTS;
+    aiscan(tracer_schema::AbstractTracerSchema, prompt::ALLOWED_PROMPT_TYPE;
         tracer_kwargs = NamedTuple(), model = "", kwargs...)
 
 Wraps the normal `aiscan` call in a tracing/callback system. Use `tracer_kwargs` to provide any information necessary to the tracer/callback system only (eg, `parent_id`, `thread_id`, `run_id`).
@@ -172,7 +164,7 @@ Logic:
 - calls `aiscan` (with the `tracer_schema.schema`)
 - calls `finalize_tracer`
 """
-function aiscan(tracer_schema::AbstractTracerSchema, prompt::ALLOW_TRACED_INPUTS;
+function aiscan(tracer_schema::AbstractTracerSchema, prompt::ALLOWED_PROMPT_TYPE;
         tracer_kwargs = NamedTuple(), model = "", kwargs...)
     tracer = initialize_tracer(tracer_schema; model, tracer_kwargs..., kwargs...)
     merged_kwargs = isempty(model) ? kwargs : (; model, kwargs...) # to not override default model for each schema if not provided
@@ -182,7 +174,7 @@ function aiscan(tracer_schema::AbstractTracerSchema, prompt::ALLOW_TRACED_INPUTS
 end
 
 """
-    aiimage(tracer_schema::AbstractTracerSchema, prompt::ALLOW_TRACED_INPUTS;
+    aiimage(tracer_schema::AbstractTracerSchema, prompt::ALLOWED_PROMPT_TYPE;
         tracer_kwargs = NamedTuple(), model = "", kwargs...)
 
 Wraps the normal `aiimage` call in a tracing/callback system. Use `tracer_kwargs` to provide any information necessary to the tracer/callback system only (eg, `parent_id`, `thread_id`, `run_id`).
@@ -192,7 +184,7 @@ Logic:
 - calls `aiimage` (with the `tracer_schema.schema`)
 - calls `finalize_tracer`
 """
-function aiimage(tracer_schema::AbstractTracerSchema, prompt::ALLOW_TRACED_INPUTS;
+function aiimage(tracer_schema::AbstractTracerSchema, prompt::ALLOWED_PROMPT_TYPE;
         tracer_kwargs = NamedTuple(), model = "", kwargs...)
     tracer = initialize_tracer(tracer_schema; model, tracer_kwargs..., kwargs...)
     merged_kwargs = isempty(model) ? kwargs : (; model, kwargs...) # to not override default model for each schema if not provided
