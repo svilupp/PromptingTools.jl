@@ -2,7 +2,10 @@ using PromptingTools: AIMessage, SystemMessage, MetadataMessage, AbstractMessage
 using PromptingTools: UserMessage, UserMessageWithImages, DataMessage
 using PromptingTools: _encode_local_image, attach_images_to_user_message, last_message,
                       last_output
-using PromptingTools: isusermessage, issystemmessage, isdatamessage, isaimessage
+using PromptingTools: isusermessage, issystemmessage, isdatamessage, isaimessage,
+                      istracermessage
+using PromptingTools: TracerMessageLike, TracerMessage, align_tracer!, unwrap,
+                      AbstractTracerMessage, AbstractTracer, pprint
 
 @testset "Message constructors" begin
     # Creates an instance of MSG with the given content string.
@@ -31,6 +34,7 @@ using PromptingTools: isusermessage, issystemmessage, isdatamessage, isaimessage
     @test SystemMessage(content) |> issystemmessage
     @test DataMessage(; content) |> isdatamessage
     @test AIMessage(; content) |> isaimessage
+    @test UserMessage(content) |> AIMessage |> isaimessage
 end
 @testset "UserMessageWithImages" begin
     content = "Hello, world!"
@@ -110,4 +114,75 @@ end
     msg = UserMessage("Hello, world 2!")
     @test last_message(msg) == msg
     @test last_output(msg) == "Hello, world 2!"
+end
+
+@testset "TracerMessage,TracerMessageLike" begin
+    # Tracer functionality
+    msg1 = UserMessage("Hi")
+    msg2 = AIMessage("Hi there!")
+
+    # Create wrapper
+    tr1 = TracerMessage(msg1; from = :me, to = :you)
+    @test istracermessage(tr1)
+    @test tr1.object == msg1
+    @test tr1.from == :me
+    @test tr1.to == :you
+
+    # Message methods
+    tr2 = TracerMessage(msg2; from = :you, to = :me)
+    @test tr1.content == msg1.content
+    @test tr2.run_id == msg2.run_id
+    @test tr1 != tr2
+    @test tr1 == tr1
+    @test UserMessage(tr2).content == msg2.content
+    @test copy(tr1) == tr1
+    @test copy(tr2) !== tr2
+
+    # Specific methods
+    # unwrap the tracer
+    @test unwrap(tr1) == msg1
+
+    # Align random IDs
+    conv = [tr1, tr2]
+    align_tracer!(conv)
+    @test conv[1].parent_id == conv[2].parent_id
+    @test conv[1].thread_id == conv[2].thread_id
+
+    ## TracerMessageLike
+    str = "Test Message"
+    tracer = TracerMessageLike(str)
+    @test tracer.object == str
+    @test unwrap(tracer) == str
+
+    # show and pprint for TracerMessage
+    # Test show method
+    io_show = IOBuffer()
+    show(io_show, MIME("text/plain"), tr1)
+    show_output = String(take!(io_show))
+    @test occursin("TracerMessage", show_output)
+    @test occursin("UserMessage", show_output)
+    @test occursin("you", show_output)
+
+    # Test pprint method
+    io_pprint = IOBuffer()
+    pprint(io_pprint, tr1)
+    pprint_output = String(take!(io_pprint))
+    @test occursin("TracerMessage with:", pprint_output)
+    @test occursin("User Message", pprint_output)
+    @test occursin("Hi", pprint_output)
+
+    # show and pprint for TracerMessageLike
+    # Test show method
+    io_show = IOBuffer()
+    show(io_show, MIME("text/plain"), tracer)
+    show_output = String(take!(io_show))
+    @test occursin("TracerMessageLike{String}", show_output)
+    @test occursin("Test Message", show_output)
+
+    # Test pprint method
+    io_pprint = IOBuffer()
+    pprint(io_pprint, tracer)
+    pprint_output = String(take!(io_pprint))
+    @test occursin("TracerMessageLike with:", pprint_output)
+    @test occursin("Test Message", pprint_output)
 end
