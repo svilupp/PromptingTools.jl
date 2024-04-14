@@ -231,6 +231,15 @@ This structure is particularly useful for debugging, monitoring, and auditing th
 
 All fields are optional besides the `object`.
 
+Useful methods: `pprint` (pretty prints the underlying message), `unwrap` (to get the `object` out of tracer), `align_tracer!` (to set all shared IDs in a vector of tracers to the same), `istracermessage` to check if given message is an AbstractTracerMessage
+
+# Example
+```julia
+wrap_schema = PT.TracerSchema(PT.OpenAISchema())
+msg = aigenerate(wrap_schema, "Say hi!"; model = "gpt4t")
+msg # isa TracerMessage
+msg.content # access content like if it was the message
+```
 """
 Base.@kwdef mutable struct TracerMessage{T <:
                                          Union{AbstractChatMessage, AbstractDataMessage}} <:

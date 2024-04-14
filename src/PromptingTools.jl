@@ -73,6 +73,7 @@ include("llm_ollama.jl")
 include("llm_google.jl")
 include("llm_anthropic.jl")
 include("llm_sharegpt.jl")
+include("llm_tracer.jl")
 
 ## Convenience utils
 export @ai_str, @aai_str, @ai!_str, @aai!_str
