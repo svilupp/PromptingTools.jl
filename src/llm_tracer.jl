@@ -1,12 +1,17 @@
 # Tracing infrastructure for logging and other callbacks
+# - Define your own schema that is subtype of AbstractTracerSchema and wraps the underlying LLM provider schema
+# - Customize initialize_tracer and finalize_tracer with your custom callback
+# - Call your ai* function with the tracer schema as usual
 
 # Simple passthrough, do nothing
 """
-    render(tracer_schema::AbstractTracerSchema, conv::ALLOWED_PROMPT_TYPE; kwargs...)
+    render(tracer_schema::AbstractTracerSchema,
+        conv::AbstractVector{<:AbstractMessage}; kwargs...)
 
 Passthrough. No changes.
 """
-function render(tracer_schema::AbstractTracerSchema, conv::ALLOWED_PROMPT_TYPE; kwargs...)
+function render(tracer_schema::AbstractTracerSchema,
+        conv::AbstractVector{<:AbstractMessage}; kwargs...)
     return conv
 end
 
@@ -36,7 +41,6 @@ function finalize_tracer(
         tracer_schema::AbstractTracerSchema, tracer, msg_or_conv; tracer_kwargs = NamedTuple(), model = "", kwargs...)
     # We already captured all kwargs, they are already in `tracer`, we can ignore them in this implementation
     time_received = now()
-    @info tracer
     # work with arrays for unified processing
     is_vector = msg_or_conv isa AbstractVector
     conv = msg_or_conv isa AbstractVector{<:AbstractMessage} ?

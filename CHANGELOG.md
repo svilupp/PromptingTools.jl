@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Added a few new open-weights models hosted by Fireworks.ai to the registry (DBRX Instruct, Mixtral 8x22b Instruct, Qwen 72b). If you're curious about how well they work, try them!
-- Added basic support for observability downstream. Dedicated types are `TracerMessage` and `TracerMessageLike` wrappers. See `?TracerMessage` for more information.
+- Added basic support for observability downstream. Created custom callback infrastructure with `initialize_tracer` and `finalize_tracer` and dedicated types are `TracerMessage` and `TracerMessageLike`. See `?TracerMessage` for more information and the corresponding `aigenerate` docstring.
 
 ### Updated
 - Changed default model for `RAGTools.CohereReranker` to "cohere-rerank-english-v3.0".
