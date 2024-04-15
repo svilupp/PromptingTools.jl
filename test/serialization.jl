@@ -50,3 +50,25 @@ end
     @test s ==
           """{"conversations":[{"value":"System message 1","from":"system"},{"value":"User message","from":"human"},{"value":"AI message","from":"gpt"}]}"""
 end
+
+@testset "Serialization - TracerMessage" begin
+    conv = AbstractMessage[SystemMessage("System message 1"),
+        UserMessage("User message"),
+        AIMessage("AI message")]
+    traced_conv = TracerMessage.(conv)
+    align_tracer!(traced_conv)
+    tmp, _ = mktemp()
+    save_conversation(tmp, traced_conv)
+    loaded_tracer = load_conversation(tmp)
+    @test loaded_tracer == traced_conv
+
+    # We cannot recover all type information !!!
+    obj = Dict{String, Any}("a" => 1, "b" => 2)
+    tr = TracerMessageLike(obj; from = :user, to = :ai, model = "TestModel")
+    tmp, _ = mktemp()
+    JSON3.write(tmp, tr)
+    tr2 = JSON3.read(tmp, TracerMessageLike)
+    @test tr2.from == tr.from
+    @test tr2.to == tr.to
+    @test unwrap(tr) == unwrap(tr2) == obj
+end
