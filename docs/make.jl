@@ -47,6 +47,7 @@ makedocs(;
         "Home" => "index.md",
         "Getting Started" => "getting_started.md",
         "How It Works" => "how_it_works.md",
+        "Model Providers and Supported Functions" => "model_providers_and_supported_functions.md",
         "Examples" => [
             "Various examples" => "examples/readme_examples.md",
             "Using AITemplates" => "examples/working_with_aitemplates.md",
