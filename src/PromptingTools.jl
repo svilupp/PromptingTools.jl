@@ -2,6 +2,7 @@ module PromptingTools
 
 import AbstractTrees
 using Base64: base64encode
+using Dates: now, DateTime
 using Logging
 using OpenAI
 using JSON3
@@ -72,6 +73,7 @@ include("llm_ollama.jl")
 include("llm_google.jl")
 include("llm_anthropic.jl")
 include("llm_sharegpt.jl")
+include("llm_tracer.jl")
 
 ## Convenience utils
 export @ai_str, @aai_str, @ai!_str, @aai!_str

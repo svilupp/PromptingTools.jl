@@ -2,6 +2,7 @@ using PromptingTools
 using OpenAI, HTTP, JSON3
 using SparseArrays, LinearAlgebra, Markdown
 using Statistics
+using Dates: now
 using Test, Pkg
 const PT = PromptingTools
 using Aqua
@@ -23,6 +24,7 @@ end
     include("llm_google.jl")
     include("llm_anthropic.jl")
     include("llm_sharegpt.jl")
+    include("llm_tracer.jl")
     include("macros.jl")
     include("templates.jl")
     include("serialization.jl")

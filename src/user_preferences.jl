@@ -523,9 +523,27 @@ registry = Dict{String, ModelSpec}(
     "accounts/fireworks/models/mixtral-8x7b-instruct" => ModelSpec(
         "accounts/fireworks/models/mixtral-8x7b-instruct",
         FireworksOpenAISchema(),
-        4e-7, #unknown, expected 1.25e-7
-        1.6e-6, #unknown, expected 3.75e-7
+        5e-7,
+        5e-7,
         "Mixtral (8x7b) from Mistral, hosted by Fireworks.ai. For more information, see [models](https://fireworks.ai/models/fireworks/mixtral-8x7b-instruct)."),
+    "accounts/fireworks/models/mixtral-8x22b-instruct-preview" => ModelSpec(
+        "accounts/fireworks/models/mixtral-8x22b-instruct-preview",
+        FireworksOpenAISchema(),
+        9e-7,
+        9e-7,
+        "Mixtral (8x22b) from Mistral, instruction finetuned and hosted by Fireworks.ai. For more information, see [models](https://fireworks.ai/models/fireworks/mixtral-8x22b-instruct-preview)."),
+    "accounts/fireworks/models/dbrx-instruct" => ModelSpec(
+        "accounts/fireworks/models/dbrx-instruct",
+        FireworksOpenAISchema(),
+        1.6e-6,
+        1.6e-6,
+        "Databricks DBRX Instruct, hosted by Fireworks.ai. For more information, see [models](https://fireworks.ai/models/fireworks/dbrx-instruct)."),
+    "accounts/fireworks/models/qwen-72b-chat" => ModelSpec(
+        "accounts/fireworks/models/qwen-72b-chat",
+        FireworksOpenAISchema(),
+        9e-7,
+        9e-7,
+        "Qwen is a 72B parameter model from Alibaba Cloud, hosted by from Fireworks.ai. For more information, see [models](https://fireworks.ai/models/fireworks/dbrx-instruct)."),
     "accounts/fireworks/models/firefunction-v1" => ModelSpec(
         "accounts/fireworks/models/firefunction-v1",
         FireworksOpenAISchema(),
