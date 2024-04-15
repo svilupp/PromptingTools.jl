@@ -4,6 +4,9 @@
 abstract type AbstractMessage end
 abstract type AbstractChatMessage <: AbstractMessage end # with text-based content
 abstract type AbstractDataMessage <: AbstractMessage end # with data-based content, eg, embeddings
+abstract type AbstractTracerMessage{T <: AbstractMessage} <: AbstractMessage end # message with annotation that exposes the underlying message
+# Complementary type for tracing, follows the same API as TracerMessage
+abstract type AbstractTracer{T <: Any} end
 
 ## Allowed inputs for ai* functions, AITemplate is resolved one level higher
 const ALLOWED_PROMPT_TYPE = Union{
@@ -122,14 +125,23 @@ Base.@kwdef struct DataMessage{T <: Any} <: AbstractDataMessage
     _type::Symbol = :datamessage
 end
 
+### Other Message methods
 # content-only constructor
 function (MSG::Type{<:AbstractChatMessage})(prompt::AbstractString)
     MSG(; content = prompt)
 end
+function (MSG::Type{<:AbstractChatMessage})(msg::AbstractChatMessage)
+    MSG(; msg.content)
+end
+function (MSG::Type{<:AbstractChatMessage})(msg::AbstractTracerMessage{<:AbstractChatMessage})
+    MSG(; msg.content)
+end
+
 isusermessage(m::AbstractMessage) = m isa UserMessage
 issystemmessage(m::AbstractMessage) = m isa SystemMessage
 isdatamessage(m::AbstractMessage) = m isa DataMessage
 isaimessage(m::AbstractMessage) = m isa AIMessage
+istracermessage(m::AbstractMessage) = m isa AbstractTracerMessage
 
 # equality check for testing, only equal if all fields are equal and type is the same
 Base.var"=="(m1::AbstractMessage, m2::AbstractMessage) = false
@@ -193,6 +205,151 @@ function attach_images_to_user_message(msgs::Vector{T};
     return msgs
 end
 
+##############################
+### TracerMessages
+# - They are mutable (to update iteratively)
+# - they contain a message and additional metadata
+# - they expose as much of the underlying message as possible to allow the same operations
+"""
+    TracerMessage{T <: Union{AbstractChatMessage, AbstractDataMessage}} <: AbstractTracerMessage
+
+A mutable wrapper message designed for tracing the flow of messages through the system, allowing for iterative updates and providing additional metadata for observability.
+
+# Fields
+- `object::T`: The original message being traced, which can be either a chat or data message.
+- `from::Union{Nothing, Symbol}`: The identifier of the sender of the message.
+- `to::Union{Nothing, Symbol}`: The identifier of the intended recipient of the message.
+- `viewers::Vector{Symbol}`: A list of identifiers for entities that have access to view the message, in addition to the sender and recipient.
+- `time_received::DateTime`: The timestamp when the message was received by the tracing system.
+- `time_sent::Union{Nothing, DateTime}`: The timestamp when the message was originally sent, if available.
+- `model::String`: The name of the model that generated the message. Defaults to empty.
+- `parent_id::Symbol`: An identifier for the job or process that the message is associated with. Higher-level tracing ID.
+- `thread_id::Symbol`: An identifier for the thread (series of messages for one model/agent) or execution context within the job where the message originated. It should be the same for messages in the same thread.
+- `_type::Symbol`: A fixed symbol identifying the type of the message as `:eventmessage`, used for type discrimination.
+
+This structure is particularly useful for debugging, monitoring, and auditing the flow of messages in systems that involve complex interactions or asynchronous processing.
+
+All fields are optional besides the `object`.
+
+Useful methods: `pprint` (pretty prints the underlying message), `unwrap` (to get the `object` out of tracer), `align_tracer!` (to set all shared IDs in a vector of tracers to the same), `istracermessage` to check if given message is an AbstractTracerMessage
+
+# Example
+```julia
+wrap_schema = PT.TracerSchema(PT.OpenAISchema())
+msg = aigenerate(wrap_schema, "Say hi!"; model = "gpt4t")
+msg # isa TracerMessage
+msg.content # access content like if it was the message
+```
+"""
+Base.@kwdef mutable struct TracerMessage{T <:
+                                         Union{AbstractChatMessage, AbstractDataMessage}} <:
+                           AbstractTracerMessage{T}
+    object::T
+    from::Union{Nothing, Symbol} = nothing # who sent it
+    to::Union{Nothing, Symbol} = nothing # who received it
+    viewers::Vector{Symbol} = Symbol[] # who has access to it (besides from, to)
+    time_received::DateTime = now()
+    time_sent::Union{Nothing, DateTime} = nothing
+    model::String = ""
+    parent_id::Symbol = gensym("parent")
+    thread_id::Symbol = gensym("thread")
+    run_id::Union{Nothing, Int} = Int(rand(Int32))
+    _type::Symbol = :tracermessage
+end
+function TracerMessage(msg::Union{AbstractChatMessage, AbstractDataMessage}; kwargs...)
+    TracerMessage(; object = msg, kwargs...)
+end
+
+"""
+    TracerMessageLike{T <: Any} <: AbstractTracer
+
+A mutable structure designed for general-purpose tracing within the system, capable of handling any type of object that is part of the AI Conversation.
+It provides a flexible way to track and annotate objects as they move through different parts of the system, facilitating debugging, monitoring, and auditing.
+
+# Fields
+- `object::T`: The original object being traced.
+- `from::Union{Nothing, Symbol}`: The identifier of the sender or origin of the object.
+- `to::Union{Nothing, Symbol}`: The identifier of the intended recipient or destination of the object.
+- `viewers::Vector{Symbol}`: A list of identifiers for entities that have access to view the object, in addition to the sender and recipient.
+- `time_received::DateTime`: The timestamp when the object was received by the tracing system.
+- `time_sent::Union{Nothing, DateTime}`: The timestamp when the object was originally sent, if available.
+- `model::String`: The name of the model or process that generated or is associated with the object. Defaults to empty.
+- `parent_id::Symbol`: An identifier for the job or process that the object is associated with. Higher-level tracing ID.
+- `thread_id::Symbol`: An identifier for the thread or execution context within the job where the object originated. It should be the same for objects in the same thread.
+- `run_id::Union{Nothing, Int}`: A unique identifier for the run or instance of the process that generated the object. Defaults to a random integer.
+- `_type::Symbol`: A fixed symbol identifying the type of the tracer as `:tracermessage`, used for type discrimination.
+
+This structure is particularly useful for systems that involve complex interactions or asynchronous processing, where tracking the flow and transformation of objects is crucial.
+
+All fields are optional besides the `object`.
+"""
+@kwdef mutable struct TracerMessageLike{T <: Any} <: AbstractTracer{T}
+    object::T
+    from::Union{Nothing, Symbol} = nothing # who sent it
+    to::Union{Nothing, Symbol} = nothing # who received it
+    viewers::Vector{Symbol} = Symbol[] # who has access to it (besides from, to)
+    time_received::DateTime = now()
+    time_sent::Union{Nothing, DateTime} = nothing
+    model::String = ""
+    parent_id::Symbol = gensym("parent")
+    thread_id::Symbol = gensym("thread")
+    run_id::Union{Nothing, Int} = Int(rand(Int32))
+    _type::Symbol = :tracermessagelike
+    ## TracerMessageLike() = new()
+end
+## function TracerMessageLike()
+##     TracerMessageLike(; object = undef)
+## end
+function TracerMessageLike(
+        object; kwargs...)
+    TracerMessageLike(; object, kwargs...)
+end
+Base.var"=="(t1::AbstractTracer, t2::AbstractTracer) = false
+function Base.var"=="(t1::AbstractTracer{T}, t2::AbstractTracer{T}) where {T <: Any}
+    ## except for run_id, that's random and not important for content comparison
+    all([getproperty(t1, f) == getproperty(t2, f) for f in fieldnames(T) if f != :run_id])
+end
+
+# Shared methods
+# getproperty for tracer messages forwards to the message when relevant
+function Base.getproperty(t::Union{AbstractTracerMessage, AbstractTracer}, f::Symbol)
+    obj = getfield(t, :object)
+    if hasproperty(obj, f)
+        getproperty(obj, f)
+    else
+        getfield(t, f)
+    end
+end
+
+function Base.copy(t::T) where {T <: Union{AbstractTracerMessage, AbstractTracer}}
+    T([deepcopy(getfield(t, f)) for f in fieldnames(T)]...)
+end
+
+"Unwraps the tracer message, returning the original `object`."
+function unwrap(t::Union{AbstractTracerMessage, AbstractTracer})
+    getfield(t, :object)
+end
+
+"Aligns the tracer message, updating the `parent_id`, `thread_id`. Often used to align multiple tracers in the vector to have the same IDs."
+function align_tracer!(
+        t::Union{AbstractTracerMessage, AbstractTracer}; parent_id::Symbol = t.parent_id,
+        thread_id::Symbol = t.thread_id)
+    t.parent_id = parent_id
+    t.thread_id = thread_id
+    return t
+end
+"Aligns multiple tracers in the vector to have the same Parent and Thread IDs as the first item."
+function align_tracer!(
+        vect::AbstractVector{<:Union{AbstractTracerMessage, AbstractTracer}})
+    if !isempty(vect)
+        t = first(vect)
+        align_tracer!.(vect; t.parent_id, t.thread_id)
+    else
+        vect
+    end
+end
+
+##############################
 ## Helpful accessors
 "Helpful accessor for the last message in `conversation`. Returns the last message in the conversation."
 function last_message(conversation::AbstractVector{<:AbstractMessage})
@@ -236,6 +393,12 @@ function Base.show(io::IO, ::MIME"text/plain", m::AbstractDataMessage)
         print(io, "(", typeof(m.content), ")")
     end
 end
+function Base.show(io::IO, ::MIME"text/plain", t::AbstractTracerMessage)
+    dump(IOContext(io, :limit => true), t, maxdepth = 1)
+end
+function Base.show(io::IO, ::MIME"text/plain", t::AbstractTracer)
+    dump(IOContext(io, :limit => true), t, maxdepth = 1)
+end
 
 ## Dispatch for render
 # function render(schema::AbstractPromptSchema,
@@ -259,7 +422,8 @@ function StructTypes.subtypes(::Type{AbstractMessage})
         aimessage = AIMessage,
         systemmessage = SystemMessage,
         metadatamessage = MetadataMessage,
-        datamessage = DataMessage)
+        datamessage = DataMessage,
+        tracermessage = TracerMessage)
 end
 
 StructTypes.StructType(::Type{AbstractChatMessage}) = StructTypes.AbstractType()
@@ -272,12 +436,26 @@ function StructTypes.subtypes(::Type{AbstractChatMessage})
         metadatamessage = MetadataMessage)
 end
 
+StructTypes.StructType(::Type{AbstractTracerMessage}) = StructTypes.AbstractType()
+StructTypes.subtypekey(::Type{AbstractTracerMessage}) = :_type
+function StructTypes.subtypes(::Type{AbstractTracerMessage})
+    (tracermessage = TracerMessage,)
+end
+
+StructTypes.StructType(::Type{AbstractTracer}) = StructTypes.AbstractType()
+StructTypes.subtypekey(::Type{AbstractTracer}) = :_type
+function StructTypes.subtypes(::Type{AbstractTracer})
+    (tracermessagelike = TracerMessageLike,)
+end
+
 StructTypes.StructType(::Type{MetadataMessage}) = StructTypes.Struct()
 StructTypes.StructType(::Type{SystemMessage}) = StructTypes.Struct()
 StructTypes.StructType(::Type{UserMessage}) = StructTypes.Struct()
 StructTypes.StructType(::Type{UserMessageWithImages}) = StructTypes.Struct()
 StructTypes.StructType(::Type{AIMessage}) = StructTypes.Struct()
 StructTypes.StructType(::Type{DataMessage}) = StructTypes.Struct()
+StructTypes.StructType(::Type{TracerMessage}) = StructTypes.Struct() # Ignore mutability once we serialize
+StructTypes.StructType(::Type{TracerMessageLike}) = StructTypes.Struct() # Ignore mutability once we serialize
 
 ### Utilities for Pretty Printing
 """
@@ -310,6 +488,14 @@ function pprint(io::IO, msg::AbstractMessage; text_width::Int = displaysize(io)[
     printstyled(io, role, color = :blue, bold = true)
     print(io, "\n", "-"^20, "\n")
     print(io, content, "\n\n")
+end
+
+function pprint(io::IO, t::Union{AbstractTracerMessage, AbstractTracer};
+        text_width::Int = displaysize(io)[2])
+    role = "$(nameof(typeof(t))) with:"
+    print(io, "-"^20, "\n")
+    print(io, role, "\n")
+    pprint(io, unwrap(t); text_width)
 end
 """
     pprint(io::IO, conversation::AbstractVector{<:AbstractMessage})

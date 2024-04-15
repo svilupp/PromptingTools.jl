@@ -375,6 +375,26 @@ function aiimage(schema::AbstractPromptSchema, template::Symbol; kwargs...)
     aiimage(schema, AITemplate(template); kwargs...)
 end
 
+## Dispatch for TracerSchema to avoid ambiguities
+function render(schema::AbstractTracerSchema, template::AITemplate; kwargs...)
+    render(schema.schema, template; kwargs...)
+end
+function aigenerate(schema::AbstractTracerSchema, template::Symbol; kwargs...)
+    aigenerate(schema, render(schema, AITemplate(template)); kwargs...)
+end
+function aiclassify(schema::AbstractTracerSchema, template::Symbol; kwargs...)
+    aiclassify(schema, render(schema, AITemplate(template)); kwargs...)
+end
+function aiextract(schema::AbstractTracerSchema, template::Symbol; kwargs...)
+    aiextract(schema, render(schema, AITemplate(template)); kwargs...)
+end
+function aiscan(schema::AbstractTracerSchema, template::Symbol; kwargs...)
+    aiscan(schema, render(schema, AITemplate(template)); kwargs...)
+end
+function aiimage(schema::AbstractTracerSchema, template::Symbol; kwargs...)
+    aiimage(schema, render(schema, AITemplate(template)); kwargs...)
+end
+
 ## Utility for creating templates
 """
     create_template(; user::AbstractString, system::AbstractString="Act as a helpful AI assistant.", 

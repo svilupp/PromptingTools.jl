@@ -285,6 +285,28 @@ Frequently used schema for finetuning LLMs. Conversations are recorded as a vect
 """
 struct ShareGPTSchema <: AbstractShareGPTSchema end
 
+abstract type AbstractTracerSchema <: AbstractPromptSchema end
+
+"""
+    TracerSchema <: AbstractTracerSchema
+
+A schema designed to wrap another schema, enabling pre- and post-execution callbacks for tracing and additional functionalities. This type is specifically utilized within the `TracerMessage` type to trace the execution flow, facilitating observability and debugging in complex conversational AI systems.
+
+The `TracerSchema` acts as a middleware, allowing developers to insert custom logic before and after the execution of the primary schema's functionality. This can include logging, performance measurement, or any other form of tracing required to understand or improve the execution flow.
+
+# Usage
+```julia
+wrap_schema = TracerSchema(OpenAISchema())
+msg = aigenerate(wrap_schema, "Say hi!"; model="gpt-4")
+# output type should be TracerMessage
+msg isa TracerMessage
+```
+You can define your own tracer schema and the corresponding methods: `initialize_tracer`, `finalize_tracer`. See `src/llm_tracer.jl`
+"""
+struct TracerSchema <: AbstractTracerSchema
+    schema::AbstractPromptSchema
+end
+
 ## Dispatch into a default schema (can be set by Preferences.jl)
 # Since we load it as strings, we need to convert it to a symbol and instantiate it
 global PROMPT_SCHEMA::AbstractPromptSchema = @load_preference("PROMPT_SCHEMA",
