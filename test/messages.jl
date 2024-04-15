@@ -35,6 +35,7 @@ using PromptingTools: TracerMessageLike, TracerMessage, align_tracer!, unwrap,
     @test DataMessage(; content) |> isdatamessage
     @test AIMessage(; content) |> isaimessage
     @test UserMessage(content) |> AIMessage |> isaimessage
+    @test UserMessage(content) != AIMessage(content)
 end
 @testset "UserMessageWithImages" begin
     content = "Hello, world!"
@@ -148,11 +149,22 @@ end
     @test conv[1].parent_id == conv[2].parent_id
     @test conv[1].thread_id == conv[2].thread_id
 
+    empty_ = AbstractTracer[]
+    @test empty_ == align_tracer!(empty_)
+
     ## TracerMessageLike
     str = "Test Message"
     tracer = TracerMessageLike(str)
     @test tracer.object == str
     @test unwrap(tracer) == str
+
+    # methods
+    tracer2 = TracerMessageLike(str)
+    @test tracer == tracer2
+
+    struct TracerRandom1 <: AbstractTracer{Int} end
+    tracer3 = TracerRandom1()
+    @test tracer != tracer3
 
     # show and pprint for TracerMessage
     # Test show method

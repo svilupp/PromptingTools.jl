@@ -4,9 +4,9 @@
 abstract type AbstractMessage end
 abstract type AbstractChatMessage <: AbstractMessage end # with text-based content
 abstract type AbstractDataMessage <: AbstractMessage end # with data-based content, eg, embeddings
-abstract type AbstractTracerMessage{T} <: AbstractMessage end # message with annotation that exposes the underlying message
+abstract type AbstractTracerMessage{T <: AbstractMessage} <: AbstractMessage end # message with annotation that exposes the underlying message
 # Complementary type for tracing, follows the same API as TracerMessage
-abstract type AbstractTracer{T} end
+abstract type AbstractTracer{T <: Any} end
 
 ## Allowed inputs for ai* functions, AITemplate is resolved one level higher
 const ALLOWED_PROMPT_TYPE = Union{

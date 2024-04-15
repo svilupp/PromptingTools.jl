@@ -103,6 +103,9 @@ end
     @test msg.content == "Hello!"
     @test msg.model == "xyz"
     @test msg.thread_id == :ABC1
+
+    msg = aigenerate(schema1, :BlankSystemUser)
+    @test istracermessage(msg)
 end
 
 @testset "aiembed-Tracer" begin
@@ -164,6 +167,9 @@ end
     @test unwrap(msg) isa DataMessage
     @test msg.content == RandomType1235(1)
     @test msg.log_prob ≈ -0.9
+
+    msg = aiextract(schema1, :BlankSystemUser; return_type)
+    @test istracermessage(msg)
 end
 
 @testset "aiscan-Tracer" begin
@@ -187,6 +193,9 @@ end
     @test unwrap(msg) isa AIMessage
     @test msg.content == "Hello1!"
     @test msg.log_prob ≈ -0.3
+
+    msg = aiscan(schema1, :BlankSystemUser; image_url = "https://example.com/image.png")
+    @test istracermessage(msg)
 end
 
 @testset "aiimage-Tracer" begin
@@ -198,4 +207,7 @@ end
     msg = aiimage(schema1, "Hello World")
     @test istracermessage(msg)
     @test unwrap(msg) isa DataMessage
+
+    msg = aiimage(schema1, :BlankSystemUser)
+    @test istracermessage(msg)
 end
