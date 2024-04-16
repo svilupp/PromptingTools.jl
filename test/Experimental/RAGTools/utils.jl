@@ -279,3 +279,88 @@ end
     @test group_ids == [1, 2, 3, 3, 3, 3, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
         15, 16, 17, 18, 19, 19, 19, 19, 19, 20, 21, 22, 23, 24, 25]
 end
+
+@testset "getpropertynested" begin
+    # Direct Match Tests
+    kw = (; abc = (; def = "x"))
+    @test getpropertynested(kw, [:abc], :def) == "x"
+    @test getpropertynested(kw, [:abc], :ghi, "default") == "default"
+
+    # Nested Match Tests
+    kw = (; abc = (; def = (; ghi = "y")))
+    @test getpropertynested(kw, [:abc, :def], :ghi) == "y"
+    @test getpropertynested(kw, [:abc, :def], :xyz, "default") == "default"
+
+    # No Match Tests
+    kw = (; abc = (; def = "x"))
+    @test getpropertynested(kw, [:xyz], :def, "default") == "default"
+    @test getpropertynested(kw, [:abc, :def], :ghi, "default") == "default"
+    # Complex Nested Match Tests
+    kw = (; abc = (; def = (; ghi = (; jkl = "z"))))
+    @test getpropertynested(kw, [:abc, :def, :ghi], :jkl) == "z"
+    @test getpropertynested(kw, [:abc, :def, :ghi], :mno, "default") == "default"
+end
+
+@testset "setpropertynested" begin
+    # Direct Set Tests
+    kw = (; abc = (; def = "x"))
+    modified_kw = setpropertynested(kw, [:abc], :def, "y")
+    @test modified_kw == (; abc = (; def = "y"))
+
+    # Nested Set Tests
+    kw = (; abc = (; def = (; ghi = "x")))
+    modified_kw = setpropertynested(kw, [:abc, :def], :ghi, "y")
+    @test modified_kw == (; abc = (; def = (; ghi = "y")))
+
+    # New Key Set Tests
+    kw = (; abc = (; def = "x"))
+    modified_kw = setpropertynested(kw, [:abc], :ghi, "y")
+    @test modified_kw == (; abc = (; def = "x", ghi = "y"))
+
+    # Complex Nested Set Tests
+    kw = (; abc = (; def = (; ghi = (; jkl = "x"))))
+    modified_kw = setpropertynested(kw, [:abc, :def, :ghi], :jkl, "y")
+    @test modified_kw == (; abc = (; def = (; ghi = (; jkl = "y"))))
+
+    # Set In Non-Existent Nested Key
+    kw = (; abc = (; def = "x"))
+    modified_kw = setpropertynested(kw, [:xyz], :ghi, "y")
+    @test modified_kw == (; abc = (; def = "x"), xyz = (; ghi = "y"))
+end
+
+@testset "merge_kwargs_nested" begin
+    # Basic Merge
+    nt1 = (; a = 1, b = 2)
+    nt2 = (; b = 3, c = 4)
+    expected = (; a = 1, b = 3, c = 4)
+    @test merge_kwargs_nested(nt1, nt2) == expected
+
+    # Nested Merge
+    nt1 = (; a = (; x = 1), b = 2)
+    nt2 = (; a = (; y = 2), c = 3)
+    expected = (; a = (; x = 1, y = 2), b = 2, c = 3)
+    @test merge_kwargs_nested(nt1, nt2) == expected
+
+    # Deep Nested Merge
+    nt1 = (; a = (; x = (; i = 1)), b = 2)
+    nt2 = (; a = (; x = (; j = 2)), c = 3)
+    expected = (; a = (; x = (; i = 1, j = 2)), b = 2, c = 3)
+    @test merge_kwargs_nested(nt1, nt2) == expected
+
+    # Override with Non-NamedTuple
+    nt1 = (; a = (; x = 1), b = 2)
+    nt2 = (; a = "Not a NamedTuple", c = 3)
+    expected = (; a = "Not a NamedTuple", b = 2, c = 3)
+    @test merge_kwargs_nested(nt1, nt2) == expected
+
+    # Merge with Empty NamedTuple
+    nt1 = NamedTuple()
+    nt2 = (; a = 1, b = (; c = 2))
+    expected = (; a = 1, b = (; c = 2))
+    @test merge_kwargs_nested(nt1, nt2) == expected
+
+    nt1 = (; a = 1, b = (; c = 2))
+    nt2 = NamedTuple()
+    expected = (; a = 1, b = (; c = 2))
+    @test merge_kwargs_nested(nt1, nt2) == expected
+end

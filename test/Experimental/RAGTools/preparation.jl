@@ -1,5 +1,6 @@
 using PromptingTools.Experimental.RAGTools: load_text, FileChunker, TextChunker,
-                                            BatchEmbedder,
+                                            BatchEmbedder, BinaryBatchEmbedder,
+                                            EmbedderEltype,
                                             NoTagger, PassthroughTagger, OpenTagger
 using PromptingTools.Experimental.RAGTools: AbstractTagger, AbstractChunker,
                                             AbstractEmbedder, AbstractIndexBuilder
@@ -60,13 +61,24 @@ end
     PT.register_model!(; name = "mock-emb", schema)
 
     docs = ["Hello World", "Hello World"]
-    output = get_embeddings(BatchEmbedder(), docs; model = "mock-emb")
-    @test size(output) == (128, 2)
+    output = get_embeddings(
+        BatchEmbedder(), docs; model = "mock-emb", truncate_dimension = 100)
+    @test size(output) == (100, 2)
 
     # Unknown type
     struct RandomEmbedder123 <: AbstractEmbedder end
     @test_throws ArgumentError get_embeddings(
         RandomEmbedder123(), ["text1", "text2"])
+
+    # BinaryBatchEmbedder
+    output = get_embeddings(
+        BinaryBatchEmbedder(), docs; model = "mock-emb", truncate_dimension = 100)
+    @test size(output) == (100, 2)
+    @test eltype(output) == Bool
+
+    # EmbedderEltype
+    @test EmbedderEltype(BinaryBatchEmbedder()) == Float32
+    @test EmbedderEltype(BatchEmbedder()) == Bool
 end
 
 @testset "tags_extract" begin

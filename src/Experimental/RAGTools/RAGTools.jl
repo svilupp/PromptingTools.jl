@@ -21,6 +21,8 @@ export pprint
 
 ## export trigrams, trigrams_hashed, text_to_trigrams, text_to_trigrams_hashed
 ## export STOPWORDS, tokenize, split_into_code_and_sentences
+# export merge_kwargs_nested
+export getpropertynested, setpropertynested
 include("utils.jl")
 
 # eg, cohere_api

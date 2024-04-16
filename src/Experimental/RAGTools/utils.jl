@@ -250,3 +250,103 @@ function split_into_code_and_sentences(input::Union{String, SubString{String}})
 
     return sentences, group_ids
 end
+
+## Utility to extract values from nested kwargs
+"""
+    setpropertynested(nt::NamedTuple, parent_keys::Vector{Symbol},
+        key::Symbol,
+        value
+)
+
+Setter for a property `key` in a nested NamedTuple `nt`, where the property is nested to a key in `parent_keys`.
+
+Useful for nested kwargs where we want to change some property in `parent_keys` subset (eg, `model` in `retriever_kwargs`).
+
+# Examples
+```julia
+kw = (; abc = (; def = "x"))
+setpropertynested(kw, [:abc], :def, "y")
+# Output: (abc = (def = "x", key = "y"),)
+```
+"""
+function setpropertynested(nt::NamedTuple, parent_keys::Vector{Symbol},
+        key::Symbol,
+        value
+)
+    result = Dict{Symbol, Any}(pairs(nt))
+    for (key_, val_) in pairs(nt)
+        if key_ in parent_keys && val_ isa NamedTuple
+            # replace/set directly
+            result[key_] = merge(val_, (; key = value))
+        elseif key_ in parent_keys
+            # for Dict and similar
+            result[key_][key] = value
+        elseif val_ isa NamedTuple
+            # recurse to check if its inside
+            result[key_] = setpropertynested(val_, parent_keys, key, value)
+        end
+    end
+    return (; zip(keys(result), values(result))...)
+end
+
+"""
+    getpropertynested(
+        nt::NamedTuple, parent_keys::Vector{Symbol}, key::Symbol, default = nothing)
+
+Get a property `key` from a nested NamedTuple `nt`, where the property is nested to a key in `parent_keys`.
+
+Useful for nested kwargs where we want to get some property in `parent_keys` subset (eg, `model` in `retriever_kwargs`).
+
+# Examples
+```julia
+kw = (; abc = (; def = "x"))
+getpropertynested(kw, [:abc], :def)
+# Output: "x"
+```
+"""
+function getpropertynested(
+        nt::NamedTuple, parent_keys::Vector{Symbol}, key::Symbol, default = nothing)
+    result = nothing
+    for (key_, val_) in pairs(nt)
+        result = if key_ in parent_keys && val_ isa NamedTuple && haskey(val_, key)
+            ## check if we have a direct match
+            getproperty(val_, key)
+        elseif val_ isa NamedTuple
+            ## recurse into child namedtuple
+            getpropertynested(val_, parent_keys, key, default)
+        else
+            nothing
+        end
+        !isnothing(result) && break
+    end
+    return isnothing(result) ? default : result
+end
+
+"""
+    merge_kwargs_nested(nt1::NamedTuple, nt2::NamedTuple)
+
+Merges two nested NamedTuples `nt1` and `nt2` recursively. The `nt2` values will overwrite the `nt1` values when overlapping.
+
+# Example
+```julia
+kw = (; abc = (; def = "x"))
+kw2 = (; abc = (; def = "x", def2 = 2), new = 1)
+merge_kwargs_nested(kw, kw2)
+```
+"""
+function merge_kwargs_nested(nt1::NamedTuple, nt2::NamedTuple)
+    result = Dict{Symbol, Any}(pairs(nt1))
+
+    for (key, value) in pairs(nt2)
+        if haskey(result, key)
+            if isa(result[key], NamedTuple) && isa(value, NamedTuple)
+                result[key] = merge_kwargs_nested(result[key], value)
+            else
+                result[key] = value
+            end
+        else
+            result[key] = value
+        end
+    end
+    return (; zip(keys(result), values(result))...)
+end
