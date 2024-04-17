@@ -12,15 +12,19 @@ module RAGTools
 using PromptingTools
 using PromptingTools: pprint, AbstractMessage
 using HTTP, JSON3
+using JSON3: StructTypes
 using AbstractTrees
 using AbstractTrees: PreOrderDFS
 const PT = PromptingTools
+using PromptingTools.Experimental.APITools: create_websearch
 
 # reexport
 export pprint
 
 ## export trigrams, trigrams_hashed, text_to_trigrams, text_to_trigrams_hashed
 ## export STOPWORDS, tokenize, split_into_code_and_sentences
+# export merge_kwargs_nested
+export getpropertynested, setpropertynested
 include("utils.jl")
 
 # eg, cohere_api
