@@ -19,7 +19,7 @@ PromptingTools.jl is not meant for building large-scale systems. It's meant to b
 
 Getting started with PromptingTools.jl is as easy as importing the package and using the `@ai_str` macro for your questions.
 
-Note: You will need to set your OpenAI API key as an environment variable before using PromptingTools.jl (see the [Creating OpenAI API Key](#creating-openai-api-key) section below). 
+Note: You will need to set your OpenAI API key as an environment variable before using PromptingTools.jl (see the [Creating OpenAI API Key](#creating-openai-api-key) section below). Note also that your OpenAI account has to be funded to access the OpenAI API.
 For a quick start, simply set it via `ENV["OPENAI_API_KEY"] = "your-api-key"`
 
 Install PromptingTools:
