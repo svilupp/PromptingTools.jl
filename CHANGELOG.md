@@ -7,13 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
+### Fixed
+
+## [0.20.0]
+
+### Added
 - Added a few new open-weights models hosted by Fireworks.ai to the registry (DBRX Instruct, Mixtral 8x22b Instruct, Qwen 72b). If you're curious about how well they work, try them!
 - Added basic support for observability downstream. Created custom callback infrastructure with `initialize_tracer` and `finalize_tracer` and dedicated types are `TracerMessage` and `TracerMessageLike`. See `?TracerMessage` for more information and the corresponding `aigenerate` docstring.
+- Added `MultiCandidateChunks` which can hold candidates for retrieval across many indices (it's a flat structure to be similar to `CandidateChunks` and easy to reason about).
+- JSON serialization support extended for `RAGResult`, `CandidateChunks`, and `MultiCandidateChunks` to increase observability of RAG systems
+- Added a new search refiner `TavilySearchRefiner` - it will search the web via Tavily API to try to improve on the RAG answer (see `?refine!`).
+- Introduced a few small utilities for manipulation of nested kwargs (necessary for RAG pipelines), check out `getpropertynested`, `setpropertynested`, `merge_kwargs_nested`.
 
 ### Updated
+- [BREAKING] change to `CandidateChunks` where it's no longer allowed to be nested (ie, `cc.positions` being a list of several `CandidateChunks`). This is a breaking change for the `RAGTools` module only. We have introduced a new `MultiCandidateChunks` types that can refer to `CandidateChunks` across many indices.
 - Changed default model for `RAGTools.CohereReranker` to "cohere-rerank-english-v3.0".
 
 ### Fixed
+- `wrap_string` utility now correctly splits only on spaces. Previously it would split on newlines, which would remove natural formatting of prompts/messages when displayed via `pprint`
 
 ## [0.19.0]
 

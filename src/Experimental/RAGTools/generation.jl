@@ -146,6 +146,13 @@ Refines the answer using the same context previously provided via the provided p
 """
 struct SimpleRefiner <: AbstractRefiner end
 
+"""
+    TavilySearchRefiner <: AbstractRefiner
+
+Refines the answer by executing a web search using the Tavily API. This method aims to enhance the answer's accuracy and relevance by incorporating information retrieved from the web.
+"""
+struct TavilySearchRefiner <: AbstractRefiner end
+
 function refine!(
         refiner::AbstractRefiner, index::AbstractChunkIndex, result::AbstractRAGResult;
         kwargs...)
@@ -214,6 +221,112 @@ function refine!(
     msg = conv[end]
     result.final_answer = strip(msg.content)
     result.conversations[:final_answer] = conv
+
+    ## Increment the cost
+    Threads.atomic_add!(cost_tracker, msg.cost)
+    verbose &&
+        @info "Done refining the answer. Cost: \$$(round(msg.cost,digits=3))"
+
+    return result
+end
+
+"""
+    refine!(
+        refiner::TavilySearchRefiner, index::AbstractChunkIndex, result::AbstractRAGResult;
+        verbose::Bool = true,
+        model::AbstractString = PT.MODEL_CHAT,
+        include_answer::Bool = true,
+        max_results::Integer = 5,
+        include_domains::AbstractVector{<:AbstractString} = String[],
+        exclude_domains::AbstractVector{<:AbstractString} = String[],
+        template::Symbol = :RAGWebSearchRefiner,
+        cost_tracker = Threads.Atomic{Float64}(0.0),
+        kwargs...)
+
+Refines the answer by executing a web search using the Tavily API. This method aims to enhance the answer's accuracy and relevance by incorporating information retrieved from the web.
+
+Note: The web results and web answer (if requested) will be added to the context and sources!
+
+# Returns
+- Mutated `result` with `result.final_answer` and the full conversation saved in `result.conversations[:final_answer]`.
+- In addition, the web results and web answer (if requested) are appended to the `result.context` and `result.sources` for correct highlighting and verification.
+
+# Arguments
+- `refiner::TavilySearchRefiner`: The method to use for refining the answer. Uses `aigenerate` with a web search template.
+- `index::AbstractChunkIndex`: The index containing chunks and sources.
+- `result::AbstractRAGResult`: The result containing the context and question to generate the answer for.
+- `model::AbstractString`: The model to use for generating the answer. Defaults to `PT.MODEL_CHAT`.
+- `include_answer::Bool`: If `true`, includes the answer from Tavily in the web search.
+- `max_results::Integer`: The maximum number of results to return.
+- `include_domains::AbstractVector{<:AbstractString}`: A list of domains to include in the search results. Default is an empty list.
+- `exclude_domains::AbstractVector{<:AbstractString}`: A list of domains to exclude from the search results. Default is an empty list.
+- `verbose::Bool`: If `true`, enables verbose logging.
+- `template::Symbol`: The template to use for the `aigenerate` function. Defaults to `:RAGWebSearchRefiner`.
+- `cost_tracker`: An atomic counter to track the cost of the operation.
+
+# Example
+```julia
+refiner!(TavilySearchRefiner(), index, result)
+# See result.final_answer or pprint(result)
+```
+
+To enable this refiner in a full RAG pipeline, simply swap the component in the config:
+```julia
+cfg = RT.RAGConfig()
+cfg.generator.refiner = RT.TavilySearchRefiner()
+
+result = airag(cfg, index; question, return_all = true)
+pprint(result)
+```
+"""
+function refine!(
+        refiner::TavilySearchRefiner, index::AbstractChunkIndex, result::AbstractRAGResult;
+        verbose::Bool = true,
+        model::AbstractString = PT.MODEL_CHAT,
+        include_answer::Bool = true,
+        max_results::Integer = 5,
+        include_domains::AbstractVector{<:AbstractString} = String[],
+        exclude_domains::AbstractVector{<:AbstractString} = String[],
+        template::Symbol = :RAGWebSearchRefiner,
+        cost_tracker = Threads.Atomic{Float64}(0.0),
+        kwargs...)
+
+    ## Checks
+    placeholders = only(aitemplates(template)).variables # only one template should be found
+    @assert (:query in placeholders)&&(:answer in placeholders) &&
+            (:search_results in placeholders) "Provided RAG Template $(template) is not suitable. It must have placeholders: `query`, `answer` and `search_results`."
+    ##
+    (; answer, question) = result
+    ## execute Tavily web search and format it
+    r = create_websearch(
+        question; include_answer, max_results, include_domains,
+        exclude_domains)
+    web_summary = get(r.response, "answer", "")
+    web_raw = get(r.response, "results", [])
+    web_sources = ["TOOL(TavilySearch): " * get(res, "url", "") for res in web_raw]
+    web_content = join(
+        ["$(i). TavilySearch: " * get(res, "content", "")
+         for (i, res) in enumerate(web_raw)],
+        "\n\n")
+    search_results = """
+    Web Results Summary: $(web_summary)
+
+    **Raw Results:** 
+    $(web_content)
+
+    """
+    ##
+    conv = aigenerate(template; query = question, search_results,
+        answer, model, verbose = false,
+        return_all = true,
+        kwargs...)
+    msg = conv[end]
+    result.final_answer = strip(msg.content)
+    result.conversations[:final_answer] = conv
+
+    ## Attache the web sources to the context + sources (for reference)
+    result.sources = vcat(result.sources, web_sources)
+    result.context = vcat(result.context, web_content)
 
     ## Increment the cost
     Threads.atomic_add!(cost_tracker, msg.cost)
@@ -446,7 +559,7 @@ Eg, use `subtypes(AbstractRetriever)` to find the available options.
 - If `return_all` is `false`, returns the generated message (`msg`).
 - If `return_all` is `true`, returns the detail of the full pipeline in `RAGResult` (see the docs).
 
-See also `build_index`, `retrieve`, `generate!`, `RAGResult`
+See also `build_index`, `retrieve`, `generate!`, `RAGResult`, `getpropertynested`, `setpropertynested`, `merge_kwargs_nested`.
 
 # Examples
 
@@ -498,6 +611,8 @@ kwargs = (
 
 result = airag(cfg, index, question; kwargs...)
 ```
+
+For easier manipulation of nested kwargs, see utilities `getpropertynested`, `setpropertynested`, `merge_kwargs_nested`.
 """
 function airag(cfg::AbstractRAGConfig, index::AbstractChunkIndex;
         question::AbstractString,
