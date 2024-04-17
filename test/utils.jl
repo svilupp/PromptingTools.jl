@@ -98,6 +98,9 @@ end
     @test_broken maximum(length.(split(output, "\n"))) <= 20 #bug, it adds back the separator
     str = "This function will wrap words into lines"
     @test wrap_string(str, length(str)) == str
+    ## ensure newlines are not removed
+    str = "This function\n will wrap\n words into lines"
+    @test wrap_string(str, length(str)) == str
 end
 
 @testset "length_longest_common_subsequence" begin

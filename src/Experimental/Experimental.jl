@@ -11,13 +11,13 @@ Contains:
 """
 module Experimental
 
+export APITools
+include("APITools/APITools.jl")
+
 export RAGTools
 include("RAGTools/RAGTools.jl")
 
 export AgentTools
 include("AgentTools/AgentTools.jl")
-
-export APITools
-include("APITools/APITools.jl")
 
 end # module Experimental
