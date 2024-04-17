@@ -77,8 +77,8 @@ end
     @test eltype(output) == Bool
 
     # EmbedderEltype
-    @test EmbedderEltype(BinaryBatchEmbedder()) == Float32
-    @test EmbedderEltype(BatchEmbedder()) == Bool
+    @test EmbedderEltype(BinaryBatchEmbedder()) == Bool
+    @test EmbedderEltype(BatchEmbedder()) == Float32
 end
 
 @testset "tags_extract" begin

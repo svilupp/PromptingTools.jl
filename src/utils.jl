@@ -218,7 +218,8 @@ wrap_string("Certainly, here's a function in Julia that will wrap a string accor
 function wrap_string(str::AbstractString,
         text_width::Int = 20;
         newline::Union{AbstractString, AbstractChar} = '\n')
-    words = split(str)
+    ## split only on spaces to make sure it doesn't remove newlines already in the text!
+    words = split(str, " ")
     output = IOBuffer()
     current_line_length = 0
 

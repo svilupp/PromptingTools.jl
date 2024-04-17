@@ -266,7 +266,23 @@ Useful for nested kwargs where we want to change some property in `parent_keys` 
 ```julia
 kw = (; abc = (; def = "x"))
 setpropertynested(kw, [:abc], :def, "y")
-# Output: (abc = (def = "x", key = "y"),)
+# Output: (abc = (def = "y",),)
+```
+
+Practical example of changing all `model` keys in CHAT-based steps in the pipeline:
+```julia
+# changes :model to "gpt4t" whenever the parent key is in the below list (chat-based steps)
+setpropertynested(kwargs,
+    [:rephraser_kwargs, :tagger_kwargs, :answerer_kwargs, :refiner_kwargs],
+    :model, "gpt4t")
+```
+
+Or changing an embedding model (across both indexer and retriever steps, because it's same step name):
+```julia
+kwargs = setpropertynested(
+        kwargs, [:embedder_kwargs],
+        :model, "text-embedding-3-large"
+    )
 ```
 """
 function setpropertynested(nt::NamedTuple, parent_keys::Vector{Symbol},
@@ -276,8 +292,9 @@ function setpropertynested(nt::NamedTuple, parent_keys::Vector{Symbol},
     result = Dict{Symbol, Any}(pairs(nt))
     for (key_, val_) in pairs(nt)
         if key_ in parent_keys && val_ isa NamedTuple
-            # replace/set directly
-            result[key_] = merge(val_, (; key = value))
+            # replace/set directly and recurse
+            result[key_] = merge(val_, (; zip([key], [value])...)) |>
+                           x -> setpropertynested(x, parent_keys, key, value)
         elseif key_ in parent_keys
             # for Dict and similar
             result[key_][key] = value

@@ -12,9 +12,11 @@ module RAGTools
 using PromptingTools
 using PromptingTools: pprint, AbstractMessage
 using HTTP, JSON3
+using JSON3: StructTypes
 using AbstractTrees
 using AbstractTrees: PreOrderDFS
 const PT = PromptingTools
+using PromptingTools.Experimental.APITools: create_websearch
 
 # reexport
 export pprint

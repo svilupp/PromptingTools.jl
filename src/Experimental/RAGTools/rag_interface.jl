@@ -83,6 +83,30 @@
 abstract type AbstractRAGConfig end
 
 # supertype for RAGDetails, return_type for retrieve and generate (and optionally airag)
+"""
+    AbstractRAGResult
+
+Abstract type for the result of the RAG (Retrieval-Augmented Generation) process. 
+    
+Implementations of this type should contain the necessary fields to represent the outcome of the RAG pipeline, including the original question, any rephrased versions of the question, the generated answer, and any additional context or metadata used or generated during the process.
+
+# Fields
+- [OPTIONAL] `question::AbstractString`: The original question posed to the RAG system.
+- `rephrased_questions::AbstractVector{<:AbstractString}`: A vector of rephrased versions of the original question, generated during the retrieval phase to improve the quality of the results.
+- [OPTIONAL] `answer::Union{Nothing, AbstractString}`: The initial answer generated based on the retrieved information and the question. This field may be `nothing` if the generation phase has not yet produced an answer.
+- `final_answer::Union{Nothing, AbstractString}`: The final refined answer after any post-processing steps have been applied. This is considered the definitive answer produced by the RAG system.
+- `context::Vector{<:AbstractString}`: A vector of strings representing the context used for generating the answer. This may include relevant information retrieved during the retrieval phase.
+- `sources::Vector{<:AbstractString}`: The sources of the context information, providing traceability for the data used in generating the answer.
+... some fields for search candidates (`::CandidateChunks`)
+- [OPTIONAL] `conversations::Dict{Symbol,Vector{<:AbstractMessage}}`: A dictionary containing the history of AI-generated messages and interactions during the RAG process. Keys correspond to the names of functions in the RAG pipeline, providing insight into the decision-making process at each step.
+
+If `rephrased_questions` is the primarily field, it should be used instead of `question`.
+If `final_answer` is the primarily field, it should be used instead of `answer`.
+`conversations` recording is optional but highly recommended for observability.
+
+This abstract type serves as a blueprint for concrete implementations that store the results of the RAG process, facilitating debugging, analysis, and further processing of the generated answers.
+"""
+
 abstract type AbstractRAGResult end
 
 # ## Preparation Stage

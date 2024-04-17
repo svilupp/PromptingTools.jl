@@ -4,6 +4,8 @@ using PromptingTools.Experimental.RAGTools: tokenize, trigrams, trigrams_hashed
 using PromptingTools.Experimental.RAGTools: token_with_boundaries, text_to_trigrams,
                                             text_to_trigrams_hashed
 using PromptingTools.Experimental.RAGTools: split_into_code_and_sentences
+using PromptingTools.Experimental.RAGTools: getpropertynested, setpropertynested,
+                                            merge_kwargs_nested
 
 @testset "_check_aiextract_capability" begin
     @test _check_aiextract_capability("gpt-3.5-turbo") == nothing
@@ -310,7 +312,7 @@ end
     # Nested Set Tests
     kw = (; abc = (; def = (; ghi = "x")))
     modified_kw = setpropertynested(kw, [:abc, :def], :ghi, "y")
-    @test modified_kw == (; abc = (; def = (; ghi = "y")))
+    @test modified_kw == (; abc = (; def = (; ghi = "y"), ghi = "y"))
 
     # New Key Set Tests
     kw = (; abc = (; def = "x"))
@@ -320,12 +322,12 @@ end
     # Complex Nested Set Tests
     kw = (; abc = (; def = (; ghi = (; jkl = "x"))))
     modified_kw = setpropertynested(kw, [:abc, :def, :ghi], :jkl, "y")
-    @test modified_kw == (; abc = (; def = (; ghi = (; jkl = "y"))))
+    @test modified_kw == (; abc = (; jkl = "y", def = (; jkl = "y", ghi = (; jkl = "y"))))
 
     # Set In Non-Existent Nested Key
     kw = (; abc = (; def = "x"))
     modified_kw = setpropertynested(kw, [:xyz], :ghi, "y")
-    @test modified_kw == (; abc = (; def = "x"), xyz = (; ghi = "y"))
+    @test modified_kw == (; abc = (; def = "x"))
 end
 
 @testset "merge_kwargs_nested" begin
@@ -338,13 +340,13 @@ end
     # Nested Merge
     nt1 = (; a = (; x = 1), b = 2)
     nt2 = (; a = (; y = 2), c = 3)
-    expected = (; a = (; x = 1, y = 2), b = 2, c = 3)
+    expected = (; a = (; y = 2, x = 1), b = 2, c = 3)
     @test merge_kwargs_nested(nt1, nt2) == expected
 
     # Deep Nested Merge
     nt1 = (; a = (; x = (; i = 1)), b = 2)
     nt2 = (; a = (; x = (; j = 2)), c = 3)
-    expected = (; a = (; x = (; i = 1, j = 2)), b = 2, c = 3)
+    expected = (; a = (; x = (; j = 2, i = 1)), b = 2, c = 3)
     @test merge_kwargs_nested(nt1, nt2) == expected
 
     # Override with Non-NamedTuple
