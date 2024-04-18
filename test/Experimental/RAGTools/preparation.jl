@@ -64,6 +64,10 @@ end
     output = get_embeddings(
         BatchEmbedder(), docs; model = "mock-emb", truncate_dimension = 100)
     @test size(output) == (100, 2)
+    ## value of 0 for truncation, skips the step
+    output = get_embeddings(
+        BatchEmbedder(), docs; model = "mock-emb", truncate_dimension = 0)
+    @test size(output) == (128, 2)
 
     # Unknown type
     struct RandomEmbedder123 <: AbstractEmbedder end
