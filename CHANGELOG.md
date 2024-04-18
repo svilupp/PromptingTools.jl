@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.20.1]
+
+### Fixed
+- Fixed `truncate_dimension` to ignore when 0 is provided (previously it would throw an error).
+
 ## [0.20.0]
 
 ### Added
