@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.21.0]
+
+### Added
+- New models added to the model registry: Llama3 8b on Ollama (alias "llama3" for convenience) and on Together.ai (alias "tllama3", "t" stands for Together.ai), also adding the llama3 70b on Together.ai (alias "tllama370") and the powerful Mixtral-8x22b on Together.ai (alias "tmixtral22").
+
+### Fixed
+- Fixed a bug where pretty-printing `RAGResult` would forget a newline between the sources and context sections.
+
 ## [0.20.1]
 
 ### Fixed
