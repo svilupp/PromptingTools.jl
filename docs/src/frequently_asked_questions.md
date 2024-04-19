@@ -83,6 +83,9 @@ If you want to avoid this error, you have two options:
    end
    ```
 
+## Getting the error "429 Too Many Requests"?
+This error has been reported, along with the message "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors". It was concluded that this was because the account in question was not funded, which meant that the "current quota" was zero. Unlike using [ChatGPT online](chat.openai.com/), it is not free to access ChatGPT via the OpenAI API. Note however that each request is cheap, and that it might make sense to pay a few cents or dollars for the online service.
+
 ## Setting OpenAI Spending Limits
 
 OpenAI allows you to set spending limits directly on your account dashboard to prevent unexpected costs.
