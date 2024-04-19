@@ -300,7 +300,7 @@ end
 
     ## Pretty printing
     io = IOBuffer()
-    PT.pprint(io, result)
+    PT.pprint(io, result; add_newline = false)
     result_str = String(take!(io))
     expected_str = "--------------------\nQUESTION(s)\n--------------------\n- Time?\n\n--------------------\nANSWER\n--------------------\n# Question\n\nTime\n\n\n\n# Answer\n\n--------------------\nSOURCES\n--------------------\n1. .\n2. .\n3. ."
     @test result_str == expected_str

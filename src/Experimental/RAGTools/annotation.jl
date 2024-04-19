@@ -100,14 +100,16 @@ end
 
 """
     PromptingTools.pprint(
-        io::IO, node::AbstractAnnotatedNode; text_width::Int = displaysize(io)[2])
+        io::IO, node::AbstractAnnotatedNode;
+        text_width::Int = displaysize(io)[2], add_newline::Bool = true)
 
 Pretty print the `node` to the `io` stream, including all its children
 
 Supports only `node.style::Styler` for now.
 """
 function PromptingTools.pprint(
-        io::IO, node::AbstractAnnotatedNode; text_width::Int = displaysize(io)[2])
+        io::IO, node::AbstractAnnotatedNode;
+        text_width::Int = displaysize(io)[2], add_newline::Bool = true)
     for node in AbstractTrees.PreOrderDFS(node)
         ## print out text only for leaf nodes (ie, with no children)
         if isempty(node.children) && node.style isa Styler
@@ -125,12 +127,14 @@ function PromptingTools.pprint(
             print(io, node.content)
         end
     end
+    # finish with a new line
+    add_newline && print(io, "\n")
     return nothing
 end
 
 function PromptingTools.pprint(
-        node::AbstractAnnotatedNode; text_width::Int = displaysize(stdout)[2])
-    pprint(stdout, node; text_width)
+        node::AbstractAnnotatedNode; text_width::Int = displaysize(stdout)[2], add_newline::Bool = true)
+    pprint(stdout, node; text_width, add_newline)
 end
 
 ### ANNOTATION METHODS -- TrigramAnnotater
