@@ -55,7 +55,7 @@ end
     # Test pprint function for a single node
     node = AnnotatedNode(content = "test", group_id = 123)
     io = IOBuffer()
-    pprint(io, node)
+    pprint(io, node; add_newline = false)
     @test String(take!(io)) == "test"
 
     ## Multiple nodes
@@ -65,7 +65,7 @@ end
     child_node2 = AnnotatedNode(parent = parent_node, content = "child2")
     push!(parent_node.children, child_node2)
     io = IOBuffer()
-    pprint(io, parent_node)
+    pprint(io, parent_node; add_newline = false)
     output = String(take!(io))
     # iterate over all nodes with no children
     @test output == "childchild2"
@@ -76,7 +76,7 @@ end
     io = IOBuffer()
     pprint(io, parent_node)
     output = String(take!(io))
-    @test output == "childchild3"
+    @test output == "childchild3\n"
 end
 
 @testset "set_node_style!" begin
@@ -314,7 +314,7 @@ end
     # no scores, so no extra children
     @test length(annotated_root.children) == 3
     io = IOBuffer()
-    pprint(io, annotated_root)
+    pprint(io, annotated_root; add_newline = false)
     output = String(take!(io))
     @test answer == output
 
@@ -340,7 +340,7 @@ end
             "Source 1", "Source 2", "Source 3"])
     annotated_root = annotate_support(annotater, r)
     io = IOBuffer()
-    pprint(io, annotated_root)
+    pprint(io, annotated_root; add_newline = false)
     output = String(take!(io))
     @test occursin("This is a test answer.", output)
     @test occursin("[1,0.67]", output)

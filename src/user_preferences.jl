@@ -298,6 +298,9 @@ aliases = merge(
         "yi34c" => "yi:34b-chat",
         "oh25" => "openhermes2.5-mistral",
         "starling" => "starling-lm",
+        "llama3" => "llama3:8b-instruct-q5_K_S",
+        # o-llama3, because it's hosted on Ollama (same as t-mixtral on Together)
+        "ollama3" => "llama3:8b-instruct-q5_K_S",
         "local" => "local-server",
         "gemini" => "gemini-pro",
         ## f-mixtral -> Fireworks.ai Mixtral
@@ -305,6 +308,9 @@ aliases = merge(
         "firefunction" => "accounts/fireworks/models/firefunction-v1",
         ## t-mixtral -> Together.ai Mixtral
         "tmixtral" => "mistralai/Mixtral-8x7B-Instruct-v0.1",
+        "tmixtral22" => "mistralai/Mixtral-8x22B-Instruct-v0.1",
+        "tllama3" => "meta-llama/Llama-3-8b-chat-hf",
+        "tllama370" => "meta-llama/Llama-3-70b-chat-hf",
         ## Mistral AI
         "mistral-tiny" => "mistral-tiny",
         "mistral-small" => "mistral-small-latest",
@@ -418,6 +424,17 @@ registry = Dict{String, ModelSpec}(
         0.0,
         0.0,
         "Yi is a 34B parameter model finetuned by X on top of base model from Starling AI."),
+    "llama3:8b-instruct-q5_K_S" => ModelSpec("llama3:8b-instruct-q5_K_S",
+        OllamaSchema(),
+        0.0,
+        0.0,
+        "Llama 3 8b is the latest model from Meta"
+    ),
+    "wizardlm2:7b-q5_K_S" => ModelSpec("wizardlm2:7b-q5_K_S",
+        OllamaSchema(),
+        0.0,
+        0.0,
+        "WizardLM2 7b from Microsoft."),
     "nomic-embed-text" => ModelSpec("nomic-embed-text",
         OllamaSchema(),
         0.0,
@@ -550,12 +567,31 @@ registry = Dict{String, ModelSpec}(
         0.0, #unknown, expected to be the same as Mixtral
         0.0, #unknown, expected to be the same as Mixtral
         "Fireworks' open-source function calling model (fine-tuned Mixtral). Useful for `aiextract` calls. For more information, see [models](https://fireworks.ai/models/fireworks/firefunction-v1)."),
+    ## Together AI
     "mistralai/Mixtral-8x7B-Instruct-v0.1" => ModelSpec(
         "mistralai/Mixtral-8x7B-Instruct-v0.1",
         TogetherOpenAISchema(),
         6e-7,
         6e-7,
         "Mixtral (8x7b) from Mistral, hosted by Together.ai. For more information, see [models](https://docs.together.ai/docs/inference-models)."),
+    "mistralai/Mixtral-8x22B-Instruct-v0.1" => ModelSpec(
+        "mistralai/Mixtral-8x22B-Instruct-v0.1",
+        TogetherOpenAISchema(),
+        1.2e-6,
+        1.2e-6,
+        "Mixtral (22x7b) from Mistral, hosted by Together.ai. For more information, see [models](https://docs.together.ai/docs/inference-models)."),
+    "meta-llama/Llama-3-8b-chat-hf" => ModelSpec(
+        "meta-llama/Llama-3-8b-chat-hf",
+        TogetherOpenAISchema(),
+        2e-7,
+        2e-7,
+        "Meta Llama3 8b from Mistral, hosted by Together.ai. For more information, see [models](https://docs.together.ai/docs/inference-models)."),
+    "meta-llama/Llama-3-70b-chat-hf" => ModelSpec(
+        "meta-llama/Llama-3-70b-chat-hf",
+        TogetherOpenAISchema(),
+        9e-7,
+        9e-7,
+        "Meta Llama3 70b from Mistral, hosted by Together.ai. For more information, see [models](https://docs.together.ai/docs/inference-models)."),
     ### Anthropic models
     "claude-3-opus-20240229" => ModelSpec("claude-3-opus-20240229",
         AnthropicSchema(),

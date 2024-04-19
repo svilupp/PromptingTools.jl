@@ -481,11 +481,11 @@ function PT.pprint(
         pprint(io, root; text_width)
     end
     if add_context
-        print(io, "-"^20, "\n")
+        print(io, "\n" * "-"^20, "\n")
         printstyled(io, "CONTEXT", color = :blue, bold = true)
         print(io, "\n", "-"^20, "\n")
         for (i, ctx) in enumerate(r.context)
-            print(io, "$(i). ", PT.wrap_string(ctx, text_width))
+            print(io, PT.wrap_string(ctx, text_width))
             print(io, "\n", "-"^20, "\n")
         end
     end
