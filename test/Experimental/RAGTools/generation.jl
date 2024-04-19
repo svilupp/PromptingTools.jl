@@ -1,3 +1,4 @@
+using PromptingTools: TestEchoOpenAISchema
 using PromptingTools.Experimental.RAGTools: ChunkIndex,
                                             CandidateChunks, build_context, build_context!
 using PromptingTools.Experimental.RAGTools: MaybeTags, Tag, ContextEnumerator,
@@ -197,7 +198,7 @@ end
 
 @testset "airag" begin
     # test with a mock server
-    PORT = rand(20010:40001)
+    PORT = rand(10000:40002)
     PT.register_model!(; name = "mock-emb", schema = PT.CustomOpenAISchema())
     PT.register_model!(; name = "mock-meta", schema = PT.CustomOpenAISchema())
     PT.register_model!(; name = "mock-gen", schema = PT.CustomOpenAISchema())
@@ -300,9 +301,9 @@ end
 
     ## Pretty printing
     io = IOBuffer()
-    PT.pprint(io, result; add_newline = false)
+    PT.pprint(io, result)
     result_str = String(take!(io))
-    expected_str = "--------------------\nQUESTION(s)\n--------------------\n- Time?\n\n--------------------\nANSWER\n--------------------\n# Question\n\nTime\n\n\n\n# Answer\n\n--------------------\nSOURCES\n--------------------\n1. .\n2. .\n3. ."
+    expected_str = "--------------------\nQUESTION(s)\n--------------------\n- Time?\n\n--------------------\nANSWER\n--------------------\n# Question\n\nTime\n\n\n\n# Answer\n\n--------------------\nSOURCES\n--------------------\n1. .\n2. .\n3. .\n"
     @test result_str == expected_str
 
     # clean up
