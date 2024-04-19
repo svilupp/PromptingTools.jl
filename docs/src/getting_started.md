@@ -11,7 +11,7 @@ CurrentModule = PromptingTools
 You will need to register with OpenAI and generate an API key:
 
 1. Create an account with [OpenAI](https://platform.openai.com/signup)
-2. Fund your account. If not, requests you send will recieve an error
+2. Go to [Account Billing](https://platform.openai.com/account/billing) and buy some credits (prepayment, minimum $5). Your account must have credits for the API access to work.
 3. Go to [API Key page](https://platform.openai.com/account/api-keys)
 4. Click on “Create new secret key”
   !!! Do not share it with anyone and do NOT save it to any files that get synced online.
