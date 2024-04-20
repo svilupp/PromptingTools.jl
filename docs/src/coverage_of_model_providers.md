@@ -17,6 +17,7 @@ Below is an overview of the model providers supported by PromptingTools.jl, alon
 | AbstractOpenAISchema    | DatabricksOpenAISchema    | Databricks                             | ✅         | ✅     | ✅       | ✅     | ✅     | ❌         |
 | AbstractOpenAISchema    | FireworksOpenAISchema     | Fireworks AI                           | ✅         | ✅     | ✅       | ✅     | ✅     | ❌         |
 | AbstractOpenAISchema    | TogetherOpenAISchema      | Together AI                            | ✅         | ✅     | ✅       | ✅     | ✅     | ❌         |
+| AbstractOpenAISchema    | GroqOpenAISchema          | Groq                                   | ✅         | ❌     | ✅       | ❌     | ❌     | ❌         |
 | AbstractOllamaSchema    | OllamaSchema              | Ollama (endpoint `api/chat`)           | ✅         | ✅     | ❌       | ✅     | ❌     | ❌         |
 | AbstractManagedSchema   | AbstractOllamaManagedSchema | Ollama (endpoint `api/generate`)     | ✅         | ✅     | ❌       | ❌     | ❌     | ❌         |
 | AbstractAnthropicSchema | AnthropicSchema           | Anthropic                              | ✅         | ❌     | ✅       | ❌     | ❌     | ❌         |
