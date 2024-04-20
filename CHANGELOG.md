@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.22.0]
+
+### Added
+- Added support for [Groq](https://console.groq.com/), the fastest LLM provider out there. It's free for now, so you can try it out - you just need to set your `GROQ_API_KEY`. We've added Llama3 8b (alias "gllama3"), 70b (alias "gllama370") and Mixtral 8x7b (alias "gmixtral"). For the shortcut junkies, we also added a shorthand Llama3 8b = "gl3" (first two letters and the last digit), Llama3 70b = "gl70" (first two letters and the last two digits).
+
 ## [0.21.0]
 
 ### Added
