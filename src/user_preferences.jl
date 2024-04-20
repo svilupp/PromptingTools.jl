@@ -19,6 +19,7 @@ Check your preferences by calling `get_preferences(key::String)`.
 - `GOOGLE_API_KEY`: The API key for Google Gemini models. Get yours from [here](https://ai.google.dev/). If you see a documentation page ("Available languages and regions for Google AI Studio and Gemini API"), it means that it's not yet available in your region.
 - `ANTHROPIC_API_KEY`: The API key for the Anthropic API. Get yours from [here](https://www.anthropic.com/).
 - `VOYAGE_API_KEY`: The API key for the Voyage API. Free tier is upto 50M tokens! Get yours from [here](https://dash.voyageai.com/api-keys).
+- `GROQ_API_KEY`: The API key for the Groq API. Free in beta! Get yours from [here](https://console.groq.com/keys).
 - `MODEL_CHAT`: The default model to use for aigenerate and most ai* calls. See `MODEL_REGISTRY` for a list of available models or define your own.
 - `MODEL_EMBEDDING`: The default model to use for aiembed (embedding documents). See `MODEL_REGISTRY` for a list of available models or define your own.
 - `PROMPT_SCHEMA`: The default prompt schema to use for aigenerate and most ai* calls (if not specified in `MODEL_REGISTRY`). Set as a string, eg, `"OpenAISchema"`.
@@ -44,6 +45,7 @@ Define your `register_model!()` calls in your `startup.jl` file to make them ava
 - `GOOGLE_API_KEY`: The API key for Google Gemini models. Get yours from [here](https://ai.google.dev/). If you see a documentation page ("Available languages and regions for Google AI Studio and Gemini API"), it means that it's not yet available in your region.
 - `ANTHROPIC_API_KEY`: The API key for the Anthropic API. Get yours from [here](https://www.anthropic.com/).
 - `VOYAGE_API_KEY`: The API key for the Voyage API. Free tier is upto 50M tokens! Get yours from [here](https://dash.voyageai.com/api-keys).
+- `GROQ_API_KEY`: The API key for the Groq API. Free in beta! Get yours from [here](https://console.groq.com/keys).
 
 Preferences.jl takes priority over ENV variables, so if you set a preference, it will take precedence over the ENV variable.
 
@@ -61,6 +63,7 @@ const ALLOWED_PREFERENCES = ["MISTRALAI_API_KEY",
     "GOOGLE_API_KEY",
     "ANTHROPIC_API_KEY",
     "VOYAGE_API_KEY",
+    "GROQ_API_KEY",
     "MODEL_CHAT",
     "MODEL_EMBEDDING",
     "MODEL_ALIASES",
@@ -166,6 +169,14 @@ const FIREWORKS_API_KEY::String = @load_preference("FIREWORKS_API_KEY",
 
 _temp = get(ENV, "ANTHROPIC_API_KEY", "")
 const ANTHROPIC_API_KEY::String = @load_preference("ANTHROPIC_API_KEY",
+    default=_temp);
+
+_temp = get(ENV, "VOYAGE_API_KEY", "")
+const VOYAGE_API_KEY::String = @load_preference("VOYAGE_API_KEY",
+    default=_temp);
+
+_temp = get(ENV, "GROQ_API_KEY", "")
+const GROQ_API_KEY::String = @load_preference("GROQ_API_KEY",
     default=_temp);
 
 _temp = get(ENV, "LOCAL_SERVER", "http://localhost:10897/v1")
@@ -324,7 +335,14 @@ aliases = merge(
         "claude" => "claude-3-sonnet-20240229",
         "claudeo" => "claude-3-opus-20240229",
         "claudes" => "claude-3-sonnet-20240229",
-        "claudeh" => "claude-3-haiku-20240307"),
+        "claudeh" => "claude-3-haiku-20240307",
+        ## Groq
+        "gllama3" => "llama3-8b-8192",
+        "gl3" => "llama3-8b-8192",
+        "gllama370" => "llama3-70b-8192",
+        "gl70" => "llama3-70b-8192",
+        "gmixtral" => "mixtral-8x7b-32768"
+    ),
     ## Load aliases from preferences as well
     @load_preference("MODEL_ALIASES", default=Dict{String, String}()))
 
@@ -612,7 +630,24 @@ registry = Dict{String, ModelSpec}(
         AnthropicSchema(),
         8e-6,
         2.4e-5,
-        "Anthropic's Claude 2.1 model."))
+        "Anthropic's Claude 2.1 model."),
+    ## Groq -- using preliminary pricing on https://wow.groq.com/
+    "llama3-8b-8192" => ModelSpec("llama3-8b-8192",
+        GroqOpenAISchema(),
+        5e-8,
+        1e-7,
+        "Meta's Llama3 8b, hosted by Groq. Max output 8192 tokens, 8K context. See details [here](https://console.groq.com/docs/models)"),
+    "llama3-70b-8192" => ModelSpec("llama3-70b-8192",
+        GroqOpenAISchema(),
+        5.9e-7,
+        7.9e-7,
+        "Meta's Llama3 70b, hosted by Groq. Max output 8192 tokens, 8K context. See details [here](https://console.groq.com/docs/models)"),
+    "mixtral-8x7b-32768" => ModelSpec("mixtral-8x7b-32768",
+        GroqOpenAISchema(),
+        2.7e-7,
+        2.7e-7,
+        "Mistral.ai Mixtral 8x7b, hosted by Groq. Max 32K context. See details [here](https://console.groq.com/docs/models)")
+)
 
 """
     ALTERNATIVE_GENERATION_COSTS
