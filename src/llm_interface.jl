@@ -177,6 +177,21 @@ Requires one environment variables to be set:
 """
 struct TogetherOpenAISchema <: AbstractOpenAISchema end
 
+"""
+    GroqOpenAISchema
+
+Schema to call the [groq.com](https://console.groq.com/keys) API.
+
+Links:
+- [Get your API key](https://console.groq.com/keys)
+- [API Reference](https://console.groq.com/docs/quickstart)
+- [Available models](https://console.groq.com/docs/models)
+
+Requires one environment variables to be set:
+- `GROQ_API_KEY`: Your API key (often starts with "gsk_...")
+"""
+struct GroqOpenAISchema <: AbstractOpenAISchema end
+
 abstract type AbstractOllamaSchema <: AbstractPromptSchema end
 
 """
