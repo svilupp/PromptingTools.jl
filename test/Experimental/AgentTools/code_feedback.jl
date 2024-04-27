@@ -1,8 +1,11 @@
 using PromptingTools.Experimental.AgentTools: aicodefixer_feedback
 using PromptingTools.Experimental.AgentTools: CodeEmpty,
-    CodeFailedParse, CodeFailedEval, CodeFailedTimeout, CodeSuccess
+                                              CodeFailedParse, CodeFailedEval,
+                                              CodeFailedTimeout, CodeSuccess
 using PromptingTools.Experimental.AgentTools: testset_feedback,
-    error_feedback, score_feedback, extract_test_counts
+                                              error_feedback, score_feedback,
+                                              extract_test_counts
+using PromptingTools.Experimental.AgentTools: AIGenerate
 
 @testset "aicodefixer_feedback" begin
     # Empty code
@@ -11,6 +14,16 @@ using PromptingTools.Experimental.AgentTools: testset_feedback,
     code_missing_err = "**Error Detected**: No Julia code found. Always enclose Julia code in triple backticks code fence (```julia\\n ... \\n```)."
     @test feedback == code_missing_err
     @test aicodefixer_feedback(CodeEmpty()) == code_missing_err
+
+    # test with message directly
+    feedback = aicodefixer_feedback(PT.AIMessage("test")).feedback
+    @test feedback == code_missing_err
+
+    # test with aicall
+    aicall = AIGenerate()
+    aicall.conversation = [PT.AIMessage("test")]
+    feedback = aicodefixer_feedback(aicall).feedback
+    @test feedback == code_missing_err
 
     # CodeFailedParse
     cb = AICode("println(\"a\"")
@@ -24,6 +37,11 @@ using PromptingTools.Experimental.AgentTools: testset_feedback,
     feedback = aicodefixer_feedback(conv).feedback
     @test occursin("**Parsing Error Detected:**", feedback)
 
+    # test codeblock only    
+    cb = AICode("println(\"a\"")
+    feedback = aicodefixer_feedback(cb).feedback
+    @test occursin("**Parsing Error Detected:**", feedback)
+
     # CodeFailedEval -- for failed tasks and normal errors
     cb = AICode("""
     tsk=@task error("xx")
@@ -31,7 +49,8 @@ using PromptingTools.Experimental.AgentTools: testset_feedback,
     fetch(tsk)
     """)
     feedback = aicodefixer_feedback(CodeFailedEval(), cb)
-    @test occursin("**Error Detected:**\n**ErrorException**:\nxx\n\n\n\n**Lines that caused the error:**\n- fetch(tsk)",
+    @test occursin(
+        "**Error Detected:**\n**ErrorException**:\nxx\n\n\n\n**Lines that caused the error:**\n- fetch(tsk)",
         feedback)
 
     cb = AICode("error(\"xx\")")

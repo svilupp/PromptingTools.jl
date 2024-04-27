@@ -1,0 +1,26 @@
+[
+    {
+        "content": "Template Metadata",
+        "description": "Generic writer persona (defined as `pesona`) to write a `what` for `audience`. It's purpose is `purpose`. Provide some `notes`! Placeholders: `persona`, `what`, `audience`, `purpose`, `notes`.",
+        "version": "1.0",
+        "source": "",
+        "_type": "metadatamessage"
+    },
+    {
+        "content": "Act as a world-class writer and {{persona}}.\n\nYou are a writing {{what}} for {{audience}}.\n\nThe purpose is {{purpose}}.\n\nMake sure to extensively leverage the notes provided.\n\nFirst, think step-by-step about the ideal outline given the format and the target audience.\nOnce you have the outline, write the text.\n",
+        "variables": [
+            "persona",
+            "what",
+            "audience",
+            "purpose"
+        ],
+        "_type": "systemmessage"
+    },
+    {
+        "content": "Notes:\n{{notes}}\nIt's EXTREMELY important that you leverage these notes.",
+        "variables": [
+            "notes"
+        ],
+        "_type": "usermessage"
+    }
+]

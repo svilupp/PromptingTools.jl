@@ -355,6 +355,10 @@ function Base.var"=="(c1::AICallBlock, c2::AICallBlock)
     all(f -> getfield(c1, f) == getfield(c2, f), fieldnames(typeof(c1)))
 end
 
+function aicodefixer_feedback(aicall::AICall; kwargs...)
+    aicodefixer_feedback(aicall.conversation; kwargs...)
+end
+
 """
     AICodeFixer(aicall::AICall, templates::Vector{<:PT.UserMessage}; num_rounds::Int = 3, feedback_func::Function = aicodefixer_feedback; kwargs...)
     AICodeFixer(aicall::AICall, template::Union{AITemplate, Symbol} = :CodeFixerRCI; kwargs...)

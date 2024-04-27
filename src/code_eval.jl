@@ -149,7 +149,8 @@ function (CB::Type{T})(md::AbstractString;
     end
     if !isempty(removed)
         ## Add to STDOUT what we removed
-        warning = string("!!! IMPORTANT: Unsafe lines blocked from execution (eg, Pkg operations or imports of non-existent packages):",
+        warning = string(
+            "!!! IMPORTANT: Unsafe lines blocked from execution (eg, Pkg operations or imports of non-existent packages):",
             "\n$removed\n",
             "Fix or find a workaround!")
         if isnothing(cb.stdout)

@@ -32,7 +32,7 @@ function render(schema::NoSchema,
         if msg isa Union{SystemMessage, UserMessage, UserMessageWithImages}
             replacements = ["{{$(key)}}" => value
                             for (key, value) in pairs(replacement_kwargs)
-                                if key in msg.variables]
+                            if key in msg.variables]
             # Rebuild the message with the replaced content
             MSGTYPE = typeof(msg)
             new_msg = MSGTYPE(;

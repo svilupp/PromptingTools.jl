@@ -79,7 +79,8 @@ Simple wrapper for a call to Ollama API.
 - `port`: The port of the Ollama API. Defaults to 11434.
 - `kwargs`: Prompt variables to be used to fill the prompt/template
 """
-function ollama_api(prompt_schema::Union{AbstractOllamaManagedSchema, AbstractOllamaSchema},
+function ollama_api(
+        prompt_schema::Union{AbstractOllamaManagedSchema, AbstractOllamaSchema},
         prompt::Union{AbstractString, Nothing} = nothing;
         system::Union{Nothing, AbstractString} = nothing,
         messages::Vector{<:AbstractDict{String, <:Any}} = Vector{Dict{String, Any}}(),
@@ -196,7 +197,8 @@ msg = aigenerate(schema, conversation; model="openhermes2.5-mistral")
 
 Note: Managed Ollama currently supports at most 1 User Message and 1 System Message given the API limitations. If you want more, you need to use the `ChatMLSchema`.
 """
-function aigenerate(prompt_schema::AbstractOllamaManagedSchema, prompt::ALLOWED_PROMPT_TYPE;
+function aigenerate(
+        prompt_schema::AbstractOllamaManagedSchema, prompt::ALLOWED_PROMPT_TYPE;
         verbose::Bool = true,
         api_key::String = "",
         model::String = MODEL_CHAT,
@@ -348,12 +350,12 @@ function aiembed(prompt_schema::AbstractOllamaManagedSchema,
     model_id = get(MODEL_ALIASES, model, model)
     ## Send each document individually (no parallelism)
     messages = [aiembed(prompt_schema,
-        doc,
-        postprocess;
-        verbose = false,
-        api_key,
-        model = model_id,
-        kwargs...)
+                    doc,
+                    postprocess;
+                    verbose = false,
+                    api_key,
+                    model = model_id,
+                    kwargs...)
                 for doc in docs]
     ## Aggregate results
     msg = DataMessage(;

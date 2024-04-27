@@ -65,7 +65,7 @@ function create_websearch(query::AbstractString;
         max_results::Integer = 5,
         include_images::Bool = false,
         include_domains::AbstractVector{<:AbstractString} = String[],
-        exclude_domains::AbstractVector{<:AbstractString} = String[],)
+        exclude_domains::AbstractVector{<:AbstractString} = String[])
     @assert search_depth in ["basic", "advanced"] "Search depth must be either 'basic' or 'advanced'"
     @assert max_results>0 "Max results must be a positive integer"
 

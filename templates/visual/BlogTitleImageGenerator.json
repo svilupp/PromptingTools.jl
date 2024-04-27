@@ -1,0 +1,21 @@
+[
+    {
+        "content": "Template Metadata",
+        "description": "Simple prompt to generate a cartoonish title image for a blog post based on its TLDR. Placeholders: `tldr`",
+        "version": "1.0",
+        "source": "",
+        "_type": "metadatamessage"
+    },
+    {
+        "content": "Your task is to generate a title image for a blog post.\n\nGiven the provided summary (TLDR) of the blog post, generate an image that captures the key points and ideas of the blog post.\nUse some of the key themes when generating the image.\n\nInstructions:\n- The image should be colorful, cartoonish, playful.\n- It must NOT have any text, labels, letters or words. Any text will be immediately rejected.\n- The image should be wide aspect ratio (1000:420).\n",
+        "variables": [],
+        "_type": "systemmessage"
+    },
+    {
+        "content": "Blog post TLDR:\n{{tldr}}\n\nPlease generate the image.",
+        "variables": [
+            "tldr"
+        ],
+        "_type": "usermessage"
+    }
+]

@@ -1,6 +1,6 @@
 using PromptingTools.Experimental.AgentTools: add_feedback!,
-    evaluate_condition!,
-    SampleNode, expand!, AICallBlock
+                                              evaluate_condition!,
+                                              SampleNode, expand!, AICallBlock
 
 @testset "add_feedback!" begin
     # Test for adding feedback as a new message to the conversation
@@ -129,9 +129,10 @@ end
 end
 
 @testset "airetry!" begin
-    response = Dict(:choices => [
+    response = Dict(
+        :choices => [
             Dict(:message => Dict(:content => "Hello!"),
-                :finish_reason => "stop"),
+            :finish_reason => "stop")
         ],
         :usage => Dict(:total_tokens => 3, :prompt_tokens => 2, :completion_tokens => 1))
     schema = PT.TestEchoOpenAISchema(; response, status = 200)
