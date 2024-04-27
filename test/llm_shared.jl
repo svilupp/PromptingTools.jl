@@ -8,14 +8,14 @@ using PromptingTools: finalize_outputs
     # Given a schema and a vector of messages with handlebar variables, it should replace the variables with the correct values in the conversation dictionary.
     messages = [
         SystemMessage("Act as a helpful AI assistant"),
-        UserMessage("Hello, my name is {{name}}"),
+        UserMessage("Hello, my name is {{name}}")
     ]
     expected_output = [
         SystemMessage("Act as a helpful AI assistant"),
         UserMessage(;
             content = "Hello, my name is John",
             variables = [:name],
-            _type = :usermessage),
+            _type = :usermessage)
     ]
     conversation = render(schema,
         messages;
@@ -26,11 +26,11 @@ using PromptingTools: finalize_outputs
     # AI message does NOT replace variables
     messages = [
         SystemMessage("Act as a helpful AI assistant"),
-        AIMessage("Hello, my name is {{name}}"),
+        AIMessage("Hello, my name is {{name}}")
     ]
     expected_output = [
         SystemMessage("Act as a helpful AI assistant"),
-        AIMessage("Hello, my name is {{name}}"),
+        AIMessage("Hello, my name is {{name}}")
     ]
     conversation = render(schema, messages; name = "John")
     # AIMessage does not replace handlebar variables
@@ -38,12 +38,12 @@ using PromptingTools: finalize_outputs
 
     # Given a schema and a vector of messages with no system messages, it should add a default system prompt to the conversation dictionary.
     messages = [
-        UserMessage("User message"),
+        UserMessage("User message")
     ]
     conversation = render(schema, messages)
     expected_output = [
         SystemMessage("Act as a helpful AI assistant"),
-        UserMessage("User message"),
+        UserMessage("User message")
     ]
     @test conversation == expected_output
 
@@ -51,18 +51,18 @@ using PromptingTools: finalize_outputs
     conversation = [
         SystemMessage("System message 1"),
         UserMessage("Hello"),
-        AIMessage("Hi there"),
+        AIMessage("Hi there")
     ]
     messages = [
         UserMessage("How are you?"),
-        AIMessage("I'm doing well, thank you!"),
+        AIMessage("I'm doing well, thank you!")
     ]
     expected_output = [
         SystemMessage("System message 1"),
         UserMessage("Hello"),
         AIMessage("Hi there"),
         UserMessage("How are you?"),
-        AIMessage("I'm doing well, thank you!"),
+        AIMessage("I'm doing well, thank you!")
     ]
     conversation = render(schema, messages; conversation)
     @test conversation == expected_output
@@ -71,18 +71,18 @@ using PromptingTools: finalize_outputs
     conversation = [
         SystemMessage("System message 1"),
         UserMessage("Hello {{name}}"),
-        AIMessage("Hi there"),
+        AIMessage("Hi there")
     ]
     messages = [
         UserMessage("How are you, {{name}}?"),
-        AIMessage("I'm doing well, thank you!"),
+        AIMessage("I'm doing well, thank you!")
     ]
     expected_output = [
         SystemMessage("System message 1"),
         UserMessage("Hello {{name}}"),
         AIMessage("Hi there"),
         UserMessage("How are you, John?", [:name], :usermessage),
-        AIMessage("I'm doing well, thank you!"),
+        AIMessage("I'm doing well, thank you!")
     ]
     conversation = render(schema, messages; conversation, name = "John")
     @test conversation == expected_output
@@ -91,12 +91,12 @@ using PromptingTools: finalize_outputs
     messages = [
         UserMessage("Hello"),
         AIMessage("Hi there"),
-        SystemMessage("This is a system message"),
+        SystemMessage("This is a system message")
     ]
     expected_output = [
         SystemMessage("This is a system message"),
         UserMessage("Hello"),
-        AIMessage("Hi there"),
+        AIMessage("Hi there")
     ]
     conversation = render(schema, messages)
     @test conversation == expected_output
@@ -104,7 +104,7 @@ using PromptingTools: finalize_outputs
     # Given an empty vector of messages, it should return an empty conversation dictionary just with the system prompt
     messages = AbstractMessage[]
     expected_output = [
-        SystemMessage("Act as a helpful AI assistant"),
+        SystemMessage("Act as a helpful AI assistant")
     ]
     conversation = render(schema, messages)
     @test conversation == expected_output
@@ -112,11 +112,11 @@ using PromptingTools: finalize_outputs
     # Given a schema and a vector of messages with a system message containing handlebar variables not present in kwargs, it should replace the variables with empty strings in the conversation dictionary.
     messages = [
         SystemMessage("Hello, {{name}}!"),
-        UserMessage("How are you?"),
+        UserMessage("How are you?")
     ]
     expected_output = [
         SystemMessage("Hello, !", [:name], :systemmessage),
-        UserMessage("How are you?"),
+        UserMessage("How are you?")
     ]
     conversation = render(schema, messages)
     # Broken because we do not remove any unused handlebar variables
@@ -127,12 +127,12 @@ using PromptingTools: finalize_outputs
         SystemMessage("Act as a helpful AI assistant"),
         UserMessage("Hello"),
         DataMessage(; content = ones(3, 3)),
-        AIMessage("Hi there"),
+        AIMessage("Hi there")
     ]
     expected_output = [
         SystemMessage("Act as a helpful AI assistant"),
         UserMessage("Hello"),
-        AIMessage("Hi there"),
+        AIMessage("Hi there")
     ]
     conversation = render(schema, messages)
     @test conversation == expected_output
@@ -141,7 +141,7 @@ using PromptingTools: finalize_outputs
     messages = [
         SystemMessage("System message 1"),
         SystemMessage("System message 2"),
-        UserMessage("User message"),
+        UserMessage("User message")
     ]
     @test_throws ArgumentError render(schema, messages)
 
@@ -149,7 +149,7 @@ using PromptingTools: finalize_outputs
     messages = [
         SystemMessage("System message 1"),
         SystemMessage("System message 2"),
-        UserMessage("User message"),
+        UserMessage("User message")
     ]
     # conversation = render(schema, messages)
     # expected_output = [
@@ -163,11 +163,11 @@ using PromptingTools: finalize_outputs
     # Test UserMessageWithImages
     messages = [
         SystemMessage("System message 1"),
-        UserMessageWithImages("User message"; image_url = "https://example.com/image.png"),
+        UserMessageWithImages("User message"; image_url = "https://example.com/image.png")
     ]
     expected_output = [
         SystemMessage("System message 1"),
-        UserMessageWithImages("User message"; image_url = "https://example.com/image.png"),
+        UserMessageWithImages("User message"; image_url = "https://example.com/image.png")
     ]
     conversation = render(schema, messages)
     @test conversation == expected_output
@@ -179,7 +179,7 @@ end
     messages = [
         SystemMessage("System message 1"),
         UserMessage("User message"),
-        AIMessage("AI message"),
+        AIMessage("AI message")
     ]
     msg = AIMessage("AI message 2")
     expected_output = msg
@@ -190,14 +190,14 @@ end
     messages = [
         SystemMessage("System message 1"),
         UserMessage("User message"),
-        AIMessage("AI message"),
+        AIMessage("AI message")
     ]
     msg = AIMessage("AI message 2")
     expected_output = [
         SystemMessage("System message 1"),
         UserMessage("User message"),
         AIMessage("AI message"),
-        msg,
+        msg
     ]
     output = finalize_outputs(messages, [], msg; return_all = true)
     @test output == expected_output
@@ -206,10 +206,10 @@ end
     conversation = [
         SystemMessage("System message 1"),
         UserMessage("User message"),
-        AIMessage("AI message"),
+        AIMessage("AI message")
     ]
     messages = [
-        AIMessage("AI message 2"),
+        AIMessage("AI message 2")
     ]
     msg = AIMessage("AI message 3")
     expected_output = [
@@ -217,7 +217,7 @@ end
         UserMessage("User message"),
         AIMessage("AI message"),
         AIMessage("AI message 2"),
-        msg,
+        msg
     ]
     output = finalize_outputs(messages, [], msg; conversation, return_all = true)
     @test output == expected_output
@@ -226,10 +226,10 @@ end
     conversation = [
         SystemMessage("System message 1"),
         UserMessage("User message"),
-        AIMessage("AI message"),
+        AIMessage("AI message")
     ]
     messages = [
-        AIMessage("AI message 2"),
+        AIMessage("AI message 2")
     ]
     msg = AIMessage("AI message 3")
 
@@ -245,11 +245,11 @@ end
     conversation = [
         SystemMessage("System message 1"),
         UserMessage("User message {{name}}"),
-        AIMessage("AI message"),
+        AIMessage("AI message")
     ]
     messages = [
         UserMessage("User message {{name}}"),
-        AIMessage("AI message 2"),
+        AIMessage("AI message 2")
     ]
     msg = AIMessage("AI message 3")
     expected_output = [
@@ -258,7 +258,7 @@ end
         AIMessage("AI message"),
         UserMessage("User message John", [:name], :usermessage),
         AIMessage("AI message 2"),
-        msg,
+        msg
     ]
     output = finalize_outputs(messages,
         [],
@@ -272,11 +272,11 @@ end
     conversation = [
         SystemMessage("System message 1"),
         UserMessage("User message {{name}}"),
-        AIMessage("AI message"),
+        AIMessage("AI message")
     ]
     messages = [
         UserMessage("User message {{name}}"),
-        AIMessage("AI message 2"),
+        AIMessage("AI message 2")
     ]
     msg = AIMessage("AI message 3")
     expected_output = [
@@ -286,7 +286,7 @@ end
         UserMessage("User message John", [:name], :usermessage),
         AIMessage("AI message 2"),
         msg,
-        msg,
+        msg
     ]
     output = finalize_outputs(messages,
         [],

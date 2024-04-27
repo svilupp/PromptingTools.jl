@@ -75,6 +75,9 @@ end
 function Base.getindex(node::SampleNode, id::Integer)
     find_node(node, id)
 end
+function Base.length(node::SampleNode)
+    PreOrderDFS(node) |> collect |> length
+end
 function Base.var"=="(n1::SampleNode, n2::SampleNode)
     all(fieldnames(typeof(n1))) do f
         if f == :parent

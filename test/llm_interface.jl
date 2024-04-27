@@ -7,8 +7,9 @@ using PromptingTools: response_to_message, AbstractPromptSchema
     OLD_PROMPT_SCHEMA = PromptingTools.PROMPT_SCHEMA
     ### AIGenerate
     # corresponds to OpenAI API v1
-    response = Dict(:choices => [
-            Dict(:message => Dict(:content => "Hello!"), :finish_reason => "stop"),
+    response = Dict(
+        :choices => [
+            Dict(:message => Dict(:content => "Hello!"), :finish_reason => "stop")
         ],
         :usage => Dict(:total_tokens => 3, :prompt_tokens => 2, :completion_tokens => 1))
 
@@ -38,11 +39,13 @@ using PromptingTools: response_to_message, AbstractPromptSchema
     @test msg == expected_output
 
     ### AIExtract
-    response1 = Dict(:choices => [
-            Dict(:message => Dict(:tool_calls => [
-                    Dict(:function => Dict(:arguments => "{\"content\": \"x\"}")),
-                ]),
-                :finish_reason => "stop")],
+    response1 = Dict(
+        :choices => [
+            Dict(
+            :message => Dict(:tool_calls => [
+                Dict(:function => Dict(:arguments => "{\"content\": \"x\"}"))
+            ]),
+            :finish_reason => "stop")],
         :usage => Dict(:total_tokens => 3, :prompt_tokens => 2, :completion_tokens => 1))
 
     schema = TestEchoOpenAISchema(; response = response1, status = 200)

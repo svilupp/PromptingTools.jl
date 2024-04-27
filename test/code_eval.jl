@@ -103,7 +103,8 @@ import Base.splitx
 splitx(aaa) = 2
 """)
     @test_logs (:warn,
-        r"Safety Warning: Base / Main overrides detected \(functions: splitx\)") match_mode=:any eval!(cb;
+        r"Safety Warning: Base / Main overrides detected \(functions: splitx\)") match_mode=:any eval!(
+        cb;
         safe_eval = true)
 
     # Evaluate inside a gensym'd module
