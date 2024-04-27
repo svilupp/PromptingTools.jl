@@ -225,9 +225,11 @@ end
     end
     output = function_call_signature(MyMeasurement2)#|> JSON3.pretty
     expected_output = Dict{String, Any}("name" => "MyMeasurement2_extractor",
-        "parameters" => Dict{String, Any}("properties" => Dict{String, Any}("height" => Dict{
+        "parameters" => Dict{String, Any}(
+            "properties" => Dict{String, Any}(
+                "height" => Dict{
                     String,
-                    Any,
+                    Any
                 }("type" => "integer"),
                 "weight" => Dict{String, Any}("type" => "number"),
                 "age" => Dict{String, Any}("type" => "integer")),

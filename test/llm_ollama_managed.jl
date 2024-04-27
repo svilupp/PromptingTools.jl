@@ -52,7 +52,7 @@ using PromptingTools: UserMessage, UserMessageWithImages, DataMessage
     # Double check templating
     messages = [
         SystemMessage("Act as a helpful AI assistant"),
-        UserMessage("Hello, my name is {{name}}"),
+        UserMessage("Hello, my name is {{name}}")
     ]
     expected_output = (; system = "Act as a helpful AI assistant",
         prompt = "Hello, my name is John")

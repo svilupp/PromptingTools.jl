@@ -10,6 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.23.0]
+
+### Added
+- Added new prompt templates for "Expert" tasks like `LinuxBashExpertAsk`, `JavascriptExpertTask`, etc.
+- Added new prompt templates for self-critiquing agents like `ChiefEditorTranscriptCritic`, `JuliaExpertTranscriptCritic`, etc.
+
+### Updated
+- Extended `aicodefixer_feedback` methods to work with `AICode` and `AIGenerate`.
+
 ## [0.22.0]
 
 ### Added

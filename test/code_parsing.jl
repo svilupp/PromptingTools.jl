@@ -1,13 +1,15 @@
 using PromptingTools: extract_julia_imports
 using PromptingTools: detect_pkg_operation,
-    detect_missing_packages, extract_function_name, extract_function_names,
-    remove_unsafe_lines, detect_base_main_overrides
+                      detect_missing_packages, extract_function_name,
+                      extract_function_names,
+                      remove_unsafe_lines, detect_base_main_overrides
 using PromptingTools: has_julia_prompt,
-    remove_julia_prompt, extract_code_blocks, extract_code_blocks_fallback, eval!
+                      remove_julia_prompt, extract_code_blocks,
+                      extract_code_blocks_fallback, eval!
 using PromptingTools: escape_interpolation, find_subsequence_positions
 using PromptingTools: AICode, is_julia_code, is_julia_expr
 using PromptingTools: extract_testset_name,
-    extract_package_name_from_argerror, extract_stacktrace_lines
+                      extract_package_name_from_argerror, extract_stacktrace_lines
 
 @testset "is_julia_code" begin
 
@@ -54,7 +56,8 @@ end
     @test detect_missing_packages(Symbol.(["Test",
         "Base",
         "Main",
-        "SpecialPackage12345678", "SpecialPackage123456789"])) == (true, [:SpecialPackage12345678, :SpecialPackage123456789])
+        "SpecialPackage12345678", "SpecialPackage123456789"])) ==
+          (true, [:SpecialPackage12345678, :SpecialPackage123456789])
 end
 
 @testset "detect_pkg_operation" begin

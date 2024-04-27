@@ -6,12 +6,14 @@ load_templates!();
 @load_preference("MODEL_CHAT", default="x")
 
 # API Calls prep
-mock_response = Dict(:choices => [
-        Dict(:message => Dict(:content => "Hello!",
-                :tool_calls => [
-                    Dict(:function => Dict(:arguments => JSON3.write(Dict(:x => 1)))),
-                ]),
-            :finish_reason => "stop"),
+mock_response = Dict(
+    :choices => [
+        Dict(
+        :message => Dict(:content => "Hello!",
+            :tool_calls => [
+                Dict(:function => Dict(:arguments => JSON3.write(Dict(:x => 1))))
+            ]),
+        :finish_reason => "stop")
     ],
     :usage => Dict(:total_tokens => 3, :prompt_tokens => 2, :completion_tokens => 1))
 schema = TestEchoOpenAISchema(; response = mock_response, status = 200)
