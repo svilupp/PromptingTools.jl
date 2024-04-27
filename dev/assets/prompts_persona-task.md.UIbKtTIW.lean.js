@@ -30,27 +30,27 @@ const _hoisted_15 = /* @__PURE__ */ createBaseVNode("li", null, [
 const _hoisted_16 = /* @__PURE__ */ createStaticVNode("", 5);
 const _hoisted_21 = /* @__PURE__ */ createBaseVNode("code", null, 'instructions="None."', -1);
 const _hoisted_22 = /* @__PURE__ */ createStaticVNode("", 4);
-const _hoisted_26 = /* @__PURE__ */ createStaticVNode("", 22);
-const _hoisted_48 = /* @__PURE__ */ createBaseVNode("code", null, "Follow up email. Sections: Agreements, Next steps", -1);
-const _hoisted_49 = /* @__PURE__ */ createBaseVNode("li", null, [
+const _hoisted_26 = /* @__PURE__ */ createStaticVNode("", 28);
+const _hoisted_54 = /* @__PURE__ */ createBaseVNode("code", null, "Follow up email. Sections: Agreements, Next steps", -1);
+const _hoisted_55 = /* @__PURE__ */ createBaseVNode("li", null, [
   /* @__PURE__ */ createBaseVNode("p", null, [
     /* @__PURE__ */ createTextVNode("Placeholders: "),
     /* @__PURE__ */ createBaseVNode("code", null, "brief")
   ])
 ], -1);
-const _hoisted_50 = /* @__PURE__ */ createBaseVNode("li", null, [
+const _hoisted_56 = /* @__PURE__ */ createBaseVNode("li", null, [
   /* @__PURE__ */ createBaseVNode("p", null, "Word count: 1204")
 ], -1);
-const _hoisted_51 = /* @__PURE__ */ createBaseVNode("li", null, [
+const _hoisted_57 = /* @__PURE__ */ createBaseVNode("li", null, [
   /* @__PURE__ */ createBaseVNode("p", null, "Source:")
 ], -1);
-const _hoisted_52 = /* @__PURE__ */ createBaseVNode("li", null, [
+const _hoisted_58 = /* @__PURE__ */ createBaseVNode("li", null, [
   /* @__PURE__ */ createBaseVNode("p", null, "Version: 1.1")
 ], -1);
-const _hoisted_53 = /* @__PURE__ */ createStaticVNode("", 17);
-const _hoisted_70 = /* @__PURE__ */ createBaseVNode("code", null, "code", -1);
-const _hoisted_71 = /* @__PURE__ */ createBaseVNode("code", null, 'instructions="None."', -1);
-const _hoisted_72 = /* @__PURE__ */ createBaseVNode("li", null, [
+const _hoisted_59 = /* @__PURE__ */ createStaticVNode("", 41);
+const _hoisted_100 = /* @__PURE__ */ createBaseVNode("code", null, "code", -1);
+const _hoisted_101 = /* @__PURE__ */ createBaseVNode("code", null, 'instructions="None."', -1);
+const _hoisted_102 = /* @__PURE__ */ createBaseVNode("li", null, [
   /* @__PURE__ */ createBaseVNode("p", null, [
     /* @__PURE__ */ createTextVNode("Placeholders: "),
     /* @__PURE__ */ createBaseVNode("code", null, "code"),
@@ -58,19 +58,19 @@ const _hoisted_72 = /* @__PURE__ */ createBaseVNode("li", null, [
     /* @__PURE__ */ createBaseVNode("code", null, "instructions")
   ])
 ], -1);
-const _hoisted_73 = /* @__PURE__ */ createBaseVNode("li", null, [
+const _hoisted_103 = /* @__PURE__ */ createBaseVNode("li", null, [
   /* @__PURE__ */ createBaseVNode("p", null, "Word count: 1475")
 ], -1);
-const _hoisted_74 = /* @__PURE__ */ createBaseVNode("li", null, [
+const _hoisted_104 = /* @__PURE__ */ createBaseVNode("li", null, [
   /* @__PURE__ */ createBaseVNode("p", null, "Source:")
 ], -1);
-const _hoisted_75 = /* @__PURE__ */ createBaseVNode("li", null, [
+const _hoisted_105 = /* @__PURE__ */ createBaseVNode("li", null, [
   /* @__PURE__ */ createBaseVNode("p", null, "Version: 1.1")
 ], -1);
-const _hoisted_76 = /* @__PURE__ */ createStaticVNode("", 36);
-const _hoisted_112 = /* @__PURE__ */ createBaseVNode("code", null, "code", -1);
-const _hoisted_113 = /* @__PURE__ */ createBaseVNode("code", null, 'instructions="None."', -1);
-const _hoisted_114 = /* @__PURE__ */ createBaseVNode("li", null, [
+const _hoisted_106 = /* @__PURE__ */ createStaticVNode("", 42);
+const _hoisted_148 = /* @__PURE__ */ createBaseVNode("code", null, "code", -1);
+const _hoisted_149 = /* @__PURE__ */ createBaseVNode("code", null, 'instructions="None."', -1);
+const _hoisted_150 = /* @__PURE__ */ createBaseVNode("li", null, [
   /* @__PURE__ */ createBaseVNode("p", null, [
     /* @__PURE__ */ createTextVNode("Placeholders: "),
     /* @__PURE__ */ createBaseVNode("code", null, "code"),
@@ -78,16 +78,16 @@ const _hoisted_114 = /* @__PURE__ */ createBaseVNode("li", null, [
     /* @__PURE__ */ createBaseVNode("code", null, "instructions")
   ])
 ], -1);
-const _hoisted_115 = /* @__PURE__ */ createBaseVNode("li", null, [
+const _hoisted_151 = /* @__PURE__ */ createBaseVNode("li", null, [
   /* @__PURE__ */ createBaseVNode("p", null, "Word count: 1643")
 ], -1);
-const _hoisted_116 = /* @__PURE__ */ createBaseVNode("li", null, [
+const _hoisted_152 = /* @__PURE__ */ createBaseVNode("li", null, [
   /* @__PURE__ */ createBaseVNode("p", null, "Source:")
 ], -1);
-const _hoisted_117 = /* @__PURE__ */ createBaseVNode("li", null, [
+const _hoisted_153 = /* @__PURE__ */ createBaseVNode("li", null, [
   /* @__PURE__ */ createBaseVNode("p", null, "Version: 1.0")
 ], -1);
-const _hoisted_118 = /* @__PURE__ */ createStaticVNode("", 4);
+const _hoisted_154 = /* @__PURE__ */ createStaticVNode("", 4);
 function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
   return openBlock(), createElementBlock("div", null, [
     _hoisted_1,
@@ -120,48 +120,48 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
       createBaseVNode("li", null, [
         createBaseVNode("p", null, [
           createTextVNode("Description: Template for quick email drafts. Provide a brief in 5-7 words as headlines, eg, "),
-          _hoisted_48,
+          _hoisted_54,
           createTextVNode(" Placeholders: " + toDisplayString(_ctx.brief), 1)
         ])
       ]),
-      _hoisted_49,
-      _hoisted_50,
-      _hoisted_51,
-      _hoisted_52
+      _hoisted_55,
+      _hoisted_56,
+      _hoisted_57,
+      _hoisted_58
     ]),
-    _hoisted_53,
+    _hoisted_59,
     createBaseVNode("ul", null, [
       createBaseVNode("li", null, [
         createBaseVNode("p", null, [
           createTextVNode("Description: For writing Julia-style unit tests. It expects "),
-          _hoisted_70,
+          _hoisted_100,
           createTextVNode(" provided as a string (it can be the whole source code of your app). Instructions are a good way to guide the model which functions to test and how. If you don't need the instructions, set "),
-          _hoisted_71,
+          _hoisted_101,
           createTextVNode(". Placeholders: " + toDisplayString(_ctx.code) + ", " + toDisplayString(_ctx.instructions), 1)
         ])
       ]),
-      _hoisted_72,
-      _hoisted_73,
-      _hoisted_74,
-      _hoisted_75
+      _hoisted_102,
+      _hoisted_103,
+      _hoisted_104,
+      _hoisted_105
     ]),
-    _hoisted_76,
+    _hoisted_106,
     createBaseVNode("ul", null, [
       createBaseVNode("li", null, [
         createBaseVNode("p", null, [
           createTextVNode("Description: For writing Julia-style unit tests. The prompt is XML-formatted - useful for Anthropic models. It expects "),
-          _hoisted_112,
+          _hoisted_148,
           createTextVNode(" provided as a string (it can be the whole source code of your app). Instructions are a good way to guide the model which functions to test and how. If you don't need the instructions, set "),
-          _hoisted_113,
+          _hoisted_149,
           createTextVNode(". Placeholders: " + toDisplayString(_ctx.code) + ", " + toDisplayString(_ctx.instructions), 1)
         ])
       ]),
-      _hoisted_114,
-      _hoisted_115,
-      _hoisted_116,
-      _hoisted_117
+      _hoisted_150,
+      _hoisted_151,
+      _hoisted_152,
+      _hoisted_153
     ]),
-    _hoisted_118
+    _hoisted_154
   ]);
 }
 const personaTask = /* @__PURE__ */ _export_sfc(_sfc_main, [["render", _sfc_render]]);
