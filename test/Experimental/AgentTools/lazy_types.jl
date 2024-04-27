@@ -38,10 +38,10 @@ end
     @test aicall.conversation == [PT.UserMessage("Hi")]
     aicall = AICall(identity, :BlankSystemUser)
     @test aicall.conversation == [PT.SystemMessage("{{system}}")
-        PT.UserMessage("{{user}}")]
+                                  PT.UserMessage("{{user}}")]
     aicall = AICall(identity, AITemplate(:BlankSystemUser))
     @test aicall.conversation == [PT.SystemMessage("{{system}}")
-        PT.UserMessage("{{user}}")]
+                                  PT.UserMessage("{{user}}")]
 
     # derived methods
     aicall = AIGenerate()

@@ -1,5 +1,5 @@
 using PromptingTools: ModelSpec,
-    register_model!, MODEL_REGISTRY, MODEL_ALIASES, ModelRegistry
+                      register_model!, MODEL_REGISTRY, MODEL_ALIASES, ModelRegistry
 using PromptingTools: list_registry, list_aliases
 using PromptingTools: OpenAISchema, OllamaManagedSchema, set_preferences!, get_preferences
 
@@ -13,7 +13,7 @@ using PromptingTools: OpenAISchema, OllamaManagedSchema, set_preferences!, get_p
     @testset "Allowed Preferences" for pref in [
         "OPENAI_API_KEY",
         "MODEL_CHAT",
-        "MODEL_EMBEDDING",
+        "MODEL_EMBEDDING"
     ]
         set_preferences!(pref => "test_value")
         @test get_preferences(pref) == "test_value"  # Assuming a get_preferences function exists
