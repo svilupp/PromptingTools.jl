@@ -21,7 +21,7 @@ using PromptingTools: TestEchoOpenAISchema, push_conversation!, CONV_HISTORY, Us
     schema_ref = PT.MODEL_REGISTRY["echo0"].schema
     @test schema_ref.inputs ==
           [Dict("role" => "system", "content" => "Act as a helpful AI assistant")
-        Dict("role" => "user", "content" => "Hello, how are you?")]
+           Dict("role" => "user", "content" => "Hello, how are you?")]
 
     # Test the macro with string interpolation
     a = 1
@@ -29,7 +29,7 @@ using PromptingTools: TestEchoOpenAISchema, push_conversation!, CONV_HISTORY, Us
     schema_ref = PT.MODEL_REGISTRY["echo0"].schema
     @test schema_ref.inputs ==
           [Dict("role" => "system", "content" => "Act as a helpful AI assistant")
-        Dict("role" => "user", "content" => "What is `1+1`?")]
+           Dict("role" => "user", "content" => "What is `1+1`?")]
 
     # ai!_str_macro" begin
     # Prepopulate conversation history
@@ -69,7 +69,7 @@ end
     schema_ref = PT.MODEL_REGISTRY["echo0"].schema
     @test schema_ref.inputs ==
           [Dict("role" => "system", "content" => "Act as a helpful AI assistant")
-        Dict("role" => "user", "content" => "Hello, how are you?")]
+           Dict("role" => "user", "content" => "Hello, how are you?")]
     @test CONV_HISTORY[end][end].content == "Hello!"
 
     # continue conversation

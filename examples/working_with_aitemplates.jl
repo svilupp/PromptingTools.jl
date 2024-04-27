@@ -46,7 +46,7 @@ msgs = PT.render(AITemplate(:JuliaExpertAsk))
 # 
 # Let's adjust the previous template to be more specific to a data analysis question:
 tpl = [PT.SystemMessage("You are a world-class Julia language programmer with the knowledge of the latest syntax. You're also a senior Data Scientist and proficient in data analysis in Julia. Your communication is brief and concise. You're precise and answer only when you're confident in the high quality of your answer.")
-    PT.UserMessage("# Question\n\n{{ask}}")]
+       PT.UserMessage("# Question\n\n{{ask}}")]
 # Templates are saved in the `templates` directory of the package. Name of the file will become the template name (eg, call `:JuliaDataExpertAsk`)
 filename = joinpath(pkgdir(PromptingTools),
     "templates",

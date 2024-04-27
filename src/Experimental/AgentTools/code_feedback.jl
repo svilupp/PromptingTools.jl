@@ -8,9 +8,12 @@ struct CodeSuccess <: AbstractCodeOutcome end
 
 # Feedback function skeleton
 """
+    aicodefixer_feedback(cb::AICode; max_length::Int = 512) -> NamedTuple(; feedback::String)
     aicodefixer_feedback(conversation::AbstractVector{<:PT.AbstractMessage}; max_length::Int = 512) -> NamedTuple(; feedback::String)
+    aicodefixer_feedback(msg::PT.AIMessage; max_length::Int = 512) -> NamedTuple(; feedback::String)
+    aicodefixer_feedback(aicall::AICall; max_length::Int = 512) -> NamedTuple(; feedback::String)
 
-Generate feedback for an AI code fixing session based on the conversation history.
+Generate feedback for an AI code fixing session based on the AICode block /or conversation history (that will be used to extract and evaluate a code block).
 Function is designed to be extensible for different types of feedback and code evaluation outcomes. 
 
 The highlevel wrapper accepts a conversation and returns new kwargs for the AICall.
@@ -20,7 +23,7 @@ Individual feedback functions are dispatched on different subtypes of `AbstractC
 See also: `AIGenerate`, `AICodeFixer`
 
 # Arguments
-- `conversation::AbstractVector{<:PT.AbstractMessage}`: A vector of messages representing the conversation history, where the last message is expected to contain the code to be analyzed.
+- `cb::AICode`: AICode block to evaluate and provide feedback on.
 - `max_length::Int=512`: An optional argument that specifies the maximum length of the feedback message.
 
 # Returns
@@ -28,6 +31,10 @@ See also: `AIGenerate`, `AICodeFixer`
 
 # Example
 ```julia
+cb = AICode(msg; skip_unsafe = true, capture_stdout = true)
+new_kwargs = aicodefixer_feedback(cb)
+
+new_kwargs = aicodefixer_feedback(msg)
 new_kwargs = aicodefixer_feedback(conversation)
 ```
 
@@ -45,11 +52,9 @@ It dispatches for the code feedback based on the subtypes of `AbstractCodeOutcom
 
 You can override the individual methods to customize the feedback.
 """
-function aicodefixer_feedback(conversation::AbstractVector{<:PT.AbstractMessage};
+function aicodefixer_feedback(cb::AICode;
         max_length::Int = 512)
     @assert max_length>0 "max_length must be positive (provided: $max_length)"
-    # Extract the last message, evaluate code, determine outcome
-    cb = AICode(last(conversation); skip_unsafe = true, capture_stdout = true)
     outcome = if isempty(cb.code)
         CodeEmpty() # No code provided
     elseif !PT.isparsed(cb)
@@ -64,6 +69,14 @@ function aicodefixer_feedback(conversation::AbstractVector{<:PT.AbstractMessage}
     # Return new kwargs or adjustments based on the outcome
     new_kwargs = (; feedback = aicodefixer_feedback(outcome, cb; max_length))
     return new_kwargs
+end
+function aicodefixer_feedback(msg::PT.AIMessage; kwargs...)
+    # Extract the last message, evaluate code, determine outcome
+    cb = AICode(msg; skip_unsafe = true, capture_stdout = true)
+    aicodefixer_feedback(cb; kwargs...)
+end
+function aicodefixer_feedback(conversation::AbstractVector{<:PT.AbstractMessage}; kwargs...)
+    aicodefixer_feedback(last(conversation); kwargs...)
 end
 
 function aicodefixer_feedback(::CodeEmpty, args...; kwargs...)

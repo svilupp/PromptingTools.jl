@@ -1,7 +1,7 @@
 using PromptingTools.Experimental.AgentTools: remove_used_kwargs, truncate_conversation
 using PromptingTools.Experimental.AgentTools: beta_sample,
-    gamma_sample, extract_config,
-    unwrap_aicall_args, split_multi_samples
+                                              gamma_sample, extract_config,
+                                              unwrap_aicall_args, split_multi_samples
 
 @testset "remove_used_kwargs" begin
     # Test 1: No overlapping keys
@@ -96,7 +96,7 @@ end
     # Splitting conversation
     conv = [PT.SystemMessage("Say hi!"), PT.SystemMessage("Hello!"),
         PT.AIMessage(; content = "hi1", run_id = 1, sample_id = 1),
-        PT.AIMessage(; content = "hi2", run_id = 1, sample_id = 2),
+        PT.AIMessage(; content = "hi2", run_id = 1, sample_id = 2)
     ]
     @test split_multi_samples(conv) == [conv[1:3], conv[[1, 2, 4]]]
 
@@ -114,7 +114,7 @@ end
     conv = [PT.SystemMessage("Say hi!"), PT.SystemMessage("Hello!"),
         PT.AIMessage(; content = "hi1", run_id = 1, sample_id = 1),
         PT.AIMessage(; content = "hi2", run_id = 1, sample_id = 2),
-        PT.SystemMessage("Hello"),
+        PT.SystemMessage("Hello")
     ]
     @test split_multi_samples(conv) == [conv]
 
@@ -131,7 +131,7 @@ end
         PT.AIMessage("Hello"),
         PT.UserMessage("World"),
         PT.AIMessage("Hello"),
-        PT.UserMessage("World"),
+        PT.UserMessage("World")
     ]
     #### Test 1: Short Conversation
     truncated = truncate_conversation(conversation, max_conversation_length = 32000)

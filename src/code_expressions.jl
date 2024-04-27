@@ -44,7 +44,7 @@ JULIA_EXPR_HEADS = [
     :comprehension,
     :generator,
     :kw,
-    :where,
+    :where
 ]
 # Checks if the provided expression `ex` has some hallmarks of Julia code. Very naive!
 # Serves as a quick check to avoid trying to eval output cells (```plaintext ... ```)
@@ -66,8 +66,9 @@ function remove_macro_expr!(expr, sym::Symbol = Symbol("@testset"))
        expr.args[1] == sym
         return Expr(:block)
     elseif expr isa Expr && !isempty(expr.args)
-        expr.args = filter(x -> !(x isa Expr && x.head == :macrocall && !isempty(x.args) &&
-                                  x.args[1] == sym),
+        expr.args = filter(
+            x -> !(x isa Expr && x.head == :macrocall && !isempty(x.args) &&
+                   x.args[1] == sym),
             expr.args)
         foreach(x -> remove_macro_expr!(x, sym), expr.args)
     end
