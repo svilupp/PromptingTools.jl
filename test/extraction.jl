@@ -225,9 +225,11 @@ end
     end
     output = function_call_signature(MyMeasurement2)#|> JSON3.pretty
     expected_output = Dict{String, Any}("name" => "MyMeasurement2_extractor",
-        "parameters" => Dict{String, Any}("properties" => Dict{String, Any}("height" => Dict{
+        "parameters" => Dict{String, Any}(
+            "properties" => Dict{String, Any}(
+                "height" => Dict{
                     String,
-                    Any,
+                    Any
                 }("type" => "integer"),
                 "weight" => Dict{String, Any}("type" => "number"),
                 "age" => Dict{String, Any}("type" => "integer")),
@@ -240,3 +242,123 @@ end
     schema = function_call_signature(MaybeExtract{MyMeasurement2})
     @test schema["name"] == "MaybeExtractMyMeasurement2_extractor"
 end
+@testset "to_json_schema-primitive_types" begin
+    @test to_json_schema(Int) == Dict("type" => "integer")
+    @test to_json_schema(Float64) == Dict("type" => "number")
+    @test to_json_schema(Bool) == Dict("type" => "boolean")
+    @test to_json_schema(String) == Dict("type" => "string")
+    @test_throws ArgumentError to_json_schema(Any) # Type Any is not supported
+end
+@testset "to_json_schema-structs" begin
+    # Function to check the equivalence of two JSON strings, since Dict is
+    # unordered, we need to sort keys before comparison.
+    function check_json_equivalence(json1::AbstractString, json2::AbstractString)
+        println("\ncheck_json_equivalence\n===json1===")
+        println(json1)
+        println("===json2===")
+        println(json2)
+        println()
+        # JSON dictionary
+        d1 = JSON3.read(json1)
+        d2 = JSON3.read(json2)
+
+        # Get all the keys
+        k1 = sort(collect(keys(d1)))
+        k2 = sort(collect(keys(d2)))
+
+        # Test that all the keys are present
+        @test setdiff(k1, k2) == []
+        @test setdiff(k2, k1) == []
+
+        # Test that all the values are equivalent
+        for (k, v) in d1
+            @test d2[k] == v
+        end
+
+        # @test JSON3.write(JSON3.read(json1)) == JSON3.write(JSON3.read(json2))
+    end
+    function check_json_equivalence(d::Dict, s::AbstractString)
+        return check_json_equivalence(JSON3.write(d), s)
+    end
+
+    # Simple flat structure where each field is a primitive type
+    struct SimpleSingleton
+        singleton_value::Int
+    end
+
+    check_json_equivalence(
+        JSON3.write(typed_json_schema(SimpleSingleton)),
+        "{\"singleton_value\":\"integer\"}"
+    )
+
+    # Test a struct that contains another struct.
+    struct Nested
+        inside_element::SimpleSingleton
+    end
+
+    check_json_equivalence(
+        JSON3.write(typed_json_schema(Nested)),
+        "{\"inside_element\":{\"singleton_value\":\"integer\"}}"
+    )
+
+    # Test a struct with two primitive types
+    struct IntFloatFlat
+        int_value::Int
+        float_value::Float64
+    end
+    check_json_equivalence(
+        typed_json_schema(IntFloatFlat),
+        "{\"int_value\":\"integer\",\"float_value\":\"number\"}"
+    )
+
+    # Test a struct that contains all primitive types
+    struct AllJSONPrimitives
+        int::Integer
+        float::Real
+        string::AbstractString
+        bool::Bool
+        nothing::Nothing
+        missing::Missing
+
+        # Array types
+        array_of_strings::Vector{String}
+        array_of_ints::Vector{Int}
+        array_of_floats::Vector{Float64}
+        array_of_bools::Vector{Bool}
+        array_of_nothings::Vector{Nothing}
+        array_of_missings::Vector{Missing}
+    end
+
+    check_json_equivalence(
+        typed_json_schema(AllJSONPrimitives),
+        "{\"int\":\"integer\",\"float\":\"number\",\"string\":\"string\",\"bool\":\"boolean\",\"nothing\":\"null\",\"missing\":\"null\",\"array_of_strings\":\"string[]\",\"array_of_ints\":\"integer[]\",\"array_of_floats\":\"number[]\",\"array_of_bools\":\"boolean[]\",\"array_of_nothings\":\"null[]\",\"array_of_missings\":\"null[]\"}"
+    )
+
+    # Test a struct with a vector of primitives
+    struct ABunchOfVectors
+        strings::Vector{String}
+        ints::Vector{Int}
+        floats::Vector{Float64}
+        nested_vector::Vector{Nested}
+    end
+
+    check_json_equivalence(
+        typed_json_schema(ABunchOfVectors),
+        "{\"strings\":\"string[]\",\"ints\":\"integer[]\",\"nested_vector\":{\"list[Object]\":\"{\\\"inside_element\\\":{\\\"singleton_value\\\":\\\"integer\\\"}}\"},\"floats\":\"number[]\"}"
+    )
+
+    # Weird struct with a bunch of different types
+    struct Monster
+        name::String
+        age::Int
+        height::Float64
+        friends::Vector{String}
+        nested::Nested
+        flat::IntFloatFlat
+    end
+
+    check_json_equivalence(
+        typed_json_schema(Monster),
+        "{\"flat\":{\"float_value\":\"number\",\"int_value\":\"integer\"},\"nested\":{\"inside_element\":{\"singleton_value\":\"integer\"}},\"age\":\"integer\",\"name\":\"string\",\"height\":\"number\",\"friends\":\"string[]\"}"
+    )
+end;
