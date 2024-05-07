@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.24.0]
+
+### Added
+- Added support for [DeepSeek models](https://platform.deepseek.com/docs) via the `dschat` and `dscode` aliases. You can set the `DEEPSEEK_API_KEY` environment variable to your DeepSeek API key.
+
+
 ## [0.23.0]
 
 ### Added
