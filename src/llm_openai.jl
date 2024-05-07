@@ -205,6 +205,19 @@ function OpenAI.create_chat(schema::GroqOpenAISchema,
         base_url = url)
     OpenAI.create_chat(provider, model, conversation; kwargs...)
 end
+function OpenAI.create_chat(schema::DeepSeekOpenAISchema,
+        api_key::AbstractString,
+        model::AbstractString,
+        conversation;
+        url::String = "https://api.deepseek.com/v1",
+        kwargs...)
+    # Build the corresponding provider object
+    # try to override provided api_key because the default is OpenAI key
+    provider = CustomProvider(;
+        api_key = isempty(DEEPSEEK_API_KEY) ? api_key : DEEPSEEK_API_KEY,
+        base_url = url)
+    OpenAI.create_chat(provider, model, conversation; kwargs...)
+end
 function OpenAI.create_chat(schema::DatabricksOpenAISchema,
         api_key::AbstractString,
         model::AbstractString,
