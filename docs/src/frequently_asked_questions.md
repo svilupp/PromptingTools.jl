@@ -415,3 +415,58 @@ Fine-tuning is a powerful technique to adapt a model to your specific use case (
 2. Once the finetuning time comes, create a bundle of ShareGPT-formatted conversations (common finetuning format) in a single `.jsonl` file. Use `PT.save_conversations("dataset.jsonl", [conversation1, conversation2, ...])` (notice that plural "conversationS" in the function name).
 
 For an example of an end-to-end finetuning process, check out our sister project [JuliaLLMLeaderboard Finetuning experiment](https://github.com/svilupp/Julia-LLM-Leaderboard/blob/main/experiments/cheater-7b-finetune/README.md). It shows the process of finetuning for half a dollar with [JarvisLabs.ai](https://jarvislabs.ai/templates/axolotl) and [Axolotl](https://github.com/OpenAccess-AI-Collective/axolotl).
+
+## Can I see how my prompt is rendered / what is sent to the API?
+
+Yes, there are two ways. 
+1) "dry run", where the `ai*` function will return the prompt rendered in the style of the selected API provider
+2) "partial render", for provider-agnostic purposes, you can run only the first step of the rendering pipeline to see the messages that will be sent (but formatted as `SystemMessage` and `UserMessage`), which is easy to read and work with
+
+1) Dry Run
+
+Add kwargs `dry_run` and `return_all` to see what could have been sent to the API to your `ai*` functions (without `return_all` there is nothing to show you).
+
+Example for OpenAI:
+```julia
+dry_conv = aigenerate(:BlankSystemUser; system = "I exist", user = "say hi",
+    model = "lngpt3t", return_all = true, dry_run = true)
+```
+
+```plaintext
+2-element Vector{Dict{String, Any}}:
+ Dict("role" => "system", "content" => "I exist")
+ Dict("role" => "user", "content" => "say hi")
+```
+
+2) Partial Render
+
+Personally, I prefer to see the pretty formatting of PromptingTools *Messages. 
+To see what will be sent to the model, you can `render` only the first stage of the rendering pipeline with schema `NoSchema()` (it merely does the variable replacements and creates the necessary messages). It's shared by all the schema/providers.
+
+```julia
+PT.render(PT.NoSchema(), "say hi, {{name}}"; name="John")
+```
+
+```plaintext
+2-element Vector{PromptingTools.AbstractMessage}:
+ PromptingTools.SystemMessage("Act as a helpful AI assistant")
+ PromptingTools.UserMessage("say hi, John")
+```
+
+What about the prompt templates?
+Prompt templates have an extra pre-rendering step that expands the symbolic `:name` (understood by PromptingTools as a reference to `AITemplate(:name)`) into a vector of Messages.
+
+```julia
+# expand the template into messages
+tpl = PT.render(AITemplate(:BlankSystemUser))
+PT.render(PT.NoSchema(), tpl; system = "I exist", user = "say hi")
+# replace any variables, etc.
+```
+
+```plaintext
+2-element Vector{PromptingTools.AbstractMessage}:
+ PromptingTools.SystemMessage("I exist")
+ PromptingTools.UserMessage("say hi")
+```
+
+For more information about the rendering pipeline and examples refer to [Walkthrough Example for aigenerate](@ref).

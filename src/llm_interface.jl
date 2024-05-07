@@ -192,6 +192,20 @@ Requires one environment variables to be set:
 """
 struct GroqOpenAISchema <: AbstractOpenAISchema end
 
+"""
+    DeepSeekOpenAISchema
+
+Schema to call the [DeepSeek](https://platform.deepseek.com/docs) API.
+
+Links:
+- [Get your API key](https://platform.deepseek.com/api_keys)
+- [API Reference](https://platform.deepseek.com/docs)
+
+Requires one environment variables to be set:
+- `DEEPSEEK_API_KEY`: Your API key (often starts with "sk-...")
+"""
+struct DeepSeekOpenAISchema <: AbstractOpenAISchema end
+
 abstract type AbstractOllamaSchema <: AbstractPromptSchema end
 
 """
