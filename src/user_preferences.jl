@@ -348,7 +348,7 @@ aliases = merge(
         "gl3" => "llama3-8b-8192",
         "gllama370" => "llama3-70b-8192",
         "gl70" => "llama3-70b-8192",
-        "gmixtral" => "mixtral-8x7b-32768"
+        "gmixtral" => "mixtral-8x7b-32768",
         ## DeepSeek
         "dschat" => "deepseek-chat",
         "dscode" => "deepseek-coder"
