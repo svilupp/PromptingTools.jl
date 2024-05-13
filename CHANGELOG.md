@@ -7,9 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Added support for [DeepSeek models](https://platform.deepseek.com/docs) via the `dschat` and `dscode` aliases. You can set the `DEEPSEEK_API_KEY` environment variable to your DeepSeek API key.
 
 ### Fixed
+
+## [0.25.0]
+
+### Added
+- Added model registry record for the latest OpenAI GPT4 Omni model (`gpt4o`) - it's as good as GPT4, faster and cheaper.
 
 ## [0.24.0]
 
