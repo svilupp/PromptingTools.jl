@@ -589,6 +589,13 @@ end
     # Return the full conversation
     conv = aiclassify(
         schema1, :InputClassifier; input = "pelican", choices, return_all = true)
+    expected_output = AIMessage(;
+        content = "A",
+        status = 200,
+        tokens = (2, 1),
+        finish_reason = "stop",
+        cost = conv[end].cost,
+        elapsed = msg.elapsed)
     @test conv[end] == expected_output
 end
 
