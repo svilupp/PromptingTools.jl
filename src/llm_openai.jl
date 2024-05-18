@@ -781,7 +781,7 @@ function decode_choices(schema::TestEchoOpenAISchema,
 end
 
 function decode_choices(schema::OpenAISchema, choices, conv::AbstractVector; kwargs...)
-    if length(conv) > 0 && isaimessage(last(conv)) && hasproperty(last(conv), :run_id)
+    if length(conv) > 0 && last(conv) isa AIMessage && hasproperty(last(conv), :run_id)
         ## if it is a multi-sample response, 
         ## Remember its run ID and convert all samples in that run
         run_id = last(conv).run_id
