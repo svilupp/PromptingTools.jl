@@ -49,6 +49,11 @@ function render(schema::NoSchema,
         elseif msg isa AIMessage
             # no replacements
             push!(conversation, msg)
+        elseif istracermessage(msg) && issystemmessage(msg.object)
+            # Look for tracers
+            count_system_msg += 1
+            # move to the front
+            pushfirst!(conversation, msg)
         else
             # Note: Ignores any DataMessage or other types for the prompt/conversation history
             @warn "Unexpected message type: $(typeof(msg)). Skipping."

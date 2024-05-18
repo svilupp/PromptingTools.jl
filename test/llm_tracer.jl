@@ -30,22 +30,28 @@ end
     @test tracer.time_sent >= time_before
     @test tracer.model == ""
     @test tracer.a == 1
+    @test isempty(tracer.meta)
 
     ## custom model and tracer_kwargs
     custom_model = "custom_model"
     custom_tracer_kwargs = (parent_id = :parent, thread_id = :thread, run_id = 1)
     tracer = initialize_tracer(
-        schema; model = custom_model, tracer_kwargs = custom_tracer_kwargs)
+        schema; model = custom_model, api_kwargs = (; temperature = 1.0),
+        tracer_kwargs = custom_tracer_kwargs, _tracer_template = AITemplate(:BlankSystemUser))
     @test tracer.time_sent >= time_before
     @test tracer.model == custom_model
     @test tracer.parent_id == :parent
     @test tracer.thread_id == :thread
     @test tracer.run_id == 1
+    @test tracer.meta[:temperature] == 1.0
+    @test tracer.meta[:template_name] == :BlankSystemUser
+    @test tracer.meta[:template_version] == aitemplates(:BlankSystemUser)[1].version
 end
 
 @testset "finalize_tracer" begin
     schema = TracerSchema(OpenAISchema())
     tracer = initialize_tracer(schema; model = "test_model",
+        api_kwargs = (; temperature = 1.0),
         tracer_kwargs = (parent_id = :parent, thread_id = :thread, run_id = 1))
     time_before = now()
 
@@ -59,6 +65,7 @@ end
     @test finalized_msg.thread_id == :thread
     @test finalized_msg.run_id == 1
     @test finalized_msg.time_received >= time_before
+    @test finalized_msg.meta[:temperature] == 1.0
 
     # vector of non-tracer messages
     msgs = [SystemMessage("Test message 1"), SystemMessage("Test message 2")]
@@ -106,6 +113,8 @@ end
 
     msg = aigenerate(schema1, :BlankSystemUser)
     @test istracermessage(msg)
+    @test msg.meta[:template_name] == :BlankSystemUser
+    @test msg.meta[:template_version] == aitemplates(:BlankSystemUser)[1].version
 end
 
 @testset "aiembed-Tracer" begin

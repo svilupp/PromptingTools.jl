@@ -1,4 +1,8 @@
 ## Rendering of converation history for the OpenAI API
+role4render(schema::AbstractOpenAISchema, msg::SystemMessage) = "system"
+role4render(schema::AbstractOpenAISchema, msg::UserMessage) = "user"
+role4render(schema::AbstractOpenAISchema, msg::UserMessageWithImages) = "user"
+role4render(schema::AbstractOpenAISchema, msg::AIMessage) = "assistant"
 """
     render(schema::AbstractOpenAISchema,
         messages::Vector{<:AbstractMessage};
@@ -28,13 +32,6 @@ function render(schema::AbstractOpenAISchema,
 
     # replace any handlebar variables in the messages
     for msg in messages_replaced
-        role = if msg isa SystemMessage
-            "system"
-        elseif msg isa UserMessage || msg isa UserMessageWithImages
-            "user"
-        elseif msg isa AIMessage
-            "assistant"
-        end
         ## Special case for images
         if msg isa UserMessageWithImages
             # Build message content
@@ -50,7 +47,7 @@ function render(schema::AbstractOpenAISchema,
         else
             content = msg.content
         end
-        push!(conversation, Dict("role" => role, "content" => content))
+        push!(conversation, Dict("role" => role4render(schema, msg), "content" => content))
     end
 
     return conversation

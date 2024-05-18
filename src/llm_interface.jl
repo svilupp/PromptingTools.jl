@@ -323,7 +323,7 @@ A schema designed to wrap another schema, enabling pre- and post-execution callb
 
 The `TracerSchema` acts as a middleware, allowing developers to insert custom logic before and after the execution of the primary schema's functionality. This can include logging, performance measurement, or any other form of tracing required to understand or improve the execution flow.
 
-# Usage
+# Example
 ```julia
 wrap_schema = TracerSchema(OpenAISchema())
 msg = aigenerate(wrap_schema, "Say hi!"; model="gpt-4")
@@ -333,6 +333,28 @@ msg isa TracerMessage
 You can define your own tracer schema and the corresponding methods: `initialize_tracer`, `finalize_tracer`. See `src/llm_tracer.jl`
 """
 struct TracerSchema <: AbstractTracerSchema
+    schema::AbstractPromptSchema
+end
+
+"""
+    SaverSchema <: AbstractTracerSchema
+
+SaverSchema is a schema that saves the conversation to a file. It's useful for debugging and for saving the conversation to a file.
+
+It can be composed with any other schema, eg, `TracerSchema` to save additional metadata.
+
+Set environment variable `LOG_DIR` to the directory where you want to save the conversation.
+
+# Example
+```julia
+wrap_schema = PT.SaverSchema(PT.TracerSchema(PT.OpenAISchema()))
+conv = aigenerate(wrap_schema,:BlankSystemUser; system="You're a French-speaking assistant!",
+    user="Say hi!"; model="gpt-4", api_kwargs=(;temperature=0.1), return_all=true)
+
+# conv is a vector of messages that will be saved to a JSON together with metadata about the template and api_kwargs
+```
+"""
+struct SaverSchema <: AbstractTracerSchema
     schema::AbstractPromptSchema
 end
 

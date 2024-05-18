@@ -191,6 +191,11 @@ _temp = get(ENV, "LOCAL_SERVER", "http://localhost:10897/v1")
 const LOCAL_SERVER::String = @load_preference("LOCAL_SERVER",
     default=_temp);
 
+_temp = get(ENV, "LOG_DIR", joinpath(pwd(), "log"))
+## Address of the local server
+const LOG_DIR::String = @load_preference("LOG_DIR",
+    default=_temp);
+
 ## CONVERSATION HISTORY
 """
     CONV_HISTORY
