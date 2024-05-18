@@ -595,7 +595,7 @@ end
         tokens = (2, 1),
         finish_reason = "stop",
         cost = conv[end].cost,
-        elapsed = msg.elapsed)
+        elapsed = conv[end].elapsed)
     @test conv[end] == expected_output
 end
 
