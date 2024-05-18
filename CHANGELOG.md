@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - [BREAKING] Changed behaviour of `aitemplates(name::Symbol)` to look for the exact match on the template name, not just a partial match. This is a breaking change for the `aitemplates` function only. Motivation is that having multiple matches could have introduced subtle bugs when looking up valid placeholders for a template.
 
+### Fixed
+- Fixed a bug where `aiclassify` would not work when returning the full conversation for choices with extra descriptions
+
 ## [0.25.0]
 
 ### Added

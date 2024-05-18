@@ -781,13 +781,14 @@ function decode_choices(schema::TestEchoOpenAISchema,
 end
 
 function decode_choices(schema::OpenAISchema, choices, conv::AbstractVector; kwargs...)
-    if length(conv) > 0 && last(conv) isa AIMessage && hasproperty(last(conv), :run_id)
+    if length(conv) > 0 && isaimessage(last(conv)) && hasproperty(last(conv), :run_id)
         ## if it is a multi-sample response, 
         ## Remember its run ID and convert all samples in that run
         run_id = last(conv).run_id
         for i in eachindex(conv)
-            if conv[i].run_id == run_id
-                conv[i] = decode_choices(schema, choices, conv[i])
+            msg = conv[i]
+            if isaimessage(msg) && msg.run_id == run_id
+                conv[i] = decode_choices(schema, choices, msg)
             end
         end
     end
@@ -855,13 +856,21 @@ aiclassify(:InputClassifier; choices, input)
 
 Choices with descriptions provided as tuples:
 ```julia
-choices = [("A", "any animal or creature"), ("P", "for any plant or tree"), ("O", "for everything else")]
+choices = [("A", "any animal or creature"), ("P", "any plant or tree"), ("O", "anything else")]
 
 # try the below inputs:
 input = "spider" # -> returns "A" for any animal or creature
 input = "daphodil" # -> returns "P" for any plant or tree
 input = "castle" # -> returns "O" for everything else
 aiclassify(:InputClassifier; choices, input)
+```
+
+You could also use this function for routing questions to different endpoints (notice the different template and placeholder used), eg, 
+```julia
+choices = [("A", "any question about animal or creature"), ("P", "any question about plant or tree"), ("O", "anything else")]
+question = "how many spiders are there?"
+msg = aiclassify(:QuestionRouter; choices, question)
+# "A"
 ```
 
 You can still use a simple true/false classification:

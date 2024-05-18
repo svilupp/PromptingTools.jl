@@ -585,6 +585,11 @@ end
         Dict("role" => "system",
             "content" => "You are a world-class classification specialist. \n\nYour task is to select the most appropriate label from the given choices for the given user input.\n\n**Available Choices:**\n---\n1. \"A\" for any animal or creature\n2. \"P\" for for any plant or tree\n3. \"O\" for for everything else\n---\n\n**Instructions:**\n- You must respond in one word. \n- You must respond only with the label ID (e.g., \"1\", \"2\", ...) that best fits the input.\n"),
         Dict("role" => "user", "content" => "User Input: pelican\n\nLabel:\n")]
+
+    # Return the full conversation
+    conv = aiclassify(
+        schema1, :InputClassifier; input = "pelican", choices, return_all = true)
+    @test conv[end] == expected_output
 end
 
 @testset "aiextract-OpenAI" begin
