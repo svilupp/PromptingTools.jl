@@ -19,7 +19,7 @@ const _hoisted_40 = /* @__PURE__ */ createBaseVNode("a", {
 }, "here", -1);
 const _hoisted_41 = /* @__PURE__ */ createBaseVNode("p", null, [
   /* @__PURE__ */ createBaseVNode("a", {
-    href: "https://github.com/svilupp/PromptingTools.jl/blob/15982fe6068421c2cc304d0f69e90ceee8073894/src/llm_interface.jl#L285-L299",
+    href: "https://github.com/svilupp/PromptingTools.jl/blob/6ae31a58166372b5b7ec4a9c84900f6d84fcb1f9/src/llm_interface.jl#L285-L299",
     target: "_blank",
     rel: "noreferrer"
   }, "source")
@@ -36,22 +36,22 @@ const _hoisted_111 = /* @__PURE__ */ createBaseVNode("b", null, [
 const _hoisted_112 = /* @__PURE__ */ createBaseVNode("i", null, "Method", -1);
 const _hoisted_113 = /* @__PURE__ */ createStaticVNode("", 3);
 const _hoisted_116 = /* @__PURE__ */ createBaseVNode("code", null, "choices", -1);
-const _hoisted_117 = /* @__PURE__ */ createStaticVNode("", 19);
-const _hoisted_136 = /* @__PURE__ */ createStaticVNode("", 57);
-const _hoisted_193 = { style: { "border-width": "1px", "border-style": "solid", "border-color": "black", "padding": "1em", "border-radius": "25px" } };
-const _hoisted_194 = /* @__PURE__ */ createBaseVNode("a", {
+const _hoisted_117 = /* @__PURE__ */ createStaticVNode("", 21);
+const _hoisted_138 = /* @__PURE__ */ createStaticVNode("", 57);
+const _hoisted_195 = { style: { "border-width": "1px", "border-style": "solid", "border-color": "black", "padding": "1em", "border-radius": "25px" } };
+const _hoisted_196 = /* @__PURE__ */ createBaseVNode("a", {
   id: "PromptingTools.create_template-Tuple{AbstractString, AbstractString}",
   href: "#PromptingTools.create_template-Tuple{AbstractString, AbstractString}"
 }, "#", -1);
-const _hoisted_195 = /* @__PURE__ */ createBaseVNode("b", null, [
+const _hoisted_197 = /* @__PURE__ */ createBaseVNode("b", null, [
   /* @__PURE__ */ createBaseVNode("u", null, "PromptingTools.create_template")
 ], -1);
-const _hoisted_196 = /* @__PURE__ */ createBaseVNode("i", null, "Method", -1);
-const _hoisted_197 = /* @__PURE__ */ createStaticVNode("", 4);
-const _hoisted_201 = /* @__PURE__ */ createBaseVNode("code", null, "kwargs", -1);
-const _hoisted_202 = /* @__PURE__ */ createStaticVNode("", 19);
-const _hoisted_221 = /* @__PURE__ */ createStaticVNode("", 27);
-const _hoisted_248 = /* @__PURE__ */ createBaseVNode("div", { style: { "border-width": "1px", "border-style": "solid", "border-color": "black", "padding": "1em", "border-radius": "25px" } }, [
+const _hoisted_198 = /* @__PURE__ */ createBaseVNode("i", null, "Method", -1);
+const _hoisted_199 = /* @__PURE__ */ createStaticVNode("", 4);
+const _hoisted_203 = /* @__PURE__ */ createBaseVNode("code", null, "kwargs", -1);
+const _hoisted_204 = /* @__PURE__ */ createStaticVNode("", 19);
+const _hoisted_223 = /* @__PURE__ */ createStaticVNode("", 27);
+const _hoisted_250 = /* @__PURE__ */ createBaseVNode("div", { style: { "border-width": "1px", "border-style": "solid", "border-color": "black", "padding": "1em", "border-radius": "25px" } }, [
   /* @__PURE__ */ createBaseVNode("a", {
     id: "PromptingTools.function_call_signature-Tuple{Type}",
     href: "#PromptingTools.function_call_signature-Tuple{Type}"
@@ -301,7 +301,7 @@ const _hoisted_248 = /* @__PURE__ */ createBaseVNode("div", { style: { "border-w
         ]),
         /* @__PURE__ */ createTextVNode("\n"),
         /* @__PURE__ */ createBaseVNode("span", { class: "line" }, [
-          /* @__PURE__ */ createBaseVNode("span", null, "[source](https://github.com/svilupp/PromptingTools.jl/blob/15982fe6068421c2cc304d0f69e90ceee8073894/src/extraction.jl#L96-L164)")
+          /* @__PURE__ */ createBaseVNode("span", null, "[source](https://github.com/svilupp/PromptingTools.jl/blob/6ae31a58166372b5b7ec4a9c84900f6d84fcb1f9/src/extraction.jl#L96-L164)")
         ]),
         /* @__PURE__ */ createTextVNode("\n"),
         /* @__PURE__ */ createBaseVNode("span", { class: "line" }, [
@@ -383,27 +383,27 @@ const _hoisted_248 = /* @__PURE__ */ createBaseVNode("div", { style: { "border-w
   ]),
   /* @__PURE__ */ createBaseVNode("p", null, [
     /* @__PURE__ */ createBaseVNode("a", {
-      href: "https://github.com/svilupp/PromptingTools.jl/blob/15982fe6068421c2cc304d0f69e90ceee8073894/src/user_preferences.jl#L105-L116",
+      href: "https://github.com/svilupp/PromptingTools.jl/blob/6ae31a58166372b5b7ec4a9c84900f6d84fcb1f9/src/user_preferences.jl#L105-L116",
       target: "_blank",
       rel: "noreferrer"
     }, "source")
   ])
 ], -1);
-const _hoisted_249 = /* @__PURE__ */ createStaticVNode("", 43);
-const _hoisted_292 = { style: { "border-width": "1px", "border-style": "solid", "border-color": "black", "padding": "1em", "border-radius": "25px" } };
-const _hoisted_293 = /* @__PURE__ */ createBaseVNode("a", {
+const _hoisted_251 = /* @__PURE__ */ createStaticVNode("", 43);
+const _hoisted_294 = { style: { "border-width": "1px", "border-style": "solid", "border-color": "black", "padding": "1em", "border-radius": "25px" } };
+const _hoisted_295 = /* @__PURE__ */ createBaseVNode("a", {
   id: "PromptingTools.render-Tuple{PromptingTools.AbstractAnthropicSchema, Vector{<:PromptingTools.AbstractMessage}}",
   href: "#PromptingTools.render-Tuple{PromptingTools.AbstractAnthropicSchema, Vector{<:PromptingTools.AbstractMessage}}"
 }, "#", -1);
-const _hoisted_294 = /* @__PURE__ */ createBaseVNode("b", null, [
+const _hoisted_296 = /* @__PURE__ */ createBaseVNode("b", null, [
   /* @__PURE__ */ createBaseVNode("u", null, "PromptingTools.render")
 ], -1);
-const _hoisted_295 = /* @__PURE__ */ createBaseVNode("i", null, "Method", -1);
-const _hoisted_296 = /* @__PURE__ */ createStaticVNode("", 1);
-const _hoisted_297 = /* @__PURE__ */ createBaseVNode("p", null, [
+const _hoisted_297 = /* @__PURE__ */ createBaseVNode("i", null, "Method", -1);
+const _hoisted_298 = /* @__PURE__ */ createStaticVNode("", 1);
+const _hoisted_299 = /* @__PURE__ */ createBaseVNode("p", null, [
   /* @__PURE__ */ createBaseVNode("strong", null, "Keyword Arguments")
 ], -1);
-const _hoisted_298 = /* @__PURE__ */ createBaseVNode("ul", null, [
+const _hoisted_300 = /* @__PURE__ */ createBaseVNode("ul", null, [
   /* @__PURE__ */ createBaseVNode("li", null, [
     /* @__PURE__ */ createBaseVNode("p", null, [
       /* @__PURE__ */ createBaseVNode("code", null, "conversation"),
@@ -417,28 +417,28 @@ const _hoisted_298 = /* @__PURE__ */ createBaseVNode("ul", null, [
     ])
   ])
 ], -1);
-const _hoisted_299 = /* @__PURE__ */ createBaseVNode("p", null, [
+const _hoisted_301 = /* @__PURE__ */ createBaseVNode("p", null, [
   /* @__PURE__ */ createBaseVNode("a", {
-    href: "https://github.com/svilupp/PromptingTools.jl/blob/15982fe6068421c2cc304d0f69e90ceee8073894/src/llm_anthropic.jl#L7-L19",
+    href: "https://github.com/svilupp/PromptingTools.jl/blob/6ae31a58166372b5b7ec4a9c84900f6d84fcb1f9/src/llm_anthropic.jl#L7-L19",
     target: "_blank",
     rel: "noreferrer"
   }, "source")
 ], -1);
-const _hoisted_300 = /* @__PURE__ */ createBaseVNode("br", null, null, -1);
-const _hoisted_301 = { style: { "border-width": "1px", "border-style": "solid", "border-color": "black", "padding": "1em", "border-radius": "25px" } };
-const _hoisted_302 = /* @__PURE__ */ createBaseVNode("a", {
+const _hoisted_302 = /* @__PURE__ */ createBaseVNode("br", null, null, -1);
+const _hoisted_303 = { style: { "border-width": "1px", "border-style": "solid", "border-color": "black", "padding": "1em", "border-radius": "25px" } };
+const _hoisted_304 = /* @__PURE__ */ createBaseVNode("a", {
   id: "PromptingTools.render-Tuple{PromptingTools.AbstractGoogleSchema, Vector{<:PromptingTools.AbstractMessage}}",
   href: "#PromptingTools.render-Tuple{PromptingTools.AbstractGoogleSchema, Vector{<:PromptingTools.AbstractMessage}}"
 }, "#", -1);
-const _hoisted_303 = /* @__PURE__ */ createBaseVNode("b", null, [
+const _hoisted_305 = /* @__PURE__ */ createBaseVNode("b", null, [
   /* @__PURE__ */ createBaseVNode("u", null, "PromptingTools.render")
 ], -1);
-const _hoisted_304 = /* @__PURE__ */ createBaseVNode("i", null, "Method", -1);
-const _hoisted_305 = /* @__PURE__ */ createStaticVNode("", 1);
-const _hoisted_306 = /* @__PURE__ */ createBaseVNode("p", null, [
+const _hoisted_306 = /* @__PURE__ */ createBaseVNode("i", null, "Method", -1);
+const _hoisted_307 = /* @__PURE__ */ createStaticVNode("", 1);
+const _hoisted_308 = /* @__PURE__ */ createBaseVNode("p", null, [
   /* @__PURE__ */ createBaseVNode("strong", null, "Keyword Arguments")
 ], -1);
-const _hoisted_307 = /* @__PURE__ */ createBaseVNode("ul", null, [
+const _hoisted_309 = /* @__PURE__ */ createBaseVNode("ul", null, [
   /* @__PURE__ */ createBaseVNode("li", null, [
     /* @__PURE__ */ createBaseVNode("code", null, "conversation"),
     /* @__PURE__ */ createTextVNode(": An optional vector of "),
@@ -446,62 +446,62 @@ const _hoisted_307 = /* @__PURE__ */ createBaseVNode("ul", null, [
     /* @__PURE__ */ createTextVNode(" objects representing the conversation history. If not provided, it is initialized as an empty vector.")
   ])
 ], -1);
-const _hoisted_308 = /* @__PURE__ */ createBaseVNode("p", null, [
+const _hoisted_310 = /* @__PURE__ */ createBaseVNode("p", null, [
   /* @__PURE__ */ createBaseVNode("a", {
-    href: "https://github.com/svilupp/PromptingTools.jl/blob/15982fe6068421c2cc304d0f69e90ceee8073894/src/llm_google.jl#L2-L13",
+    href: "https://github.com/svilupp/PromptingTools.jl/blob/6ae31a58166372b5b7ec4a9c84900f6d84fcb1f9/src/llm_google.jl#L2-L13",
     target: "_blank",
     rel: "noreferrer"
   }, "source")
 ], -1);
-const _hoisted_309 = /* @__PURE__ */ createBaseVNode("br", null, null, -1);
-const _hoisted_310 = { style: { "border-width": "1px", "border-style": "solid", "border-color": "black", "padding": "1em", "border-radius": "25px" } };
-const _hoisted_311 = /* @__PURE__ */ createBaseVNode("a", {
+const _hoisted_311 = /* @__PURE__ */ createBaseVNode("br", null, null, -1);
+const _hoisted_312 = { style: { "border-width": "1px", "border-style": "solid", "border-color": "black", "padding": "1em", "border-radius": "25px" } };
+const _hoisted_313 = /* @__PURE__ */ createBaseVNode("a", {
   id: "PromptingTools.render-Tuple{PromptingTools.AbstractOllamaManagedSchema, Vector{<:PromptingTools.AbstractMessage}}",
   href: "#PromptingTools.render-Tuple{PromptingTools.AbstractOllamaManagedSchema, Vector{<:PromptingTools.AbstractMessage}}"
 }, "#", -1);
-const _hoisted_312 = /* @__PURE__ */ createBaseVNode("b", null, [
+const _hoisted_314 = /* @__PURE__ */ createBaseVNode("b", null, [
   /* @__PURE__ */ createBaseVNode("u", null, "PromptingTools.render")
 ], -1);
-const _hoisted_313 = /* @__PURE__ */ createBaseVNode("i", null, "Method", -1);
-const _hoisted_314 = /* @__PURE__ */ createStaticVNode("", 1);
-const _hoisted_315 = /* @__PURE__ */ createBaseVNode("p", null, [
+const _hoisted_315 = /* @__PURE__ */ createBaseVNode("i", null, "Method", -1);
+const _hoisted_316 = /* @__PURE__ */ createStaticVNode("", 1);
+const _hoisted_317 = /* @__PURE__ */ createBaseVNode("p", null, [
   /* @__PURE__ */ createTextVNode('Note: Due to its "managed" nature, at most 2 messages can be provided ('),
   /* @__PURE__ */ createBaseVNode("code", null, "system"),
   /* @__PURE__ */ createTextVNode(" and "),
   /* @__PURE__ */ createBaseVNode("code", null, "prompt"),
   /* @__PURE__ */ createTextVNode(" inputs in the API).")
 ], -1);
-const _hoisted_316 = /* @__PURE__ */ createBaseVNode("p", null, [
+const _hoisted_318 = /* @__PURE__ */ createBaseVNode("p", null, [
   /* @__PURE__ */ createBaseVNode("strong", null, "Keyword Arguments")
 ], -1);
-const _hoisted_317 = /* @__PURE__ */ createBaseVNode("ul", null, [
+const _hoisted_319 = /* @__PURE__ */ createBaseVNode("ul", null, [
   /* @__PURE__ */ createBaseVNode("li", null, [
     /* @__PURE__ */ createBaseVNode("code", null, "conversation"),
     /* @__PURE__ */ createTextVNode(": Not allowed for this schema. Provided only for compatibility.")
   ])
 ], -1);
-const _hoisted_318 = /* @__PURE__ */ createBaseVNode("p", null, [
+const _hoisted_320 = /* @__PURE__ */ createBaseVNode("p", null, [
   /* @__PURE__ */ createBaseVNode("a", {
-    href: "https://github.com/svilupp/PromptingTools.jl/blob/15982fe6068421c2cc304d0f69e90ceee8073894/src/llm_ollama_managed.jl#L9-L21",
+    href: "https://github.com/svilupp/PromptingTools.jl/blob/6ae31a58166372b5b7ec4a9c84900f6d84fcb1f9/src/llm_ollama_managed.jl#L9-L21",
     target: "_blank",
     rel: "noreferrer"
   }, "source")
 ], -1);
-const _hoisted_319 = /* @__PURE__ */ createBaseVNode("br", null, null, -1);
-const _hoisted_320 = { style: { "border-width": "1px", "border-style": "solid", "border-color": "black", "padding": "1em", "border-radius": "25px" } };
-const _hoisted_321 = /* @__PURE__ */ createBaseVNode("a", {
+const _hoisted_321 = /* @__PURE__ */ createBaseVNode("br", null, null, -1);
+const _hoisted_322 = { style: { "border-width": "1px", "border-style": "solid", "border-color": "black", "padding": "1em", "border-radius": "25px" } };
+const _hoisted_323 = /* @__PURE__ */ createBaseVNode("a", {
   id: "PromptingTools.render-Tuple{PromptingTools.AbstractOllamaSchema, Vector{<:PromptingTools.AbstractMessage}}",
   href: "#PromptingTools.render-Tuple{PromptingTools.AbstractOllamaSchema, Vector{<:PromptingTools.AbstractMessage}}"
 }, "#", -1);
-const _hoisted_322 = /* @__PURE__ */ createBaseVNode("b", null, [
+const _hoisted_324 = /* @__PURE__ */ createBaseVNode("b", null, [
   /* @__PURE__ */ createBaseVNode("u", null, "PromptingTools.render")
 ], -1);
-const _hoisted_323 = /* @__PURE__ */ createBaseVNode("i", null, "Method", -1);
-const _hoisted_324 = /* @__PURE__ */ createStaticVNode("", 1);
-const _hoisted_325 = /* @__PURE__ */ createBaseVNode("p", null, [
+const _hoisted_325 = /* @__PURE__ */ createBaseVNode("i", null, "Method", -1);
+const _hoisted_326 = /* @__PURE__ */ createStaticVNode("", 1);
+const _hoisted_327 = /* @__PURE__ */ createBaseVNode("p", null, [
   /* @__PURE__ */ createBaseVNode("strong", null, "Keyword Arguments")
 ], -1);
-const _hoisted_326 = /* @__PURE__ */ createBaseVNode("ul", null, [
+const _hoisted_328 = /* @__PURE__ */ createBaseVNode("ul", null, [
   /* @__PURE__ */ createBaseVNode("li", null, [
     /* @__PURE__ */ createBaseVNode("code", null, "conversation"),
     /* @__PURE__ */ createTextVNode(": An optional vector of "),
@@ -509,50 +509,50 @@ const _hoisted_326 = /* @__PURE__ */ createBaseVNode("ul", null, [
     /* @__PURE__ */ createTextVNode(" objects representing the conversation history. If not provided, it is initialized as an empty vector.")
   ])
 ], -1);
-const _hoisted_327 = /* @__PURE__ */ createBaseVNode("p", null, [
+const _hoisted_329 = /* @__PURE__ */ createBaseVNode("p", null, [
   /* @__PURE__ */ createBaseVNode("a", {
-    href: "https://github.com/svilupp/PromptingTools.jl/blob/15982fe6068421c2cc304d0f69e90ceee8073894/src/llm_ollama.jl#L10-L21",
+    href: "https://github.com/svilupp/PromptingTools.jl/blob/6ae31a58166372b5b7ec4a9c84900f6d84fcb1f9/src/llm_ollama.jl#L10-L21",
     target: "_blank",
     rel: "noreferrer"
   }, "source")
 ], -1);
-const _hoisted_328 = /* @__PURE__ */ createBaseVNode("br", null, null, -1);
-const _hoisted_329 = { style: { "border-width": "1px", "border-style": "solid", "border-color": "black", "padding": "1em", "border-radius": "25px" } };
-const _hoisted_330 = /* @__PURE__ */ createBaseVNode("a", {
+const _hoisted_330 = /* @__PURE__ */ createBaseVNode("br", null, null, -1);
+const _hoisted_331 = { style: { "border-width": "1px", "border-style": "solid", "border-color": "black", "padding": "1em", "border-radius": "25px" } };
+const _hoisted_332 = /* @__PURE__ */ createBaseVNode("a", {
   id: "PromptingTools.render-Tuple{PromptingTools.AbstractOpenAISchema, Vector{<:PromptingTools.AbstractMessage}}",
   href: "#PromptingTools.render-Tuple{PromptingTools.AbstractOpenAISchema, Vector{<:PromptingTools.AbstractMessage}}"
 }, "#", -1);
-const _hoisted_331 = /* @__PURE__ */ createBaseVNode("b", null, [
+const _hoisted_333 = /* @__PURE__ */ createBaseVNode("b", null, [
   /* @__PURE__ */ createBaseVNode("u", null, "PromptingTools.render")
 ], -1);
-const _hoisted_332 = /* @__PURE__ */ createBaseVNode("i", null, "Method", -1);
-const _hoisted_333 = /* @__PURE__ */ createStaticVNode("", 1);
-const _hoisted_334 = /* @__PURE__ */ createStaticVNode("", 3);
-const _hoisted_337 = /* @__PURE__ */ createStaticVNode("", 3);
-const _hoisted_340 = { style: { "border-width": "1px", "border-style": "solid", "border-color": "black", "padding": "1em", "border-radius": "25px" } };
-const _hoisted_341 = /* @__PURE__ */ createBaseVNode("a", {
+const _hoisted_334 = /* @__PURE__ */ createBaseVNode("i", null, "Method", -1);
+const _hoisted_335 = /* @__PURE__ */ createStaticVNode("", 1);
+const _hoisted_336 = /* @__PURE__ */ createStaticVNode("", 3);
+const _hoisted_339 = /* @__PURE__ */ createStaticVNode("", 3);
+const _hoisted_342 = { style: { "border-width": "1px", "border-style": "solid", "border-color": "black", "padding": "1em", "border-radius": "25px" } };
+const _hoisted_343 = /* @__PURE__ */ createBaseVNode("a", {
   id: "PromptingTools.render-Tuple{PromptingTools.NoSchema, Vector{<:PromptingTools.AbstractMessage}}",
   href: "#PromptingTools.render-Tuple{PromptingTools.NoSchema, Vector{<:PromptingTools.AbstractMessage}}"
 }, "#", -1);
-const _hoisted_342 = /* @__PURE__ */ createBaseVNode("b", null, [
+const _hoisted_344 = /* @__PURE__ */ createBaseVNode("b", null, [
   /* @__PURE__ */ createBaseVNode("u", null, "PromptingTools.render")
 ], -1);
-const _hoisted_343 = /* @__PURE__ */ createBaseVNode("i", null, "Method", -1);
-const _hoisted_344 = /* @__PURE__ */ createStaticVNode("", 6);
-const _hoisted_350 = /* @__PURE__ */ createBaseVNode("li", null, [
+const _hoisted_345 = /* @__PURE__ */ createBaseVNode("i", null, "Method", -1);
+const _hoisted_346 = /* @__PURE__ */ createStaticVNode("", 6);
+const _hoisted_352 = /* @__PURE__ */ createBaseVNode("li", null, [
   /* @__PURE__ */ createBaseVNode("p", null, "If a SystemMessage is missing, we inject a default one at the beginning of the conversation.")
 ], -1);
-const _hoisted_351 = /* @__PURE__ */ createBaseVNode("li", null, [
+const _hoisted_353 = /* @__PURE__ */ createBaseVNode("li", null, [
   /* @__PURE__ */ createBaseVNode("p", null, "Only one SystemMessage is allowed (ie, cannot mix two conversations different system prompts).")
 ], -1);
-const _hoisted_352 = /* @__PURE__ */ createBaseVNode("p", null, [
+const _hoisted_354 = /* @__PURE__ */ createBaseVNode("p", null, [
   /* @__PURE__ */ createBaseVNode("a", {
-    href: "https://github.com/svilupp/PromptingTools.jl/blob/15982fe6068421c2cc304d0f69e90ceee8073894/src/llm_shared.jl#L2-L20",
+    href: "https://github.com/svilupp/PromptingTools.jl/blob/6ae31a58166372b5b7ec4a9c84900f6d84fcb1f9/src/llm_shared.jl#L2-L20",
     target: "_blank",
     rel: "noreferrer"
   }, "source")
 ], -1);
-const _hoisted_353 = /* @__PURE__ */ createStaticVNode("", 27);
+const _hoisted_355 = /* @__PURE__ */ createStaticVNode("", 27);
 function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
   return openBlock(), createElementBlock("div", null, [
     _hoisted_1,
@@ -591,124 +591,124 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
       ]),
       _hoisted_117
     ]),
-    _hoisted_136,
-    createBaseVNode("div", _hoisted_193, [
-      _hoisted_194,
-      createTextVNode(" "),
-      _hoisted_195,
-      createTextVNode(" — "),
+    _hoisted_138,
+    createBaseVNode("div", _hoisted_195, [
       _hoisted_196,
-      createTextVNode(". "),
+      createTextVNode(" "),
       _hoisted_197,
+      createTextVNode(" — "),
+      _hoisted_198,
+      createTextVNode(". "),
+      _hoisted_199,
       createBaseVNode("p", null, [
         createTextVNode("Use double handlebar placeholders (eg, "),
         createBaseVNode("code", null, toDisplayString(_ctx.name), 1),
         createTextVNode(") to define variables that can be replaced by the "),
-        _hoisted_201,
+        _hoisted_203,
         createTextVNode(" during the AI call (see example).")
       ]),
-      _hoisted_202
+      _hoisted_204
     ]),
-    _hoisted_221,
-    _hoisted_248,
-    _hoisted_249,
-    createBaseVNode("div", _hoisted_292, [
-      _hoisted_293,
-      createTextVNode(" "),
-      _hoisted_294,
-      createTextVNode(" — "),
+    _hoisted_223,
+    _hoisted_250,
+    _hoisted_251,
+    createBaseVNode("div", _hoisted_294, [
       _hoisted_295,
-      createTextVNode(". "),
+      createTextVNode(" "),
       _hoisted_296,
-      createBaseVNode("p", null, [
-        createTextVNode("Builds a history of the conversation to provide the prompt to the API. All unspecified kwargs are passed as replacements such that "),
-        createBaseVNode("code", null, toDisplayString(_ctx.key) + "=>value", 1),
-        createTextVNode(" in the template.")
-      ]),
+      createTextVNode(" — "),
       _hoisted_297,
+      createTextVNode(". "),
       _hoisted_298,
-      _hoisted_299
+      createBaseVNode("p", null, [
+        createTextVNode("Builds a history of the conversation to provide the prompt to the API. All unspecified kwargs are passed as replacements such that "),
+        createBaseVNode("code", null, toDisplayString(_ctx.key) + "=>value", 1),
+        createTextVNode(" in the template.")
+      ]),
+      _hoisted_299,
+      _hoisted_300,
+      _hoisted_301
     ]),
-    _hoisted_300,
-    createBaseVNode("div", _hoisted_301, [
-      _hoisted_302,
-      createTextVNode(" "),
-      _hoisted_303,
-      createTextVNode(" — "),
+    _hoisted_302,
+    createBaseVNode("div", _hoisted_303, [
       _hoisted_304,
-      createTextVNode(". "),
+      createTextVNode(" "),
       _hoisted_305,
-      createBaseVNode("p", null, [
-        createTextVNode("Builds a history of the conversation to provide the prompt to the API. All unspecified kwargs are passed as replacements such that "),
-        createBaseVNode("code", null, toDisplayString(_ctx.key) + "=>value", 1),
-        createTextVNode(" in the template.")
-      ]),
+      createTextVNode(" — "),
       _hoisted_306,
+      createTextVNode(". "),
       _hoisted_307,
-      _hoisted_308
+      createBaseVNode("p", null, [
+        createTextVNode("Builds a history of the conversation to provide the prompt to the API. All unspecified kwargs are passed as replacements such that "),
+        createBaseVNode("code", null, toDisplayString(_ctx.key) + "=>value", 1),
+        createTextVNode(" in the template.")
+      ]),
+      _hoisted_308,
+      _hoisted_309,
+      _hoisted_310
     ]),
-    _hoisted_309,
-    createBaseVNode("div", _hoisted_310, [
-      _hoisted_311,
-      createTextVNode(" "),
-      _hoisted_312,
-      createTextVNode(" — "),
+    _hoisted_311,
+    createBaseVNode("div", _hoisted_312, [
       _hoisted_313,
-      createTextVNode(". "),
+      createTextVNode(" "),
       _hoisted_314,
-      createBaseVNode("p", null, [
-        createTextVNode("Builds a history of the conversation to provide the prompt to the API. All unspecified kwargs are passed as replacements such that "),
-        createBaseVNode("code", null, toDisplayString(_ctx.key) + "=>value", 1),
-        createTextVNode(" in the template.")
-      ]),
+      createTextVNode(" — "),
       _hoisted_315,
+      createTextVNode(". "),
       _hoisted_316,
+      createBaseVNode("p", null, [
+        createTextVNode("Builds a history of the conversation to provide the prompt to the API. All unspecified kwargs are passed as replacements such that "),
+        createBaseVNode("code", null, toDisplayString(_ctx.key) + "=>value", 1),
+        createTextVNode(" in the template.")
+      ]),
       _hoisted_317,
-      _hoisted_318
+      _hoisted_318,
+      _hoisted_319,
+      _hoisted_320
     ]),
-    _hoisted_319,
-    createBaseVNode("div", _hoisted_320, [
-      _hoisted_321,
-      createTextVNode(" "),
-      _hoisted_322,
-      createTextVNode(" — "),
+    _hoisted_321,
+    createBaseVNode("div", _hoisted_322, [
       _hoisted_323,
-      createTextVNode(". "),
+      createTextVNode(" "),
       _hoisted_324,
-      createBaseVNode("p", null, [
-        createTextVNode("Builds a history of the conversation to provide the prompt to the API. All unspecified kwargs are passed as replacements such that "),
-        createBaseVNode("code", null, toDisplayString(_ctx.key) + "=>value", 1),
-        createTextVNode(" in the template.")
-      ]),
+      createTextVNode(" — "),
       _hoisted_325,
-      _hoisted_326,
-      _hoisted_327
-    ]),
-    _hoisted_328,
-    createBaseVNode("div", _hoisted_329, [
-      _hoisted_330,
-      createTextVNode(" "),
-      _hoisted_331,
-      createTextVNode(" — "),
-      _hoisted_332,
       createTextVNode(". "),
-      _hoisted_333,
+      _hoisted_326,
       createBaseVNode("p", null, [
         createTextVNode("Builds a history of the conversation to provide the prompt to the API. All unspecified kwargs are passed as replacements such that "),
         createBaseVNode("code", null, toDisplayString(_ctx.key) + "=>value", 1),
         createTextVNode(" in the template.")
       ]),
-      _hoisted_334
+      _hoisted_327,
+      _hoisted_328,
+      _hoisted_329
     ]),
-    _hoisted_337,
-    createBaseVNode("div", _hoisted_340, [
-      _hoisted_341,
+    _hoisted_330,
+    createBaseVNode("div", _hoisted_331, [
+      _hoisted_332,
       createTextVNode(" "),
-      _hoisted_342,
+      _hoisted_333,
       createTextVNode(" — "),
-      _hoisted_343,
+      _hoisted_334,
       createTextVNode(". "),
+      _hoisted_335,
+      createBaseVNode("p", null, [
+        createTextVNode("Builds a history of the conversation to provide the prompt to the API. All unspecified kwargs are passed as replacements such that "),
+        createBaseVNode("code", null, toDisplayString(_ctx.key) + "=>value", 1),
+        createTextVNode(" in the template.")
+      ]),
+      _hoisted_336
+    ]),
+    _hoisted_339,
+    createBaseVNode("div", _hoisted_342, [
+      _hoisted_343,
+      createTextVNode(" "),
       _hoisted_344,
+      createTextVNode(" — "),
+      _hoisted_345,
+      createTextVNode(". "),
+      _hoisted_346,
       createBaseVNode("ul", null, [
         createBaseVNode("li", null, [
           createBaseVNode("p", null, [
@@ -717,12 +717,12 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
             createTextVNode(" in the template.")
           ])
         ]),
-        _hoisted_350,
-        _hoisted_351
+        _hoisted_352,
+        _hoisted_353
       ]),
-      _hoisted_352
+      _hoisted_354
     ]),
-    _hoisted_353
+    _hoisted_355
   ]);
 }
 const reference = /* @__PURE__ */ _export_sfc(_sfc_main, [["render", _sfc_render]]);
