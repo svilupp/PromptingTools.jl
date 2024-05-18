@@ -23,9 +23,9 @@ end
     tmps = aitemplates(:JudgeIsItTrue)
     @test length(tmps) == 1
     @test tmps[1].name == :JudgeIsItTrue
-    # Search for multiple with :Task in name
+    # Search for an exact match :Task in name
     tmps1 = aitemplates(:Task)
-    @test length(tmps1) >= 1
+    @test length(tmps1) == 0 # does not exist
     tmps2 = aitemplates("Task") # broader search
     @test length(tmps2) >= length(tmps1)
     # Search via regex

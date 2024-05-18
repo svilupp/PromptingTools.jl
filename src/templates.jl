@@ -304,14 +304,11 @@ I have my selected template, how do I use it? Just use the "name" in `aigenerate
 """
 function aitemplates end
 
-"Find the top-`limit` templates whose `name::Symbol` partially matches the `query_name::Symbol` in `TEMPLATE_METADATA`."
+"Find the top-`limit` templates whose `name::Symbol` exactly matches the `query_name::Symbol` in `TEMPLATE_METADATA`."
 function aitemplates(query_name::Symbol;
         limit::Int = 10,
         metadata_store::Vector{AITemplateMetadata} = TEMPLATE_METADATA)
-    query_str = lowercase(string(query_name))
-    found_templates = filter(
-        x -> occursin(query_str,
-            lowercase(string(x.name))), metadata_store)
+    found_templates = filter(x -> query_name == x.name, metadata_store)
     return first(found_templates, limit)
 end
 "Find the top-`limit` templates whose `name` or `description` fields partially match the `query_key::String` in `TEMPLATE_METADATA`."

@@ -668,7 +668,28 @@ const OPENAI_TOKEN_IDS = Dict("true" => 837,
     "17" => 1114,
     "18" => 972,
     "19" => 777,
-    "20" => 508)
+    "20" => 508,
+    "21" => 1691,
+    "22" => 1313,
+    "23" => 1419,
+    "24" => 1187,
+    "25" => 914,
+    "26" => 1627,
+    "27" => 1544,
+    "28" => 1591,
+    "29" => 1682,
+    "30" => 966,
+    "31" => 2148,
+    "32" => 843,
+    "33" => 1644,
+    "34" => 1958,
+    "35" => 1758,
+    "36" => 1927,
+    "37" => 1806,
+    "38" => 1987,
+    "39" => 2137,
+    "40" => 1272
+)
 
 """
     encode_choices(schema::OpenAISchema, choices::AbstractVector{<:AbstractString}; kwargs...)
@@ -679,6 +700,8 @@ const OPENAI_TOKEN_IDS = Dict("true" => 837,
 Encode the choices into an enumerated list that can be interpolated into the prompt and creates the corresponding logit biases (to choose only from the selected tokens).
 
 Optionally, can be a vector tuples, where the first element is the choice and the second is the description.
+
+There can be at most 40 choices provided.
 
 # Arguments
 - `schema::OpenAISchema`: The OpenAISchema object.
@@ -716,8 +739,8 @@ function encode_choices(schema::OpenAISchema,
     if all(x -> haskey(OPENAI_TOKEN_IDS, x), choices)
         choices_prompt = ["$c for \"$c\"" for c in choices]
         logit_bias = Dict(OPENAI_TOKEN_IDS[c] => 100 for c in choices)
-    elseif length(choices) <= 20
-        ## encode choices to IDs 1..20
+    elseif length(choices) <= 40
+        ## encode choices to IDs 1..40
         choices_prompt = ["$(i). \"$c\"" for (i, c) in enumerate(choices)]
         logit_bias = Dict(OPENAI_TOKEN_IDS[string(i)] => 100 for i in 1:length(choices))
     else
@@ -812,7 +835,7 @@ classify into an arbitrary list of categories (including with descriptions). It'
 
 !!! Note: The prompt/AITemplate must have a placeholder `choices` (ie, `{{choices}}`) that will be replaced with the encoded choices
 
-Choices are rewritten into an enumerated list and mapped to a few known OpenAI tokens (maximum of 20 choices supported). Mapping of token IDs for GPT3.5/4 are saved in variable `OPENAI_TOKEN_IDS`.
+Choices are rewritten into an enumerated list and mapped to a few known OpenAI tokens (maximum of 40 choices supported). Mapping of token IDs for GPT3.5/4 are saved in variable `OPENAI_TOKEN_IDS`.
 
 It uses Logit bias trick and limits the output to 1 token to force the model to output only true/false/unknown. Credit for the idea goes to [AAAzzam](https://twitter.com/AAAzzam/status/1669753721574633473).
 
