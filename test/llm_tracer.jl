@@ -51,7 +51,6 @@ end
     @test tracer.meta[:temperature] == 1.0
     @test tracer.meta[:template_name] == :BlankSystemUser
     @test tracer.meta[:template_version] == aitemplates(:BlankSystemUser)[1].version
-    @test meta(tracer)[:temperature] == 1.0
 end
 
 @testset "finalize_tracer" begin
@@ -72,6 +71,7 @@ end
     @test finalized_msg.run_id == 1
     @test finalized_msg.time_received >= time_before
     @test finalized_msg.meta[:temperature] == 1.0
+    @test meta(finalized_msg)[:temperature] == 1.0
 
     # vector of non-tracer messages
     msgs = [SystemMessage("Test message 1"), SystemMessage("Test message 2")]
@@ -96,6 +96,7 @@ end
     @test length(finalized_msgs) == 2
     @test finalized_msgs[1] isa TracerMessage
     @test finalized_msgs[2] === tracer_msg # should be the same object, not a new one
+    @test meta(finalized_msgs[2])[:temperature] == 1.0
 
     ## other schema -- SaverSchema
     schema = SaverSchema(OpenAISchema())
