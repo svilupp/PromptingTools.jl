@@ -357,8 +357,8 @@ Set environment variable `LOG_DIR` to the directory where you want to save the c
 Conversations are named by the hash of the first message in the conversation to naturally group subsequent conversations together.
 
 If you need to provide logging directory of the file name dynamically, you can provide the following arguments to `tracer_kwargs`:
-- `log_dir` - used as the directory to save the log into when provided
-- `log_file_path` - used as the file name to save the log into when provided
+- `log_dir` - used as the directory to save the log into when provided. Defaults to `LOG_DIR` if not provided.
+- `log_file_path` - used as the file name to save the log into when provided. This value overrules the `log_dir` and `LOG_DIR` if provided.
 
 To use it automatically, re-register the models you use with the schema wrapped in `SaverSchema`
 
