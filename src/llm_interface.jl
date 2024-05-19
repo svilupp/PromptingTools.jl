@@ -7,6 +7,7 @@
 # Ideally, each new interface would be defined in a separate `llm_<interface>.jl` file (eg, `llm_chatml.jl`).
 
 ## Main Functions
+function role4render end
 function render end
 function aigenerate end
 function aiembed end
@@ -323,7 +324,15 @@ A schema designed to wrap another schema, enabling pre- and post-execution callb
 
 The `TracerSchema` acts as a middleware, allowing developers to insert custom logic before and after the execution of the primary schema's functionality. This can include logging, performance measurement, or any other form of tracing required to understand or improve the execution flow.
 
-# Usage
+`TracerSchema` automatically wraps messages in `TracerMessage` type, which has several important fields, eg,
+- `object`: the original message - unwrap with utility `unwrap`
+- `meta`: a dictionary with metadata about the tracing process (eg, prompt templates, LLM API kwargs) - extract with utility `meta`
+- `parent_id`: an identifier for the overall job / high-level conversation with the user where the current conversation `thread` originated. It should be the same for objects in the same thread.
+- `thread_id`: an identifier for the current thread or execution context (sub-task, sub-process, CURRENT CONVERSATION or vector of messages) within the broader parent task. It should be the same for objects in the same thread.
+
+See also: `meta`, `unwrap`, `SaverSchema`, `initialize_tracer`, `finalize_tracer`
+
+# Example
 ```julia
 wrap_schema = TracerSchema(OpenAISchema())
 msg = aigenerate(wrap_schema, "Say hi!"; model="gpt-4")
@@ -333,6 +342,43 @@ msg isa TracerMessage
 You can define your own tracer schema and the corresponding methods: `initialize_tracer`, `finalize_tracer`. See `src/llm_tracer.jl`
 """
 struct TracerSchema <: AbstractTracerSchema
+    schema::AbstractPromptSchema
+end
+
+"""
+    SaverSchema <: AbstractTracerSchema
+
+SaverSchema is a schema that automatically saves the conversation to the disk. 
+It's useful for debugging and for persistent logging.
+
+It can be composed with any other schema, eg, `TracerSchema` to save additional metadata.
+
+Set environment variable `LOG_DIR` to the directory where you want to save the conversation (see `?PREFERENCES`).
+Conversations are named by the hash of the first message in the conversation to naturally group subsequent conversations together.
+
+To use it automatically, re-register the models you use with the schema wrapped in `SaverSchema`
+
+See also: `meta`, `unwrap`, `TracerSchema`, `initialize_tracer`, `finalize_tracer`
+
+# Example
+```julia
+using PromptingTools: TracerSchema, OpenAISchema, SaverSchema
+# This schema will first trace the metadata (change to TraceMessage) and then save the conversation to the disk
+
+wrap_schema = OpenAISchema() |> TracerSchema |> SaverSchema
+conv = aigenerate(wrap_schema,:BlankSystemUser; system="You're a French-speaking assistant!",
+    user="Say hi!"; model="gpt-4", api_kwargs=(;temperature=0.1), return_all=true)
+
+# conv is a vector of messages that will be saved to a JSON together with metadata about the template and api_kwargs
+```
+
+If you wanted to enable this automatically for models you use, you can do it like this:
+```julia
+PT.register_model!(; name= "gpt-3.5-turbo", schema=OpenAISchema() |> TracerSchema |> SaverSchema)
+```
+Any subsequent calls `model="gpt-3.5-turbo"` will automatically capture metadata and save the conversation to the disk.
+"""
+struct SaverSchema <: AbstractTracerSchema
     schema::AbstractPromptSchema
 end
 

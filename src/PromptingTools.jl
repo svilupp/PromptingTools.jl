@@ -2,7 +2,8 @@ module PromptingTools
 
 import AbstractTrees
 using Base64: base64encode
-using Dates: now, DateTime
+import Dates
+using Dates: now, DateTime, @dateformat_str
 using Logging
 using OpenAI
 using JSON3

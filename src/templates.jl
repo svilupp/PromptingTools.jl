@@ -377,19 +377,29 @@ function render(schema::AbstractTracerSchema, template::AITemplate; kwargs...)
     render(schema.schema, template; kwargs...)
 end
 function aigenerate(schema::AbstractTracerSchema, template::Symbol; kwargs...)
-    aigenerate(schema, render(schema, AITemplate(template)); kwargs...)
+    tpl = AITemplate(template)
+    aigenerate(schema, render(schema, tpl);
+        _tracer_template = tpl, kwargs...)
 end
 function aiclassify(schema::AbstractTracerSchema, template::Symbol; kwargs...)
-    aiclassify(schema, render(schema, AITemplate(template)); kwargs...)
+    tpl = AITemplate(template)
+    aiclassify(schema, render(schema, tpl);
+        _tracer_template = tpl, kwargs...)
 end
 function aiextract(schema::AbstractTracerSchema, template::Symbol; kwargs...)
-    aiextract(schema, render(schema, AITemplate(template)); kwargs...)
+    tpl = AITemplate(template)
+    aiextract(schema, render(schema, tpl);
+        _tracer_template = tpl, kwargs...)
 end
 function aiscan(schema::AbstractTracerSchema, template::Symbol; kwargs...)
-    aiscan(schema, render(schema, AITemplate(template)); kwargs...)
+    tpl = AITemplate(template)
+    aiscan(schema, render(schema, tpl);
+        _tracer_template = tpl, kwargs...)
 end
 function aiimage(schema::AbstractTracerSchema, template::Symbol; kwargs...)
-    aiimage(schema, render(schema, AITemplate(template)); kwargs...)
+    tpl = AITemplate(template)
+    aiimage(schema, render(schema, tpl);
+        _tracer_template = tpl, kwargs...)
 end
 
 ## Utility for creating templates

@@ -8,6 +8,12 @@ using PromptingTools: encode_choices, decode_choices, response_to_message, call_
 
 @testset "render-OpenAI" begin
     schema = OpenAISchema()
+
+    role4render(schema, SystemMessage("System message 1")) == "system"
+    role4render(schema, UserMessage("User message 1")) == "user"
+    role4render(schema, UserMessageWithImages("User message 1"; image_url = "")) == "user"
+    role4render(schema, AIMessage("AI message 1")) == "assistant"
+
     # Given a schema and a vector of messages with handlebar variables, it should replace the variables with the correct values in the conversation dictionary.
     messages = [
         SystemMessage("Act as a helpful AI assistant"),

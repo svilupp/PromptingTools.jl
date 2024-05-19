@@ -1,12 +1,30 @@
-using PromptingTools: TestEchoOpenAISchema, render, OpenAISchema, TracerSchema
+using PromptingTools: TestEchoOpenAISchema, render, OpenAISchema, TracerSchema, SaverSchema
 using PromptingTools: AIMessage, SystemMessage, AbstractMessage
 using PromptingTools: UserMessage, UserMessageWithImages, DataMessage, TracerMessage
 using PromptingTools: CustomProvider,
                       CustomOpenAISchema, MistralOpenAISchema, MODEL_EMBEDDING,
                       MODEL_IMAGE_GENERATION
 using PromptingTools: initialize_tracer, finalize_tracer, isaimessage, istracermessage,
-                      unwrap, AITemplate
+                      unwrap, meta, AITemplate, render, role4render
 
+@testset "role4render-Tracer" begin
+    schema = TracerSchema(OpenAISchema())
+
+    # unwrapping schema
+    @test role4render(schema, SystemMessage("System message 1")) == "system"
+    @test role4render(schema, UserMessage("User message 1")) == "user"
+    @test role4render(schema, UserMessageWithImages("User message 1"; image_url = "")) ==
+          "user"
+    @test role4render(schema, AIMessage("AI message 1")) == "assistant"
+
+    # unwrapping TracerMessage
+    @test role4render(OpenAISchema(), TracerMessage(SystemMessage("Abc123"))) == "system"
+    @test role4render(OpenAISchema(), TracerMessage(UserMessage("Abc123"))) == "user"
+    @test role4render(
+        OpenAISchema(), TracerMessage(UserMessageWithImages("Abc123"; image_url = ""))) ==
+          "user"
+    @test role4render(OpenAISchema(), TracerMessage(AIMessage("Abc123"))) == "assistant"
+end
 @testset "render-Tracer" begin
     schema = TracerSchema(OpenAISchema())
     # Given a schema and a vector of messages with handlebar variables, it should replace the variables with the correct values in the conversation dictionary.
@@ -19,6 +37,11 @@ using PromptingTools: initialize_tracer, finalize_tracer, isaimessage, istracerm
 
     conv = render(schema, AITemplate(:InputClassifier))
     @test conv isa Vector
+
+    ## other schema
+    schema = SaverSchema(OpenAISchema())
+    conv = render(schema, messages)
+    @test conv == messages
 end
 
 @testset "initialize_tracer" begin
@@ -30,22 +53,28 @@ end
     @test tracer.time_sent >= time_before
     @test tracer.model == ""
     @test tracer.a == 1
+    @test isempty(tracer.meta)
 
     ## custom model and tracer_kwargs
     custom_model = "custom_model"
     custom_tracer_kwargs = (parent_id = :parent, thread_id = :thread, run_id = 1)
     tracer = initialize_tracer(
-        schema; model = custom_model, tracer_kwargs = custom_tracer_kwargs)
+        schema; model = custom_model, api_kwargs = (; temperature = 1.0),
+        tracer_kwargs = custom_tracer_kwargs, _tracer_template = AITemplate(:BlankSystemUser))
     @test tracer.time_sent >= time_before
     @test tracer.model == custom_model
     @test tracer.parent_id == :parent
     @test tracer.thread_id == :thread
     @test tracer.run_id == 1
+    @test tracer.meta[:temperature] == 1.0
+    @test tracer.meta[:template_name] == :BlankSystemUser
+    @test tracer.meta[:template_version] == aitemplates(:BlankSystemUser)[1].version
 end
 
 @testset "finalize_tracer" begin
     schema = TracerSchema(OpenAISchema())
     tracer = initialize_tracer(schema; model = "test_model",
+        api_kwargs = (; temperature = 1.0),
         tracer_kwargs = (parent_id = :parent, thread_id = :thread, run_id = 1))
     time_before = now()
 
@@ -59,6 +88,8 @@ end
     @test finalized_msg.thread_id == :thread
     @test finalized_msg.run_id == 1
     @test finalized_msg.time_received >= time_before
+    @test finalized_msg.meta[:temperature] == 1.0
+    @test meta(finalized_msg)[:temperature] == 1.0
 
     # vector of non-tracer messages
     msgs = [SystemMessage("Test message 1"), SystemMessage("Test message 2")]
@@ -83,6 +114,26 @@ end
     @test length(finalized_msgs) == 2
     @test finalized_msgs[1] isa TracerMessage
     @test finalized_msgs[2] === tracer_msg # should be the same object, not a new one
+    @test meta(finalized_msgs[2])[:temperature] == 1.0
+
+    ## other schema -- SaverSchema
+    schema = SaverSchema(OpenAISchema())
+    tracer = initialize_tracer(schema)
+    msgs = [SystemMessage("Test message 1"), SystemMessage("Test message 2")]
+    conv = finalize_tracer(schema, tracer, msgs)
+    fn = filter(
+        x -> occursin("conversation__$(hash(msgs[1].content))", x), readdir(
+            PT.LOG_DIR; join = true)) |>
+         first
+    @test isfile(fn)
+    @test PT.load_conversation(fn) == conv
+    ## clean up
+    isfile(fn) && rm(fn)
+
+    # Passthrough for non-messages (dry-runs)
+    schema = TracerSchema(OpenAISchema())
+    conv = finalize_tracer(schema, tracer, [1, 2, 3, 4, 5])
+    @test conv == [1, 2, 3, 4, 5]
 end
 
 @testset "aigenerate-Tracer" begin
@@ -104,8 +155,31 @@ end
     @test msg.model == "xyz"
     @test msg.thread_id == :ABC1
 
-    msg = aigenerate(schema1, :BlankSystemUser)
+    msg = aigenerate(schema1, :BlankSystemUser; system = "abc", user = "xyz")
     @test istracermessage(msg)
+    @test msg.meta[:template_name] == :BlankSystemUser
+    @test msg.meta[:template_version] == aitemplates(:BlankSystemUser)[1].version
+
+    ## other schema -- SaverSchema
+    schema2 = schema1 |> SaverSchema
+    msgs = [TracerMessage(SystemMessage("Test message 1")), UserMessage("Hello World")]
+    msg = aigenerate(
+        schema2, msgs; model = "xyz", tracer_kwargs = (; thread_id = :ABC1))
+    @test istracermessage(msg)
+    fn = filter(
+        x -> occursin("conversation__$(hash(msgs[1].content))", x), readdir(
+            PT.LOG_DIR; join = true)) |>
+         last
+    @test isfile(fn)
+    load_conv = PT.load_conversation(fn)
+    @test length(load_conv) == 3
+    loaded_msg = load_conv[end]
+    @test unwrap(loaded_msg) |> isaimessage
+    @test loaded_msg.content == "Hello!"
+    @test loaded_msg.model == "xyz"
+    @test loaded_msg.thread_id == :ABC1
+    ## clean up
+    isfile(fn) && rm(fn)
 end
 
 @testset "aiembed-Tracer" begin
