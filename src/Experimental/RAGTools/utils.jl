@@ -367,3 +367,100 @@ function merge_kwargs_nested(nt1::NamedTuple, nt2::NamedTuple)
     end
     return (; zip(keys(result), values(result))...)
 end
+
+### Support for binary embeddings
+
+function pack_bits(arr::AbstractArray{<:Number})
+    throw(ArgumentError("Input must be of binary eltype (Bool vs provided $(eltype(arr))). Please convert your matrix to binary before packing."))
+end
+
+"""
+    pack_bits(arr::AbstractMatrix{<:Bool}) -> Matrix{UInt64}
+    pack_bits(vect::AbstractVector{<:Bool}) -> Vector{UInt64}
+
+Pack a matrix or vector of boolean values into a more compact representation using UInt64.
+
+# Arguments (Input)
+- `arr::AbstractMatrix{<:Bool}`: A matrix of boolean values where the number of rows must be divisible by 64.
+
+# Returns
+- For `arr::AbstractMatrix{<:Bool}`: Returns a matrix of UInt64 where each element represents 64 boolean values from the original matrix.
+
+# Examples
+
+For vectors:
+```julia
+bin = rand(Bool, 128)
+binint = pack_bits(bin)
+binx = unpack_bits(binint)
+@assert bin == binx
+```
+
+For matrices:
+```julia
+bin = rand(Bool, 128, 10)
+binint = pack_bits(bin)
+binx = unpack_bits(binint)
+@assert bin == binx
+```
+"""
+function pack_bits(arr::AbstractMatrix{<:Bool})
+    rows, cols = size(arr)
+    @assert rows % 64==0 "Number of rows must be divisable by 64"
+    new_rows = rows ÷ 64
+    reshape(BitArray(arr).chunks, new_rows, cols)
+end
+function pack_bits(vect::AbstractVector{<:Bool})
+    len = length(vect)
+    @assert len % 64==0 "Length must be divisable by 64"
+    BitArray(vect).chunks
+end
+
+function unpack_bits(arr::AbstractArray{<:Number})
+    throw(ArgumentError("Input must be of UInt64 eltype (provided: $(eltype(arr))). Are you sure you've packed this array?"))
+end
+
+"""
+    unpack_bits(packed_vector::AbstractVector{UInt64}) -> Vector{Bool}
+    unpack_bits(packed_matrix::AbstractMatrix{UInt64}) -> Matrix{Bool}
+
+Unpack a vector or matrix of UInt64 values into their original boolean representation.
+
+# Arguments (Input)
+- `packed_matrix::AbstractMatrix{UInt64}`: A matrix of UInt64 values where each element represents 64 boolean values.
+
+# Returns
+- For `packed_matrix::AbstractMatrix{UInt64}`: Returns a matrix of boolean values where the number of rows is 64 times the number of rows in the input matrix.
+
+# Examples
+
+For vectors:
+```julia
+bin = rand(Bool, 128)
+binint = pack_bits(bin)
+binx = unpack_bits(binint)
+@assert bin == binx
+```
+
+For matrices:
+```julia
+bin = rand(Bool, 128, 10)
+binint = pack_bits(bin)
+binx = unpack_bits(binint)
+@assert bin == binx
+```
+"""
+function unpack_bits(packed_vector::AbstractVector{UInt64})
+    return Bool[((x >> i) & 1) == 1 for x in packed_vector for i in 0:63]
+end
+function unpack_bits(packed_matrix::AbstractMatrix{UInt64})
+    num_rows, num_cols = size(packed_matrix)
+    output_rows = num_rows * 64
+    output_matrix = Matrix{Bool}(undef, output_rows, num_cols)
+
+    for col in axes(packed_matrix, 2)
+        output_matrix[:, col] = unpack_bits(@view(packed_matrix[:, col]))
+    end
+
+    return output_matrix
+end
