@@ -3,7 +3,7 @@ using OpenAI, HTTP, JSON3
 using SparseArrays, LinearAlgebra, Markdown
 using Statistics
 using Dates: now
-using Test, Pkg
+using Test, Pkg, Random
 const PT = PromptingTools
 using Aqua
 
