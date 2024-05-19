@@ -47,6 +47,18 @@ Reference: [HuggingFace: Embedding Quantization](https://huggingface.co/blog/emb
 struct BinaryCosineSimilarity <: AbstractSimilarityFinder end
 
 """
+    BitPackedCosineSimilarity <: AbstractSimilarityFinder
+
+Finds the closest chunks to a query embedding by measuring the Hamming distance AND cosine similarity between the query and the chunks' embeddings in binary form.
+
+The difference to `BinaryCosineSimilarity` is that the binary values are packed into Int64, which is more efficient.
+
+Reference: [HuggingFace: Embedding Quantization](https://huggingface.co/blog/embedding-quantization#binary-quantization-in-vector-databases).
+Implementation of `hamming_distance` is based on [TinyRAG](https://github.com/domluna/tinyrag/blob/main/README.md).
+"""
+struct BitPackedCosineSimilarity <: AbstractSimilarityFinder end
+
+"""
     NoTagFilter <: AbstractTagFilter
 
 
@@ -203,6 +215,45 @@ function find_closest(
 end
 
 ## For binary embeddings
+
+function pack_bits(arr::AbstractMatrix{<:Bool})
+    rows, cols = size(arr)
+    @assert rows % 64==0 "Number of rows must be divisable by 64"
+    new_rows = rows ÷ 64
+    reshape(BitArray(arr).chunks, new_rows, cols)
+end
+function pack_bits(vect::AbstractVector{<:Bool})
+    len = length(vect)
+    @assert len % 64==0 "Length must be divisable by 64"
+    BitArray(vect).chunks
+end
+
+## Source: https://github.com/domluna/tinyrag/blob/main/README.md
+## With minor modifications to the signatures
+
+@inline function hamming_distance(x1::T, x2::T)::Int where {T <: Integer}
+    return Int(count_ones(x1 ⊻ x2))
+end
+@inline function hamming_distance(x1::T, x2::T)::Int where {T <: Bool}
+    return Int(x1 ⊻ x2)
+end
+@inline function hamming_distance(
+        x1::AbstractVector{T}, x2::AbstractVector{T})::Int where {T <: Integer}
+    s = 0
+    @inbounds @simd for i in eachindex(x1, x2)
+        s += hamming_distance(x1[i], x2[i])
+    end
+    s
+end
+@inline function hamming_distance(
+        db::AbstractArray{T}, query::AbstractVector{T})::Vector{Int} where {T <: Integer}
+    dists = zeros(Int, size(db, 2))
+    @inbounds @simd for i in axes(db, 2)
+        dists[i] = hamming_distance(@view(db[:, i]), query)
+    end
+    dists
+end
+
 """
     hamming_distance(mat::AbstractMatrix{<:Bool}, vect::AbstractVector{<:Bool})
 
