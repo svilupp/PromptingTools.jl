@@ -4,7 +4,16 @@
 # - Call your ai* function with the tracer schema as usual
 
 # Simple passthrough, do nothing
-function role4render(schema::AbstractTracerSchema, msg::AbstractChatMessage)
+function role4render(schema::AbstractTracerSchema, msg::SystemMessage)
+    role4render(schema.schema, msg)
+end
+function role4render(schema::AbstractTracerSchema, msg::UserMessage)
+    role4render(schema.schema, msg)
+end
+function role4render(schema::AbstractTracerSchema, msg::UserMessageWithImages)
+    role4render(schema.schema, msg)
+end
+function role4render(schema::AbstractTracerSchema, msg::AIMessage)
     role4render(schema.schema, msg)
 end
 """
@@ -35,6 +44,8 @@ By default it captures:
     - expanded `api_kwargs`, ie, the keyword arguments to pass to the API call
 
 In the default implementation, we just collect the necessary data to build the tracer object in `finalize_tracer`.
+
+See also: `meta`, `unwrap`, `TracerSchema`, `SaverSchema`, `finalize_tracer`
 """
 function initialize_tracer(
         tracer_schema::AbstractTracerSchema; model = "", tracer_kwargs = NamedTuple(),
@@ -68,6 +79,8 @@ end
 Finalizes the calltracer of whatever is nedeed after the `ai*` calls. Use `tracer_kwargs` to provide any information necessary (eg, `parent_id`, `thread_id`, `run_id`).
 
 In the default implementation, we convert all non-tracer messages into `TracerMessage`.
+
+See also: `meta`, `unwrap`, `SaverSchema`, `initialize_tracer`
 """
 function finalize_tracer(
         tracer_schema::AbstractTracerSchema, tracer, msg_or_conv::Union{
@@ -102,11 +115,12 @@ end
             AbstractMessage, AbstractVector{<:AbstractMessage}};
         tracer_kwargs = NamedTuple(), model = "", kwargs...)
 
-Finalizes the calltracer by saving the provided conversation in `msg_or_conv` to the disk.
+Finalizes the calltracer by saving the provided conversation `msg_or_conv` to the disk.
 
-Path is `LOG_DIR/conversation__<first_msg_hash>__<time_received_str>.json`, where `LOG_DIR` is set by user preferences or ENV variable (defaults to `log/` in current working directory).
+Path is `LOG_DIR/conversation__<first_msg_hash>__<time_received_str>.json`, 
+ where `LOG_DIR` is set by user preferences or ENV variable (defaults to `log/` in current working directory).
 
-It can be combined with `TracerSchema` to also attach necessary metadata.
+It can be composed with `TracerSchema` to also attach necessary metadata (see below).
 
 # Example
 ```julia
@@ -116,6 +130,8 @@ conv = aigenerate(wrap_schema,:BlankSystemUser; system="You're a French-speaking
 
 # conv is a vector of messages that will be saved to a JSON together with metadata about the template and api_kwargs
 ```
+
+See also: `meta`, `unwrap`, `TracerSchema`, `initialize_tracer`
 """
 function finalize_tracer(
         tracer_schema::SaverSchema, tracer, msg_or_conv::Union{
@@ -129,9 +145,8 @@ function finalize_tracer(
            convert(Vector{AbstractMessage}, msg_or_conv) :
            AbstractMessage[msg_or_conv]
 
-    # Log the conversation to disk, save by hash + timestamp
-    str = first(conv).content
-    first_msg_hash = hash(str)
+    # Log the conversation to disk, save by hash of the first convo message + timestamp
+    first_msg_hash = hash(first(conv).content)
     time_received_str = Dates.format(
         time_received, dateformat"YYYYmmdd_HHMMSS")
     path = joinpath(
@@ -173,8 +188,9 @@ function aigenerate(tracer_schema::AbstractTracerSchema, prompt::ALLOWED_PROMPT_
         tracer_kwargs = NamedTuple(), model = "", return_all::Bool = false, kwargs...)
     tracer = initialize_tracer(tracer_schema; model, tracer_kwargs, prompt, kwargs...)
     # Force to return all convo and then subset as necessary
-    merged_kwargs = isempty(model) ? kwargs : (; model, return_all = true, kwargs...) # to not override default model for each schema if not provided
-    msg_or_conv = aigenerate(tracer_schema.schema, prompt; merged_kwargs...)
+    merged_kwargs = isempty(model) ? kwargs : (; model, kwargs...) # to not override default model for each schema if not provided
+    msg_or_conv = aigenerate(
+        tracer_schema.schema, prompt; tracer_kwargs, return_all = true, merged_kwargs...)
     output = finalize_tracer(
         tracer_schema, tracer, msg_or_conv; model, tracer_kwargs, kwargs...)
     return return_all ? output : last(output)

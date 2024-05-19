@@ -1,4 +1,12 @@
 # Reusable functionality across different schemas
+function role4render(schema::AbstractPromptSchema, msg::AbstractMessage)
+    throw(ArgumentError("Function `role4render` is not implemented for the provided schema ($(typeof(schema))) and $(typeof(msg))."))
+end
+role4render(schema::AbstractPromptSchema, msg::SystemMessage) = "system"
+role4render(schema::AbstractPromptSchema, msg::UserMessage) = "user"
+role4render(schema::AbstractPromptSchema, msg::UserMessageWithImages) = "user"
+role4render(schema::AbstractPromptSchema, msg::AIMessage) = "assistant"
+
 """
     render(schema::NoSchema,
         messages::Vector{<:AbstractMessage};

@@ -6,6 +6,7 @@ using PromptingTools: isusermessage, issystemmessage, isdatamessage, isaimessage
                       istracermessage
 using PromptingTools: TracerMessageLike, TracerMessage, align_tracer!, unwrap,
                       AbstractTracerMessage, AbstractTracer, pprint
+using PromptingTools: TracerSchema, SaverSchema
 
 @testset "Message constructors" begin
     # Creates an instance of MSG with the given content string.
@@ -140,6 +141,14 @@ end
     @test copy(tr2) !== tr2
 
     # Specific methods
+    # type trait passthrough to the underlying message
+    content = "say hi"
+    @test TracerMessage(UserMessage(content)) |> isusermessage
+    @test TracerMessage(SystemMessage(content)) |> issystemmessage
+    @test TracerMessage(DataMessage(; content)) |> isdatamessage
+    @test TracerMessage(AIMessage(; content)) |> isaimessage
+    @test TracerMessage(UserMessage(content)) |> AIMessage |> isaimessage
+
     # unwrap the tracer
     @test unwrap(tr1) == msg1
 

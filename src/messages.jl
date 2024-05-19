@@ -281,8 +281,8 @@ It provides a flexible way to track and annotate objects as they move through di
 - `time_sent::Union{Nothing, DateTime}`: The timestamp when the object was originally sent, if available.
 - `model::String`: The name of the model or process that generated or is associated with the object. Defaults to empty.
 - `parent_id::Symbol`: An identifier for the job or process that the object is associated with. Higher-level tracing ID.
-- `thread_id::Symbol`: An identifier for the thread or execution context within the job where the object originated. It should be the same for objects in the same thread.
-- `run_id::Union{Nothing, Int}`: A unique identifier for the run or instance of the process that generated the object. Defaults to a random integer.
+- `thread_id::Symbol`: An identifier for the thread or execution context (sub-task, sub-process) within the job where the object originated. It should be the same for objects in the same thread.
+- `run_id::Union{Nothing, Int}`: A unique identifier for the run or instance of the process (ie, a single call to the LLM) that generated the object. Defaults to a random integer.
 - `meta::Union{Nothing, Dict{Symbol, Any}}`: A dictionary for additional metadata that is not part of the object itself. Try to limit to a small number of items and singletons to be serializable.
 - `_type::Symbol`: A fixed symbol identifying the type of the tracer as `:tracermessage`, used for type discrimination.
 
@@ -305,9 +305,6 @@ All fields are optional besides the `object`.
     _type::Symbol = :tracermessagelike
     ## TracerMessageLike() = new()
 end
-## function TracerMessageLike()
-##     TracerMessageLike(; object = undef)
-## end
 function TracerMessageLike(
         object; kwargs...)
     TracerMessageLike(; object, kwargs...)
@@ -333,9 +330,14 @@ function Base.copy(t::T) where {T <: Union{AbstractTracerMessage, AbstractTracer
     T([deepcopy(getfield(t, f)) for f in fieldnames(T)]...)
 end
 
-"Unwraps the tracer message, returning the original `object`."
+"Unwraps the tracer message or tracer-like object, returning the original `object`."
 function unwrap(t::Union{AbstractTracerMessage, AbstractTracer})
     getfield(t, :object)
+end
+
+"Extracts the metadata dictionary from the tracer message or tracer-like object."
+function meta(t::Union{AbstractTracerMessage, AbstractTracer})
+    getfield(t, :meta)
 end
 
 "Aligns the tracer message, updating the `parent_id`, `thread_id`. Often used to align multiple tracers in the vector to have the same IDs."

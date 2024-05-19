@@ -1,9 +1,14 @@
-using PromptingTools: render, ShareGPTSchema
+using PromptingTools: role4render, render, ShareGPTSchema
 using PromptingTools: AIMessage, SystemMessage, AbstractMessage
 using PromptingTools: UserMessage, UserMessageWithImages, DataMessage
 
 @testset "render-ShareGPT" begin
     schema = ShareGPTSchema()
+
+    role4render(schema, SystemMessage("System message 1")) == "system"
+    role4render(schema, UserMessage("User message 1")) == "human"
+    role4render(schema, AIMessage("AI message 1")) == "gpt"
+
     # Ignores any handlebar replacement, takes conversations as is
     messages = [
         SystemMessage("Act as a helpful AI assistant"),

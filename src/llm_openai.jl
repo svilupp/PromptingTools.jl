@@ -1,8 +1,4 @@
 ## Rendering of converation history for the OpenAI API
-role4render(schema::AbstractOpenAISchema, msg::SystemMessage) = "system"
-role4render(schema::AbstractOpenAISchema, msg::UserMessage) = "user"
-role4render(schema::AbstractOpenAISchema, msg::UserMessageWithImages) = "user"
-role4render(schema::AbstractOpenAISchema, msg::AIMessage) = "assistant"
 """
     render(schema::AbstractOpenAISchema,
         messages::Vector{<:AbstractMessage};
