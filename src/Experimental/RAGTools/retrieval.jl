@@ -47,6 +47,18 @@ Reference: [HuggingFace: Embedding Quantization](https://huggingface.co/blog/emb
 struct BinaryCosineSimilarity <: AbstractSimilarityFinder end
 
 """
+    BitPackedCosineSimilarity <: AbstractSimilarityFinder
+
+Finds the closest chunks to a query embedding by measuring the Hamming distance AND cosine similarity between the query and the chunks' embeddings in binary form.
+
+The difference to `BinaryCosineSimilarity` is that the binary values are packed into UInt64, which is more efficient.
+
+Reference: [HuggingFace: Embedding Quantization](https://huggingface.co/blog/embedding-quantization#binary-quantization-in-vector-databases).
+Implementation of `hamming_distance` is based on [TinyRAG](https://github.com/domluna/tinyrag/blob/main/README.md).
+"""
+struct BitPackedCosineSimilarity <: AbstractSimilarityFinder end
+
+"""
     NoTagFilter <: AbstractTagFilter
 
 
@@ -202,32 +214,46 @@ function find_closest(
         c -> find_closest(finder, index, c; top_k = top_k_, kwargs...), vcat, eachcol(query_emb))
 end
 
-## For binary embeddings
+#### For binary embeddings
+## Source: https://github.com/domluna/tinyrag/blob/main/README.md
+## With minor modifications to the signatures
+
+@inline function hamming_distance(x1::T, x2::T)::Int where {T <: Integer}
+    return Int(count_ones(x1 ⊻ x2))
+end
+@inline function hamming_distance(x1::T, x2::T)::Int where {T <: Bool}
+    return Int(x1 ⊻ x2)
+end
+@inline function hamming_distance(
+        x1::AbstractVector{T}, x2::AbstractVector{T})::Int where {T <: Integer}
+    s = 0
+    @inbounds @simd for i in eachindex(x1, x2)
+        s += hamming_distance(x1[i], x2[i])
+    end
+    s
+end
+
 """
-    hamming_distance(mat::AbstractMatrix{<:Bool}, vect::AbstractVector{<:Bool})
+    hamming_distance(
+        mat::AbstractMatrix{T}, query::AbstractVector{T})::Vector{Int} where {T <: Integer}
 
 Calculates the column-wise Hamming distance between a matrix of binary vectors `mat` and a single binary vector `vect`.
 
 This is the first-pass ranking for `BinaryCosineSimilarity` method.
+
+Implementation from [**domluna's tinyRAG**](https://github.com/domluna/tinyRAG).
 """
-function hamming_distance(mat::AbstractMatrix{<:Bool}, vect::AbstractVector{<:Bool})
+@inline function hamming_distance(
+        mat::AbstractMatrix{T}, query::AbstractVector{T})::Vector{Int} where {T <: Integer}
     # Check if the number of rows matches
-    if size(mat, 1) != length(vect)
-        throw(ArgumentError("Matrix must have the same number of rows as the length of the Vector (provided: $(size(mat, 1)) vs $(length(vect)))"))
+    if size(mat, 1) != length(query)
+        throw(ArgumentError("Matrix must have the same number of rows as the length of the Vector (provided: $(size(mat, 1)) vs $(length(query)))"))
     end
-
-    # Calculate number of different bits, the smaller the number, the more similar they are.
-    distances = zeros(Int, size(mat, 2))
-    @inbounds for j in axes(mat, 2)
-        cnt = 0
-        v = @view(mat[:, j])
-        @simd for i in eachindex(vect, v)
-            cnt += v[i] ⊻ vect[i]
-        end
-        distances[j] = cnt
+    dists = zeros(Int, size(mat, 2))
+    @inbounds @simd for i in axes(mat, 2)
+        dists[i] = hamming_distance(@view(mat[:, i]), query)
     end
-
-    return distances
+    dists
 end
 
 """
@@ -266,6 +292,48 @@ function find_closest(
 
     ## Second pass, rescore with float embeddings and return top_k
     new_positions, scores = find_closest(CosineSimilarity(), @view(emb[:, positions]),
+        query_emb; top_k, minimum_similarity, kwargs...)
+
+    ## translate to original indices
+    return positions[new_positions], scores
+end
+
+"""
+    find_closest(
+        finder::BitPackedCosineSimilarity, emb::AbstractMatrix{<:Bool},
+        query_emb::AbstractVector{<:Real};
+        top_k::Int = 100, rescore_multiplier::Int = 4, minimum_similarity::AbstractFloat = -1.0, kwargs...)
+
+Finds the indices of chunks (represented by embeddings in `emb`) that are closest to query embedding (`query_emb`) using bit-packed binary embeddings (in the index).
+
+This is a two-pass approach:
+- First pass: Hamming distance in bit-packed binary form to get the `top_k * rescore_multiplier` (i.e., more than top_k) candidates.
+- Second pass: Rescore the candidates with float embeddings and return the top_k.
+
+Returns only `top_k` closest indices.
+
+Reference: [HuggingFace: Embedding Quantization](https://huggingface.co/blog/embedding-quantization#binary-quantization-in-vector-databases).
+
+# Examples
+Convert any Float embeddings to bit-packed binary like this:
+```julia
+bitpacked_emb = pack_bits(emb.>0)
+```
+"""
+function find_closest(
+        finder::BitPackedCosineSimilarity, emb::AbstractMatrix{<:Integer},
+        query_emb::AbstractVector{<:Real};
+        top_k::Int = 100, rescore_multiplier::Int = 4, minimum_similarity::AbstractFloat = -1.0, kwargs...)
+    # emb is an embedding matrix where the first dimension is the embedding dimension
+
+    ## First pass, both in binary with Hamming, get rescore_multiplier times top_k
+    bit_query_emb = pack_bits(query_emb .> 0)
+    scores = hamming_distance(emb, bit_query_emb)
+    positions = scores |> sortperm |> x -> first(x, top_k * rescore_multiplier)
+
+    ## Second pass, rescore with float embeddings and return top_k
+    unpacked_emb = unpack_bits(@view(emb[:, positions]))
+    new_positions, scores = find_closest(CosineSimilarity(), unpacked_emb,
         query_emb; top_k, minimum_similarity, kwargs...)
 
     ## translate to original indices
