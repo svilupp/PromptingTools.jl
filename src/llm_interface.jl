@@ -324,6 +324,12 @@ A schema designed to wrap another schema, enabling pre- and post-execution callb
 
 The `TracerSchema` acts as a middleware, allowing developers to insert custom logic before and after the execution of the primary schema's functionality. This can include logging, performance measurement, or any other form of tracing required to understand or improve the execution flow.
 
+`TracerSchema` automatically wraps messages in `TracerMessage` type, which has several important fields, eg,
+- `object`: the original message - unwrap with utility `unwrap`
+- `meta`: a dictionary with metadata about the tracing process (eg, prompt templates, LLM API kwargs) - extract with utility `meta`
+- `parent_id`: an identifier for the overall job / high-level conversation with the user where the current conversation `thread` originated. It should be the same for objects in the same thread.
+- `thread_id`: an identifier for the current thread or execution context (sub-task, sub-process, CURRENT CONVERSATION or vector of messages) within the broader parent task. It should be the same for objects in the same thread.
+
 See also: `meta`, `unwrap`, `SaverSchema`, `initialize_tracer`, `finalize_tracer`
 
 # Example
@@ -348,6 +354,7 @@ It's useful for debugging and for persistent logging.
 It can be composed with any other schema, eg, `TracerSchema` to save additional metadata.
 
 Set environment variable `LOG_DIR` to the directory where you want to save the conversation (see `?PREFERENCES`).
+Conversations are named by the hash of the first message in the conversation to naturally group subsequent conversations together.
 
 To use it automatically, re-register the models you use with the schema wrapped in `SaverSchema`
 
