@@ -5,8 +5,26 @@ using PromptingTools: CustomProvider,
                       CustomOpenAISchema, MistralOpenAISchema, MODEL_EMBEDDING,
                       MODEL_IMAGE_GENERATION
 using PromptingTools: initialize_tracer, finalize_tracer, isaimessage, istracermessage,
-                      unwrap, meta, AITemplate
+                      unwrap, meta, AITemplate, render, role4render
 
+@testset "role4render-Tracer" begin
+    schema = TracerSchema(OpenAISchema())
+
+    # unwrapping schema
+    @test role4render(schema, SystemMessage("System message 1")) == "system"
+    @test role4render(schema, UserMessage("User message 1")) == "user"
+    @test role4render(schema, UserMessageWithImages("User message 1"; image_url = "")) ==
+          "user"
+    @test role4render(schema, AIMessage("AI message 1")) == "assistant"
+
+    # unwrapping TracerMessage
+    @test role4render(OpenAISchema(), TracerMessage(SystemMessage("Abc123"))) == "system"
+    @test role4render(OpenAISchema(), TracerMessage(UserMessage("Abc123"))) == "user"
+    @test role4render(
+        OpenAISchema(), TracerMessage(UserMessageWithImages("Abc123"; image_url = ""))) ==
+          "user"
+    @test role4render(OpenAISchema(), TracerMessage(AIMessage("Abc123"))) == "assistant"
+end
 @testset "render-Tracer" begin
     schema = TracerSchema(OpenAISchema())
     # Given a schema and a vector of messages with handlebar variables, it should replace the variables with the correct values in the conversation dictionary.
@@ -111,6 +129,11 @@ end
     @test PT.load_conversation(fn) == conv
     ## clean up
     isfile(fn) && rm(fn)
+
+    # Passthrough for non-messages (dry-runs)
+    schema = TracerSchema(OpenAISchema())
+    conv = finalize_tracer(schema, tracer, [1, 2, 3, 4, 5])
+    @test conv == [1, 2, 3, 4, 5]
 end
 
 @testset "aigenerate-Tracer" begin
@@ -139,7 +162,7 @@ end
 
     ## other schema -- SaverSchema
     schema2 = schema1 |> SaverSchema
-    msgs = [SystemMessage("Test message 1"), UserMessage("Hello World")]
+    msgs = [TracerMessage(SystemMessage("Test message 1")), UserMessage("Hello World")]
     msg = aigenerate(
         schema2, msgs; model = "xyz", tracer_kwargs = (; thread_id = :ABC1))
     @test istracermessage(msg)
