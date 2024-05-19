@@ -6,6 +6,7 @@ using PromptingTools.Experimental.RAGTools: token_with_boundaries, text_to_trigr
 using PromptingTools.Experimental.RAGTools: split_into_code_and_sentences
 using PromptingTools.Experimental.RAGTools: getpropertynested, setpropertynested,
                                             merge_kwargs_nested
+using PromptingTools.Experimental.RAGTools: pack_bits, unpack_bits
 
 @testset "_check_aiextract_capability" begin
     @test _check_aiextract_capability("gpt-3.5-turbo") == nothing
@@ -365,4 +366,79 @@ end
     nt2 = NamedTuple()
     expected = (; a = 1, b = (; c = 2))
     @test merge_kwargs_nested(nt1, nt2) == expected
+end
+
+@testset "pack_bits,unpack_bits" begin
+    ### Test for vectors
+    # Basic functionality
+    bin = rand(Bool, 128)
+    binint = pack_bits(bin)
+    binx = unpack_bits(binint)
+    @test bin == binx
+
+    # Edge cases
+    # Test with all true values
+    bin = trues(128)
+    binint = pack_bits(bin)
+    binx = unpack_bits(binint)
+    @test bin == binx
+
+    # Test with all false values
+    bin = falses(128)
+    binint = pack_bits(bin)
+    binx = unpack_bits(binint)
+    @test bin == binx
+
+    # Test with alternating true and false values
+    bin = Bool[mod(i, 2) == 0 for i in 1:128]
+    binint = pack_bits(bin)
+    binx = unpack_bits(binint)
+    @test bin == binx
+
+    # empty vector
+    bin_empty = Bool[]
+    binint_empty = pack_bits(bin_empty)
+    binx_empty = unpack_bits(binint_empty)
+    @test bin_empty == binx_empty
+
+    # Invalid input
+    # Test with length not divisible by 64
+    bin = rand(Bool, 130)
+    @test_throws AssertionError pack_bits(bin)
+    @test_throws ArgumentError pack_bits(rand(Float32, 128))
+    @test_throws ArgumentError unpack_bits(rand(Float32, 128))
+
+    ### Test for matrices
+    # Basic functionality
+    bin = rand(Bool, 128, 10)
+    binint = pack_bits(bin)
+    binx = unpack_bits(binint)
+    @test bin == binx
+
+    # Edge cases
+    # Test with all true values
+    bin = trues(128, 10)
+    binint = pack_bits(bin)
+    binx = unpack_bits(binint)
+    @test bin == binx
+
+    # Test with all false values
+    bin = falses(128, 10)
+    binint = pack_bits(bin)
+    binx = unpack_bits(binint)
+    @test bin == binx
+
+    # Test with alternating true and false values
+    bin = Bool[mod(i, 2) == 0 for i in 1:128, j in 1:10]
+    binint = pack_bits(bin)
+    binx = unpack_bits(binint)
+    @test bin == binx
+
+    # Invalid input
+    # Test with number of rows not divisible by 64
+    bin = rand(Bool, 130, 10)
+    @test_throws AssertionError pack_bits(bin)
+    # Wrong number type
+    @test_throws ArgumentError pack_bits(rand(Float32, 128, 10))
+    @test_throws ArgumentError unpack_bits(rand(Float32, 128, 10))
 end

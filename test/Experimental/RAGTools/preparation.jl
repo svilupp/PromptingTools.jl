@@ -9,6 +9,7 @@ using PromptingTools.Experimental.RAGTools: build_tags, build_index, SimpleIndex
                                             get_tags, get_chunks, get_embeddings
 using PromptingTools.Experimental.RAGTools: build_tags, build_index
 using PromptingTools: TestEchoOpenAISchema
+using PromptingTools.Experimental.RAGTools: pack_bits, BitPackedBatchEmbedder
 
 @testset "load_text" begin
     # from file
@@ -80,9 +81,17 @@ end
     @test size(output) == (100, 2)
     @test eltype(output) == Bool
 
+    # BitPackedBatchEmbedder
+    output = get_embeddings(
+        BitPackedBatchEmbedder(), docs; model = "mock-emb")
+    @test size(output) == (2, 2)
+    @test eltype(output) == UInt64
+    output = pack_bits(ones(Float32, 128, 2) .> 0)
+
     # EmbedderEltype
     @test EmbedderEltype(BinaryBatchEmbedder()) == Bool
     @test EmbedderEltype(BatchEmbedder()) == Float32
+    @test EmbedderEltype(BitPackedBatchEmbedder()) == UInt64
 end
 
 @testset "tags_extract" begin

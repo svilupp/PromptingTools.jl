@@ -10,6 +10,8 @@ using PromptingTools.Experimental.RAGTools: find_closest, hamming_distance, find
                                             rerank, rephrase,
                                             retrieve
 using PromptingTools.Experimental.RAGTools: NoReranker, CohereReranker
+using PromptingTools.Experimental.RAGTools: hamming_distance, BitPackedCosineSimilarity,
+                                            pack_bits, unpack_bits
 
 @testset "rephrase" begin
     # Test rephrase with NoRephraser, simple passthrough
@@ -39,6 +41,8 @@ using PromptingTools.Experimental.RAGTools: NoReranker, CohereReranker
 end
 
 @testset "hamming_distance" begin
+
+    ## ORIGINAL TESTS
     # Test for matching number of rows
     @test_throws ArgumentError hamming_distance(
         [true false; false true], [true, false, true])
@@ -48,6 +52,81 @@ end
     @test hamming_distance([true false; false true], [false, true]) == [2, 0]
     @test hamming_distance([true false; false true], [true, true]) == [1, 1]
     @test hamming_distance([true false; false true], [false, false]) == [1, 1]
+
+    ## NEW TESTS
+    # Test for Bool vectors
+    vec1 = Bool[1, 0, 1, 0, 1, 0, 1, 0]
+    vec2 = Bool[0, 1, 0, 1, 0, 1, 0, 1]
+    # Basic functionality
+    @test hamming_distance(vec1, vec2) == 8
+
+    # Edge cases
+    vec3 = Bool[1, 1, 1, 1, 1, 1, 1, 1]
+    vec4 = Bool[0, 0, 0, 0, 0, 0, 0, 0]
+    @test hamming_distance(vec3, vec4) == 8
+
+    vec5 = Bool[1, 1, 1, 1, 1, 1, 1, 1]
+    vec6 = Bool[1, 1, 1, 1, 1, 1, 1, 1]
+    @test hamming_distance(vec5, vec6) == 0
+
+    # Test for UInt64 (bitpacked) vectors
+    vec7 = pack_bits(repeat(vec1, 8))
+    vec8 = pack_bits(repeat(vec2, 8))
+    @test hamming_distance(vec7, vec8) == 64
+
+    vec9 = pack_bits(repeat(vec3, 8))
+    vec10 = pack_bits(repeat(vec4, 8))
+    @test hamming_distance(vec9, vec10) == 64
+
+    vec11 = pack_bits(repeat(vec5, 8))
+    vec12 = pack_bits(repeat(vec6, 8))
+    @test hamming_distance(vec11, vec12) == 0
+
+    # Test for Bool matrices
+    mat1 = [vec1 vec2]
+    mat2 = [vec3 vec4]
+    @test hamming_distance(mat1, vec2) == [8, 0]
+    @test hamming_distance(mat2, vec3) == [0, 8]
+
+    # Test for UInt64 (bitpacked) matrices
+    mat3 = pack_bits(repeat(mat1; outer = 8))
+    mat4 = pack_bits(repeat(mat2; outer = 8))
+    @test hamming_distance(mat3, vec8) == [64, 0]
+    @test hamming_distance(mat4, vec9) == [0, 64]
+
+    # Test for mismatched dimensions
+    vec13 = Bool[1, 0, 1]
+    @test_throws ArgumentError hamming_distance(mat1, vec13)
+
+    # Additional edge cases
+    # Empty vectors
+    vec_empty1 = Bool[]
+    vec_empty2 = Bool[]
+    @test hamming_distance(vec_empty1, vec_empty2) == 0
+
+    # Single element vectors
+    vec_single1 = Bool[1]
+    vec_single2 = Bool[0]
+    @test hamming_distance(vec_single1, vec_single2) == 1
+
+    # Large vectors
+    vec_large1 = Bool[1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0,
+        1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0]
+    vec_large2 = Bool[0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1,
+        0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1]
+    @test hamming_distance(vec_large1, vec_large2) == 32
+
+    # Large vectors with bitpacking
+    vec_large_packed1 = pack_bits(repeat(vec_large1, 2))
+    vec_large_packed2 = pack_bits(repeat(vec_large2, 2))
+    @test hamming_distance(vec_large_packed1, vec_large_packed2) == 64
+
+    ## Compare packed vs binary results
+    mat_rand1 = rand(Bool, 128, 10)
+    q_rand2 = rand(Bool, 128)
+    hamming_dist_binary = hamming_distance(mat_rand1, q_rand2)
+    hamming_dist_packed = hamming_distance(pack_bits(mat_rand1), pack_bits(q_rand2))
+    @test hamming_dist_binary == hamming_dist_packed
 end
 
 @testset "find_closest" begin
@@ -152,6 +231,29 @@ end
         BinaryCosineSimilarity(), emb, query_emb; top_k = 1, minimum_similarity = 0.6)
     @test isempty(positions)
     @test isempty(scores)
+
+    ### Sense check for approximate methods
+
+    # Generate random embeddings as a sense check
+    Random.seed!(1234)  # For reproducibility
+    emb = mapreduce(normalize, hcat, eachcol(randn(128, 1000)))
+    query_emb = randn(128) |> normalize  # Normalize the query embedding
+
+    # Calculate positions and scores using normal CosineSimilarity
+    positions_cosine, scores_cosine = find_closest(
+        CosineSimilarity(), emb, query_emb; top_k = 10)
+
+    # Calculate positions and scores using BinaryCosineSimilarity
+    binary_emb = map(>(0), emb)
+    positions_binary, scores_binary = find_closest(
+        BinaryCosineSimilarity(), binary_emb, query_emb; top_k = 10)
+    @test length(intersect(positions_cosine, positions_binary)) >= 1
+
+    # Calculate positions and scores using BinaryCosineSimilarity
+    packed_emb = pack_bits(binary_emb)
+    positions_packed, scores_packed = find_closest(
+        BitPackedCosineSimilarity(), packed_emb, query_emb; top_k = 10)
+    @test length(intersect(positions_cosine, positions_packed)) >= 1
 end
 
 @testset "find_tags" begin
