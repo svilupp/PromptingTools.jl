@@ -1,4 +1,11 @@
 ## Rendering of converation history for the OpenAI API
+## No system message, we need to merge with UserMessage, see below
+function role4render(schema::AbstractGoogleSchema, msg::SystemMessage)
+    "user"
+end
+function role4render(schema::AbstractGoogleSchema, msg::AIMessage)
+    "model"
+end
 """
     render(schema::AbstractGoogleSchema,
         messages::Vector{<:AbstractMessage};
@@ -24,15 +31,9 @@ function render(schema::AbstractGoogleSchema,
 
     # replace any handlebar variables in the messages
     for msg in messages_replaced
-        role = if msg isa SystemMessage
-            ## No system message, we need to merge with UserMessage, see below
-            "user"
-        elseif msg isa UserMessage
-            "user"
-        elseif msg isa AIMessage
-            "model"
-        end
-        push!(conversation, Dict(:role => role, :parts => [Dict("text" => msg.content)]))
+        push!(conversation,
+            Dict(
+                :role => role4render(schema, msg), :parts => [Dict("text" => msg.content)]))
     end
     ## Merge any subsequent UserMessages
     merged_conversation = Dict{Symbol, Any}[]

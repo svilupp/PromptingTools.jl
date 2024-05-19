@@ -470,3 +470,56 @@ PT.render(PT.NoSchema(), tpl; system = "I exist", user = "say hi")
 ```
 
 For more information about the rendering pipeline and examples refer to [Walkthrough Example for aigenerate](@ref).
+
+
+## Automatic Logging / Tracing
+
+If you would like to automatically capture metadata about your conversations, you can use the `TracerSchema`. It automatically captures the necessary metadata such as model, task (`parent_id`), current thread (`thread_id`), API kwargs used and any prompt templates (and its versions).
+```julia
+using PromptingTools: TracerSchema, OpenAISchema
+
+wrap_schema = TracerSchema(OpenAISchema())
+msg = aigenerate(wrap_schema, "Say hi!"; model="gpt-4")
+# output type should be TracerMessage
+msg isa TracerMessage
+```
+
+You can work with the message like any other message (properties of the inner `object` are overloaded). 
+You can extract the original message with `unwrap`:
+```julia
+unwrap(msg) isa String
+```
+You can extract the metadata with `meta`:
+```julia
+meta(msg) isa Dict
+```
+
+
+If you would like to automatically save the conversations, you can use the `SaverSchema`. It automatically serializes the conversation to a file in the directory specified by the environment variable `LOG_DIR`.
+
+```julia
+using PromptingTools: SaverSchema
+
+wrap_schema = SaverSchema(OpenAISchema())
+msg = aigenerate(wrap_schema, "Say hi!"; model="gpt-4")
+```
+See `LOG_DIR` location to find the serialized conversation.
+
+
+You can also compose multiple tracing schemas. For example, you can capture metadata with `TracerSchema` and then save everything automatically with `SaverSchema`:
+```julia
+using PromptingTools: TracerSchema, SaverSchema, OpenAISchema
+
+wrap_schema = OpenAISchema() |> TracerSchema |> SaverSchema
+conv = aigenerate(wrap_schema,:BlankSystemUser; system="You're a French-speaking assistant!",
+    user="Say hi!"; model="gpt-4", api_kwargs=(;temperature=0.1), return_all=true)
+```
+
+`conv` is a vector of tracing messages that will be saved to a JSON together with metadata about the template and `api_kwargs`.
+
+If you would like to enable this behavior automatically, you can register your favorite model (or re-register existing models) with the "wrapped" schema:
+
+```julia
+PT.register_model!(; name= "gpt-3.5-turbo", schema=OpenAISchema() |> TracerSchema |> SaverSchema)
+```
+

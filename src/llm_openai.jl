@@ -28,13 +28,6 @@ function render(schema::AbstractOpenAISchema,
 
     # replace any handlebar variables in the messages
     for msg in messages_replaced
-        role = if msg isa SystemMessage
-            "system"
-        elseif msg isa UserMessage || msg isa UserMessageWithImages
-            "user"
-        elseif msg isa AIMessage
-            "assistant"
-        end
         ## Special case for images
         if msg isa UserMessageWithImages
             # Build message content
@@ -50,7 +43,7 @@ function render(schema::AbstractOpenAISchema,
         else
             content = msg.content
         end
-        push!(conversation, Dict("role" => role, "content" => content))
+        push!(conversation, Dict("role" => role4render(schema, msg), "content" => content))
     end
 
     return conversation

@@ -1,10 +1,18 @@
 using PromptingTools: render, NoSchema
 using PromptingTools: AIMessage, SystemMessage, AbstractMessage, AbstractChatMessage
 using PromptingTools: UserMessage, UserMessageWithImages
-using PromptingTools: finalize_outputs
+using PromptingTools: finalize_outputs, role4render
 
 @testset "render-NoSchema" begin
     schema = NoSchema()
+
+    @test role4render(schema, SystemMessage("System message 1")) == "system"
+    @test role4render(schema, UserMessage("User message 1")) == "user"
+    @test role4render(schema, UserMessageWithImages("User message 1"; image_url = "")) ==
+          "user"
+    @test role4render(schema, AIMessage("AI message 1")) == "assistant"
+    @test_throws ArgumentError role4render(schema, DataMessage(; content = ones(3, 3)))
+
     # Given a schema and a vector of messages with handlebar variables, it should replace the variables with the correct values in the conversation dictionary.
     messages = [
         SystemMessage("Act as a helpful AI assistant"),

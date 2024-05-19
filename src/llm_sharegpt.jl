@@ -1,13 +1,14 @@
 ### RENDERING
-function sharegpt_role(::AbstractMessage)
-    throw(ArgumentError("Unsupported message type $(typeof(msg))"))
+role4render(::AbstractShareGPTSchema, ::AIMessage) = "gpt"
+role4render(::AbstractShareGPTSchema, ::UserMessage) = "human"
+role4render(::AbstractShareGPTSchema, ::SystemMessage) = "system"
+function role4render(::AbstractShareGPTSchema, ::UserMessageWithImages)
+    throw(ArgumentError("UserMessageWithImages is not supported in ShareGPT schema"))
 end
-sharegpt_role(::AIMessage) = "gpt"
-sharegpt_role(::UserMessage) = "human"
-sharegpt_role(::SystemMessage) = "system"
 
-function render(::AbstractShareGPTSchema, conv::AbstractVector{<:AbstractMessage})
-    Dict("conversations" => [Dict("from" => sharegpt_role(msg), "value" => msg.content)
+function render(schema::AbstractShareGPTSchema, conv::AbstractVector{<:AbstractMessage})
+    Dict("conversations" => [Dict("from" => role4render(schema, msg),
+                                 "value" => msg.content)
                              for msg in conv])
 end
 
