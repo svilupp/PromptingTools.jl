@@ -406,6 +406,7 @@ end
     bin = rand(Bool, 130)
     @test_throws AssertionError pack_bits(bin)
     @test_throws ArgumentError pack_bits(rand(Float32, 128))
+    @test_throws ArgumentError unpack_bits(rand(Float32, 128))
 
     ### Test for matrices
     # Basic functionality
@@ -439,4 +440,5 @@ end
     @test_throws AssertionError pack_bits(bin)
     # Wrong number type
     @test_throws ArgumentError pack_bits(rand(Float32, 128, 10))
+    @test_throws ArgumentError unpack_bits(rand(Float32, 128, 10))
 end
