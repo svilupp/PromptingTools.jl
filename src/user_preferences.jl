@@ -31,6 +31,7 @@ Check your preferences by calling `get_preferences(key::String)`.
     See `CONV_HISTORY` for more information.
 - `LOCAL_SERVER`: The URL of the local server to use for `ai*` calls. Defaults to `http://localhost:10897/v1`. This server is called when you call `model="local"`
     See `?LocalServerOpenAISchema` for more information and examples.
+- `LOG_DIR`: The directory to save the logs to, eg, when using `SaverSchema <: AbstractTracerSchema`. Defaults to `joinpath(pwd(), "log")`. Refer to `?SaverSchema` for more information on how it works and examples.
 
 At the moment it is not possible to persist changes to `MODEL_REGISTRY` across sessions. 
 Define your `register_model!()` calls in your `startup.jl` file to make them available across sessions or put them at the top of your script.
@@ -48,6 +49,7 @@ Define your `register_model!()` calls in your `startup.jl` file to make them ava
 - `VOYAGE_API_KEY`: The API key for the Voyage API. Free tier is upto 50M tokens! Get yours from [here](https://dash.voyageai.com/api-keys).
 - `GROQ_API_KEY`: The API key for the Groq API. Free in beta! Get yours from [here](https://console.groq.com/keys).
 - `DEEPSEEK_API_KEY`: The API key for the DeepSeek API. Get \$5 credit when you join. Get yours from [here](https://platform.deepseek.com/api_keys).
+- `LOG_DIR`: The directory to save the logs to, eg, when using `SaverSchema <: AbstractTracerSchema`. Defaults to `joinpath(pwd(), "log")`. Refer to `?SaverSchema` for more information on how it works and examples.
 
 Preferences.jl takes priority over ENV variables, so if you set a preference, it will take precedence over the ENV variable.
 
@@ -72,7 +74,8 @@ const ALLOWED_PREFERENCES = ["MISTRALAI_API_KEY",
     "MODEL_ALIASES",
     "PROMPT_SCHEMA",
     "MAX_HISTORY_LENGTH",
-    "LOCAL_SERVER"]
+    "LOCAL_SERVER",
+    "LOG_DIR"]
 
 """
     set_preferences!(pairs::Pair{String, <:Any}...)
@@ -189,6 +192,11 @@ const DEEPSEEK_API_KEY::String = @load_preference("DEEPSEEK_API_KEY",
 _temp = get(ENV, "LOCAL_SERVER", "http://localhost:10897/v1")
 ## Address of the local server
 const LOCAL_SERVER::String = @load_preference("LOCAL_SERVER",
+    default=_temp);
+
+_temp = get(ENV, "LOG_DIR", joinpath(pwd(), "log"))
+## Address of the local server
+const LOG_DIR::String = @load_preference("LOG_DIR",
     default=_temp);
 
 ## CONVERSATION HISTORY

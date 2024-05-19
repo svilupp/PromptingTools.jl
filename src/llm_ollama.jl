@@ -7,6 +7,7 @@
 ## Schema dedicated to [Ollama's models](https://ollama.ai/), which also managed the prompt templates
 #
 ## Rendering of converation history for the Ollama API (similar to OpenAI but not for the images)
+
 """
     render(schema::AbstractOllamaSchema,
         messages::Vector{<:AbstractMessage};
@@ -32,14 +33,8 @@ function render(schema::AbstractOllamaSchema,
 
     # replace any handlebar variables in the messages
     for msg in messages_replaced
-        role = if msg isa SystemMessage
-            "system"
-        elseif msg isa UserMessage || msg isa UserMessageWithImages
-            "user"
-        elseif msg isa AIMessage
-            "assistant"
-        end
-        new_message = Dict{String, Any}("role" => role, "content" => msg.content)
+        new_message = Dict{String, Any}(
+            "role" => role4render(schema, msg), "content" => msg.content)
         ## Special case for images
         if msg isa UserMessageWithImages
             new_message["images"] = msg.image_url

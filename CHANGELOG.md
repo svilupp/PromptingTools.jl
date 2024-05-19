@@ -12,12 +12,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.26.0]
 
+### BREAKING CHANGES
+- Added new field `meta` to `TracerMessage` and `TracerMessageLike` to hold metadata in a simply dictionary. Change is backward-compatible.
+- Changed behaviour of `aitemplates(name::Symbol)` to look for the exact match on the template name, not just a partial match. This is a breaking change for the `aitemplates` function only. Motivation is that having multiple matches could have introduced subtle bugs when looking up valid placeholders for a template.
+
+
 ### Added
 - Improved support for `aiclassify` with OpenAI models (you can now encode upto 40 choices).
 - Added a template for routing questions `:QuestionRouter` (to be used with `aiclassify`)
-
-### Changed
-- [BREAKING] Changed behaviour of `aitemplates(name::Symbol)` to look for the exact match on the template name, not just a partial match. This is a breaking change for the `aitemplates` function only. Motivation is that having multiple matches could have introduced subtle bugs when looking up valid placeholders for a template.
+- Improved tracing by `TracerSchema` to automatically capture crucial metadata such as any LLM API kwargs (`api_kwargs`), use of prompt templates and its versions. Information is captured in `meta(tracer)` dictionary. See `?TracerSchema` for more information.
+- New tracing schema `SaverSchema` allows to automatically serialize all conversations. It can be composed with other tracing schemas, eg, `TracerSchema` to automatically capture necessary metadata and serialize. See `?SaverSchema` for more information.
 
 ### Fixed
 - Fixed a bug where `aiclassify` would not work when returning the full conversation for choices with extra descriptions

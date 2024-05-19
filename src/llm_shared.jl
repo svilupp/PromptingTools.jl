@@ -1,4 +1,12 @@
 # Reusable functionality across different schemas
+function role4render(schema::AbstractPromptSchema, msg::AbstractMessage)
+    throw(ArgumentError("Function `role4render` is not implemented for the provided schema ($(typeof(schema))) and $(typeof(msg))."))
+end
+role4render(schema::AbstractPromptSchema, msg::SystemMessage) = "system"
+role4render(schema::AbstractPromptSchema, msg::UserMessage) = "user"
+role4render(schema::AbstractPromptSchema, msg::UserMessageWithImages) = "user"
+role4render(schema::AbstractPromptSchema, msg::AIMessage) = "assistant"
+
 """
     render(schema::NoSchema,
         messages::Vector{<:AbstractMessage};
@@ -49,6 +57,11 @@ function render(schema::NoSchema,
         elseif msg isa AIMessage
             # no replacements
             push!(conversation, msg)
+        elseif istracermessage(msg) && issystemmessage(msg.object)
+            # Look for tracers
+            count_system_msg += 1
+            # move to the front
+            pushfirst!(conversation, msg)
         else
             # Note: Ignores any DataMessage or other types for the prompt/conversation history
             @warn "Unexpected message type: $(typeof(msg)). Skipping."

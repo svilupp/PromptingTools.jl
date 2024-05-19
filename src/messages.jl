@@ -142,6 +142,10 @@ issystemmessage(m::AbstractMessage) = m isa SystemMessage
 isdatamessage(m::AbstractMessage) = m isa DataMessage
 isaimessage(m::AbstractMessage) = m isa AIMessage
 istracermessage(m::AbstractMessage) = m isa AbstractTracerMessage
+isusermessage(m::AbstractTracerMessage) = isusermessage(m.object)
+issystemmessage(m::AbstractTracerMessage) = issystemmessage(m.object)
+isdatamessage(m::AbstractTracerMessage) = isdatamessage(m.object)
+isaimessage(m::AbstractTracerMessage) = isaimessage(m.object)
 
 # equality check for testing, only equal if all fields are equal and type is the same
 Base.var"=="(m1::AbstractMessage, m2::AbstractMessage) = false
@@ -225,6 +229,7 @@ A mutable wrapper message designed for tracing the flow of messages through the 
 - `model::String`: The name of the model that generated the message. Defaults to empty.
 - `parent_id::Symbol`: An identifier for the job or process that the message is associated with. Higher-level tracing ID.
 - `thread_id::Symbol`: An identifier for the thread (series of messages for one model/agent) or execution context within the job where the message originated. It should be the same for messages in the same thread.
+- `meta::Union{Nothing, Dict{Symbol, Any}}`: A dictionary for additional metadata that is not part of the message itself. Try to limit to a small number of items and singletons to be serializable.
 - `_type::Symbol`: A fixed symbol identifying the type of the message as `:eventmessage`, used for type discrimination.
 
 This structure is particularly useful for debugging, monitoring, and auditing the flow of messages in systems that involve complex interactions or asynchronous processing.
@@ -254,6 +259,7 @@ Base.@kwdef mutable struct TracerMessage{T <:
     parent_id::Symbol = gensym("parent")
     thread_id::Symbol = gensym("thread")
     run_id::Union{Nothing, Int} = Int(rand(Int32))
+    meta::Union{Nothing, Dict{Symbol, Any}} = Dict{Symbol, Any}()
     _type::Symbol = :tracermessage
 end
 function TracerMessage(msg::Union{AbstractChatMessage, AbstractDataMessage}; kwargs...)
@@ -275,8 +281,9 @@ It provides a flexible way to track and annotate objects as they move through di
 - `time_sent::Union{Nothing, DateTime}`: The timestamp when the object was originally sent, if available.
 - `model::String`: The name of the model or process that generated or is associated with the object. Defaults to empty.
 - `parent_id::Symbol`: An identifier for the job or process that the object is associated with. Higher-level tracing ID.
-- `thread_id::Symbol`: An identifier for the thread or execution context within the job where the object originated. It should be the same for objects in the same thread.
-- `run_id::Union{Nothing, Int}`: A unique identifier for the run or instance of the process that generated the object. Defaults to a random integer.
+- `thread_id::Symbol`: An identifier for the thread or execution context (sub-task, sub-process) within the job where the object originated. It should be the same for objects in the same thread.
+- `run_id::Union{Nothing, Int}`: A unique identifier for the run or instance of the process (ie, a single call to the LLM) that generated the object. Defaults to a random integer.
+- `meta::Union{Nothing, Dict{Symbol, Any}}`: A dictionary for additional metadata that is not part of the object itself. Try to limit to a small number of items and singletons to be serializable.
 - `_type::Symbol`: A fixed symbol identifying the type of the tracer as `:tracermessage`, used for type discrimination.
 
 This structure is particularly useful for systems that involve complex interactions or asynchronous processing, where tracking the flow and transformation of objects is crucial.
@@ -294,12 +301,10 @@ All fields are optional besides the `object`.
     parent_id::Symbol = gensym("parent")
     thread_id::Symbol = gensym("thread")
     run_id::Union{Nothing, Int} = Int(rand(Int32))
+    meta::Union{Nothing, Dict{Symbol, Any}} = Dict{Symbol, Any}()
     _type::Symbol = :tracermessagelike
     ## TracerMessageLike() = new()
 end
-## function TracerMessageLike()
-##     TracerMessageLike(; object = undef)
-## end
 function TracerMessageLike(
         object; kwargs...)
     TracerMessageLike(; object, kwargs...)
@@ -325,9 +330,14 @@ function Base.copy(t::T) where {T <: Union{AbstractTracerMessage, AbstractTracer
     T([deepcopy(getfield(t, f)) for f in fieldnames(T)]...)
 end
 
-"Unwraps the tracer message, returning the original `object`."
+"Unwraps the tracer message or tracer-like object, returning the original `object`."
 function unwrap(t::Union{AbstractTracerMessage, AbstractTracer})
     getfield(t, :object)
+end
+
+"Extracts the metadata dictionary from the tracer message or tracer-like object."
+function meta(t::Union{AbstractTracerMessage, AbstractTracer})
+    getfield(t, :meta)
 end
 
 "Aligns the tracer message, updating the `parent_id`, `thread_id`. Often used to align multiple tracers in the vector to have the same IDs."
@@ -406,6 +416,9 @@ end
 #         kwargs...)
 #     render(schema, messages; kwargs...)
 # end
+function role4render(schema::AbstractPromptSchema, msg::AbstractTracerMessage)
+    role4render(schema, msg.object)
+end
 function render(schema::AbstractPromptSchema, msg::AbstractMessage; kwargs...)
     render(schema, [msg]; kwargs...)
 end

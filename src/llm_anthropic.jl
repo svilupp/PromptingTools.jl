@@ -34,17 +34,12 @@ function render(schema::AbstractAnthropicSchema,
     conversation = Dict{String, Any}[]
 
     for msg in messages_replaced
-        role = if msg isa UserMessage || msg isa UserMessageWithImages
-            "user"
-        elseif msg isa AIMessage
-            "assistant"
-        end
-
         if msg isa SystemMessage
             system = msg.content
         elseif msg isa UserMessage || msg isa AIMessage
             content = msg.content
-            push!(conversation, Dict("role" => role, "content" => content))
+            push!(conversation,
+                Dict("role" => role4render(schema, msg), "content" => content))
         elseif msg isa UserMessageWithImages
             error("AbstractAnthropicSchema does not yet support UserMessageWithImages. Please use OpenAISchema instead.")
         end
