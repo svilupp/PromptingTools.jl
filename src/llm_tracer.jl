@@ -117,8 +117,12 @@ end
 
 Finalizes the calltracer by saving the provided conversation `msg_or_conv` to the disk.
 
-Path is `LOG_DIR/conversation__<first_msg_hash>__<time_received_str>.json`, 
+Default path is `LOG_DIR/conversation__<first_msg_hash>__<time_received_str>.json`, 
  where `LOG_DIR` is set by user preferences or ENV variable (defaults to `log/` in current working directory).
+
+If you want to change the logging directory or the exact file name to log with, you can provide the following arguments to `tracer_kwargs`:
+- `log_dir` - used as the directory to save the log into when provided
+- `log_file_path` - overrides the default log file path (both directory and name)
 
 It can be composed with `TracerSchema` to also attach necessary metadata (see below).
 
@@ -145,13 +149,20 @@ function finalize_tracer(
            convert(Vector{AbstractMessage}, msg_or_conv) :
            AbstractMessage[msg_or_conv]
 
-    # Log the conversation to disk, save by hash of the first convo message + timestamp
-    first_msg_hash = hash(first(conv).content)
-    time_received_str = Dates.format(
-        time_received, dateformat"YYYYmmdd_HHMMSS")
-    path = joinpath(
-        LOG_DIR,
-        "conversation__$(first_msg_hash)__$(time_received_str).json")
+    # Log the conversation to disk, 
+    log_dir = get(tracer, :log_dir, LOG_DIR)
+    path = if haskey(tracer, :log_file_path)
+        ## take the provided log file path
+        tracer.log_file_path
+    else
+        ## save by hash of the first convo message + timestamp
+        first_msg_hash = hash(first(conv).content)
+        time_received_str = Dates.format(
+            time_received, dateformat"YYYYmmdd_HHMMSS")
+        path = joinpath(
+            log_dir,
+            "conversation__$(first_msg_hash)__$(time_received_str).json")
+    end
     mkpath(dirname(path))
     save_conversation(path, conv)
     return is_vector ? conv : first(conv)

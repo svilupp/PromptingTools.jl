@@ -356,6 +356,10 @@ It can be composed with any other schema, eg, `TracerSchema` to save additional 
 Set environment variable `LOG_DIR` to the directory where you want to save the conversation (see `?PREFERENCES`).
 Conversations are named by the hash of the first message in the conversation to naturally group subsequent conversations together.
 
+If you need to provide logging directory of the file name dynamically, you can provide the following arguments to `tracer_kwargs`:
+- `log_dir` - used as the directory to save the log into when provided
+- `log_file_path` - used as the file name to save the log into when provided
+
 To use it automatically, re-register the models you use with the schema wrapped in `SaverSchema`
 
 See also: `meta`, `unwrap`, `TracerSchema`, `initialize_tracer`, `finalize_tracer`
@@ -367,7 +371,7 @@ using PromptingTools: TracerSchema, OpenAISchema, SaverSchema
 
 wrap_schema = OpenAISchema() |> TracerSchema |> SaverSchema
 conv = aigenerate(wrap_schema,:BlankSystemUser; system="You're a French-speaking assistant!",
-    user="Say hi!"; model="gpt-4", api_kwargs=(;temperature=0.1), return_all=true)
+    user="Say hi!", model="gpt-4", api_kwargs=(;temperature=0.1), return_all=true)
 
 # conv is a vector of messages that will be saved to a JSON together with metadata about the template and api_kwargs
 ```
@@ -377,6 +381,13 @@ If you wanted to enable this automatically for models you use, you can do it lik
 PT.register_model!(; name= "gpt-3.5-turbo", schema=OpenAISchema() |> TracerSchema |> SaverSchema)
 ```
 Any subsequent calls `model="gpt-3.5-turbo"` will automatically capture metadata and save the conversation to the disk.
+
+To provide logging file path explicitly, use the `tracer_kwargs`:
+```julia
+conv = aigenerate(wrap_schema,:BlankSystemUser; system="You're a French-speaking assistant!",
+    user="Say hi!", model="gpt-4", api_kwargs=(;temperature=0.1), return_all=true,
+    tracer_kwargs=(; log_file_path="my_logs/my_log.json"))
+```
 """
 struct SaverSchema <: AbstractTracerSchema
     schema::AbstractPromptSchema
