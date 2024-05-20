@@ -148,12 +148,14 @@ end
     # Real generation API
     schema1 = TestEchoOpenAISchema(; response, status = 200) |> TracerSchema
     msg = aigenerate(
-        schema1, "Hello World"; model = "xyz", tracer_kwargs = (; thread_id = :ABC1))
+        schema1, "Hello World"; model = "xyz",
+        tracer_kwargs = (; thread_id = :ABC1, meta = Dict(:meta_key => "meta_value")))
     @test istracermessage(msg)
     @test unwrap(msg) |> isaimessage
     @test msg.content == "Hello!"
     @test msg.model == "xyz"
     @test msg.thread_id == :ABC1
+    @test msg.meta[:meta_key] == "meta_value"
 
     msg = aigenerate(schema1, :BlankSystemUser; system = "abc", user = "xyz")
     @test istracermessage(msg)
@@ -179,6 +181,21 @@ end
     @test loaded_msg.model == "xyz"
     @test loaded_msg.thread_id == :ABC1
     ## clean up
+    isfile(fn) && rm(fn)
+
+    ## Use kwargs to define save path
+    file, _ = mktemp()
+    msgs = [SystemMessage("Test message 1"), UserMessage("Hello World")]
+    msg = aigenerate(
+        schema2, msgs; model = "xyz", tracer_kwargs = (;
+            thread_id = :ABC1, log_file_path = file))
+    @test istracermessage(msg)
+    @test isfile(file)
+    load_conv = PT.load_conversation(file)
+    @test length(load_conv) == 3
+    loaded_msg = load_conv[end]
+    @test unwrap(loaded_msg) |> isaimessage
+    @test loaded_msg.content == "Hello!"
     isfile(fn) && rm(fn)
 end
 
