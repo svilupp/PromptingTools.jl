@@ -52,6 +52,10 @@ function initialize_tracer(
         prompt::ALLOWED_PROMPT_TYPE = "", api_kwargs::NamedTuple = NamedTuple(),
         kwargs...)
     meta = Dict{Symbol, Any}(k => v for (k, v) in pairs(api_kwargs))
+    if haskey(tracer_kwargs, :meta)
+        ## merge with the provided metadata
+        meta = merge(meta, tracer_kwargs.meta)
+    end
     if haskey(kwargs, :_tracer_template)
         tpl = get(kwargs, :_tracer_template, nothing)
         meta[:template_name] = tpl.name
@@ -60,8 +64,9 @@ function initialize_tracer(
             meta[:template_version] = metadata[1].version
         end
     end
-    return (; time_sent = now(), model, meta,
-        tracer_kwargs...)
+    ## provide meta as last to make sure it's not overwriten by kwargs
+    return (; time_sent = now(), model,
+        tracer_kwargs..., meta)
 end
 
 function finalize_tracer(

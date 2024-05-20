@@ -148,12 +148,14 @@ end
     # Real generation API
     schema1 = TestEchoOpenAISchema(; response, status = 200) |> TracerSchema
     msg = aigenerate(
-        schema1, "Hello World"; model = "xyz", tracer_kwargs = (; thread_id = :ABC1))
+        schema1, "Hello World"; model = "xyz",
+        tracer_kwargs = (; thread_id = :ABC1, meta = Dict(:meta_key => "meta_value")))
     @test istracermessage(msg)
     @test unwrap(msg) |> isaimessage
     @test msg.content == "Hello!"
     @test msg.model == "xyz"
     @test msg.thread_id == :ABC1
+    @test msg.meta[:meta_key] == "meta_value"
 
     msg = aigenerate(schema1, :BlankSystemUser; system = "abc", user = "xyz")
     @test istracermessage(msg)
