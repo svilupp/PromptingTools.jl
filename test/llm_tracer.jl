@@ -180,6 +180,21 @@ end
     @test loaded_msg.thread_id == :ABC1
     ## clean up
     isfile(fn) && rm(fn)
+
+    ## Use kwargs to define save path
+    file, _ = mktemp()
+    msgs = [SystemMessage("Test message 1"), UserMessage("Hello World")]
+    msg = aigenerate(
+        schema2, msgs; model = "xyz", tracer_kwargs = (;
+            thread_id = :ABC1, log_file_path = file))
+    @test istracermessage(msg)
+    @test isfile(file)
+    load_conv = PT.load_conversation(file)
+    @test length(load_conv) == 3
+    loaded_msg = load_conv[end]
+    @test unwrap(loaded_msg) |> isaimessage
+    @test loaded_msg.content == "Hello!"
+    isfile(fn) && rm(fn)
 end
 
 @testset "aiembed-Tracer" begin

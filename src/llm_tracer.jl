@@ -121,8 +121,8 @@ Default path is `LOG_DIR/conversation__<first_msg_hash>__<time_received_str>.jso
  where `LOG_DIR` is set by user preferences or ENV variable (defaults to `log/` in current working directory).
 
 If you want to change the logging directory or the exact file name to log with, you can provide the following arguments to `tracer_kwargs`:
-- `log_dir` - used as the directory to save the log into when provided
-- `log_file_path` - overrides the default log file path (both directory and name)
+- `log_dir` - used as the directory to save the log into when provided. Defaults to `LOG_DIR` if not provided.
+- `log_file_path` - used as the file name to save the log into when provided. This value overrules the `log_dir` and `LOG_DIR` if provided.
 
 It can be composed with `TracerSchema` to also attach necessary metadata (see below).
 
