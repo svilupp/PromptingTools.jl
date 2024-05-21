@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.26.1]
+
+### Fixed
+- Fixed a bug where utility `length_longest_common_subsequence` was not working with complex Unicode characters
+
 ## [0.26.0]
 
 ### BREAKING CHANGES

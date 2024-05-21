@@ -120,6 +120,10 @@ end
 
     # Test for common subsequence with repeated characters
     @test length_longest_common_subsequence("abc-abc----", "___ab_c__abc") == 6
+
+    # Unusual characters
+    @test length_longest_common_subsequence("ABCBDAB Records", "Records – 6/17/19") == 7
+    @test length_longest_common_subsequence("Ján šel zpivat α β γ ∉", "Ján rad tanci") == 6
 end
 
 @testset "distance_longest_common_subsequence" begin
