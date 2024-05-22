@@ -234,7 +234,7 @@ function load_templates!(dir_templates::Union{String, Nothing} = nothing;
     for template_path in load_paths
         for (root, dirs, files) in walkdir(template_path)
             for file in files
-                if endswith(file, ".json")
+                if endswith(file, ".json") && !startswith(file, ".")
                     template_name = Symbol(split(basename(file), ".")[begin])
                     template, metadata_msgs = load_template(joinpath(root, file))
                     # add to store
