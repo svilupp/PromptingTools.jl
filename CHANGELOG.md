@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.26.2]
+
+### Fixed
+- Fixed a rare bug where prompt templates created on MacOS will come with metadata that breaks the prompt loader. From now on, it ignores any dotfiles (hidden files starting with ".").
+
 ## [0.26.1]
 
 ### Fixed

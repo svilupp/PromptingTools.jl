@@ -1,6 +1,7 @@
 using PromptingTools: AbstractChatMessage, SystemMessage, UserMessage, MetadataMessage
 using PromptingTools: render
-using PromptingTools: load_templates!, aitemplates, create_template
+using PromptingTools: load_templates!, aitemplates, create_template, AITemplateMetadata,
+                      save_conversation
 using PromptingTools: TestEchoOpenAISchema
 
 @testset "Template rendering" begin
@@ -74,6 +75,26 @@ end
     ## clean up
     delete!(PT.TEMPLATE_STORE, :PirateGreetingX)
     filter!(x -> x.name != :PirateGreetingX, PT.TEMPLATE_METADATA)
+end
+
+@testset "load_templates!-filtering" begin
+    tpl = create_template(; system = "a", user = "b")
+    mktempdir() do dir
+        ## File to be visible
+        fn = joinpath("x", "x1.json")
+        save_conversation(dir, tpl)
+
+        ## File to be invisible
+        fn = joinpath("x", "._x2.json")
+        save_conversation(dir, tpl)
+
+        store = Dict{Symbol, Any}()
+        PT.load_templates!(dir;
+            remember_path = false, store,
+            metadata_store = Vector{AITemplateMetadata}())
+        @test length(store) == 1
+        @test haskey(store, :x1)
+    end
 end
 
 @testset "Templates - Echo aigenerate call" begin
