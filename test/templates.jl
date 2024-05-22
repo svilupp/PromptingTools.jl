@@ -81,12 +81,12 @@ end
     tpl = create_template(; system = "a", user = "b")
     mktempdir() do dir
         ## File to be visible
-        fn = joinpath("x", "x1.json")
-        save_conversation(dir, tpl)
+        fn = joinpath(dir, "x1.json")
+        save_conversation(fn, tpl)
 
         ## File to be invisible
-        fn = joinpath("x", "._x2.json")
-        save_conversation(dir, tpl)
+        fn = joinpath(dir, "._x2.json")
+        save_conversation(fn, tpl)
 
         store = Dict{Symbol, Any}()
         PT.load_templates!(dir;
