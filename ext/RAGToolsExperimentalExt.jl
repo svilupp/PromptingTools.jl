@@ -1,14 +1,19 @@
 module RAGToolsExperimentalExt
 
-using PromptingTools, SparseArrays
-using LinearAlgebra: normalize
+using PromptingTools, SparseArrays, Unicode
+using LinearAlgebra
 const PT = PromptingTools
 
 using PromptingTools.Experimental.RAGTools
 const RT = PromptingTools.Experimental.RAGTools
 
 # forward to LinearAlgebra.normalize
-RT._normalize(arr::AbstractArray) = normalize(arr)
+RT._normalize(arr::AbstractArray) = LinearAlgebra.normalize(arr)
+
+# Forward to Unicode.normalize
+function RT._unicode_normalize(text::AbstractString; kwargs...)
+    Unicode.normalize(text; kwargs...)
+end
 
 """
     RT.build_tags(

@@ -280,8 +280,12 @@ end
 
 # Stub for string stemming to be extended in SnowballPromptingToolsExt
 function _stem(stemmer::Any, text::Any)
-    error(ArgumentError("Stemmer not found. Please install Snowball.jl"))
+    throw(ArgumentError("Stemmer not found. Please install Snowball.jl"))
 end
+function _unicode_normalize(text; kwargs...)
+    throw(ArgumentError("You need to import Unicode to use this function"))
+end
+
 """
     preprocess_tokens(text::AbstractString, stemmer=nothing; stopwords::Union{Nothing,Set{String}}=nothing, min_length::Int=3)
 
@@ -300,7 +304,7 @@ preprocess_tokens(text, stemmer; stopwords)
 function preprocess_tokens(text::AbstractString, stemmer = nothing;
         stopwords::Union{Nothing, Set{String}} = nothing, min_length::Int = 3)
     # Normalize Unicode and strip accents
-    text = Unicode.normalize(text; compose = true, casefold = true,
+    text = _unicode_normalize(text; compose = true, casefold = true,
         stripmark = true, stripignore = true, stripcc = true)
 
     # Remove numbers, punctuation, etc
@@ -312,7 +316,7 @@ function preprocess_tokens(text::AbstractString, stemmer = nothing;
 
     # Snowball stemmer
     if !isnothing(stemmer)
-        tokens = [Snowball.stem(stemmer, token) for token in tokens]
+        tokens = [_stem(stemmer, token) for token in tokens]
     end
 
     # Remove stopwords
