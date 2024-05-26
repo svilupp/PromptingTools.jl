@@ -32,11 +32,11 @@ include("api_services.jl")
 
 include("rag_interface.jl")
 
-export ChunkIndex, CandidateChunks, RAGResult
+export ChunkIndex, ChunkKeywordsIndex, ChunkEmbeddingsIndex, CandidateChunks, RAGResult
 # export MultiIndex # not ready yet
 include("types.jl")
 
-export build_index, get_chunks, get_embeddings, get_tags
+export build_index, get_chunks, get_embeddings, get_keywords, get_tags
 include("preparation.jl")
 
 export retrieve, SimpleRetriever, AdvancedRetriever

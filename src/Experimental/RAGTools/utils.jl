@@ -5,7 +5,7 @@ function _check_aiextract_capability(model::AbstractString)
         model)&&PT.MODEL_REGISTRY[model].schema isa PT.AbstractOpenAISchema "Only OpenAI models support the metadata extraction now. $model is not a registered OpenAI model."
 end
 # Utitity to be able to combine indices from different sources/documents easily
-function merge_labeled_matrices(mat1::AbstractMatrix{T1},
+function vcat_labeled_matrices(mat1::AbstractMatrix{T1},
         vocab1::Vector{String},
         mat2::AbstractMatrix{T2},
         vocab2::Vector{String}) where {T1 <: Number, T2 <: Number}
@@ -22,17 +22,42 @@ function merge_labeled_matrices(mat1::AbstractMatrix{T1},
     return vcat(aligned_mat1, aligned_mat2), combined_vocab
 end
 
+function hcat_labeled_matrices(mat1::AbstractMatrix{T1},
+        vocab1::Vector{String},
+        mat2::AbstractMatrix{T2},
+        vocab2::Vector{String}) where {T1 <: Number, T2 <: Number}
+    T = promote_type(T1, T2)
+    new_vocab = setdiff(vocab2, vocab1)
+    combined_vocab = [vocab1; new_vocab]
+    vocab2_indices = Dict(word => i for (i, word) in enumerate(vocab2))
+
+    aligned_mat1 = vcat(mat1, zeros(T, length(new_vocab), size(mat1, 2)))
+
+    ## Inefficient for sparseArrays but seemed like the only way "generic" way that works for sparse matrices
+    aligned_mat2 = similar(mat2, length(combined_vocab), size(mat2, 2))
+    aligned_mat2 .= zero(T)
+    for (i, word) in enumerate(combined_vocab)
+        if haskey(vocab2_indices, word)
+            aligned_mat2[i, :] = mat2[vocab2_indices[word], :]
+        end
+    end
+
+    return hcat(aligned_mat1, aligned_mat2), combined_vocab
+end
+
 ### Text Utilities
 # STOPWORDS - used for annotation highlighting
 # Just a small list to get started
 const STOPWORDS = [
-    "a", "an", "the", "and", "is", "isn't", "are", "aren't", "be", "was", "wasn't", "been",
-    "will", "won't", "would", "wouldn't",
-    "have", "haven't", "has", "hasn't", "do", "don't", "does", "did", "to",
+    "a", "an", "the", "and", "is", "isn't", "isn", "are",
+    "aren", "aren't", "be", "was", "wasn't", "been",
+    "will", "won't", "won", "would", "wouldn't", "wouldn",
+    "have", "haven't", "has", "hasn't", "hasn", "do", "don't", "don", "does", "did", "to",
     "from", "go", "goes", "went", "gone", "at",
-    "into", "on", "or", "but", "per", "so", "then", "than",
+    "into", "on", "or", "but", "per", "so", "then", "than", "was",
     "what", "why", "who", "where", "whom", "which", "that", "with",
-    "its", "their"] |> x -> vcat(x, titlecase.(x))
+    "its", "their", "it", "to", "such", "some", "these", "there", "of"] |>
+                  x -> vcat(x, titlecase.(x))
 # Some stop words intentionally omitted as we want to track them for code:
 # "if","else","elseif", "in", "for", "let","for",  
 
@@ -249,6 +274,64 @@ function split_into_code_and_sentences(input::Union{String, SubString{String}})
     end
 
     return sentences, group_ids
+end
+
+### Functionality for BM25 preprocessing
+
+# Stub for string stemming to be extended in SnowballPromptingToolsExt
+function _stem(stemmer::Any, text::Any)
+    error(ArgumentError("Stemmer not found. Please install Snowball.jl"))
+end
+"""
+    preprocess_tokens(text::AbstractString, stemmer=nothing; stopwords::Union{Nothing,Set{String}}=nothing, min_length::Int=3)
+
+Preprocess provided `text` by removing numbers, punctuation, and applying stemming for BM25 search index.
+
+Returns a list of preprocessed tokens.
+
+# Example
+```julia
+stemmer = Snowball.Stemmer("english")
+stopwords = Set(["a", "an", "and", "are", "as", "at", "be", "but", "by", "for", "if", "in", "into", "is", "it", "no", "not", "of", "on", "or", "such", "some", "that", "the", "their", "then", "there", "these", "they", "this", "to", "was", "will", "with"])
+text = "This is a sample paragraph to test the functionality of your text preprocessor. It contains a mix of uppercase and lowercase letters, as well as punctuation marks such as commas, periods, and exclamation points! Let's see how your preprocessor handles quotes, like \"this one\", and also apostrophes, like in don't. Will it preserve the formatting of this paragraph, including the indentation and line breaks?"
+preprocess_tokens(text, stemmer; stopwords)
+```
+"""
+function preprocess_tokens(text::AbstractString, stemmer = nothing;
+        stopwords::Union{Nothing, Set{String}} = nothing, min_length::Int = 3)
+    # Normalize Unicode and strip accents
+    text = Unicode.normalize(text; compose = true, casefold = true,
+        stripmark = true, stripignore = true, stripcc = true)
+
+    # Remove numbers, punctuation, etc
+    text = replace(text, r"[^a-zA-Z ]" => " ")
+
+    # Tokenize by space
+    tokens = split(text)
+    filter!(token -> length(token) >= min_length, tokens)
+
+    # Snowball stemmer
+    if !isnothing(stemmer)
+        tokens = [Snowball.stem(stemmer, token) for token in tokens]
+    end
+
+    # Remove stopwords
+    if !isnothing(stopwords)
+        tokens = [token for token in tokens if !(token in stopwords)]
+    end
+
+    return tokens
+end
+
+function preprocess_tokens(texts::Vector{<:AbstractString}, stemmer = nothing;
+        stopwords::Union{Nothing, Set{String}} = nothing, min_length::Int = 3)
+    if !isnothing(stemmer)
+        ext = Base.get_extension(PromptingTools, :SnowballPromptingToolsExt)
+        if isnothing(ext)
+            error("You need to also import Snowball.jl to use this function")
+        end
+    end
+    map(text -> preprocess_tokens(text, stemmer; stopwords, min_length), texts)
 end
 
 ## Utility to extract values from nested kwargs

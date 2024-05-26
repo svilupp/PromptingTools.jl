@@ -29,6 +29,20 @@ Default embedder for `get_embeddings` functions. It passes individual documents 
 struct BatchEmbedder <: AbstractEmbedder end
 
 """
+    KeywordsProcessor <: AbstractProcessor
+
+Default keywords processor for `get_keywords` functions. It normalizes the documents, tokenizes them and builds a `DocumentTermMatrix`.
+"""
+struct KeywordsProcessor <: AbstractProcessor end
+
+"""
+    NoProcessor <: AbstractProcessor
+
+No-op processor for `get_keywords` functions. It returns the inputs as is.
+"""
+struct NoProcessor <: AbstractProcessor end
+
+"""
     BinaryBatchEmbedder <: AbstractEmbedder
 
 Same as `BatchEmbedder` but reduces the embeddings matrix to a binary form (eg, `BitMatrix`).
@@ -96,6 +110,19 @@ It uses `TextChunker`, `BatchEmbedder`, and `NoTagger` as default chunker, embed
 @kwdef mutable struct SimpleIndexer <: AbstractIndexBuilder
     chunker::AbstractChunker = TextChunker()
     embedder::AbstractEmbedder = BatchEmbedder()
+    tagger::AbstractTagger = NoTagger()
+end
+
+"""
+    KeywordsIndexer <: AbstractIndexBuilder
+
+Keyword-based index (BM25) to be returned by `build_index`.
+
+It uses `TextChunker`, `KeywordsProcessor`, and `NoTagger` as default chunker, processor, and tagger.
+"""
+@kwdef mutable struct KeywordsIndexer <: AbstractIndexBuilder
+    chunker::AbstractChunker = TextChunker()
+    processor::AbstractProcessor = KeywordsProcessor()
     tagger::AbstractTagger = NoTagger()
 end
 
@@ -363,6 +390,75 @@ function get_embeddings(
     # Use unpack_bits to convert back to BitMatrix
     pack_bits(emb .> 0)
 end
+### Keywords Processing (for BM25)
+
+## Supporting functions defined in RAGToolsExperimentalExt.jl because they require SparseArrays
+function document_term_matrix(documents)
+    throw(ArgumentError("You need to also import LinearAlgebra and SparseArrays to use this function"))
+end
+
+function bm25(dtm, query; kwargs...)
+    throw(ArgumentError("You need to also import LinearAlgebra and SparseArrays to use this function"))
+end
+
+function get_keywords(processor::AbstractProcessor, docs::AbstractVector{<:AbstractString};
+        verbose::Bool = true,
+        kwargs...)
+    throw(ArgumentError("Not implemented for processor $(typeof(processor))"))
+end
+
+function get_keywords(processor::NoProcessor, docs::AbstractVector{<:AbstractString};
+        verbose::Bool = true,
+        kwargs...)
+    docs
+end
+
+"""
+    get_keywords(processor::KeywordsProcessor, docs::AbstractVector{<:AbstractString};
+        verbose::Bool = true,
+        stemmer = nothing,
+        stopwords::Set{String} = Set(STOPWORDS),
+        return_keywords::Bool = false,
+        kwargs...)
+
+Generate a `DocumentTermMatrix` from a vector of `docs` using the provided `stemmer` and `stopwords`.
+
+# Arguments
+- `docs`: A vector of strings to be embedded.
+- `verbose`: A boolean flag for verbose output. Default is `true`.
+- `stemmer`: A stemmer to use for stemming. Default is `nothing`.
+- `stopwords`: A set of stopwords to remove. Default is `Set(STOPWORDS)`.
+- `return_keywords`: A boolean flag for returning the keywords. Default is `false`. Useful for query processing in search time.
+"""
+function get_keywords(processor::KeywordsProcessor, docs::AbstractVector{<:AbstractString};
+        verbose::Bool = true,
+        stemmer = nothing,
+        stopwords::Set{String} = Set(STOPWORDS),
+        return_keywords::Bool = false,
+        kwargs...)
+    ## check if extension is available
+    ext = Base.get_extension(PromptingTools, :RAGToolsExperimentalExt)
+    if isnothing(ext)
+        error("You need to also import LinearAlgebra and SparseArrays to use this function")
+    end
+    ext = Base.get_extension(PromptingTools, :SnowballPromptingToolsExt)
+    if isnothing(ext)
+        error("You need to also import Snowball.jl to use this function")
+    end
+    ## Preprocess text into tokens
+    stemmer = !isnothing(stemmer) ? stemmer : Snowball.Stemmer("english")
+    # Single-threaded as stemmer is not thread-safe
+    keywords = preprocess_tokens(docs, stemmer; stopwords, min_length = 3)
+
+    ## Early exit if we only want keywords (search time)
+    return_keywords && return keywords
+
+    ## Create DTM
+    dtm = document_term_matrix(keywords)
+
+    verbose && @info "Done processing DocumentTermMatrix."
+    return dtm
+end
 
 ### Tag Extraction
 
@@ -481,7 +577,7 @@ end
         indexer::AbstractIndexBuilder, files_or_docs::Vector{<:AbstractString};
         verbose::Integer = 1,
         extras::Union{Nothing, AbstractVector} = nothing,
-        index_id = gensym("ChunkIndex"),
+        index_id = gensym("ChunkEmbeddingsIndex"),
         chunker::AbstractChunker = indexer.chunker,
         chunker_kwargs::NamedTuple = NamedTuple(),
         embedder::AbstractEmbedder = indexer.embedder,
@@ -520,9 +616,9 @@ Define your own methods via `indexer` and its subcomponents (`chunker`, `embedde
 - `cost_tracker`: A `Threads.Atomic{Float64}` object to track the total cost of the API calls. Useful to pass the total cost to the parent call.
 
 # Returns
-- `ChunkIndex`: An object containing the compiled index of chunks, embeddings, tags, vocabulary, and sources.
+- `ChunkEmbeddingsIndex`: An object containing the compiled index of chunks, embeddings, tags, vocabulary, and sources.
 
-See also: `ChunkIndex`, `get_chunks`, `get_embeddings`, `get_tags`, `CandidateChunks`, `find_closest`, `find_tags`, `rerank`, `retrieve`, `generate!`, `airag`
+See also: `ChunkEmbeddingsIndex`, `get_chunks`, `get_embeddings`, `get_tags`, `CandidateChunks`, `find_closest`, `find_tags`, `rerank`, `retrieve`, `generate!`, `airag`
 
 # Examples
 ```julia
@@ -547,7 +643,7 @@ function build_index(
         indexer::AbstractIndexBuilder, files_or_docs::Vector{<:AbstractString};
         verbose::Integer = 1,
         extras::Union{Nothing, AbstractVector} = nothing,
-        index_id = gensym("ChunkIndex"),
+        index_id = gensym("ChunkEmbeddingsIndex"),
         chunker::AbstractChunker = indexer.chunker,
         chunker_kwargs::NamedTuple = NamedTuple(),
         embedder::AbstractEmbedder = indexer.embedder,
@@ -577,7 +673,63 @@ function build_index(
 
     (verbose > 0) && @info "Index built! (cost: \$$(round(cost_tracker[], digits=3)))"
 
-    index = ChunkIndex(; id = index_id, embeddings, tags, tags_vocab,
+    index = ChunkEmbeddingsIndex(; id = index_id, embeddings, tags, tags_vocab,
+        chunks, sources, extras)
+    return index
+end
+
+"""
+    build_index(
+        indexer::KeywordsIndexer, files_or_docs::Vector{<:AbstractString};
+        verbose::Integer = 1,
+        extras::Union{Nothing, AbstractVector} = nothing,
+        index_id = gensym("ChunkKeywordsIndex"),
+        chunker::AbstractChunker = indexer.chunker,
+        chunker_kwargs::NamedTuple = NamedTuple(),
+        processor::AbstractProcessor = indexer.processor,
+        processor_kwargs::NamedTuple = NamedTuple(),
+        tagger::AbstractTagger = indexer.tagger,
+        tagger_kwargs::NamedTuple = NamedTuple(),
+        api_kwargs::NamedTuple = NamedTuple(),
+        cost_tracker = Threads.Atomic{Float64}(0.0))
+
+Builds a `ChunkKeywordsIndex` from the provided files or documents to support keyword-based search (BM25).
+"""
+function build_index(
+        indexer::KeywordsIndexer, files_or_docs::Vector{<:AbstractString};
+        verbose::Integer = 1,
+        extras::Union{Nothing, AbstractVector} = nothing,
+        index_id = gensym("ChunkKeywordsIndex"),
+        chunker::AbstractChunker = indexer.chunker,
+        chunker_kwargs::NamedTuple = NamedTuple(),
+        processor::AbstractProcessor = indexer.processor,
+        processor_kwargs::NamedTuple = NamedTuple(),
+        tagger::AbstractTagger = indexer.tagger,
+        tagger_kwargs::NamedTuple = NamedTuple(),
+        api_kwargs::NamedTuple = NamedTuple(),
+        cost_tracker = Threads.Atomic{Float64}(0.0))
+
+    ## Split into chunks
+    chunks, sources = get_chunks(chunker, files_or_docs;
+        chunker_kwargs...)
+
+    ## Tokenize and DTM
+    dtm = get_keywords(processor, chunks;
+        verbose = (verbose > 1),
+        cost_tracker,
+        api_kwargs, processor_kwargs...)
+
+    ## Extract tags
+    tags_extracted = get_tags(tagger, chunks;
+        verbose = (verbose > 1),
+        cost_tracker,
+        api_kwargs, tagger_kwargs...)
+    # Build the sparse matrix and the vocabulary
+    tags, tags_vocab = build_tags(tagger, tags_extracted)
+
+    (verbose > 0) && @info "Index built! (cost: \$$(round(cost_tracker[], digits=3)))"
+
+    index = ChunkKeywordsIndex(; id = index_id, chunkdata = dtm, tags, tags_vocab,
         chunks, sources, extras)
     return index
 end

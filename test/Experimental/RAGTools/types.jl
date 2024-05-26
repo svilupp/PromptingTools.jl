@@ -1,8 +1,9 @@
 using PromptingTools.Experimental.RAGTools: ChunkIndex, MultiIndex, CandidateChunks,
                                             MultiCandidateChunks,
-                                            AbstractCandidateChunks
+                                            AbstractCandidateChunks, DocumentTermMatrix,
+                                            document_term_matrix
 using PromptingTools.Experimental.RAGTools: embeddings, chunks, tags, tags_vocab, sources,
-                                            RAGResult
+                                            RAGResult, chunkdata
 using PromptingTools: last_message, last_output
 
 @testset "ChunkIndex" begin
@@ -71,6 +72,60 @@ using PromptingTools: last_message, last_output
         sources = ["source1"])
     @test ci1 == ci2
 end
+
+## @testset "DocumentTermMatrix" begin
+# Simple case
+documents = [["this", "is", "a", "test"],
+    ["this", "is", "another", "test"], ["foo", "bar", "baz"]]
+dtm = document_term_matrix(documents)
+@test size(dtm.tf) == (3, 8)
+@test Set(dtm.vocab) == Set(["a", "another", "bar", "baz", "foo", "is", "test", "this"])
+avgdl = 3.666666666666667
+@test all(dtm.doc_rel_length .≈ [4 / avgdl, 4 / avgdl, 3 / avgdl])
+@test length(dtm.idf) == 8
+
+# Edge case: single document
+documents = [["this", "is", "a", "test"]]
+dtm = document_term_matrix(documents)
+@test size(dtm.tf) == (1, 4)
+@test Set(dtm.vocab) == Set(["a", "is", "test", "this"])
+@test dtm.doc_rel_length == ones(1)
+@test length(dtm.idf) == 4
+
+# Edge case: duplicate tokens
+documents = [["this", "is", "this", "test"],
+    ["this", "is", "another", "test"], ["this", "bar", "baz"]]
+dtm = document_term_matrix(documents)
+@test size(dtm.tf) == (3, 6)
+@test Set(dtm.vocab) == Set(["another", "bar", "baz", "is", "test", "this"])
+avgdl = 3.666666666666667
+@test all(dtm.doc_rel_length .≈ [4 / avgdl, 4 / avgdl, 3 / avgdl])
+@test length(dtm.idf) == 6
+
+# Edge case: no tokens
+documents = [String[], String[], String[]]
+dtm = document_term_matrix(documents)
+@test size(dtm.tf) == (3, 0)
+@test isempty(dtm.vocab)
+@test isempty(dtm.vocab_lookup)
+@test isempty(dtm.idf)
+@test dtm.doc_rel_length == zeros(3)
+
+## Methods - hcat
+documents = [["this", "is", "a", "test"],
+    ["this", "is", "another", "test"], ["foo", "bar", "baz"]]
+dtm1 = document_term_matrix(documents)
+documents = [["this", "is", "a", "test"],
+    ["this", "is", "another", "test"], ["foo", "bar", "baz"]]
+dtm2 = document_term_matrix(documents)
+dtm = hcat(dtm1, dtm2)
+@test size(dtm.tf) == (6, 8)
+@test length(dtm.vocab) == 8
+@test length(dtm.idf) == 8
+@test isapprox(dtm.doc_rel_length,
+    [4 / 3.666666666666667, 4 / 3.666666666666667, 3 / 3.666666666666667,
+        4 / 3.666666666666667, 4 / 3.666666666666667, 3 / 3.666666666666667])
+## end
 
 @testset "MultiIndex" begin
     # Test constructors/accessors

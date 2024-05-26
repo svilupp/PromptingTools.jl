@@ -12,6 +12,7 @@ using PromptingTools.Experimental.RAGTools: find_closest, hamming_distance, find
 using PromptingTools.Experimental.RAGTools: NoReranker, CohereReranker
 using PromptingTools.Experimental.RAGTools: hamming_distance, BitPackedCosineSimilarity,
                                             pack_bits, unpack_bits
+using PromptingTools.Experimental.RAGTools: bm25, document_term_matrix, DocumentTermMatrix
 
 @testset "rephrase" begin
     # Test rephrase with NoRephraser, simple passthrough
@@ -127,6 +128,58 @@ end
     hamming_dist_binary = hamming_distance(mat_rand1, q_rand2)
     hamming_dist_packed = hamming_distance(pack_bits(mat_rand1), pack_bits(q_rand2))
     @test hamming_dist_binary == hamming_dist_packed
+end
+
+@testset "bm25" begin
+    # Simple case
+    documents = [["this", "is", "a", "test"],
+        ["this", "is", "another", "test"], ["foo", "bar", "baz"]]
+    dtm = document_term_matrix(documents)
+    query = ["this"]
+    scores = bm25(dtm, query)
+    idf = log(1 + (3 - 2 + 0.5) / (2 + 0.5))
+    tf = 1
+    expected = idf * (tf * (1.2 + 1)) /
+               (tf + 1.2 * (1 - 0.75 + 0.75 * 4 / 3.666666666666667))
+    @test scores[1] ≈ expected
+    @test scores[2] ≈ expected
+    @test scores[3] ≈ 0
+
+    # Two words, both existing
+    query = ["this", "test"]
+    scores = bm25(dtm, query)
+    @test scores[1] ≈ expected * 2
+    @test scores[2] ≈ expected * 2
+    @test scores[3] ≈ 0
+
+    # Multiwords with no hits
+    query = ["baz", "unknown", "words", "xyz"]
+    scores = bm25(dtm, query)
+    idf = log(1 + (3 - 1 + 0.5) / (1 + 0.5))
+    tf = 1
+    expected = idf * (tf * (1.2 + 1)) /
+               (tf + 1.2 * (1 - 0.75 + 0.75 * 3 / 3.666666666666667))
+    @test scores[1] ≈ 0
+    @test scores[2] ≈ 0
+    @test scores[3] ≈ expected
+
+    # Edge case: empty query
+    @test bm25(dtm, String[]) == zeros(Float32, size(dtm.tf, 1))
+
+    # Edge case: query with no matches
+    query = ["food", "bard"]
+    @test bm25(dtm, query) == zeros(Float32, size(dtm.tf, 1))
+
+    # Edge case: query with multiple matches and repeats
+    query = ["this", "is", "this", "this"]
+    scores = bm25(dtm, query)
+    idf = log(1 + (3 - 2 + 0.5) / (2 + 0.5))
+    tf = 1
+    expected = idf * (tf * (1.2 + 1)) /
+               (tf + 1.2 * (1 - 0.75 + 0.75 * 4 / 3.666666666666667))
+    @test scores[1] ≈ expected * 4
+    @test scores[2] ≈ expected * 4
+    @test scores[3] ≈ 0
 end
 
 @testset "find_closest" begin

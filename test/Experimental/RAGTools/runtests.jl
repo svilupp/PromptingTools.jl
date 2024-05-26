@@ -4,6 +4,7 @@ using PromptingTools.Experimental.RAGTools
 using PromptingTools
 using PromptingTools.AbstractTrees
 const PT = PromptingTools
+using Snowball
 using JSON3, HTTP
 
 @testset "RAGTools" begin

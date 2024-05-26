@@ -59,6 +59,16 @@ Implementation of `hamming_distance` is based on [TinyRAG](https://github.com/do
 struct BitPackedCosineSimilarity <: AbstractSimilarityFinder end
 
 """
+    BM25Similarity <: AbstractSimilarityFinder
+
+Finds the closest chunks to a query embedding by measuring the BM25 similarity between the query and the chunks' embeddings in binary form.
+
+Reference: [Wikipedia: BM25](https://en.wikipedia.org/wiki/Okapi_BM25).
+Implementation follows: [The Next Generation of Lucene Relevance](https://opensourceconnections.com/blog/2015/10/16/bm25-the-next-generation-of-lucene-relevation/).
+"""
+struct BM25Similarity <: AbstractSimilarityFinder end
+
+"""
     NoTagFilter <: AbstractTagFilter
 
 
@@ -148,13 +158,15 @@ end
 # General fallback
 function find_closest(
         finder::AbstractSimilarityFinder, emb::AbstractMatrix{<:Real},
-        query_emb::AbstractVector{<:Real}; kwargs...)
+        query_emb::AbstractVector{<:Real}, query_tokens::AbstractVector{<:AbstractString} = String[];
+        kwargs...)
     throw(ArgumentError("Not implemented yet for type $(typeof(finder))"))
 end
 
 """
-    find_closest(finder::CosineSimilarity, emb::AbstractMatrix{<:Real},
-        query_emb::AbstractVector{<:Real};
+    find_closest(
+        finder::CosineSimilarity, emb::AbstractMatrix{<:Real},
+        query_emb::AbstractVector{<:Real}, query_tokens::AbstractVector{<:AbstractString} = String[];
         top_k::Int = 100, minimum_similarity::AbstractFloat = -1.0, kwargs...)
 
 Finds the indices of chunks (represented by embeddings in `emb`) that are closest (in cosine similarity for `CosineSimilarity()`) to query embedding (`query_emb`). 
@@ -168,11 +180,11 @@ Returns only `top_k` closest indices.
 """
 function find_closest(
         finder::CosineSimilarity, emb::AbstractMatrix{<:Real},
-        query_emb::AbstractVector{<:Real};
+        query_emb::AbstractVector{<:Real}, query_tokens::AbstractVector{<:AbstractString} = String[];
         top_k::Int = 100, minimum_similarity::AbstractFloat = -1.0, kwargs...)
     # emb is an embedding matrix where the first dimension is the embedding dimension
     scores = query_emb' * emb |> vec
-    positions = scores |> sortperm |> reverse |> x -> first(x, top_k)
+    positions = scores |> sortperm |> x -> last(x, top_k) |> reverse
     if minimum_similarity > -1.0
         mask = scores[positions] .>= minimum_similarity
         positions = positions[mask]
@@ -183,7 +195,7 @@ end
 """
     find_closest(
         finder::AbstractSimilarityFinder, index::AbstractChunkIndex,
-        query_emb::AbstractVector{<:Real};
+        query_emb::AbstractVector{<:Real}, query_tokens::AbstractVector{<:AbstractString} = String[];
         top_k::Int = 100, kwargs...)
 
 Finds the indices of chunks (represented by embeddings in `index`) that are closest to query embedding (`query_emb`).
@@ -192,11 +204,11 @@ Returns only `top_k` closest indices.
 """
 function find_closest(
         finder::AbstractSimilarityFinder, index::AbstractChunkIndex,
-        query_emb::AbstractVector{<:Real};
+        query_emb::AbstractVector{<:Real}, query_tokens::AbstractVector{<:AbstractString} = String[];
         top_k::Int = 100, kwargs...)
     isnothing(embeddings(index)) && return CandidateChunks(; index_id = index.id)
-    positions, scores = find_closest(finder, embeddings(index),
-        query_emb;
+    positions, scores = find_closest(finder, chunkdata(index),
+        query_emb, query_tokens;
         top_k, kwargs...)
     return CandidateChunks(index.id, positions, Float32.(scores))
 end
@@ -204,14 +216,20 @@ end
 # Dispatch to find scores for multiple embeddings
 function find_closest(
         finder::AbstractSimilarityFinder, index::AbstractChunkIndex,
-        query_emb::AbstractMatrix{<:Real};
+        query_emb::AbstractMatrix{<:Real}, query_tokens::AbstractVector{<:AbstractVector{<:AbstractString}} = Vector{Vector{String}}();
         top_k::Int = 100, kwargs...)
     isnothing(embeddings(index)) && CandidateChunks(; index_id = index.id)
     ## reduce top_k since we have more than one query
     top_k_ = top_k ÷ size(query_emb, 2)
     ## simply vcat together (gets sorted from the highest similarity to the lowest)
-    mapreduce(
-        c -> find_closest(finder, index, c; top_k = top_k_, kwargs...), vcat, eachcol(query_emb))
+    if isempty(query_tokens)
+        mapreduce(
+            c -> find_closest(finder, index, c; top_k = top_k_, kwargs...), vcat, eachcol(query_emb))
+    else
+        @assert length(query_tokens)==size(query_emb, 2) "Length of `query_tokens` must be equal to the number of columns in `query_emb`."
+        mapreduce(
+            (emb, tok) -> find_closest(finder, index, emb, tok; top_k = top_k_, kwargs...), vcat, eachcol(query_emb), query_tokens)
+    end
 end
 
 #### For binary embeddings
@@ -259,7 +277,7 @@ end
 """
     find_closest(
         finder::BinaryCosineSimilarity, emb::AbstractMatrix{<:Bool},
-        query_emb::AbstractVector{<:Real};
+        query_emb::AbstractVector{<:Real}, query_tokens::AbstractVector{<:AbstractString} = String[];
         top_k::Int = 100, rescore_multiplier::Int = 4, minimum_similarity::AbstractFloat = -1.0, kwargs...)
 
 Finds the indices of chunks (represented by embeddings in `emb`) that are closest to query embedding (`query_emb`) using binary embeddings (in the index).
@@ -281,7 +299,7 @@ binary_emb = map(>(0), emb)
 """
 function find_closest(
         finder::BinaryCosineSimilarity, emb::AbstractMatrix{<:Bool},
-        query_emb::AbstractVector{<:Real};
+        query_emb::AbstractVector{<:Real}, query_tokens::AbstractVector{<:AbstractString} = String[];
         top_k::Int = 100, rescore_multiplier::Int = 4, minimum_similarity::AbstractFloat = -1.0, kwargs...)
     # emb is an embedding matrix where the first dimension is the embedding dimension
 
@@ -301,7 +319,7 @@ end
 """
     find_closest(
         finder::BitPackedCosineSimilarity, emb::AbstractMatrix{<:Bool},
-        query_emb::AbstractVector{<:Real};
+        query_emb::AbstractVector{<:Real}, query_tokens::AbstractVector{<:AbstractString} = String[];
         top_k::Int = 100, rescore_multiplier::Int = 4, minimum_similarity::AbstractFloat = -1.0, kwargs...)
 
 Finds the indices of chunks (represented by embeddings in `emb`) that are closest to query embedding (`query_emb`) using bit-packed binary embeddings (in the index).
@@ -322,7 +340,7 @@ bitpacked_emb = pack_bits(emb.>0)
 """
 function find_closest(
         finder::BitPackedCosineSimilarity, emb::AbstractMatrix{<:Integer},
-        query_emb::AbstractVector{<:Real};
+        query_emb::AbstractVector{<:Real}, query_tokens::AbstractVector{<:AbstractString} = String[];
         top_k::Int = 100, rescore_multiplier::Int = 4, minimum_similarity::AbstractFloat = -1.0, kwargs...)
     # emb is an embedding matrix where the first dimension is the embedding dimension
 
@@ -338,6 +356,31 @@ function find_closest(
 
     ## translate to original indices
     return positions[new_positions], scores
+end
+
+"""
+    find_closest(
+        finder::BM25Similarity, dtm::DocumentTermMatrix,
+        query_emb::AbstractVector{<:Real}, query_tokens::AbstractVector{<:AbstractString} = String[];
+        top_k::Int = 100, minimum_similarity::AbstractFloat = -1.0, kwargs...)
+
+Finds the indices of chunks (represented by DocumentTermMatrix in `dtm`) that are closest to query tokens (`query_tokens`) using BM25.
+
+Reference: [Wikipedia: BM25](https://en.wikipedia.org/wiki/Okapi_BM25).
+Implementation follows: [The Next Generation of Lucene Relevance](https://opensourceconnections.com/blog/2015/10/16/bm25-the-next-generation-of-lucene-relevation/).
+"""
+function find_closest(
+        finder::BM25Similarity, dtm::DocumentTermMatrix,
+        query_emb::AbstractVector{<:Real}, query_tokens::AbstractVector{<:AbstractString} = String[];
+        top_k::Int = 100, minimum_similarity::AbstractFloat = -1.0, kwargs...)
+    bm_scores = bm25(dtm, query)
+    positions = bm_scores |> sortperm |> x -> last(x, top_k)
+
+    if minimum_similarity > -1.0
+        mask = scores[positions] .>= minimum_similarity
+        positions = positions[mask]
+    end
+    return positions, bm_scores[positions]
 end
 
 ## TODO: Implement for MultiIndex
@@ -539,6 +582,7 @@ Make sure to use consistent `embedder` and `tagger` with the Preparation Stage (
 # Fields
 - `rephraser::AbstractRephraser`: the rephrasing method, dispatching `rephrase` - uses `NoRephraser`
 - `embedder::AbstractEmbedder`: the embedding method, dispatching `get_embeddings` (see Preparation Stage for more details) - uses `BatchEmbedder`
+- `processor::AbstractProcessor`: the processor method, dispatching `get_keywords` (see Preparation Stage for more details) - uses `NoProcessor`
 - `finder::AbstractSimilarityFinder`: the similarity search method, dispatching `find_closest` - uses `CosineSimilarity`
 - `tagger::AbstractTagger`: the tag generating method, dispatching `get_tags` (see Preparation Stage for more details) - uses `NoTagger`
 - `filter::AbstractTagFilter`: the tag matching method, dispatching `find_tags` - uses `NoTagFilter`
@@ -547,6 +591,7 @@ Make sure to use consistent `embedder` and `tagger` with the Preparation Stage (
 @kwdef mutable struct SimpleRetriever <: AbstractRetriever
     rephraser::AbstractRephraser = NoRephraser()
     embedder::AbstractEmbedder = BatchEmbedder()
+    processor::AbstractProcessor = NoProcessor()
     finder::AbstractSimilarityFinder = CosineSimilarity()
     tagger::AbstractTagger = NoTagger()
     filter::AbstractTagFilter = NoTagFilter()
@@ -562,6 +607,7 @@ Compared to SimpleRetriever, it adds rephrasing the query and reranking the resu
 # Fields
 - `rephraser::AbstractRephraser`: the rephrasing method, dispatching `rephrase` - uses `HyDERephraser`
 - `embedder::AbstractEmbedder`: the embedding method, dispatching `get_embeddings` (see Preparation Stage for more details) - uses `BatchEmbedder`
+- `processor::AbstractProcessor`: the processor method, dispatching `get_keywords` (see Preparation Stage for more details) - uses `KeywordsProcessor`
 - `finder::AbstractSimilarityFinder`: the similarity search method, dispatching `find_closest` - uses `CosineSimilarity`
 - `tagger::AbstractTagger`: the tag generating method, dispatching `get_tags` (see Preparation Stage for more details) - uses `NoTagger`
 - `filter::AbstractTagFilter`: the tag matching method, dispatching `find_tags` - uses `NoTagFilter`
@@ -570,6 +616,7 @@ Compared to SimpleRetriever, it adds rephrasing the query and reranking the resu
 @kwdef mutable struct AdvancedRetriever <: AbstractRetriever
     rephraser::AbstractRephraser = HyDERephraser()
     embedder::AbstractEmbedder = BatchEmbedder()
+    processor::AbstractProcessor = KeywordsProcessor()
     finder::AbstractSimilarityFinder = CosineSimilarity()
     tagger::AbstractTagger = NoTagger()
     filter::AbstractTagFilter = NoTagFilter()
@@ -588,6 +635,8 @@ end
         rephraser_kwargs::NamedTuple = NamedTuple(),
         embedder::AbstractEmbedder = retriever.embedder,
         embedder_kwargs::NamedTuple = NamedTuple(),
+        processor::AbstractProcessor = retriever.processor,
+        processor_kwargs::NamedTuple = NamedTuple(),
         finder::AbstractSimilarityFinder = retriever.finder,
         finder_kwargs::NamedTuple = NamedTuple(),
         tagger::AbstractTagger = retriever.tagger,
@@ -630,6 +679,8 @@ If you're using locally-hosted models, you can pass the `api_kwargs` with the `u
     - `template`: The rephrasing template to use. Default is `:RAGQueryOptimizer` or `:RAGQueryHyDE` (depending on the `rephraser` selected).
 - `embedder`: The embedding method to use. Default is `retriever.embedder`.
 - `embedder_kwargs`: Additional keyword arguments to be passed to the embedder.
+- `processor`: The processor method to use when using Keyword-based index. Default is `retriever.processor`.
+- `processor_kwargs`: Additional keyword arguments to be passed to the processor.
 - `finder`: The similarity search method to use. Default is `retriever.finder`, often `CosineSimilarity`.
 - `finder_kwargs`: Additional keyword arguments to be passed to the similarity finder.
 - `tagger`: The tag generating method to use. Default is `retriever.tagger`.
@@ -642,7 +693,7 @@ If you're using locally-hosted models, you can pass the `api_kwargs` with the `u
     - `model`: The model to use for reranking. Default is `rerank-english-v2.0` if you use `reranker = CohereReranker()`.
 - `cost_tracker`: An atomic counter to track the cost of the retrieval. Default is `Threads.Atomic{Float64}(0.0)`.
 
-See also: `SimpleRetriever`, `AdvancedRetriever`, `build_index`, `rephrase`, `get_embeddings`, `find_closest`, `get_tags`, `find_tags`, `rerank`, `RAGResult`.
+See also: `SimpleRetriever`, `AdvancedRetriever`, `build_index`, `rephrase`, `get_embeddings`, `get_keywords`, `find_closest`, `get_tags`, `find_tags`, `rerank`, `RAGResult`.
 
 # Examples
 
@@ -695,6 +746,8 @@ function retrieve(retriever::AbstractRetriever,
         rephraser_kwargs::NamedTuple = NamedTuple(),
         embedder::AbstractEmbedder = retriever.embedder,
         embedder_kwargs::NamedTuple = NamedTuple(),
+        processor::AbstractProcessor = retriever.processor,
+        processor_kwargs::NamedTuple = NamedTuple(),
         finder::AbstractSimilarityFinder = retriever.finder,
         finder_kwargs::NamedTuple = NamedTuple(),
         tagger::AbstractTagger = retriever.tagger,
@@ -712,14 +765,27 @@ function retrieve(retriever::AbstractRetriever,
         rephraser, question; verbose = (verbose > 1), cost_tracker, rephraser_kwargs_...)
 
     ## Embed one or more rephrased questions
-    embedder_kwargs_ = isempty(api_kwargs) ? embedder_kwargs :
-                       merge(embedder_kwargs, (; api_kwargs))
-    embeddings = get_embeddings(embedder, rephrased_questions;
-        verbose = (verbose > 1), cost_tracker, embedder_kwargs_...)
+    embeddings = if index isa ChunkEmbeddingsIndex
+        embedder_kwargs_ = isempty(api_kwargs) ? embedder_kwargs :
+                           merge(embedder_kwargs, (; api_kwargs))
+        embeddings = get_embeddings(embedder, rephrased_questions;
+            verbose = (verbose > 1), cost_tracker, embedder_kwargs_...)
+    else
+        embeddings = hcat([Float32[] for x in rephrased_questions]...)
+    end
+
+    ## Preprocess into keyword tokens if we're running BM25 
+    keywords = if index isa ChunkKeywordsIndex
+        ## Return only keywords, not DTM
+        get_keywords(processor, rephrased_questions;
+            verbose = (verbose > 1), processor_kwargs..., return_keywords = true)
+    else
+        [String[] for x in rephrased_questions]
+    end
 
     finder_kwargs_ = isempty(api_kwargs) ? finder_kwargs :
                      merge(finder_kwargs, (; api_kwargs))
-    emb_candidates = find_closest(finder, index, embeddings;
+    emb_candidates = find_closest(finder, index, embeddings, keywords;
         verbose = (verbose > 1), top_k, finder_kwargs_...)
 
     ## Tagging - if you provide them explicitly, use tagger `PassthroughTagger` and `tagger_kwargs = (;tags = ...)`

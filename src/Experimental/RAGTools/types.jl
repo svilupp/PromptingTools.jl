@@ -1,11 +1,57 @@
 
 # More advanced index would be: HybridChunkIndex
 
+### Shared methods
+chunkdata(index::AbstractChunkIndex) = index.chunkdata
+chunks(index::AbstractChunkIndex) = index.chunks
+tags(index::AbstractChunkIndex) = index.tags
+tags_vocab(index::AbstractChunkIndex) = index.tags_vocab
+sources(index::AbstractChunkIndex) = index.sources
+extras(index::AbstractChunkIndex) = index.extras
+
+Base.var"=="(i1::AbstractChunkIndex, i2::AbstractChunkIndex) = false
+function Base.var"=="(i1::T, i2::T) where {T <: AbstractChunkIndex}
+    ((sources(i1) == sources(i2)) && (tags_vocab(i1) == tags_vocab(i2)) &&
+     (chunkdata(i1) == chunkdata(i2)) && (chunks(i1) == chunks(i2)) &&
+     (tags(i1) == tags(i2)) && (extras(i1) == extras(i2)))
+end
+
+function Base.vcat(i1::AbstractDocumentIndex, i2::AbstractDocumentIndex)
+    throw(ArgumentError("Not implemented"))
+end
+function Base.vcat(i1::AbstractChunkIndex, i2::AbstractChunkIndex)
+    throw(ArgumentError("Not implemented"))
+end
+function Base.vcat(i1::T, i2::T) where {T <: AbstractChunkIndex}
+    tags_, tags_vocab_ = if (isnothing(tags(i1)) || isnothing(tags(i2)))
+        nothing, nothing
+    elseif tags_vocab(i1) == tags_vocab(i2)
+        vcat(tags(i1), tags(i2)), tags_vocab(i1)
+    else
+        merge_labeled_matrices(tags(i1), tags_vocab(i1), tags(i2), tags_vocab(i2))
+    end
+    chunkdata_ = (isnothing(chunkdata(i1)) || isnothing(chunkdata(i2))) ? nothing :
+                 hcat(chunkdata(i1), chunkdata(i2))
+    extras_ = if isnothing(extras(i1)) || isnothing(extras(i2))
+        nothing
+    else
+        vcat(extras(i1), extras(i2))
+    end
+    T(i1.id, vcat(chunks(i1), chunks(i2)),
+        chunkdata_,
+        tags_,
+        tags_vocab_,
+        vcat(sources(i1), sources(i2)),
+        extras_)
+end
+
 # Stores document chunks and their embeddings
 """
-    ChunkIndex
+    ChunkEmbeddingsIndex
 
 Main struct for storing document chunks and their embeddings. It also stores tags and sources for each chunk.
+
+Previously, this struct was called `ChunkIndex`.
 
 # Fields
 - `id::Symbol`: unique identifier of each index (to ensure we're using the right index with `CandidateChunks`)
@@ -16,13 +62,13 @@ Main struct for storing document chunks and their embeddings. It also stores tag
 - `sources::Vector{<:AbstractString}`: sources of the chunks
 - `extras::Union{Nothing, AbstractVector}`: additional data, eg, metadata, source code, etc.
 """
-@kwdef struct ChunkIndex{
+@kwdef struct ChunkEmbeddingsIndex{
     T1 <: AbstractString,
     T2 <: Union{Nothing, Matrix{<:Real}},
     T3 <: Union{Nothing, AbstractMatrix{<:Bool}},
     T4 <: Union{Nothing, AbstractVector}
 } <: AbstractChunkIndex
-    id::Symbol = gensym("ChunkIndex")
+    id::Symbol = gensym("ChunkEmbeddingsIndex")
     # underlying document chunks / snippets
     chunks::Vector{T1}
     # for semantic search
@@ -35,37 +81,74 @@ Main struct for storing document chunks and their embeddings. It also stores tag
     sources::Vector{<:AbstractString}
     extras::T4 = nothing
 end
-embeddings(index::ChunkIndex) = index.embeddings
-chunks(index::ChunkIndex) = index.chunks
-tags(index::ChunkIndex) = index.tags
-tags_vocab(index::ChunkIndex) = index.tags_vocab
-sources(index::ChunkIndex) = index.sources
+embeddings(index::ChunkEmbeddingsIndex) = index.embeddings
+chunkdata(index::ChunkEmbeddingsIndex) = embeddings(index)
 
-function Base.var"=="(i1::ChunkIndex, i2::ChunkIndex)
-    ((i1.sources == i2.sources) && (i1.tags_vocab == i2.tags_vocab) &&
-     (i1.embeddings == i2.embeddings) && (i1.chunks == i2.chunks) && (i1.tags == i2.tags))
+# For backward compatibility
+const ChunkIndex = ChunkEmbeddingsIndex
+
+"""
+    DocumentTermMatrix{T<:AbstractString}
+
+A sparse matrix of term frequencies and document lengths to allow calculation of BM25 similarity scores.
+"""
+struct DocumentTermMatrix{T1 <: AbstractMatrix{<:Real}, T2 <: AbstractString}
+    ## assumed to be SparseMatrixCSC{Float32, Int64}
+    tf::T1
+    vocab::Vector{T2}
+    vocab_lookup::Dict{T2, Int}
+    idf::Vector{Float32}
+    # |d|/avgDl
+    doc_rel_length::Vector{Float32}
 end
 
-function Base.vcat(i1::AbstractDocumentIndex, i2::AbstractDocumentIndex)
-    throw(ArgumentError("Not implemented"))
+function Base.hcat(d1::DocumentTermMatrix, d2::DocumentTermMatrix)
+    tf, vocab = vcat_labeled_matrices(d1.tf, d1.vocab, d2.tf, d2.vocab)
+    vocab_lookup = Dict(t => i for (i, t) in enumerate(vocab))
+
+    N, _ = size(tf)
+    doc_freq = [count(x -> x > 0, col) for col in eachcol(tf)]
+    idf = @. log(1.0f0 + (N - doc_freq + 0.5f0) / (doc_freq + 0.5f0))
+    doc_lengths = [count(x -> x > 0, row) for row in eachrow(tf)]
+    sumdl = sum(doc_lengths)
+    doc_rel_length = sumdl == 0 ? zeros(Float32, N) : (doc_lengths ./ (sumdl / N))
+
+    return DocumentTermMatrix(
+        tf, vocab, vocab_lookup, idf, convert(Vector{Float32}, doc_rel_length))
 end
 
-function Base.vcat(i1::ChunkIndex, i2::ChunkIndex)
-    tags_, tags_vocab_ = if (isnothing(tags(i1)) || isnothing(tags(i2)))
-        nothing, nothing
-    elseif tags_vocab(i1) == tags_vocab(i2)
-        vcat(tags(i1), tags(i2)), tags_vocab(i1)
-    else
-        merge_labeled_matrices(tags(i1), tags_vocab(i1), tags(i2), tags_vocab(i2))
-    end
-    embeddings_ = (isnothing(embeddings(i1)) || isnothing(embeddings(i2))) ? nothing :
-                  hcat(embeddings(i1), embeddings(i2))
-    ChunkIndex(;
-        chunks = vcat(chunks(i1), chunks(i2)),
-        embeddings = embeddings_,
-        tags = tags_,
-        tags_vocab = tags_vocab_,
-        sources = vcat(i1.sources, i2.sources))
+"""
+    ChunkKeywordsIndex
+
+Struct for storing chunks of text and associated keywords for BM25 similarity search.
+
+# Fields
+- `id::Symbol`: unique identifier of each index (to ensure we're using the right index with `CandidateChunks`)
+- `chunks::Vector{<:AbstractString}`: underlying document chunks / snippets
+- `chunkdata::Union{Nothing, AbstractMatrix{<:Real}}`: for similarity search, assumed to be `DocumentTermMatrix`
+- `tags::Union{Nothing, AbstractMatrix{<:Bool}}`: for exact search, filtering, etc. This is often a sparse matrix indicating which chunks have the given `tag` (see `tag_vocab` for the position lookup)
+- `tags_vocab::Union{Nothing, Vector{<:AbstractString}}`: vocabulary for the `tags` matrix (each column in `tags` is one item in `tags_vocab` and rows are the chunks)
+- `sources::Vector{<:AbstractString}`: sources of the chunks
+- `extras::Union{Nothing, AbstractVector}`: additional data, eg, metadata, source code, etc.
+"""
+@kwdef struct ChunkKeywordsIndex{
+    T1 <: AbstractString,
+    T2 <: Union{Nothing, DocumentTermMatrix},
+    T3 <: Union{Nothing, AbstractMatrix{<:Bool}},
+    T4 <: Union{Nothing, AbstractVector}
+} <: AbstractChunkIndex
+    id::Symbol = gensym("ChunkKeywordsIndex")
+    # underlying document chunks / snippets
+    chunks::Vector{T1}
+    # for similarity search
+    chunkdata::T2 = nothing
+    # for exact search, filtering, etc.
+    # expected to be some sparse structure, eg, sparse matrix or nothing
+    # column oriented, ie, each column is one item in `tags_vocab` and rows are the chunks
+    tags::T3 = nothing
+    tags_vocab::Union{Nothing, Vector{<:AbstractString}} = nothing
+    sources::Vector{<:AbstractString}
+    extras::T4 = nothing
 end
 
 ## TODO: implement a view(), make sure to recover the output positions correctly
@@ -288,25 +371,26 @@ function Base.getindex(ci::AbstractDocumentIndex,
         field::Symbol)
     throw(ArgumentError("Not implemented"))
 end
-function Base.getindex(ci::ChunkIndex,
+function Base.getindex(ci::AbstractChunkIndex,
         candidate::CandidateChunks{TP, TD},
         field::Symbol = :chunks) where {TP <: Integer, TD <: Real}
-    @assert field in [:chunks, :embeddings, :sources] "Only `chunks`, `embeddings`, `sources` fields are supported for now"
+    @assert field in [:chunks, :embeddings, :chunkdata, :sources] "Only `chunks`, `embeddings`, `chunkdata`, `sources` fields are supported for now"
+    field = field == :embeddings ? :chunkdata : field
     len_ = length(chunks(ci))
     @assert all(1 .<= candidate.positions .<= len_) "Some positions are out of bounds"
     if ci.id == candidate.index_id
         if field == :chunks
             @views chunks(ci)[candidate.positions]
-        elseif field == :embeddings
-            @views embeddings(ci)[:, candidate.positions]
+        elseif field == :chunkdata
+            @views chunkdata(ci)[:, candidate.positions]
         elseif field == :sources
             @views sources(ci)[candidate.positions]
         end
     else
         if field == :chunks
             eltype(chunks(ci))[]
-        elseif field == :embeddings
-            eltype(embeddings(ci))[]
+        elseif field == :chunkdata
+            eltype(chunkdata(ci))[]
         elseif field == :sources
             eltype(sources(ci))[]
         end
@@ -324,7 +408,7 @@ function Base.getindex(mi::MultiIndex,
     end
 end
 # Dispatch for multi-candidate chunks
-function Base.getindex(ci::ChunkIndex,
+function Base.getindex(ci::AbstractChunkIndex,
         candidate::MultiCandidateChunks{TP, TD},
         field::Symbol = :chunks; sorted::Bool = false) where {TP <: Integer, TD <: Real}
     @assert field in [:chunks, :scores] "Only `chunks` and `scores` fields are supported for now"
