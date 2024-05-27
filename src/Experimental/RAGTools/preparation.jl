@@ -722,7 +722,7 @@ index = build_index(SimpleIndexer(), texts; chunker_kwargs = (; max_length=10))
 # Creating an additional index for keyword-based search (BM25), is as simple as
 index_keywords = ChunkKeywordsIndex(index)
 
-# We can immediately create a MultiIndex (holding both indices)
+# We can immediately create a MultiIndex (a hybrid index holding both indices)
 multi_index = MultiIndex([index, index_keywords])
 
 ```

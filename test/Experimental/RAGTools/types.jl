@@ -81,7 +81,7 @@ using PromptingTools: last_message, last_output
     @test ci1 == ci2
 
     # HasEmbeddings
-    @test has_embeddings(ci1) == true
+    @test HasEmbeddings(ci1) == true
 end
 
 @testset "ChunkKeywordsIndex" begin
