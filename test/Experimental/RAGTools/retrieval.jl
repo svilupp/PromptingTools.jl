@@ -433,6 +433,26 @@ end
     struct RandomTagFilter123 <: AbstractTagFilter end
     @test_throws ArgumentError find_tags(RandomTagFilter123(), index, "hello")
     @test_throws ArgumentError find_tags(RandomTagFilter123(), index, ["hello"])
+
+    ## Multi-index implementation
+    # TODO: add AnyTag
+    emb1 = [0.1 0.2; 0.3 0.4; 0.5 0.6] |> x -> mapreduce(normalize, hcat, eachcol(x))
+    index1 = ChunkEmbeddingsIndex(id = :index1, chunks = ["chunk1", "chunk2"],
+        embeddings = emb1, sources = ["source1", "source2"])
+    index2 = ChunkKeywordsIndex(id = :index2, chunks = ["chunk3", "chunk4"],
+        chunkdata = document_term_matrix([["example", "query"], ["random", "words"]]),
+        sources = ["source3", "source4"])
+
+    # Create MultiIndex instance
+    multi_index = MultiIndex(id = :multi, indexes = [index1, index2])
+
+    mcc = find_tags(NoTagFilter(), multi_index, "julia")
+    @test mcc.positions == [1, 2, 3, 4]
+    @test mcc.scores == [0.0, 0.0, 0.0, 0.0]
+
+    mcc = find_tags(NoTagFilter(), multi_index, nothing)
+    @test mcc.positions == [1, 2, 3, 4]
+    @test mcc.scores == [0.0, 0.0, 0.0, 0.0]
 end
 
 @testset "rerank" begin

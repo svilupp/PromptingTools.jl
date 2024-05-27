@@ -33,7 +33,7 @@ include("api_services.jl")
 include("rag_interface.jl")
 
 export ChunkIndex, ChunkKeywordsIndex, ChunkEmbeddingsIndex, CandidateChunks, RAGResult
-# export MultiIndex # not ready yet
+export MultiIndex
 include("types.jl")
 
 export build_index, get_chunks, get_embeddings, get_keywords, get_tags, SimpleIndexer,

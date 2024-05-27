@@ -7,6 +7,7 @@ function embeddings(index::AbstractChunkIndex)
     throw(ArgumentError("`embeddings` not implemented for $(typeof(index))"))
 end
 HasEmbeddings(::AbstractChunkIndex) = false
+HasKeywords(::AbstractChunkIndex) = false
 chunks(index::AbstractChunkIndex) = index.chunks
 tags(index::AbstractChunkIndex) = index.tags
 tags_vocab(index::AbstractChunkIndex) = index.tags_vocab
@@ -135,6 +136,34 @@ Struct for storing chunks of text and associated keywords for BM25 similarity se
 - `tags_vocab::Union{Nothing, Vector{<:AbstractString}}`: vocabulary for the `tags` matrix (each column in `tags` is one item in `tags_vocab` and rows are the chunks)
 - `sources::Vector{<:AbstractString}`: sources of the chunks
 - `extras::Union{Nothing, AbstractVector}`: additional data, eg, metadata, source code, etc.
+
+# Example
+
+We can easily create a keywords-based index from a standard embeddings-based index.
+
+```julia
+
+# Let's assume we have a standard embeddings-based index
+index = build_index(SimpleIndexer(), texts; chunker_kwargs = (; max_length=10))
+
+# Creating an additional index for keyword-based search (BM25), is as simple as
+index_keywords = ChunkKeywordsIndex(index)
+
+# We can immediately create a MultiIndex (a hybrid index holding both indices)
+multi_index = MultiIndex([index, index_keywords])
+
+```
+
+You can also build the index via
+```julia
+# given some sentences and sources
+index_keywords = build_index(KeywordsIndexer(), sentences; chunker_kwargs=(; sources))
+
+# Retrive closest chunks with
+retriever = SimpleBM25Retriever()
+result = retrieve(retriever, index_keywords, "What are the best practices for parallel computing in Julia?")
+result.context
+```
 """
 @kwdef struct ChunkKeywordsIndex{
     T1 <: AbstractString,
@@ -156,6 +185,8 @@ Struct for storing chunks of text and associated keywords for BM25 similarity se
     extras::T4 = nothing
 end
 
+HasKeywords(::ChunkKeywordsIndex) = true
+
 ## TODO: implement a view(), make sure to recover the output positions correctly
 ## TODO: fields: parent, positions
 
@@ -167,6 +198,14 @@ end
 
 indexes(index::MultiIndex) = index.indexes
 HasEmbeddings(index::AbstractMultiIndex) = any(HasEmbeddings, indexes(index))
+HasKeywords(index::AbstractMultiIndex) = any(HasKeywords, indexes(index))
+
+function MultiIndex(indexes::AbstractChunkIndex...)
+    MultiIndex(; indexes = collect(indexes))
+end
+function MultiIndex(indexes::AbstractVector{<:AbstractChunkIndex})
+    MultiIndex(; indexes = indexes)
+end
 
 # check that each index has a counterpart in the other MultiIndex
 function Base.var"=="(i1::MultiIndex, i2::MultiIndex)
@@ -373,7 +412,56 @@ function Base.var"&"(cc1::CandidateChunks{TP1, TD1},
     CandidateChunks(cc1.index_id, positions, scores)
 end
 
-# TODO: add method for intersection between two MultiChunkCandidates
+function Base.var"&"(mc1::MultiCandidateChunks{TP1, TD1},
+        mc2::MultiCandidateChunks{TP2, TD2}) where
+        {TP1 <: Integer, TP2 <: Integer, TD1 <: Real, TD2 <: Real}
+    ##
+    # TODO: fix
+    ## index_ids = intersect(mc1.index_ids, mc2.index_ids)
+    ## for index_id in index_ids
+    ##     positions1 = findall(==(index_id), mc1.index_ids)
+    ##     positions2 = findall(==(index_id), mc2.index_ids)
+    ##     positions = intersect(positions1, positions2)
+
+    ##     scores = zeros(TD1, length(positions))
+    ##     for i in eachindex(positions)
+    ##         pos = positions[i]
+    ##         scores[i] = max(mc1.scores[positions1[i]], mc2.scores[positions2[i]])
+    ##     end
+    ## end
+
+    ## scores = if !isempty(mc1.scores) && !isempty(mc2.scores)
+    ##     valid_scores = fill(TD1(-1), length(positions))
+    ##     # scan the first MultiCandidateChunks
+    ##     for i in eachindex(mc1.positions, mc1.scores)
+    ##         pos = mc1.positions[i]
+    ##         idx = findfirst(==(pos), positions)
+    ##         if !isnothing(idx)
+    ##             valid_scores[idx] = max(valid_scores[idx], mc1.scores[i])
+    ##         end
+    ##     end
+    ##     # scan the second MultiCandidateChunks
+    ##     for i in eachindex(mc2.positions, mc2.scores)
+    ##         pos = mc2.positions[i]
+    ##         idx = findfirst(==(pos), positions)
+    ##         if !isnothing(idx)
+    ##             valid_scores[idx] = max(valid_scores[idx], mc2.scores[i])
+    ##         end
+    ##     end
+    ##     valid_scores
+    ## else
+    ##     TD1[]
+    ## end
+    ## ## Sort by maximum similarity
+    ## if !isempty(scores)
+    ##     sorted_idxs = sortperm(scores, rev = true)
+    ##     positions = positions[sorted_idxs]
+    ##     scores = scores[sorted_idxs]
+    ## end
+
+    ## MultiCandidateChunks(index_ids, positions, scores)
+end
+
 function Base.getindex(ci::AbstractDocumentIndex,
         candidate::AbstractCandidateChunks,
         field::Symbol)
@@ -407,25 +495,29 @@ end
 function Base.getindex(mi::MultiIndex,
         candidate::CandidateChunks{TP, TD},
         field::Symbol = :chunks) where {TP <: Integer, TD <: Real}
-    @assert field==:chunks "Only `chunks` field is supported for now"
+    @assert field in [:chunks, :sources] "Only `chunks`, `sources` fields are supported for now"
     valid_index = findfirst(x -> x.id == candidate.index_id, indexes(mi))
-    if isnothing(valid_index)
+    if isnothing(valid_index) && field == :chunks
+        String[]
+    elseif isnothing(valid_index) && field == :sources
         String[]
     else
-        getindex(indexes(mi)[valid_index], candidate)
+        getindex(indexes(mi)[valid_index], candidate, field)
     end
 end
 # Dispatch for multi-candidate chunks
 function Base.getindex(ci::AbstractChunkIndex,
         candidate::MultiCandidateChunks{TP, TD},
         field::Symbol = :chunks; sorted::Bool = false) where {TP <: Integer, TD <: Real}
-    @assert field in [:chunks, :scores] "Only `chunks` and `scores` fields are supported for now"
+    @assert field in [:chunks, :sources, :scores] "Only `chunks`, `sources`, and `scores` fields are supported for now"
 
     index_pos = findall(==(ci.id), candidate.index_ids)
     if isempty(index_pos) && field == :chunks
         eltype(chunks(ci))[]
     elseif isempty(index_pos) && field == :scores
         eltype(candidate.scores)[]
+    elseif isempty(index_pos) && field == :sources
+        eltype(sources(ci))[]
     else
         # Sort if requested
         idx = if sorted
@@ -437,6 +529,8 @@ function Base.getindex(ci::AbstractChunkIndex,
         end
         if field == :chunks
             getindex(chunks(ci), candidate.positions[idx])
+        elseif field == :sources
+            getindex(sources(ci), candidate.positions[idx])
         elseif field == :scores
             candidate.scores[idx]
         end
@@ -446,14 +540,15 @@ end
 function Base.getindex(mi::MultiIndex,
         candidate::MultiCandidateChunks{TP, TD},
         field::Symbol = :chunks; sorted::Bool = false) where {TP <: Integer, TD <: Real}
-    @assert field==:chunks "Only `chunks` field is supported for now"
+    @assert field in [:chunks, :sources, :scores] "Only `chunks`, `sources`, and `scores` fields are supported for now"
     if sorted
-        chunks = mapreduce(idxs -> Base.getindex(idxs, candidate, :chunks, sorted = false),
+        # values can be either of chunks or sources
+        values = mapreduce(idxs -> Base.getindex(idxs, candidate, field, sorted = false),
             vcat, indexes(mi))
         scores = mapreduce(idxs -> Base.getindex(idxs, candidate, :scores, sorted = false),
             vcat, indexes(mi))
         sorted_idx = sortperm(scores, rev = true)
-        chunks[sorted_idx]
+        values[sorted_idx]
     else
         mapreduce(idxs -> Base.getindex(idxs, candidate, field, sorted = false),
             vcat, indexes(mi))

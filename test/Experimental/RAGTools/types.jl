@@ -4,6 +4,7 @@ using PromptingTools.Experimental.RAGTools: ChunkEmbeddingsIndex, ChunkKeywordsI
                                             MultiCandidateChunks,
                                             AbstractCandidateChunks, DocumentTermMatrix,
                                             document_term_matrix, HasEmbeddings,
+                                            HasKeywords,
                                             ChunkKeywordsIndex
 using PromptingTools.Experimental.RAGTools: embeddings, chunks, tags, tags_vocab, sources,
                                             extras,
@@ -82,6 +83,7 @@ using PromptingTools: last_message, last_output
 
     # HasEmbeddings
     @test HasEmbeddings(ci1) == true
+    @test HasKeywords(ci1) == false
 end
 
 @testset "ChunkKeywordsIndex" begin
@@ -126,6 +128,7 @@ end
 
     # HasEmbeddings
     @test HasEmbeddings(ci1) == false
+    @test HasKeywords(ci1) == true
 end
 
 @testset "DocumentTermMatrix" begin
@@ -207,12 +210,13 @@ end
     # Test equality with different ChunkEmbeddingsIndexes inside
     cin1 = ChunkEmbeddingsIndex(chunks = ["chunk1"], sources = ["source1"])
     cin2 = ChunkEmbeddingsIndex(chunks = ["chunk2"], sources = ["source2"])
-    mi1 = MultiIndex(indexes = [cin1])
-    mi2 = MultiIndex(indexes = [cin2])
+    mi1 = MultiIndex([cin1])
+    mi2 = MultiIndex(cin2)
     @test mi1 != mi2
 
     # HasEmbeddings
     @test HasEmbeddings(mi1) == true
+    @test HasKeywords(mi1) == false
 
     ci = ChunkKeywordsIndex(chunks = ["chunk1"], sources = ["source1"])
     mi2 = MultiIndex(indexes = [ci])
@@ -222,6 +226,7 @@ end
     cin2 = ChunkKeywordsIndex(chunks = ["chunk1"], sources = ["source1"])
     mi3 = MultiIndex(indexes = [cin1, cin2])
     @test HasEmbeddings(mi3) == true
+    @test HasKeywords(mi3) == true
 
     ## not implemented
     @test_throws ArgumentError vcat(mi1, mi2)
@@ -359,6 +364,51 @@ end
     ## struct RandomMultiCandidateChunks123 <: AbstractCandidateChunks end
     ## @test_throws ArgumentError (mcc1&RandomMultiCandidateChunks123())
 end
+
+## @testset "intersectigon with MultiCandidateChunks" begin
+chunk_sym1 = Symbol("idx1")
+chunk_sym2 = Symbol("idx2")
+# Test intersection with overlapping positions
+mcc3 = MultiCandidateChunks(index_ids = [chunk_sym1, chunk_sym2],
+    positions = [1, 4],
+    scores = [0.3, 0.5])
+joint = (mcc1 & mcc3)
+@test joint.positions == [1]
+@test joint.scores == [0.3]
+joint2 = (mcc2 & mcc3)
+@test joint2.positions == [4]
+@test joint2.scores == [0.5]
+
+# Test intersection with no overlapping positions
+mcc4 = MultiCandidateChunks(index_ids = [chunk_sym1, chunk_sym2],
+    positions = [6, 7],
+    scores = [0.6, 0.7])
+joint3 = (mcc1 & mcc4)
+@test isempty(joint3.positions)
+@test isempty(joint3.scores)
+@test isempty(joint3) == true
+
+# Test intersection with long positions
+mcc5 = MultiCandidateChunks(index_ids = [chunk_sym1, chunk_sym2],
+    positions = [5, 6, 7, 8, 9, 10, 4],
+    scores = 0.1 * ones(7))
+joint4 = (mcc2 & mcc5)
+@test joint4.positions == [4]
+@test joint4.scores == [0.4]
+
+# Test intersection with wrong index
+mcc6 = MultiCandidateChunks(index_ids = [:xyz, :abc],
+    positions = [2, 4],
+    scores = [0.3, 0.4])
+joint5 = (mcc2 & mcc6)
+@test isempty(joint5.positions)
+@test isempty(joint5.scores)
+@test isempty(joint5) == true
+
+# Test intersection with unknown type
+struct RandomMultiCandidateChunks123 <: AbstractCandidateChunks end
+@test_throws ArgumentError (mcc1&RandomMultiCandidateChunks123())
+## end
 
 @testset "getindex with CandidateChunks" begin
     # Initialize a ChunkEmbeddingsIndex with test data

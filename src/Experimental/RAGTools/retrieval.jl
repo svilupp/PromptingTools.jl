@@ -276,18 +276,19 @@ function find_closest(
         query_emb::AbstractVector{<:Real}, query_tokens::AbstractVector{<:AbstractString} = String[];
         kwargs...)
     new_finder = MultiFinder(fill(finder, length(indexes(index))))
-    find_closest(new_finder, index, query_emb, query_tokens; top_k, kwargs...)
+    find_closest(new_finder, index, query_emb, query_tokens; kwargs...)
 end
 
 # Method for multiple-queries at once (for rephrased queries)
-# TODO: finish
 function find_closest(
         finder::AbstractSimilarityFinder, index::AbstractMultiIndex,
         query_emb::AbstractMatrix{<:Real}, query_tokens::AbstractVector{<:AbstractVector{<:AbstractString}} = Vector{Vector{String}}();
         top_k::Int = 100, kwargs...)
-    isnothing(chunkdata(index)) && CandidateChunks(; index_id = index.id)
+    all_indexes = indexes(index)
+    all(isnothing(chunkdata(index)) for index in all_indexes) &&
+        return MultiCandidateChunks(; index_ids = Symbol[])
     ## reduce top_k since we have more than one query
-    top_k_ = top_k ÷ size(query_emb, 2)
+    top_k_ = top_k ÷ max(size(query_emb, 2), length(query_tokens))
     ## simply vcat together (gets sorted from the highest similarity to the lowest)
     if isempty(query_tokens)
         mapreduce(
@@ -473,10 +474,10 @@ end
 
 ### TAG Filtering
 
-function find_tags(::AbstractTagFilter, index::AbstractChunkIndex,
+function find_tags(::AbstractTagFilter, index::AbstractDocumentIndex,
         tag::Union{T, AbstractVector{<:T}}; kwargs...) where {T <:
                                                               Union{AbstractString, Regex}}
-    throw(ArgumentError("Not implemented yet for type $(typeof(filter))"))
+    throw(ArgumentError("Not implemented yet for type $(typeof(filter)) and index $(typeof(index))"))
 end
 
 """
@@ -523,10 +524,57 @@ function find_tags(method::NoTagFilter, index::AbstractChunkIndex,
     return CandidateChunks(
         index.id, collect(1:length(index.chunks)), zeros(Float32, length(index.chunks)))
 end
+
 function find_tags(method::NoTagFilter, index::AbstractChunkIndex,
         tags::Nothing; kwargs...)
     return CandidateChunks(
         index.id, collect(1:length(index.chunks)), zeros(Float32, length(index.chunks)))
+end
+
+## Multi-index implementation
+# TODO: finish find_tags with AnyTagFilter
+
+function find_tags(method::AnyTagFilter, index::AbstractMultiIndex,
+        tag::Union{AbstractString, Regex}; kwargs...)
+    all_indexes = indexes(index)
+    all(isnothing(chunkdata(index)) for index in all_indexes) &&
+        return MultiCandidateChunks(; index_ids = Symbol[])
+
+    # Not finished - throw an error
+    throw(ArgumentError("Not implemented yet for type $(typeof(filter)) and index $(typeof(index))"))
+    ## tag_idx = if tag isa AbstractString
+    ##     findall(tags_vocab(index) .== tag)
+    ## else # assume it's a regex
+    ##     findall(occursin.(tag, tags_vocab(index)))
+    ## end
+    ## # getindex.(x, 1) is to get the first dimension in each CartesianIndex
+    ## match_row_idx = @view(tags(index)[:, tag_idx]) |> findall |>
+    ##                 x -> getindex.(x, 1) |> unique
+    ## return CandidateChunks(index.id, match_row_idx, ones(Float32, length(match_row_idx)))
+    return nothing
+end
+
+function find_tags(method::NoTagFilter, index::AbstractMultiIndex,
+        tags::Union{T, AbstractVector{<:T}}; kwargs...) where {T <:
+                                                               Union{
+        AbstractString, Regex}}
+    indexes_ = indexes(index)
+    length_ = sum(x -> length(x.chunks), indexes_)
+    index_ids = [fill(x.id, length(x.chunks)) for x in indexes_] |> Base.Splat(vcat)
+
+    return MultiCandidateChunks(
+        index_ids, collect(1:length_),
+        zeros(Float32, length_))
+end
+function find_tags(method::NoTagFilter, index::AbstractMultiIndex,
+        tags::Nothing; kwargs...)
+    indexes_ = indexes(index)
+    length_ = sum(x -> length(x.chunks), indexes_)
+    index_ids = [fill(x.id, length(x.chunks)) for x in indexes_] |> Base.Splat(vcat)
+
+    return MultiCandidateChunks(
+        index_ids, collect(1:length_),
+        zeros(Float32, length_))
 end
 
 ### Reranking
@@ -551,7 +599,7 @@ function rerank(reranker::AbstractReranker,
 end
 
 function rerank(reranker::NoReranker,
-        index::AbstractChunkIndex,
+        index::AbstractMultiIndex,
         question::AbstractString,
         candidates::AbstractCandidateChunks;
         top_n::Integer = length(candidates),
@@ -829,7 +877,7 @@ result = retrieve(retriever, index, question;
 ```
 """
 function retrieve(retriever::AbstractRetriever,
-        index::AbstractChunkIndex,
+        index::AbstractDocumentIndex,
         question::AbstractString;
         verbose::Integer = 1,
         top_k::Integer = 100,
@@ -858,7 +906,7 @@ function retrieve(retriever::AbstractRetriever,
         rephraser, question; verbose = (verbose > 1), cost_tracker, rephraser_kwargs_...)
 
     ## Embed one or more rephrased questions
-    embeddings = if index isa ChunkEmbeddingsIndex
+    embeddings = if HasEmbeddings(index)
         embedder_kwargs_ = isempty(api_kwargs) ? embedder_kwargs :
                            merge(embedder_kwargs, (; api_kwargs))
         embeddings = get_embeddings(embedder, rephrased_questions;
@@ -868,7 +916,7 @@ function retrieve(retriever::AbstractRetriever,
     end
 
     ## Preprocess into keyword tokens if we're running BM25 
-    keywords = if index isa ChunkKeywordsIndex
+    keywords = if HasKeywords(index)
         ## Return only keywords, not DTM
         keywords = get_keywords(processor, rephrased_questions;
             verbose = (verbose > 1), processor_kwargs..., return_keywords = true)
@@ -918,8 +966,8 @@ function retrieve(retriever::AbstractRetriever,
         answer = nothing,
         rephrased_questions,
         final_answer = nothing,
-        context = chunks(index)[reranked_candidates.positions],
-        sources = sources(index)[reranked_candidates.positions],
+        context = index[reranked_candidates, :chunks],
+        sources = index[reranked_candidates, :sources],
         emb_candidates,
         tag_candidates,
         filtered_candidates,
