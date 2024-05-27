@@ -86,6 +86,11 @@ function RT.document_term_matrix(documents::AbstractVector{<:AbstractVector{<:Ab
     doc_rel_length = sumdl == 0 ? zeros(Float32, N) : doc_lengths ./ (sumdl / N)
     RT.DocumentTermMatrix(term_freq, vocab, vocab_lookup, idf, doc_rel_length)
 end
+
+function RT.document_term_matrix(documents::AbstractVector{<:AbstractString})
+    RT.document_term_matrix(RT.preprocess_tokens(documents))
+end
+
 """
     RT.bm25(dtm::DocumentTermMatrix, query::Vector{String}; k1::Float32=1.2f0, b::Float32=0.75f0)
 
@@ -102,7 +107,7 @@ scores = bm25(dtm, query)
 # Returns array with 3 scores (one for each document)
 ```
 """
-function RT.bm25(dtm::RT.DocumentTermMatrix, query::Vector{String};
+function RT.bm25(dtm::RT.DocumentTermMatrix, query::AbstractVector{<:AbstractString};
         k1::Float32 = 1.2f0, b::Float32 = 0.75f0)
     scores = zeros(Float32, size(dtm.tf, 1))
     ## Identify non-zero items to leverage the sparsity

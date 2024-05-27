@@ -6,9 +6,9 @@ function _check_aiextract_capability(model::AbstractString)
 end
 # Utitity to be able to combine indices from different sources/documents easily
 function vcat_labeled_matrices(mat1::AbstractMatrix{T1},
-        vocab1::Vector{String},
+        vocab1::AbstractVector{<:AbstractString},
         mat2::AbstractMatrix{T2},
-        vocab2::Vector{String}) where {T1 <: Number, T2 <: Number}
+        vocab2::AbstractVector{<:AbstractString}) where {T1 <: Number, T2 <: Number}
     T = promote_type(T1, T2)
     new_words = setdiff(vocab2, vocab1)
     combined_vocab = [vocab1; new_words]
@@ -23,9 +23,9 @@ function vcat_labeled_matrices(mat1::AbstractMatrix{T1},
 end
 
 function hcat_labeled_matrices(mat1::AbstractMatrix{T1},
-        vocab1::Vector{String},
+        vocab1::AbstractVector{<:AbstractString},
         mat2::AbstractMatrix{T2},
-        vocab2::Vector{String}) where {T1 <: Number, T2 <: Number}
+        vocab2::AbstractVector{<:AbstractString}) where {T1 <: Number, T2 <: Number}
     T = promote_type(T1, T2)
     new_vocab = setdiff(vocab2, vocab1)
     combined_vocab = [vocab1; new_vocab]
@@ -302,7 +302,7 @@ preprocess_tokens(text, stemmer; stopwords)
 ```
 """
 function preprocess_tokens(text::AbstractString, stemmer = nothing;
-        stopwords::Union{Nothing, Set{String}} = nothing, min_length::Int = 3)
+        stopwords::Union{Nothing, Set{String}} = Set(STOPWORDS), min_length::Int = 3)
     # Normalize Unicode and strip accents
     text = _unicode_normalize(text; compose = true, casefold = true,
         stripmark = true, stripignore = true, stripcc = true)

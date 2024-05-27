@@ -3,6 +3,10 @@
 
 ### Shared methods
 chunkdata(index::AbstractChunkIndex) = index.chunkdata
+function embeddings(index::AbstractChunkIndex)
+    throw(ArgumentError("`embeddings` not implemented for $(typeof(index))"))
+end
+HasEmbeddings(::AbstractChunkIndex) = false
 chunks(index::AbstractChunkIndex) = index.chunks
 tags(index::AbstractChunkIndex) = index.tags
 tags_vocab(index::AbstractChunkIndex) = index.tags_vocab
@@ -82,6 +86,7 @@ Previously, this struct was called `ChunkIndex`.
     extras::T4 = nothing
 end
 embeddings(index::ChunkEmbeddingsIndex) = index.embeddings
+HasEmbeddings(::ChunkEmbeddingsIndex) = true
 chunkdata(index::ChunkEmbeddingsIndex) = embeddings(index)
 
 # For backward compatibility
@@ -157,9 +162,11 @@ end
 "Composite index that stores multiple ChunkIndex objects and their embeddings. It's not yet fully implemented."
 @kwdef struct MultiIndex <: AbstractMultiIndex
     id::Symbol = gensym("MultiIndex")
-    indexes::Vector{<:AbstractChunkIndex}
+    indexes::Vector{<:AbstractChunkIndex} = AbstractChunkIndex[]
 end
+
 indexes(index::MultiIndex) = index.indexes
+HasEmbeddings(index::AbstractMultiIndex) = any(HasEmbeddings, indexes(index))
 # check that each index has a counterpart in the other MultiIndex
 function Base.var"=="(i1::MultiIndex, i2::MultiIndex)
     length(indexes(i1)) != length(indexes(i2)) && return false

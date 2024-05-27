@@ -39,7 +39,7 @@ include("types.jl")
 export build_index, get_chunks, get_embeddings, get_keywords, get_tags
 include("preparation.jl")
 
-export retrieve, SimpleRetriever, AdvancedRetriever
+export retrieve, SimpleRetriever, SimpleBM25Retriever, AdvancedRetriever
 export find_closest, find_tags, rerank, rephrase
 include("retrieval.jl")
 

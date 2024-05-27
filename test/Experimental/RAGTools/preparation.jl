@@ -8,6 +8,7 @@ using PromptingTools.Experimental.RAGTools: tags_extract, Tag, MaybeTags
 using PromptingTools.Experimental.RAGTools: build_tags, build_index, SimpleIndexer,
                                             get_tags, get_chunks, get_embeddings,
                                             get_keywords, KeywordsProcessor, NoProcessor,
+                                            AbstractProcessor,
                                             DocumentTermMatrix, document_term_matrix, bm25
 using PromptingTools.Experimental.RAGTools: build_tags, build_index
 using PromptingTools: TestEchoOpenAISchema
@@ -141,6 +142,8 @@ end
     # Check stubs that they throw
     @test_throws ArgumentError document_term_matrix(nothing)
     @test_throws ArgumentError bm25(nothing, ["abc"])
+    struct XYZProcessor <: AbstractProcessor end
+    @test_throws ArgumentError get_keywords(XYZProcessor(), ["abc"])
 end
 
 @testset "tags_extract" begin

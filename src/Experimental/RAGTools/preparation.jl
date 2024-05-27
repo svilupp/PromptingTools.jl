@@ -22,6 +22,13 @@ struct TextChunker <: AbstractChunker end
 
 ### Embedding Types
 """
+    NoEmbedder <: AbstractEmbedder
+
+No-op embedder for `get_embeddings` functions. It returns `nothing`.
+"""
+struct NoEmbedder <: AbstractEmbedder end
+
+"""
     BatchEmbedder <: AbstractEmbedder
 
 Default embedder for `get_embeddings` functions. It passes individual documents to be embedded in chunks to `aiembed`.
@@ -64,6 +71,7 @@ struct BitPackedBatchEmbedder <: AbstractEmbedder end
 
 EmbedderEltype(::T) where {T} = EmbedderEltype(T)
 EmbedderEltype(::Type{<:AbstractEmbedder}) = Float32
+EmbedderEltype(::Type{NoEmbedder}) = Nothing
 EmbedderEltype(::Type{BinaryBatchEmbedder}) = Bool
 EmbedderEltype(::Type{BitPackedBatchEmbedder}) = UInt64
 
@@ -212,6 +220,11 @@ end
 function get_embeddings(
         embedder::AbstractEmbedder, docs::AbstractVector{<:AbstractString}; kwargs...)
     throw(ArgumentError("Not implemented for embedder $(typeof(embedder))"))
+end
+
+function get_embeddings(
+        embedder::NoEmbedder, docs::AbstractVector{<:AbstractString}; kwargs...)
+    return nothing
 end
 
 """

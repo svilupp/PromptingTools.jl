@@ -2,6 +2,7 @@ using PromptingTools: TestEchoOpenAISchema
 using PromptingTools.Experimental.RAGTools: ContextEnumerator, NoRephraser, SimpleRephraser,
                                             HyDERephraser,
                                             CosineSimilarity, BinaryCosineSimilarity,
+                                            MultiFinder, BM25Similarity,
                                             NoTagFilter, AnyTagFilter,
                                             SimpleRetriever, AdvancedRetriever
 using PromptingTools.Experimental.RAGTools: AbstractRephraser, AbstractTagFilter,
@@ -253,14 +254,6 @@ end
     @test result.positions == [1]
     @test result.scores == [1.0]
 
-    ## find_closest with MultiIndex
-    ## mi = MultiIndex(id = :multi, indexes = [ci1, ci2])
-    ## query_emb = [0.5, 0.5] # Example query embedding vector
-    ## result = find_closest(mi, query_emb)
-    ## @test result isa CandidateChunks
-    ## @test result.positions == [1, 2]
-    ## @test all(1.0 .>= result.distances .>= -1.0)   # Assuming default minimum_similarity
-
     ### For Binary embeddings
     # Test for correct retrieval of closest positions and scores
     emb = [true false; false true]
@@ -309,7 +302,92 @@ end
     @test length(intersect(positions_cosine, positions_packed)) >= 1
 end
 
-# TODO: add keywords retrieval test
+## find_closest with MultiIndex
+## mi = MultiIndex(id = :multi, indexes = [ci1, ci2])
+## query_emb = [0.5, 0.5] # Example query embedding vector
+## result = find_closest(mi, query_emb)
+## @test result isa CandidateChunks
+## @test result.positions == [1, 2]
+## @test all(1.0 .>= result.distances .>= -1.0)   # Assuming default minimum_similarity
+
+## @testset "find_closest with MultiFinder" begin
+# Create mock data for testing
+emb1 = [0.1 0.2; 0.3 0.4; 0.5 0.6] |> x -> mapreduce(normalize, hcat, eachcol(x))
+emb2 = [0.7 0.8; 0.9 1.0; 1.1 1.2] |> x -> mapreduce(normalize, hcat, eachcol(x))
+query_emb = [0.1, 0.2, 0.3] |> normalize
+
+# Create ChunkIndex instances
+index1 = ChunkEmbeddingsIndex(id = :index1, chunks = ["chunk1", "chunk2"],
+    embeddings = emb1, sources = ["source1", "source2"])
+index2 = ChunkEmbeddingsIndex(id = :index2, chunks = ["chunk3", "chunk4"],
+    embeddings = emb2, sources = ["source3", "source4"])
+
+# Create MultiIndex instance
+multi_index = MultiIndex(id = :multi, indexes = [index1, index2])
+
+# Create MultiFinder instance
+multi_finder = MultiFinder([CosineSimilarity(), CosineSimilarity()])
+
+# Perform find_closest with MultiFinder
+result = find_closest(multi_finder, multi_index, query_emb; top_k = 2)
+@test result isa MultiCandidateChunks
+@test result.index_ids == [:index1, :index2]
+@test result.positions == [2, 1]
+@test query_emb' * emb1[:, 2] ≈ result.scores[1]
+@test query_emb' * emb2[:, 1] ≈ result.scores[2]
+# Check that the positions and scores are sorted correctly
+@test result.scores[1] >= result.scores[2]
+
+result = find_closest(multi_finder, multi_index, query_emb; top_k = 20)
+@test length(result.index_ids) == 4
+@test length(result.positions) == 4
+@test length(result.scores) == 4
+
+## No embeddings
+index1 = ChunkEmbeddingsIndex(id = :index1, chunks = ["chunk1", "chunk2"],
+    sources = ["source1", "source2"])
+index2 = ChunkEmbeddingsIndex(id = :index2, chunks = ["chunk3", "chunk4"],
+    sources = ["source3", "source4"])
+result = find_closest(MultiFinder([CosineSimilarity(), CosineSimilarity()]),
+    MultiIndex(id = :multi, indexes = [index1, index2]), query_emb; top_k = 20)
+@test isempty(result.index_ids)
+@test isempty(result.positions)
+@test isempty(result.scores)
+
+### With mixed index types
+# Create mock data for testing
+emb1 = [0.1 0.2; 0.3 0.4; 0.5 0.6] |> x -> mapreduce(normalize, hcat, eachcol(x))
+query_emb = [0.1, 0.2, 0.3] |> normalize
+query_keywords = ["example", "query"]
+
+# Create ChunkIndex instances
+index1 = ChunkEmbeddingsIndex(id = :index1, chunks = ["chunk1", "chunk2"],
+    embeddings = emb1, sources = ["source1", "source2"])
+index2 = ChunkKeywordsIndex(id = :index2, chunks = ["chunk3", "chunk4"],
+    chunkdata = document_term_matrix([["example", "query"], ["random", "words"]]),
+    sources = ["source3", "source4"])
+
+# Create MultiIndex instance
+multi_index = MultiIndex(id = :multi, indexes = [index1, index2])
+
+# Create MultiFinder instance
+multi_finder = MultiFinder([CosineSimilarity(), BM25Similarity()])
+
+# Perform find_closest with MultiFinder
+result = find_closest(multi_finder, multi_index, query_emb, query_keywords; top_k = 2)
+@test result isa MultiCandidateChunks
+@test result.index_ids == [:index2, :index1]
+@test result.positions == [1, 2]
+@test isapprox(result.scores, [1.387, 1.0], atol = 1e-1)
+# Check that the positions and scores are sorted correctly
+@test result.scores[1] >= result.scores[2]
+
+result = find_closest(multi_finder, multi_index, query_emb, query_keywords; top_k = 20)
+@test length(result.index_ids) == 4
+@test length(result.positions) == 4
+@test length(result.scores) == 4
+
+## end
 
 @testset "find_tags" begin
     tagger = AnyTagFilter()

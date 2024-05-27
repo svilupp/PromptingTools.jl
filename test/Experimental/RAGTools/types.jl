@@ -1,19 +1,23 @@
-using PromptingTools.Experimental.RAGTools: ChunkIndex, MultiIndex, CandidateChunks,
+using PromptingTools.Experimental.RAGTools: ChunkEmbeddingsIndex, ChunkKeywordsIndex,
+                                            MultiIndex,
+                                            CandidateChunks,
                                             MultiCandidateChunks,
                                             AbstractCandidateChunks, DocumentTermMatrix,
-                                            document_term_matrix
+                                            document_term_matrix, HasEmbeddings,
+                                            ChunkKeywordsIndex
 using PromptingTools.Experimental.RAGTools: embeddings, chunks, tags, tags_vocab, sources,
-                                            RAGResult, chunkdata
+                                            extras,
+                                            RAGResult, chunkdata, preprocess_tokens
 using PromptingTools: last_message, last_output
 
-@testset "ChunkIndex" begin
+@testset "ChunkEmbeddingsIndex" begin
     # Test constructors and basic accessors
     chunks_test = ["chunk1", "chunk2"]
     emb_test = ones(2, 2)
     tags_test = sparse([1, 2], [1, 2], [true, true], 2, 2)
     tags_vocab_test = ["vocab1", "vocab2"]
     sources_test = ["source1", "source2"]
-    ci = ChunkIndex(chunks = chunks_test,
+    ci = ChunkEmbeddingsIndex(chunks = chunks_test,
         embeddings = emb_test,
         tags = tags_test,
         tags_vocab = tags_vocab_test,
@@ -21,26 +25,30 @@ using PromptingTools: last_message, last_output
 
     @test chunks(ci) == chunks_test
     @test (embeddings(ci)) == emb_test
+    @test (chunkdata(ci)) == emb_test
     @test tags(ci) == tags_test
     @test tags_vocab(ci) == tags_vocab_test
     @test sources(ci) == sources_test
 
     # Test identity/equality
-    ci1 = ChunkIndex(chunks = ["chunk1", "chunk2"], sources = ["source1", "source2"])
-    ci2 = ChunkIndex(chunks = ["chunk1", "chunk2"], sources = ["source1", "source2"])
+    ci1 = ChunkEmbeddingsIndex(
+        chunks = ["chunk1", "chunk2"], sources = ["source1", "source2"])
+    ci2 = ChunkEmbeddingsIndex(
+        chunks = ["chunk1", "chunk2"], sources = ["source1", "source2"])
     @test ci1 == ci2
 
     # Test equality with different chunks and sources
-    ci2 = ChunkIndex(chunks = ["chunk3", "chunk4"], sources = ["source3", "source4"])
+    ci2 = ChunkEmbeddingsIndex(
+        chunks = ["chunk3", "chunk4"], sources = ["source3", "source4"])
     @test ci1 != ci2
 
-    # Test hcat with ChunkIndex
-    # Setup two different ChunkIndex with different tags and then hcat them
+    # Test hcat with ChunkEmbeddingsIndex
+    # Setup two different ChunkEmbeddingsIndex with different tags and then hcat them
     chunks1 = ["chunk1", "chunk2"]
     tags1 = sparse([1, 2], [1, 2], [true, true], 2, 3)
     tags_vocab1 = ["vocab1", "vocab2", "vocab3"]
     sources1 = ["source1", "source1"]
-    ci1 = ChunkIndex(chunks = chunks1,
+    ci1 = ChunkEmbeddingsIndex(chunks = chunks1,
         tags = tags1,
         tags_vocab = tags_vocab1,
         sources = sources1)
@@ -49,7 +57,7 @@ using PromptingTools: last_message, last_output
     tags2 = sparse([1, 2], [1, 3], [true, true], 2, 3)
     tags_vocab2 = ["vocab1", "vocab3", "vocab4"]
     sources2 = ["source2", "source2"]
-    ci2 = ChunkIndex(chunks = chunks2,
+    ci2 = ChunkEmbeddingsIndex(chunks = chunks2,
         tags = tags2,
         tags_vocab = tags_vocab2,
         sources = sources2)
@@ -61,16 +69,63 @@ using PromptingTools: last_message, last_output
           length(tags_vocab(combined_ci))
     @test sources(combined_ci) == vcat(sources(ci1), (sources(ci2)))
 
-    # Test base var"==" with ChunkIndex
-    ci1 = ChunkIndex(chunks = ["chunk1"],
+    # Test base var"==" with ChunkEmbeddingsIndex
+    ci1 = ChunkEmbeddingsIndex(chunks = ["chunk1"],
         tags = trues(3, 1),
         tags_vocab = ["vocab1"],
         sources = ["source1"])
-    ci2 = ChunkIndex(chunks = ["chunk1"],
+    ci2 = ChunkEmbeddingsIndex(chunks = ["chunk1"],
         tags = trues(3, 1),
         tags_vocab = ["vocab1"],
         sources = ["source1"])
     @test ci1 == ci2
+
+    # HasEmbeddings
+    @test has_embeddings(ci1) == true
+end
+
+@testset "ChunkKeywordsIndex" begin
+    # Test creation of ChunkKeywordsIndex
+    chunks_ = ["chunk1", "chunk2"]
+    sources_ = ["source1", "source2"]
+    ci = ChunkKeywordsIndex(chunks = chunks_, sources = sources_)
+    @test chunks(ci) == chunks_
+    @test sources(ci) == sources_
+    @test chunkdata(ci) == nothing
+    @test tags(ci) == nothing
+    @test tags_vocab(ci) == nothing
+    @test extras(ci) == nothing
+
+    # Test equality of ChunkKeywordsIndex
+    chunks_ = ["this is a test", "this is another test", "foo bar baz"]
+    sources_ = ["source1", "source2", "source3"]
+    dtm = document_term_matrix(chunks_)
+    ci1 = ChunkKeywordsIndex(chunks = chunks_, sources = sources_, chunkdata = dtm)
+    ci2 = ChunkKeywordsIndex(chunks = chunks_, sources = sources_, chunkdata = dtm)
+    @test ci1 == ci2
+
+    ci3 = ChunkKeywordsIndex(chunks = ["chunk2"], sources = ["source2"])
+    @test ci1 != ci3
+
+    # Test hcat with ChunkKeywordsIndex
+    chunks1 = ["chunk1", "chunk2"]
+    sources1 = ["source1", "source1"]
+    ci1 = ChunkKeywordsIndex(
+        chunks = chunks1, sources = sources1, chunkdata = document_term_matrix(chunks1))
+
+    chunks2 = ["chunk3", "chunk4"]
+    sources2 = ["source2", "source2"]
+    ci2 = ChunkKeywordsIndex(
+        chunks = chunks2, sources = sources2, chunkdata = document_term_matrix(chunks2))
+
+    combined_ci = vcat(ci1, ci2)
+    @test length(combined_ci.chunks) == 4
+    @test length(combined_ci.sources) == 4
+    @test combined_ci.chunks == ["chunk1", "chunk2", "chunk3", "chunk4"]
+    @test combined_ci.sources == ["source1", "source1", "source2", "source2"]
+
+    # HasEmbeddings
+    @test HasEmbeddings(ci1) == false
 end
 
 @testset "DocumentTermMatrix" begin
@@ -133,9 +188,9 @@ end
 
 @testset "MultiIndex" begin
     # Test constructors/accessors
-    # MultiIndex behaves as a container for ChunkIndexes
-    cin1 = ChunkIndex(chunks = ["chunk1"], sources = ["source1"])
-    cin2 = ChunkIndex(chunks = ["chunk2"], sources = ["source2"])
+    # MultiIndex behaves as a container for ChunkEmbeddingsIndexes
+    cin1 = ChunkEmbeddingsIndex(chunks = ["chunk1"], sources = ["source1"])
+    cin2 = ChunkEmbeddingsIndex(chunks = ["chunk2"], sources = ["source2"])
     multi_index = MultiIndex(indexes = [cin1, cin2])
     @test length(multi_index.indexes) == 2
     @test cin1 in multi_index.indexes
@@ -143,25 +198,37 @@ end
 
     # Test base var"==" with MultiIndex
     # Case where MultiIndexes are equal
-    cin1 = ChunkIndex(chunks = ["chunk1"], sources = ["source1"])
-    cin2 = ChunkIndex(chunks = ["chunk2"], sources = ["source2"])
+    cin1 = ChunkEmbeddingsIndex(chunks = ["chunk1"], sources = ["source1"])
+    cin2 = ChunkEmbeddingsIndex(chunks = ["chunk2"], sources = ["source2"])
     mi1 = MultiIndex(indexes = [cin1, cin2])
     mi2 = MultiIndex(indexes = [cin1, cin2])
     @test mi1 == mi2
 
-    # Test equality with different ChunkIndexes inside
-    cin1 = ChunkIndex(chunks = ["chunk1"], sources = ["source1"])
-    cin2 = ChunkIndex(chunks = ["chunk2"], sources = ["source2"])
+    # Test equality with different ChunkEmbeddingsIndexes inside
+    cin1 = ChunkEmbeddingsIndex(chunks = ["chunk1"], sources = ["source1"])
+    cin2 = ChunkEmbeddingsIndex(chunks = ["chunk2"], sources = ["source2"])
     mi1 = MultiIndex(indexes = [cin1])
     mi2 = MultiIndex(indexes = [cin2])
     @test mi1 != mi2
+
+    # HasEmbeddings
+    @test HasEmbeddings(mi1) == true
+
+    ci = ChunkKeywordsIndex(chunks = ["chunk1"], sources = ["source1"])
+    mi2 = MultiIndex(indexes = [ci])
+    @test HasEmbeddings(mi2) == false
+
+    cin1 = ChunkEmbeddingsIndex(chunks = ["chunk1"], sources = ["source1"])
+    cin2 = ChunkKeywordsIndex(chunks = ["chunk1"], sources = ["source1"])
+    mi3 = MultiIndex(indexes = [cin1, cin2])
+    @test HasEmbeddings(mi3) == true
 
     ## not implemented
     @test_throws ArgumentError vcat(mi1, mi2)
 end
 
 @testset "CandidateChunks" begin
-    chunk_sym = Symbol("TestChunkIndex")
+    chunk_sym = Symbol("TestChunkEmbeddingsIndex")
     cc1 = CandidateChunks(index_id = chunk_sym,
         positions = [1, 3],
         scores = [0.1, 0.2])
@@ -232,8 +299,8 @@ end
 end
 
 @testset "MultiCandidateChunks" begin
-    chunk_sym1 = Symbol("TestChunkIndex1")
-    chunk_sym2 = Symbol("TestChunkIndex2")
+    chunk_sym1 = Symbol("TestChunkEmbeddingsIndex1")
+    chunk_sym2 = Symbol("TestChunkEmbeddingsIndex2")
     mcc1 = MultiCandidateChunks(index_ids = [chunk_sym1, chunk_sym2],
         positions = [1, 3],
         scores = [0.1, 0.2])
@@ -294,13 +361,13 @@ end
 end
 
 @testset "getindex with CandidateChunks" begin
-    # Initialize a ChunkIndex with test data
+    # Initialize a ChunkEmbeddingsIndex with test data
     chunks_data = ["First chunk", "Second chunk", "Third chunk"]
     embeddings_data = rand(3, 3)  # Random matrix with 3 embeddings
     tags_data = sparse(Bool[1 1; 0 1; 1 0])  # Some arbitrary sparse matrix representation
     tags_vocab_data = ["tag1", "tag2"]
-    chunk_sym = Symbol("TestChunkIndex")
-    test_chunk_index = ChunkIndex(chunks = chunks_data,
+    chunk_sym = Symbol("TestChunkEmbeddingsIndex")
+    test_chunk_index = ChunkEmbeddingsIndex(chunks = chunks_data,
         embeddings = embeddings_data,
         tags = tags_data,
         tags_vocab = tags_vocab_data,
@@ -341,13 +408,13 @@ end
         scores = [0.3, 0.4])
     @test isempty(test_chunk_index[candidate_chunks_wrong_id])
 
-    # Test when chunks are requested from a MultiIndex, only chunks from the corresponding ChunkIndex should be returned
-    another_chuck_index = ChunkIndex(chunks = chunks_data,
+    # Test when chunks are requested from a MultiIndex, only chunks from the corresponding ChunkEmbeddingsIndex should be returned
+    another_chuck_index = ChunkEmbeddingsIndex(chunks = chunks_data,
         embeddings = nothing,
         tags = nothing,
         tags_vocab = nothing,
         sources = repeat(["another_source"], 3),
-        id = Symbol("AnotherChunkIndex"))
+        id = Symbol("AnotherChunkEmbeddingsIndex"))
     test_multi_index = MultiIndex(indexes = [
         test_chunk_index,
         another_chuck_index
@@ -363,10 +430,10 @@ end
     # Multi-Candidate CandidateChunks
     cc = MultiCandidateChunks(; index_ids = [:TestChunkIndex2, :TestChunkIndex1],
         positions = [2, 2], scores = [0.1, 0.4])
-    ci1 = ChunkIndex(id = :TestChunkIndex1,
+    ci1 = ChunkEmbeddingsIndex(id = :TestChunkIndex1,
         chunks = ["chunk1", "chunk2"],
         sources = ["source1", "source2"])
-    ci2 = ChunkIndex(id = :TestChunkIndex2,
+    ci2 = ChunkEmbeddingsIndex(id = :TestChunkIndex2,
         chunks = ["chunk1", "chunk2x"],
         sources = ["source1", "source2"])
     @test ci1[cc, :chunks] == ["chunk2"]
@@ -383,7 +450,7 @@ end
 
 @testset "getindex-MultiCandidateChunks" begin
     chunks_data = ["First chunk", "Second chunk", "Third chunk"]
-    test_chunk_index = ChunkIndex(chunks = chunks_data,
+    test_chunk_index = ChunkEmbeddingsIndex(chunks = chunks_data,
         embeddings = nothing,
         tags = nothing,
         tags_vocab = nothing,
@@ -421,7 +488,7 @@ end
     @test test_chunk_index[mixed_multi_candidate_chunks, :scores] == [0.5]
 
     ## MultiIndex
-    ci2 = ChunkIndex(chunks = ["4", "5", "6"],
+    ci2 = ChunkEmbeddingsIndex(chunks = ["4", "5", "6"],
         embeddings = nothing,
         tags = nothing,
         tags_vocab = nothing,

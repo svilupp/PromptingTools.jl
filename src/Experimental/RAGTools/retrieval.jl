@@ -69,6 +69,18 @@ Implementation follows: [The Next Generation of Lucene Relevance](https://openso
 struct BM25Similarity <: AbstractSimilarityFinder end
 
 """
+    MultiFinder <: AbstractSimilarityFinder 
+
+Composite finder for `MultiIndex` where we want to set multiple finders for each index.
+Positions correspond to `indexes(::MultiIndex)`.
+"""
+struct MultiFinder <: AbstractSimilarityFinder
+    finders::AbstractVector{<:AbstractSimilarityFinder}
+end
+Base.getindex(finder::MultiFinder, index::Int) = finder.finders[index]
+Base.length(finder::MultiFinder) = length(finder.finders)
+
+"""
     NoTagFilter <: AbstractTagFilter
 
 
@@ -206,7 +218,7 @@ function find_closest(
         finder::AbstractSimilarityFinder, index::AbstractChunkIndex,
         query_emb::AbstractVector{<:Real}, query_tokens::AbstractVector{<:AbstractString} = String[];
         top_k::Int = 100, kwargs...)
-    isnothing(embeddings(index)) && return CandidateChunks(; index_id = index.id)
+    isnothing(chunkdata(index)) && return CandidateChunks(; index_id = index.id)
     positions, scores = find_closest(finder, chunkdata(index),
         query_emb, query_tokens;
         top_k, kwargs...)
@@ -218,7 +230,7 @@ function find_closest(
         finder::AbstractSimilarityFinder, index::AbstractChunkIndex,
         query_emb::AbstractMatrix{<:Real}, query_tokens::AbstractVector{<:AbstractVector{<:AbstractString}} = Vector{Vector{String}}();
         top_k::Int = 100, kwargs...)
-    isnothing(embeddings(index)) && CandidateChunks(; index_id = index.id)
+    isnothing(chunkdata(index)) && CandidateChunks(; index_id = index.id)
     ## reduce top_k since we have more than one query
     top_k_ = top_k ÷ size(query_emb, 2)
     ## simply vcat together (gets sorted from the highest similarity to the lowest)
@@ -230,6 +242,41 @@ function find_closest(
         mapreduce(
             (emb, tok) -> find_closest(finder, index, emb, tok; top_k = top_k_, kwargs...), vcat, eachcol(query_emb), query_tokens)
     end
+end
+
+### For MultiIndex
+function find_closest(
+        finder::MultiFinder, index::AbstractMultiIndex,
+        query_emb::AbstractVector{<:Real}, query_tokens::AbstractVector{<:AbstractString} = String[];
+        top_k::Int = 100, kwargs...)
+    all_indexes = indexes(index)
+    all(isnothing(chunkdata(index)) for index in all_indexes) &&
+        return MultiCandidateChunks(; index_ids = Symbol[])
+
+    ## Get more than top_k candidates, then pick the top 100 by score
+    top_k_shard = ceil(Int, top_k / length(all_indexes))
+    index_ids = Symbol[]
+    positions = Int[]
+    scores = Float32[]
+    for i in eachindex(all_indexes, finder.finders)
+        positions_, scores_ = find_closest(finder[i], chunkdata(all_indexes[i]),
+            query_emb, query_tokens;
+            top_k = top_k_shard, kwargs...)
+        append!(index_ids, fill(all_indexes[i].id, length(positions_)))
+        append!(positions, positions_)
+        append!(scores, scores_)
+    end
+    idxs = sortperm(scores, rev = true) |> x -> first(x, top_k)
+    return MultiCandidateChunks(index_ids[idxs], positions[idxs], scores[idxs])
+end
+
+# If we have multi-index, convert to MultiFinder
+function find_closest(
+        finder::AbstractSimilarityFinder, index::AbstractMultiIndex,
+        query_emb::AbstractVector{<:Real}, query_tokens::AbstractVector{<:AbstractString} = String[];
+        kwargs...)
+    new_finder = MultiFinder(fill(finder, length(indexes(index))))
+    find_closest(new_finder, index, query_emb, query_tokens; top_k, kwargs...)
 end
 
 #### For binary embeddings
@@ -373,8 +420,8 @@ function find_closest(
         finder::BM25Similarity, dtm::DocumentTermMatrix,
         query_emb::AbstractVector{<:Real}, query_tokens::AbstractVector{<:AbstractString} = String[];
         top_k::Int = 100, minimum_similarity::AbstractFloat = -1.0, kwargs...)
-    bm_scores = bm25(dtm, query)
-    positions = bm_scores |> sortperm |> x -> last(x, top_k)
+    bm_scores = bm25(dtm, query_tokens)
+    positions = bm_scores |> sortperm |> x -> last(x, top_k) |> reverse
 
     if minimum_similarity > -1.0
         mask = scores[positions] .>= minimum_similarity
@@ -599,6 +646,32 @@ Make sure to use consistent `embedder` and `tagger` with the Preparation Stage (
 end
 
 """
+    SimpleBM25Retriever <: AbstractRetriever
+
+Keyword-based implementation for `retrieve`. It does a simple similarity search via `BM25Similarity` and returns the results.
+
+Make sure to use consistent `processor` and `tagger` with the Preparation Stage (`build_index`)!
+
+# Fields
+- `rephraser::AbstractRephraser`: the rephrasing method, dispatching `rephrase` - uses `NoRephraser`
+- `embedder::AbstractEmbedder`: the embedding method, dispatching `get_embeddings` (see Preparation Stage for more details) - uses `NoEmbedder`
+- `processor::AbstractProcessor`: the processor method, dispatching `get_keywords` (see Preparation Stage for more details) - uses `KeywordsProcessor`
+- `finder::AbstractSimilarityFinder`: the similarity search method, dispatching `find_closest` - uses `CosineSimilarity`
+- `tagger::AbstractTagger`: the tag generating method, dispatching `get_tags` (see Preparation Stage for more details) - uses `NoTagger`
+- `filter::AbstractTagFilter`: the tag matching method, dispatching `find_tags` - uses `NoTagFilter`
+- `reranker::AbstractReranker`: the reranking method, dispatching `rerank` - uses `NoReranker`
+"""
+@kwdef mutable struct SimpleBM25Retriever <: AbstractRetriever
+    rephraser::AbstractRephraser = NoRephraser()
+    embedder::AbstractEmbedder = NoEmbedder()
+    processor::AbstractProcessor = KeywordsProcessor()
+    finder::AbstractSimilarityFinder = BM25Similarity()
+    tagger::AbstractTagger = NoTagger()
+    filter::AbstractTagFilter = NoTagFilter()
+    reranker::AbstractReranker = NoReranker()
+end
+
+"""
     AdvancedRetriever <: AbstractRetriever
 
 Dispatch for `retrieve` with advanced retrieval methods to improve result quality.
@@ -607,7 +680,7 @@ Compared to SimpleRetriever, it adds rephrasing the query and reranking the resu
 # Fields
 - `rephraser::AbstractRephraser`: the rephrasing method, dispatching `rephrase` - uses `HyDERephraser`
 - `embedder::AbstractEmbedder`: the embedding method, dispatching `get_embeddings` (see Preparation Stage for more details) - uses `BatchEmbedder`
-- `processor::AbstractProcessor`: the processor method, dispatching `get_keywords` (see Preparation Stage for more details) - uses `KeywordsProcessor`
+- `processor::AbstractProcessor`: the processor method, dispatching `get_keywords` (see Preparation Stage for more details) - uses `NoProcessor`
 - `finder::AbstractSimilarityFinder`: the similarity search method, dispatching `find_closest` - uses `CosineSimilarity`
 - `tagger::AbstractTagger`: the tag generating method, dispatching `get_tags` (see Preparation Stage for more details) - uses `NoTagger`
 - `filter::AbstractTagFilter`: the tag matching method, dispatching `find_tags` - uses `NoTagFilter`
@@ -616,7 +689,7 @@ Compared to SimpleRetriever, it adds rephrasing the query and reranking the resu
 @kwdef mutable struct AdvancedRetriever <: AbstractRetriever
     rephraser::AbstractRephraser = HyDERephraser()
     embedder::AbstractEmbedder = BatchEmbedder()
-    processor::AbstractProcessor = KeywordsProcessor()
+    processor::AbstractProcessor = NoProcessor()
     finder::AbstractSimilarityFinder = CosineSimilarity()
     tagger::AbstractTagger = NoTagger()
     filter::AbstractTagFilter = NoTagFilter()
@@ -777,8 +850,12 @@ function retrieve(retriever::AbstractRetriever,
     ## Preprocess into keyword tokens if we're running BM25 
     keywords = if index isa ChunkKeywordsIndex
         ## Return only keywords, not DTM
-        get_keywords(processor, rephrased_questions;
+        keywords = get_keywords(processor, rephrased_questions;
             verbose = (verbose > 1), processor_kwargs..., return_keywords = true)
+        ## Send warning for common error
+        verbose >= 1 && (keywords isa AbstractVector{<:AbstractVector{<:AbstractString}} ||
+         @warn "Processed Keywords is not a vector of tokenized queries. Have you used the correct processor? (provided: $(typeof(processor))).")
+        keywords
     else
         [String[] for x in rephrased_questions]
     end
