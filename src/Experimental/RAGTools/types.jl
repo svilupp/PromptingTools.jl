@@ -28,7 +28,7 @@ function Base.vcat(i1::T, i2::T) where {T <: AbstractChunkIndex}
     elseif tags_vocab(i1) == tags_vocab(i2)
         vcat(tags(i1), tags(i2)), tags_vocab(i1)
     else
-        merge_labeled_matrices(tags(i1), tags_vocab(i1), tags(i2), tags_vocab(i2))
+        vcat_labeled_matrices(tags(i1), tags_vocab(i1), tags(i2), tags_vocab(i2))
     end
     chunkdata_ = (isnothing(chunkdata(i1)) || isnothing(chunkdata(i2))) ? nothing :
                  hcat(chunkdata(i1), chunkdata(i2))
