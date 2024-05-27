@@ -310,7 +310,7 @@ end
         verbose::Bool = true,
         model::AbstractString = PT.MODEL_EMBEDDING,
         truncate_dimension::Union{Int, Nothing} = nothing,
-        return_type::Type = BitMatrix,
+        return_type::Type = Matrix{Bool},
         cost_tracker = Threads.Atomic{Float64}(0.0),
         target_batch_size_length::Int = 80_000,
         ntasks::Int = 4 * Threads.nthreads(),
@@ -332,7 +332,7 @@ Embeds a vector of `docs` using the provided model (kwarg `model`) in a batched 
 - `verbose`: A boolean flag for verbose output. Default is `true`.
 - `model`: The model to use for embedding. Default is `PT.MODEL_EMBEDDING`.
 - `truncate_dimension`: The dimensionality of the embeddings to truncate to. Default is `nothing`.
-- `return_type`: The type of the returned embeddings matrix. Default is `BitMatrix`. Choose `BitMatrix` to minimize storage requirements, `Matrix{Bool}` to maximize performance in elementwise-ops.
+- `return_type`: The type of the returned embeddings matrix. Default is `Matrix{Bool}`. Choose `BitMatrix` to minimize storage requirements, `Matrix{Bool}` to maximize performance in elementwise-ops.
 - `cost_tracker`: A `Threads.Atomic{Float64}` object to track the total cost of the API calls. Useful to pass the total cost to the parent call.
 - `target_batch_size_length`: The target length (in characters) of each batch of document chunks sent for embedding. Default is 80_000 characters. Speeds up embedding process.
 - `ntasks`: The number of tasks to use for asyncmap. Default is 4 * Threads.nthreads().
@@ -343,15 +343,15 @@ function get_embeddings(
         verbose::Bool = true,
         model::AbstractString = PT.MODEL_EMBEDDING,
         truncate_dimension::Union{Int, Nothing} = nothing,
-        return_type::Type = BitMatrix,
+        return_type::Type = Matrix{Bool},
         cost_tracker = Threads.Atomic{Float64}(0.0),
         target_batch_size_length::Int = 80_000,
         ntasks::Int = 4 * Threads.nthreads(),
         kwargs...)
     emb = get_embeddings(BatchEmbedder(), docs; verbose, model, truncate_dimension,
         cost_tracker, target_batch_size_length, ntasks, kwargs...)
-    # This will return BitMatrix to save space, for best performance use Matrix{Bool}, eg, map(>(0),emb)
-    emb = (emb .> 0) |> x -> x isa return_type ? x : return_type(x)
+    # This will return Matrix{Bool}, eg, map(>(0),emb)
+    emb = map(>(0), emb) |> x -> x isa return_type ? x : return_type(x)
 end
 
 """
@@ -703,6 +703,44 @@ function build_index(
     index = ChunkKeywordsIndex(; id = index_id, chunkdata = dtm, tags, tags_vocab,
         chunks, sources, extras)
     return index
+end
+
+# Convenience for easy index creation
+"""
+    ChunkKeywordsIndex(
+        [processor::AbstractProcessor=KeywordsProcessor(),] index::ChunkEmbeddingsIndex; verbose::Int = 1,
+        index_id = gensym("ChunkKeywordsIndex"), processor_kwargs...)
+
+Convenience method to quickly create a `ChunkKeywordsIndex` from an existing `ChunkEmbeddingsIndex`.
+
+# Example
+```julia
+
+# Let's assume we have a standard embeddings-based index
+index = build_index(SimpleIndexer(), texts; chunker_kwargs = (; max_length=10))
+
+# Creating an additional index for keyword-based search (BM25), is as simple as
+index_keywords = ChunkKeywordsIndex(index)
+
+# We can immediately create a MultiIndex (holding both indices)
+multi_index = MultiIndex([index, index_keywords])
+
+```
+"""
+function ChunkKeywordsIndex(
+        processor::AbstractProcessor, index::ChunkEmbeddingsIndex; verbose::Int = 1,
+        index_id = gensym("ChunkKeywordsIndex"), processor_kwargs...)
+    dtm = get_keywords(processor, chunks(index);
+        verbose = (verbose > 1),
+        processor_kwargs...)
+
+    (verbose > 0) && @info "Index built!"
+    ChunkKeywordsIndex(index_id,
+        chunks(index), dtm, tags(index), tags_vocab(index), sources(index), extras(index))
+end
+function ChunkKeywordsIndex(
+        index::ChunkEmbeddingsIndex; kwargs...)
+    ChunkKeywordsIndex(KeywordsProcessor(), index; kwargs...)
 end
 
 # Default dispatch

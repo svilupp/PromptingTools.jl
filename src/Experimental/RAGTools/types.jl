@@ -167,6 +167,7 @@ end
 
 indexes(index::MultiIndex) = index.indexes
 HasEmbeddings(index::AbstractMultiIndex) = any(HasEmbeddings, indexes(index))
+
 # check that each index has a counterpart in the other MultiIndex
 function Base.var"=="(i1::MultiIndex, i2::MultiIndex)
     length(indexes(i1)) != length(indexes(i2)) && return false

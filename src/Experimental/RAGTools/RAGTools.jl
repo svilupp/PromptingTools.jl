@@ -36,7 +36,8 @@ export ChunkIndex, ChunkKeywordsIndex, ChunkEmbeddingsIndex, CandidateChunks, RA
 # export MultiIndex # not ready yet
 include("types.jl")
 
-export build_index, get_chunks, get_embeddings, get_keywords, get_tags
+export build_index, get_chunks, get_embeddings, get_keywords, get_tags, SimpleIndexer,
+       KeywordsIndexer
 include("preparation.jl")
 
 export retrieve, SimpleRetriever, SimpleBM25Retriever, AdvancedRetriever

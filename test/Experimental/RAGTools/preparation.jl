@@ -353,6 +353,30 @@ end
     @test index.sources == fill("x", length(index.chunks))
     @test index.tags == nothing
     @test index.tags_vocab == nothing
+
+    # ChunkKeywordsIndex
+    index_keywords = ChunkKeywordsIndex(index)
+    @test chunkdata(index_keywords) isa DocumentTermMatrix
+    @test length(chunkdata(index_keywords).vocab) == 7
+    @test size(chunkdata(index_keywords).tf) == (30, 7)
+    @test index_keywords.chunks == index.chunks
+    @test index_keywords.sources == index.sources
+    @test index_keywords.tags == index.tags
+    @test index_keywords.tags_vocab == index.tags_vocab
+    @test index_keywords.sources == index.sources
+    @test index_keywords.extras == index.extras
+
+    # Keywords-based index
+    index = build_index(KeywordsIndexer(), [text, text];
+        chunker_kwargs = (;
+            sources = ["x", "x"], max_length = 10),
+        tagger_kwargs = (; model = "mock-meta"), api_kwargs = (;
+            url = "http://localhost:$(PORT)"))
+    dtm = chunkdata(index)
+    @test dtm isa DocumentTermMatrix
+    @test length(dtm.vocab) == 7
+    @test size(dtm.tf) == (30, 7)
+
     # clean up
     close(echo_server)
 end

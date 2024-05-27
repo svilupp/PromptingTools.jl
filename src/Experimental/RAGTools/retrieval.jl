@@ -270,13 +270,33 @@ function find_closest(
     return MultiCandidateChunks(index_ids[idxs], positions[idxs], scores[idxs])
 end
 
-# If we have multi-index, convert to MultiFinder
+# If we have multi-index, convert to MultiFinder first
 function find_closest(
         finder::AbstractSimilarityFinder, index::AbstractMultiIndex,
         query_emb::AbstractVector{<:Real}, query_tokens::AbstractVector{<:AbstractString} = String[];
         kwargs...)
     new_finder = MultiFinder(fill(finder, length(indexes(index))))
     find_closest(new_finder, index, query_emb, query_tokens; top_k, kwargs...)
+end
+
+# Method for multiple-queries at once (for rephrased queries)
+# TODO: finish
+function find_closest(
+        finder::AbstractSimilarityFinder, index::AbstractMultiIndex,
+        query_emb::AbstractMatrix{<:Real}, query_tokens::AbstractVector{<:AbstractVector{<:AbstractString}} = Vector{Vector{String}}();
+        top_k::Int = 100, kwargs...)
+    isnothing(chunkdata(index)) && CandidateChunks(; index_id = index.id)
+    ## reduce top_k since we have more than one query
+    top_k_ = top_k ÷ size(query_emb, 2)
+    ## simply vcat together (gets sorted from the highest similarity to the lowest)
+    if isempty(query_tokens)
+        mapreduce(
+            c -> find_closest(finder, index, c; top_k = top_k_, kwargs...), vcat, eachcol(query_emb))
+    else
+        @assert length(query_tokens)==size(query_emb, 2) "Length of `query_tokens` must be equal to the number of columns in `query_emb`."
+        mapreduce(
+            (emb, tok) -> find_closest(finder, index, emb, tok; top_k = top_k_, kwargs...), vcat, eachcol(query_emb), query_tokens)
+    end
 end
 
 #### For binary embeddings
