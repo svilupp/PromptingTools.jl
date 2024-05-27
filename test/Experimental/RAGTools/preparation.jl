@@ -6,7 +6,9 @@ using PromptingTools.Experimental.RAGTools: AbstractTagger, AbstractChunker,
                                             AbstractEmbedder, AbstractIndexBuilder
 using PromptingTools.Experimental.RAGTools: tags_extract, Tag, MaybeTags
 using PromptingTools.Experimental.RAGTools: build_tags, build_index, SimpleIndexer,
-                                            get_tags, get_chunks, get_embeddings
+                                            get_tags, get_chunks, get_embeddings,
+                                            get_keywords, KeywordsProcessor, NoProcessor,
+                                            DocumentTermMatrix
 using PromptingTools.Experimental.RAGTools: build_tags, build_index
 using PromptingTools: TestEchoOpenAISchema
 using PromptingTools.Experimental.RAGTools: pack_bits, BitPackedBatchEmbedder
@@ -92,6 +94,49 @@ end
     @test EmbedderEltype(BinaryBatchEmbedder()) == Bool
     @test EmbedderEltype(BatchEmbedder()) == Float32
     @test EmbedderEltype(BitPackedBatchEmbedder()) == UInt64
+end
+
+@testset "get_keywords" begin
+
+    # Mock data
+    docs = ["This is a test document.", "Another test document with more text."]
+    stopwords = Set(["is", "a", "with", "more"])
+
+    # Test for KeywordsProcessor with default parameters
+    processor = KeywordsProcessor()
+    dtm = get_keywords(processor, docs)
+    @test dtm isa DocumentTermMatrix
+    @test Set(dtm.vocab) == Set(["this", "test", "document", "anoth", "more", "text"])
+    @test size(dtm.tf) == (2, 6)
+
+    # Test for KeywordsProcessor with custom stemmer and stopwords
+    custom_stemmer = Snowball.Stemmer("french")
+    dtm_custom = get_keywords(
+        processor, docs; stemmer = custom_stemmer, stopwords = stopwords)
+    @test dtm isa DocumentTermMatrix
+    @test size(dtm.tf) == (2, 6)
+
+    # Test for KeywordsProcessor with return_keywords = true
+    keywords = get_keywords(processor, docs; return_keywords = true)
+    @test keywords == [["this", "test", "document"],
+        ["anoth", "test", "document", "more", "text"]]
+
+    # Test for NoProcessor
+    no_processor = NoProcessor()
+    output_docs = get_keywords(no_processor, docs)
+    @test output_docs == docs
+
+    # Test for KeywordsProcessor with empty documents
+    empty_docs = String[]
+    dtm_empty = get_keywords(processor, empty_docs)
+    @test isempty(dtm_empty.vocab)
+    @test isempty(dtm_empty.tf)
+
+    # Test for KeywordsProcessor with only stopwords
+    stopword_docs = ["is a with more"]
+    dtm_stopwords = get_keywords(processor, stopword_docs; stopwords = stopwords)
+    @test isempty(dtm_stopwords.vocab)
+    @test isempty(dtm_stopwords.tf)
 end
 
 @testset "tags_extract" begin

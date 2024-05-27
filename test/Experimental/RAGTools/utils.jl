@@ -6,7 +6,7 @@ using PromptingTools.Experimental.RAGTools: token_with_boundaries, text_to_trigr
 using PromptingTools.Experimental.RAGTools: split_into_code_and_sentences
 using PromptingTools.Experimental.RAGTools: getpropertynested, setpropertynested,
                                             merge_kwargs_nested
-using PromptingTools.Experimental.RAGTools: pack_bits, unpack_bits
+using PromptingTools.Experimental.RAGTools: pack_bits, unpack_bits, preprocess_tokens
 
 @testset "_check_aiextract_capability" begin
     @test _check_aiextract_capability("gpt-3.5-turbo") == nothing
@@ -480,4 +480,67 @@ end
     # Wrong number type
     @test_throws ArgumentError pack_bits(rand(Float32, 128, 10))
     @test_throws ArgumentError unpack_bits(rand(Float32, 128, 10))
+end
+
+@testset "preprocess_tokens" begin
+    stemmer = Snowball.Stemmer("english")
+    stopwords = Set([
+        "a", "an", "and", "are", "as", "at", "be", "but", "by", "for", "if", "in",
+        "into", "is", "it", "no", "not", "of", "on", "or", "such", "some", "that", "the",
+        "their", "then", "there", "these", "they", "this", "to", "was", "will", "with"])
+    # Empty string
+    @test preprocess_tokens("") == []
+
+    # Simple case
+    @test preprocess_tokens("This is a test."; stopwords) == ["test"]
+
+    # Case insensitive
+    @test preprocess_tokens("This Is A Test."; stopwords) == ["test"]
+
+    # Punctuation and numbers
+    @test preprocess_tokens(
+        "This is a test, with punctuation and 123 numbers!", stemmer; stopwords) ==
+          ["test", "punctuat", "number"]
+
+    # Unicode and accents
+    @test preprocess_tokens(
+        "Thís is à tést wîth Ünïcôdë and áccênts.", stemmer; stopwords) ==
+          ["test", "unicod", "accent"]
+
+    # Multiple spaces
+    @test preprocess_tokens(
+        "This  is a   test with   multiple    spaces.", stemmer; stopwords) ==
+          ["test", "multipl", "space"]
+
+    # Stopwords
+    @test preprocess_tokens(
+        "This is a test with some stopwords like the and is.", stemmer; stopwords) ==
+          ["test", "stopword", "like"]
+
+    # Stemming
+    @test preprocess_tokens(
+        "This is a test with some words for stemming like testing and tested.",
+        stemmer; stopwords) == ["test", "word", "stem", "like", "test", "test"]
+
+    # Long text
+    long_text = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed euismod, nulla sit amet aliquam lacinia, nisl nisl aliquam nisl, nec aliquam nisl nisl sit amet nisl. Sed euismod, nulla sit amet aliquam lacinia, nisl nisl aliquam nisl, nec aliquam nisl nisl sit amet nisl. Sed euismod, nulla sit amet aliquam lacinia, nisl nisl aliquam nisl, nec aliquam nisl nisl sit amet nisl."
+    @test preprocess_tokens(long_text, stemmer; stopwords) ==
+          ["lorem", "ipsum", "dolor", "sit", "amet", "consectetur", "adipisc", "elit",
+        "sed", "euismod", "nulla", "sit", "amet", "aliquam", "lacinia", "nisl", "nisl",
+        "aliquam", "nisl", "nec", "aliquam", "nisl", "nisl", "sit", "amet", "nisl",
+        "sed", "euismod", "nulla", "sit", "amet", "aliquam", "lacinia", "nisl", "nisl",
+        "aliquam", "nisl", "nec", "aliquam", "nisl", "nisl", "sit", "amet", "nisl",
+        "sed", "euismod", "nulla", "sit", "amet", "aliquam", "lacinia", "nisl", "nisl",
+        "aliquam", "nisl", "nec", "aliquam", "nisl", "nisl", "sit", "amet", "nisl"]
+
+    # Edge case: non-English text
+    @test preprocess_tokens("Ceci n'est pas une pipe.", stemmer; stopwords) ==
+          ["ceci", "est", "pas", "une", "pipe"]
+
+    # Vector of inputs
+    @test preprocess_tokens(
+        ["This is a test, with punctuation and 123 numbers!",
+            "This is a test, with punctuation and 123 numbers!"],
+        stemmer;
+        stopwords) == [["test", "punctuat", "number"], ["test", "punctuat", "number"]]
 end

@@ -309,6 +309,8 @@ end
     @test length(intersect(positions_cosine, positions_packed)) >= 1
 end
 
+# TODO: add keywords retrieval test
+
 @testset "find_tags" begin
     tagger = AnyTagFilter()
     test_embeddings = [1.0 2.0; 3.0 4.0; 5.0 6.0] |>

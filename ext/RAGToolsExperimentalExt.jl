@@ -61,8 +61,9 @@ dtm = document_term_matrix(documents)
 ```
 """
 function RT.document_term_matrix(documents::AbstractVector{<:AbstractVector{<:AbstractString}})
-    vocab = unique(vcat(documents...))
-    vocab_lookup = Dict(t => i for (i, t) in enumerate(vocab))
+    T = eltype(documents) |> eltype
+    vocab = convert(Vector{T}, unique(vcat(documents...)))
+    vocab_lookup = Dict{T, Int}(t => i for (i, t) in enumerate(vocab))
     N = length(documents)
     doc_freq = zeros(Int, length(vocab))
     term_freq = spzeros(Float32, N, length(vocab))
