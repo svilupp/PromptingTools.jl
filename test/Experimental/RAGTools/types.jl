@@ -125,6 +125,10 @@ end
     @test isapprox(dtm.doc_rel_length,
         [4 / 3.666666666666667, 4 / 3.666666666666667, 3 / 3.666666666666667,
             4 / 3.666666666666667, 4 / 3.666666666666667, 3 / 3.666666666666667])
+
+    # Check stubs that they throw
+    @test_throws ArgumentError RT._stem(nothing, "abc")
+    @test_throws ArgumentError RT._unicode_normalize(nothing)
 end
 
 @testset "MultiIndex" begin

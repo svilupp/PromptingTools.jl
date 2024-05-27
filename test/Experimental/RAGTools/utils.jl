@@ -543,4 +543,8 @@ end
             "This is a test, with punctuation and 123 numbers!"],
         stemmer;
         stopwords) == [["test", "punctuat", "number"], ["test", "punctuat", "number"]]
+
+    # Check stubs that they throw
+    @test_throws ArgumentError RT._stem(nothing, "abc")
+    @test_throws ArgumentError RT._unicode_normalize(nothing)
 end

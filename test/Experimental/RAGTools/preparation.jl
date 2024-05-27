@@ -8,7 +8,7 @@ using PromptingTools.Experimental.RAGTools: tags_extract, Tag, MaybeTags
 using PromptingTools.Experimental.RAGTools: build_tags, build_index, SimpleIndexer,
                                             get_tags, get_chunks, get_embeddings,
                                             get_keywords, KeywordsProcessor, NoProcessor,
-                                            DocumentTermMatrix
+                                            DocumentTermMatrix, document_term_matrix, bm25
 using PromptingTools.Experimental.RAGTools: build_tags, build_index
 using PromptingTools: TestEchoOpenAISchema
 using PromptingTools.Experimental.RAGTools: pack_bits, BitPackedBatchEmbedder
@@ -137,6 +137,10 @@ end
     dtm_stopwords = get_keywords(processor, stopword_docs; stopwords = stopwords)
     @test isempty(dtm_stopwords.vocab)
     @test isempty(dtm_stopwords.tf)
+
+    # Check stubs that they throw
+    @test_throws ArgumentError document_term_matrix(nothing)
+    @test_throws ArgumentError bm25(nothing, ["abc"])
 end
 
 @testset "tags_extract" begin
