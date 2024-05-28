@@ -72,6 +72,7 @@ using PromptingTools: last_message, last_output
 
     # Test base var"==" with ChunkEmbeddingsIndex
     ci1 = ChunkEmbeddingsIndex(chunks = ["chunk1"],
+        id = :ci1,
         tags = trues(3, 1),
         tags_vocab = ["vocab1"],
         sources = ["source1"])
@@ -84,6 +85,10 @@ using PromptingTools: last_message, last_output
     # HasEmbeddings
     @test HasEmbeddings(ci1) == true
     @test HasKeywords(ci1) == false
+
+    # Getindex
+    @test ci1[:ci1] == ci1
+    @test ci1[:ci2] == nothing
 end
 
 @testset "ChunkKeywordsIndex" begin
@@ -222,14 +227,20 @@ end
     mi2 = MultiIndex(indexes = [ci])
     @test HasEmbeddings(mi2) == false
 
-    cin1 = ChunkEmbeddingsIndex(chunks = ["chunk1"], sources = ["source1"])
-    cin2 = ChunkKeywordsIndex(chunks = ["chunk1"], sources = ["source1"])
-    mi3 = MultiIndex(indexes = [cin1, cin2])
+    cin1 = ChunkEmbeddingsIndex(chunks = ["chunk1"], sources = ["source1"], id = :cin1)
+    cin2 = ChunkKeywordsIndex(chunks = ["chunk1"], sources = ["source1"], id = :cin2)
+    mi3 = MultiIndex(indexes = [cin1, cin2], id = :mi3)
     @test HasEmbeddings(mi3) == true
     @test HasKeywords(mi3) == true
 
     ## not implemented
     @test_throws ArgumentError vcat(mi1, mi2)
+
+    # Get index
+    @test mi3[:cin1] == cin1
+    @test mi3[:cin2] == cin2
+    @test mi3[:xyz] == nothing
+    @test mi3[:mi3] == mi3
 end
 
 @testset "CandidateChunks" begin
@@ -376,7 +387,7 @@ end
     @test_throws ArgumentError (mcc1&RandomMultiCandidateChunks123())
 end
 
-@testset "getindex with CandidateChunks" begin
+@testset "getindex-CandidateChunks" begin
     # Initialize a ChunkEmbeddingsIndex with test data
     chunks_data = ["First chunk", "Second chunk", "Third chunk"]
     embeddings_data = rand(3, 3)  # Random matrix with 3 embeddings
@@ -401,6 +412,8 @@ end
           ["test_source", "test_source"]
     @test collect(test_chunk_index[candidate_chunks, :embeddings]) ==
           embeddings_data[:, [1, 3]]
+    @test collect(test_chunk_index[candidate_chunks, :chunkdata]) ==
+          embeddings_data[:, [1, 3]]
 
     # Test with empty positions, which should result in an empty array
     candidate_chunks_empty = CandidateChunks(index_id = chunk_sym,
@@ -409,6 +422,7 @@ end
     @test isempty(test_chunk_index[candidate_chunks_empty])
     @test isempty(test_chunk_index[candidate_chunks_empty, :chunks])
     @test isempty(test_chunk_index[candidate_chunks_empty, :embeddings])
+    @test isempty(test_chunk_index[candidate_chunks_empty, :chunkdata])
     @test isempty(test_chunk_index[candidate_chunks_empty, :sources])
 
     # Test with positions out of bounds, should handle gracefully without errors
@@ -425,7 +439,7 @@ end
     @test isempty(test_chunk_index[candidate_chunks_wrong_id])
 
     # Test when chunks are requested from a MultiIndex, only chunks from the corresponding ChunkEmbeddingsIndex should be returned
-    another_chuck_index = ChunkEmbeddingsIndex(chunks = chunks_data,
+    another_chunk_index = ChunkEmbeddingsIndex(chunks = chunks_data,
         embeddings = nothing,
         tags = nothing,
         tags_vocab = nothing,
@@ -433,7 +447,7 @@ end
         id = Symbol("AnotherChunkEmbeddingsIndex"))
     test_multi_index = MultiIndex(indexes = [
         test_chunk_index,
-        another_chuck_index
+        another_chunk_index
     ])
     @test collect(test_multi_index[candidate_chunks]) == ["First chunk", "Third chunk"]
 
@@ -458,6 +472,13 @@ end
     @test Base.getindex(ci1, cc, :chunks; sorted = true) == ["chunk2"]
     @test Base.getindex(ci1, cc, :scores; sorted = true) == [0.4]
 
+    # Wrong index
+    cc_wrong = MultiCandidateChunks(index_ids = [:TestChunkIndex2xxx, :TestChunkIndex1xxx],
+        positions = [2, 2], scores = [0.1, 0.4])
+    @test isempty(ci1[cc_wrong])
+    @test isempty(ci1[cc_wrong, :chunks])
+    @test isempty(ci1[cc_wrong, :scores])
+
     # with MultiIndex
     mi = MultiIndex(; id = :multi, indexes = [ci1, ci2])
     @test mi[cc] == ["chunk2", "chunk2x"]
@@ -470,7 +491,7 @@ end
         embeddings = nothing,
         tags = nothing,
         tags_vocab = nothing,
-        sources = repeat(["test_source"], 3),
+        sources = ["test_source$i" for i in 1:3],
         id = Symbol("TestChunkIndex"))
 
     # Test with correct index_id and positions, expect correct chunks and scores
@@ -494,21 +515,24 @@ end
         scores = [0.5, 0.6])
     @test isempty(test_chunk_index[wrong_multi_candidate_chunks])
     @test isempty(test_chunk_index[wrong_multi_candidate_chunks, :scores])
+    @test isempty(test_chunk_index[wrong_multi_candidate_chunks, :chunks])
+    @test isempty(test_chunk_index[wrong_multi_candidate_chunks, :sources])
 
     # Test with a mix of correct and incorrect index_ids, expect only chunks and scores from correct index_id
     mixed_multi_candidate_chunks = MultiCandidateChunks(
         index_ids = [Symbol("TestChunkIndex"), Symbol("WrongIndex")],
-        positions = [1, 3],
+        positions = [2, 3],
         scores = [0.5, 0.6])
-    @test test_chunk_index[mixed_multi_candidate_chunks] == ["First chunk"]
+    @test test_chunk_index[mixed_multi_candidate_chunks] == ["Second chunk"]
     @test test_chunk_index[mixed_multi_candidate_chunks, :scores] == [0.5]
+    @test test_chunk_index[mixed_multi_candidate_chunks, :sources] == ["test_source2"]
 
     ## MultiIndex
     ci2 = ChunkEmbeddingsIndex(chunks = ["4", "5", "6"],
         embeddings = nothing,
         tags = nothing,
         tags_vocab = nothing,
-        sources = repeat(["test_source"], 3),
+        sources = ["other_source$i" for i in 1:3],
         id = Symbol("TestChunkIndex2"))
     mi = MultiIndex(; id = :multi, indexes = [test_chunk_index, ci2])
     mc1 = MultiCandidateChunks(
@@ -517,6 +541,9 @@ end
         scores = [0.5, 0.7])
     @test mi[mc1] == ["First chunk", "6"]
     @test Base.getindex(mi, mc1, :chunks; sorted = true) == ["6", "First chunk"]
+    @test Base.getindex(mi, mc1, :sources; sorted = true) ==
+          ["other_source3", "test_source1"]
+    @test Base.getindex(mi, mc1, :scores; sorted = true) == [0.7, 0.5]
 end
 
 @testset "RAGResult" begin
