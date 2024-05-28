@@ -671,7 +671,7 @@ function rerank(
         doc = r.response[:results][i]
         positions[i] = candidates.positions[doc[:index] + 1]
         scores[i] = doc[:relevance_score]
-        index_ids = if index isa AbstractMultiIndex
+        index_ids = if candidates isa MultiCandidateChunks
             candidates.index_ids[doc[:index] + 1]
         else
             index.id
@@ -689,7 +689,7 @@ function rerank(
     end
     verbose && @info "Reranking done. $search_units_str"
 
-    index_ids = if index isa AbstractMultiIndex
+    index_ids = if candidates isa MultiCandidateChunks
         MultiCandidateChunks(index_ids, positions, scores)
     else
         CandidateChunks(index_ids, positions, scores)

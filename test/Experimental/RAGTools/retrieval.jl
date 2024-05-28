@@ -475,15 +475,19 @@ end
     @test reranked.positions == [2] # gets resorted by score
     @test reranked.scores == [0.4]
 
-    # Cohere assertion
     ci2 = ChunkIndex(id = :TestChunkIndex2,
         chunks = ["chunk1", "chunk2"],
         sources = ["source1", "source2"])
     mi = MultiIndex(; id = :multi, indexes = [ci1, ci2])
-    @test_throws ArgumentError rerank(CohereReranker(),
+    reranked = rerank(NoReranker(),
         mi,
         question,
         cc1)
+    @test reranked.positions == [2, 1] # gets resorted by score
+    @test reranked.scores == [0.4, 0.3]
+
+    # Cohere assertion
+    ## @test reranked isa MultiCandidateChunks
 
     # Bad top_n
     @test_throws AssertionError rerank(CohereReranker(),
