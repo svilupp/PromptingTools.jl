@@ -415,51 +415,61 @@ end
 function Base.var"&"(mc1::MultiCandidateChunks{TP1, TD1},
         mc2::MultiCandidateChunks{TP2, TD2}) where
         {TP1 <: Integer, TP2 <: Integer, TD1 <: Real, TD2 <: Real}
-    ##
-    # TODO: fix
-    ## index_ids = intersect(mc1.index_ids, mc2.index_ids)
-    ## for index_id in index_ids
-    ##     positions1 = findall(==(index_id), mc1.index_ids)
-    ##     positions2 = findall(==(index_id), mc2.index_ids)
-    ##     positions = intersect(positions1, positions2)
+    ## if empty, skip the work
+    if isempty(mc1.scores) || isempty(mc2.scores)
+        return MultiCandidateChunks(;
+            index_ids = Symbol[], positions = TP1[], scores = TD1[])
+    end
 
-    ##     scores = zeros(TD1, length(positions))
-    ##     for i in eachindex(positions)
-    ##         pos = positions[i]
-    ##         scores[i] = max(mc1.scores[positions1[i]], mc2.scores[positions2[i]])
-    ##     end
-    ## end
+    keep_indexes = intersect(mc1.index_ids, mc2.index_ids)
+    keep_positions = intersect(mc1.positions, mc2.positions)
+    keep_candidates1 = falses(length(mc1.positions))
+    visited_candidates1 = Set{Tuple{Symbol, Int}}()
+    sizehint!(visited_candidates1, length(mc1.positions))
+    # Load up the scores from first candidates as a starting point
+    scores1 = Dict(id => Dict(pos => score
+                   for (pos, score, id_) in zip(mc1.positions, mc1.scores, mc1.index_ids)
+                   if id_ == id)
+    for id in keep_indexes)
 
-    ## scores = if !isempty(mc1.scores) && !isempty(mc2.scores)
-    ##     valid_scores = fill(TD1(-1), length(positions))
-    ##     # scan the first MultiCandidateChunks
-    ##     for i in eachindex(mc1.positions, mc1.scores)
-    ##         pos = mc1.positions[i]
-    ##         idx = findfirst(==(pos), positions)
-    ##         if !isnothing(idx)
-    ##             valid_scores[idx] = max(valid_scores[idx], mc1.scores[i])
-    ##         end
-    ##     end
-    ##     # scan the second MultiCandidateChunks
-    ##     for i in eachindex(mc2.positions, mc2.scores)
-    ##         pos = mc2.positions[i]
-    ##         idx = findfirst(==(pos), positions)
-    ##         if !isnothing(idx)
-    ##             valid_scores[idx] = max(valid_scores[idx], mc2.scores[i])
-    ##         end
-    ##     end
-    ##     valid_scores
-    ## else
-    ##     TD1[]
-    ## end
-    ## ## Sort by maximum similarity
-    ## if !isempty(scores)
-    ##     sorted_idxs = sortperm(scores, rev = true)
-    ##     positions = positions[sorted_idxs]
-    ##     scores = scores[sorted_idxs]
-    ## end
+    ## Iterate through the candidates
+    for i in eachindex(mc1.positions, mc1.index_ids, mc1.scores)
+        pos, score, id = mc1.positions[i], mc1.scores[i], mc1.index_ids[i]
+        if id in keep_indexes && pos in keep_positions
+            ## check the other index manually only if it's a high chance it's a match
+            for j in eachindex(mc2.positions, mc2.index_ids, mc2.scores)
+                if mc2.index_ids[j] == id && mc2.positions[j] == pos
+                    if (id, pos) ∉ visited_candidates1
+                        # keep this item
+                        keep_candidates1[i] = true
+                        # remember not to save it again, that way we know `keep_candidates1` will return unique items
+                        push!(visited_candidates1, (id, pos))
+                    end
+                    # always save the highest score (from the tracker, current score, or candidates2)
+                    scores1[id][pos] = max(max(scores1[id][pos], score), mc2.scores[j])
+                end
+            end
+        end
+    end
 
-    ## MultiCandidateChunks(index_ids, positions, scores)
+    ## Build the matching items
+    index_ids = @view(mc1.index_ids[keep_candidates1])
+    positions = @view(mc1.positions[keep_candidates1])
+    scores = TD1[scores1[id][pos] for (id, pos) in zip(index_ids, positions)]
+
+    ## Sort by maximum similarity
+    if !isempty(scores)
+        sorted_idxs = sortperm(scores, rev = true)
+        positions = positions[sorted_idxs]
+        index_ids = index_ids[sorted_idxs]
+        scores = scores[sorted_idxs]
+    else
+        ## take as is
+        index_ids = Symbol[]
+        positions = TP1[]
+    end
+
+    return MultiCandidateChunks(index_ids, positions, scores)
 end
 
 function Base.getindex(ci::AbstractDocumentIndex,
@@ -584,13 +594,13 @@ See also: `pprint` (pretty printing), `annotate_support` (for annotating the ans
     final_answer::Union{Nothing, AbstractString} = nothing
     context::Vector{<:AbstractString} = String[]
     sources::Vector{<:AbstractString} = String[]
-    emb_candidates::CandidateChunks = CandidateChunks(
+    emb_candidates::Union{CandidateChunks, MultiCandidateChunks} = CandidateChunks(
         index_id = :NOTINDEX, positions = Int[], scores = Float32[])
-    tag_candidates::Union{Nothing, CandidateChunks} = CandidateChunks(
+    tag_candidates::Union{Nothing, CandidateChunks, MultiCandidateChunks} = CandidateChunks(
         index_id = :NOTINDEX, positions = Int[], scores = Float32[])
-    filtered_candidates::CandidateChunks = CandidateChunks(
+    filtered_candidates::Union{CandidateChunks, MultiCandidateChunks} = CandidateChunks(
         index_id = :NOTINDEX, positions = Int[], scores = Float32[])
-    reranked_candidates::CandidateChunks = CandidateChunks(
+    reranked_candidates::Union{CandidateChunks, MultiCandidateChunks} = CandidateChunks(
         index_id = :NOTINDEX, positions = Int[], scores = Float32[])
     conversations::Dict{Symbol, Vector{<:AbstractMessage}} = Dict{
         Symbol, Vector{<:AbstractMessage}}()
@@ -716,8 +726,9 @@ function StructTypes.constructfrom(::Type{RAGResult}, obj::Union{Dict, JSON3.Obj
     ## Retype where necessary
     for f in [
         :emb_candidates, :tag_candidates, :filtered_candidates, :reranked_candidates]
-        if haskey(obj, f)
-            @info obj[f]
+        if haskey(obj, f) && haskey(obj[f], :index_ids)
+            obj[f] = StructTypes.constructfrom(MultiCandidateChunks, obj[f])
+        elseif haskey(obj, f)
             obj[f] = StructTypes.constructfrom(CandidateChunks, obj[f])
         end
     end
