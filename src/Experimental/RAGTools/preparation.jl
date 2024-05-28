@@ -22,11 +22,32 @@ struct TextChunker <: AbstractChunker end
 
 ### Embedding Types
 """
+    NoEmbedder <: AbstractEmbedder
+
+No-op embedder for `get_embeddings` functions. It returns `nothing`.
+"""
+struct NoEmbedder <: AbstractEmbedder end
+
+"""
     BatchEmbedder <: AbstractEmbedder
 
 Default embedder for `get_embeddings` functions. It passes individual documents to be embedded in chunks to `aiembed`.
 """
 struct BatchEmbedder <: AbstractEmbedder end
+
+"""
+    KeywordsProcessor <: AbstractProcessor
+
+Default keywords processor for `get_keywords` functions. It normalizes the documents, tokenizes them and builds a `DocumentTermMatrix`.
+"""
+struct KeywordsProcessor <: AbstractProcessor end
+
+"""
+    NoProcessor <: AbstractProcessor
+
+No-op processor for `get_keywords` functions. It returns the inputs as is.
+"""
+struct NoProcessor <: AbstractProcessor end
 
 """
     BinaryBatchEmbedder <: AbstractEmbedder
@@ -50,6 +71,7 @@ struct BitPackedBatchEmbedder <: AbstractEmbedder end
 
 EmbedderEltype(::T) where {T} = EmbedderEltype(T)
 EmbedderEltype(::Type{<:AbstractEmbedder}) = Float32
+EmbedderEltype(::Type{NoEmbedder}) = Nothing
 EmbedderEltype(::Type{BinaryBatchEmbedder}) = Bool
 EmbedderEltype(::Type{BitPackedBatchEmbedder}) = UInt64
 
@@ -96,6 +118,19 @@ It uses `TextChunker`, `BatchEmbedder`, and `NoTagger` as default chunker, embed
 @kwdef mutable struct SimpleIndexer <: AbstractIndexBuilder
     chunker::AbstractChunker = TextChunker()
     embedder::AbstractEmbedder = BatchEmbedder()
+    tagger::AbstractTagger = NoTagger()
+end
+
+"""
+    KeywordsIndexer <: AbstractIndexBuilder
+
+Keyword-based index (BM25) to be returned by `build_index`.
+
+It uses `TextChunker`, `KeywordsProcessor`, and `NoTagger` as default chunker, processor, and tagger.
+"""
+@kwdef mutable struct KeywordsIndexer <: AbstractIndexBuilder
+    chunker::AbstractChunker = TextChunker()
+    processor::AbstractProcessor = KeywordsProcessor()
     tagger::AbstractTagger = NoTagger()
 end
 
@@ -187,6 +222,11 @@ function get_embeddings(
     throw(ArgumentError("Not implemented for embedder $(typeof(embedder))"))
 end
 
+function get_embeddings(
+        embedder::NoEmbedder, docs::AbstractVector{<:AbstractString}; kwargs...)
+    return nothing
+end
+
 """
     get_embeddings(embedder::BatchEmbedder, docs::AbstractVector{<:AbstractString};
         verbose::Bool = true,
@@ -270,7 +310,7 @@ end
         verbose::Bool = true,
         model::AbstractString = PT.MODEL_EMBEDDING,
         truncate_dimension::Union{Int, Nothing} = nothing,
-        return_type::Type = BitMatrix,
+        return_type::Type = Matrix{Bool},
         cost_tracker = Threads.Atomic{Float64}(0.0),
         target_batch_size_length::Int = 80_000,
         ntasks::Int = 4 * Threads.nthreads(),
@@ -292,7 +332,7 @@ Embeds a vector of `docs` using the provided model (kwarg `model`) in a batched 
 - `verbose`: A boolean flag for verbose output. Default is `true`.
 - `model`: The model to use for embedding. Default is `PT.MODEL_EMBEDDING`.
 - `truncate_dimension`: The dimensionality of the embeddings to truncate to. Default is `nothing`.
-- `return_type`: The type of the returned embeddings matrix. Default is `BitMatrix`. Choose `BitMatrix` to minimize storage requirements, `Matrix{Bool}` to maximize performance in elementwise-ops.
+- `return_type`: The type of the returned embeddings matrix. Default is `Matrix{Bool}`. Choose `BitMatrix` to minimize storage requirements, `Matrix{Bool}` to maximize performance in elementwise-ops.
 - `cost_tracker`: A `Threads.Atomic{Float64}` object to track the total cost of the API calls. Useful to pass the total cost to the parent call.
 - `target_batch_size_length`: The target length (in characters) of each batch of document chunks sent for embedding. Default is 80_000 characters. Speeds up embedding process.
 - `ntasks`: The number of tasks to use for asyncmap. Default is 4 * Threads.nthreads().
@@ -303,15 +343,15 @@ function get_embeddings(
         verbose::Bool = true,
         model::AbstractString = PT.MODEL_EMBEDDING,
         truncate_dimension::Union{Int, Nothing} = nothing,
-        return_type::Type = BitMatrix,
+        return_type::Type = Matrix{Bool},
         cost_tracker = Threads.Atomic{Float64}(0.0),
         target_batch_size_length::Int = 80_000,
         ntasks::Int = 4 * Threads.nthreads(),
         kwargs...)
     emb = get_embeddings(BatchEmbedder(), docs; verbose, model, truncate_dimension,
         cost_tracker, target_batch_size_length, ntasks, kwargs...)
-    # This will return BitMatrix to save space, for best performance use Matrix{Bool}, eg, map(>(0),emb)
-    emb = (emb .> 0) |> x -> x isa return_type ? x : return_type(x)
+    # This will return Matrix{Bool}, eg, map(>(0),emb)
+    emb = map(>(0), emb) |> x -> x isa return_type ? x : return_type(x)
 end
 
 """
@@ -362,6 +402,33 @@ function get_embeddings(
     # This will return Matrix{UInt64} to save space
     # Use unpack_bits to convert back to BitMatrix
     pack_bits(emb .> 0)
+end
+### Keywords Processing (for BM25)
+
+## Supporting functions defined in RAGToolsExperimentalExt.jl because they require SparseArrays
+function document_term_matrix(documents)
+    throw(ArgumentError("You need to also import LinearAlgebra, Unicode, and SparseArrays to use this function"))
+end
+
+function bm25(dtm, query; kwargs...)
+    throw(ArgumentError("You need to also import LinearAlgebra, Unicode, and SparseArrays to use this function"))
+end
+
+function get_keywords(processor::AbstractProcessor, docs::AbstractVector{<:AbstractString};
+        verbose::Bool = true,
+        kwargs...)
+    ext = Base.get_extension(PromptingTools, :SnowballPromptingToolsExt)
+    if processor isa KeywordsProcessor && isnothing(ext)
+        throw(ArgumentError("You need to also import Snowball.jl to use this function"))
+    else
+        throw(ArgumentError("Not implemented for processor $(typeof(processor))."))
+    end
+end
+
+function get_keywords(processor::NoProcessor, docs::AbstractVector{<:AbstractString};
+        verbose::Bool = true,
+        kwargs...)
+    docs
 end
 
 ### Tag Extraction
@@ -481,7 +548,7 @@ end
         indexer::AbstractIndexBuilder, files_or_docs::Vector{<:AbstractString};
         verbose::Integer = 1,
         extras::Union{Nothing, AbstractVector} = nothing,
-        index_id = gensym("ChunkIndex"),
+        index_id = gensym("ChunkEmbeddingsIndex"),
         chunker::AbstractChunker = indexer.chunker,
         chunker_kwargs::NamedTuple = NamedTuple(),
         embedder::AbstractEmbedder = indexer.embedder,
@@ -520,9 +587,9 @@ Define your own methods via `indexer` and its subcomponents (`chunker`, `embedde
 - `cost_tracker`: A `Threads.Atomic{Float64}` object to track the total cost of the API calls. Useful to pass the total cost to the parent call.
 
 # Returns
-- `ChunkIndex`: An object containing the compiled index of chunks, embeddings, tags, vocabulary, and sources.
+- `ChunkEmbeddingsIndex`: An object containing the compiled index of chunks, embeddings, tags, vocabulary, and sources.
 
-See also: `ChunkIndex`, `get_chunks`, `get_embeddings`, `get_tags`, `CandidateChunks`, `find_closest`, `find_tags`, `rerank`, `retrieve`, `generate!`, `airag`
+See also: `ChunkEmbeddingsIndex`, `get_chunks`, `get_embeddings`, `get_tags`, `CandidateChunks`, `find_closest`, `find_tags`, `rerank`, `retrieve`, `generate!`, `airag`
 
 # Examples
 ```julia
@@ -547,7 +614,7 @@ function build_index(
         indexer::AbstractIndexBuilder, files_or_docs::Vector{<:AbstractString};
         verbose::Integer = 1,
         extras::Union{Nothing, AbstractVector} = nothing,
-        index_id = gensym("ChunkIndex"),
+        index_id = gensym("ChunkEmbeddingsIndex"),
         chunker::AbstractChunker = indexer.chunker,
         chunker_kwargs::NamedTuple = NamedTuple(),
         embedder::AbstractEmbedder = indexer.embedder,
@@ -577,9 +644,103 @@ function build_index(
 
     (verbose > 0) && @info "Index built! (cost: \$$(round(cost_tracker[], digits=3)))"
 
-    index = ChunkIndex(; id = index_id, embeddings, tags, tags_vocab,
+    index = ChunkEmbeddingsIndex(; id = index_id, embeddings, tags, tags_vocab,
         chunks, sources, extras)
     return index
+end
+
+"""
+    build_index(
+        indexer::KeywordsIndexer, files_or_docs::Vector{<:AbstractString};
+        verbose::Integer = 1,
+        extras::Union{Nothing, AbstractVector} = nothing,
+        index_id = gensym("ChunkKeywordsIndex"),
+        chunker::AbstractChunker = indexer.chunker,
+        chunker_kwargs::NamedTuple = NamedTuple(),
+        processor::AbstractProcessor = indexer.processor,
+        processor_kwargs::NamedTuple = NamedTuple(),
+        tagger::AbstractTagger = indexer.tagger,
+        tagger_kwargs::NamedTuple = NamedTuple(),
+        api_kwargs::NamedTuple = NamedTuple(),
+        cost_tracker = Threads.Atomic{Float64}(0.0))
+
+Builds a `ChunkKeywordsIndex` from the provided files or documents to support keyword-based search (BM25).
+"""
+function build_index(
+        indexer::KeywordsIndexer, files_or_docs::Vector{<:AbstractString};
+        verbose::Integer = 1,
+        extras::Union{Nothing, AbstractVector} = nothing,
+        index_id = gensym("ChunkKeywordsIndex"),
+        chunker::AbstractChunker = indexer.chunker,
+        chunker_kwargs::NamedTuple = NamedTuple(),
+        processor::AbstractProcessor = indexer.processor,
+        processor_kwargs::NamedTuple = NamedTuple(),
+        tagger::AbstractTagger = indexer.tagger,
+        tagger_kwargs::NamedTuple = NamedTuple(),
+        api_kwargs::NamedTuple = NamedTuple(),
+        cost_tracker = Threads.Atomic{Float64}(0.0))
+
+    ## Split into chunks
+    chunks, sources = get_chunks(chunker, files_or_docs;
+        chunker_kwargs...)
+
+    ## Tokenize and DTM
+    dtm = get_keywords(processor, chunks;
+        verbose = (verbose > 1),
+        cost_tracker,
+        api_kwargs, processor_kwargs...)
+
+    ## Extract tags
+    tags_extracted = get_tags(tagger, chunks;
+        verbose = (verbose > 1),
+        cost_tracker,
+        api_kwargs, tagger_kwargs...)
+    # Build the sparse matrix and the vocabulary
+    tags, tags_vocab = build_tags(tagger, tags_extracted)
+
+    (verbose > 0) && @info "Index built! (cost: \$$(round(cost_tracker[], digits=3)))"
+
+    index = ChunkKeywordsIndex(; id = index_id, chunkdata = dtm, tags, tags_vocab,
+        chunks, sources, extras)
+    return index
+end
+
+# Convenience for easy index creation
+"""
+    ChunkKeywordsIndex(
+        [processor::AbstractProcessor=KeywordsProcessor(),] index::ChunkEmbeddingsIndex; verbose::Int = 1,
+        index_id = gensym("ChunkKeywordsIndex"), processor_kwargs...)
+
+Convenience method to quickly create a `ChunkKeywordsIndex` from an existing `ChunkEmbeddingsIndex`.
+
+# Example
+```julia
+
+# Let's assume we have a standard embeddings-based index
+index = build_index(SimpleIndexer(), texts; chunker_kwargs = (; max_length=10))
+
+# Creating an additional index for keyword-based search (BM25), is as simple as
+index_keywords = ChunkKeywordsIndex(index)
+
+# We can immediately create a MultiIndex (a hybrid index holding both indices)
+multi_index = MultiIndex([index, index_keywords])
+
+```
+"""
+function ChunkKeywordsIndex(
+        processor::AbstractProcessor, index::ChunkEmbeddingsIndex; verbose::Int = 1,
+        index_id = gensym("ChunkKeywordsIndex"), processor_kwargs...)
+    dtm = get_keywords(processor, chunks(index);
+        verbose = (verbose > 1),
+        processor_kwargs...)
+
+    (verbose > 0) && @info "Index built!"
+    ChunkKeywordsIndex(index_id,
+        chunks(index), dtm, tags(index), tags_vocab(index), sources(index), extras(index))
+end
+function ChunkKeywordsIndex(
+        index::ChunkEmbeddingsIndex; kwargs...)
+    ChunkKeywordsIndex(KeywordsProcessor(), index; kwargs...)
 end
 
 # Default dispatch

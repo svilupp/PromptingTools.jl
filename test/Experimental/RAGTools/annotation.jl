@@ -5,7 +5,8 @@ using PromptingTools.Experimental.RAGTools: AnnotatedNode, AbstractAnnotater,
                                             HTMLStyler,
                                             pprint, print_html
 using PromptingTools.Experimental.RAGTools: trigram_support!, add_node_metadata!,
-                                            annotate_support, RAGResult, text_to_trigrams
+                                            annotate_support, RAGResult, text_to_trigrams,
+                                            print_tree
 
 @testset "AnnotatedNode" begin
     # Test node creation with default values
@@ -282,8 +283,8 @@ end
     # Test annotating an answer that partially matches the context
     answer = "This is a test answer. It has multiple sentences."
     annotated_root = annotate_support(annotater, answer, context)
-    @test length(annotated_root.children) == 3 # One for each sentence + metadata
-    @test annotated_root.score≈0.42 atol=0.01
+    @test length(annotated_root.children) == 4 # One for each sentence + 2x metadata
+    @test annotated_root.score≈0.483 atol=0.01
     io = IOBuffer()
     pprint(io, annotated_root)
     output = String(take!(io))
@@ -395,7 +396,7 @@ end
 
     # print the HTML
     str = print_html(parent_node)
-    expected_output = "<div>This is a test <span style=\"color:magenta\">answer</span>. <span style=\"color:magenta\">It</span> has <span style=\"color:magenta\">multiple</span> <span style=\"color:blue\">sentences</span>.</div>"
+    expected_output = "<div>This is a test <span style=\"color:magenta\">answer</span>. It has <span style=\"color:magenta\">multiple</span> <span style=\"color:blue\">sentences</span>.</div>"
     @test str == expected_output
     # Test RAGResult overload
     rag = RAGResult(; context, final_answer = answer, question = "")
