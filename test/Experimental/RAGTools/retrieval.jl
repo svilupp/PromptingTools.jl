@@ -9,7 +9,8 @@ using PromptingTools.Experimental.RAGTools: AbstractRephraser, AbstractTagFilter
                                             AbstractSimilarityFinder, AbstractReranker
 using PromptingTools.Experimental.RAGTools: find_closest, hamming_distance, find_tags,
                                             rerank, rephrase,
-                                            retrieve
+                                            retrieve, HasEmbeddings, MultiCandidateChunks,
+                                            CandidateChunks
 using PromptingTools.Experimental.RAGTools: NoReranker, CohereReranker
 using PromptingTools.Experimental.RAGTools: hamming_distance, BitPackedCosineSimilarity,
                                             pack_bits, unpack_bits
@@ -327,6 +328,7 @@ end
 
     # Create MultiFinder instance
     multi_finder = MultiFinder([CosineSimilarity(), CosineSimilarity()])
+    @test length(multi_finder) == 2
 
     # Perform find_closest with MultiFinder
     result = find_closest(multi_finder, multi_index, query_emb; top_k = 2)
@@ -338,7 +340,14 @@ end
     # Check that the positions and scores are sorted correctly
     @test result.scores[1] >= result.scores[2]
 
+    ## Get all results
     result = find_closest(multi_finder, multi_index, query_emb; top_k = 20)
+    @test length(result.index_ids) == 4
+    @test length(result.positions) == 4
+    @test length(result.scores) == 4
+
+    # Broadcast uni-finder without multi-finder
+    result = find_closest(CosineSimilarity(), multi_index, query_emb; top_k = 20)
     @test length(result.index_ids) == 4
     @test length(result.positions) == 4
     @test length(result.scores) == 4
@@ -400,6 +409,7 @@ end
     test_tags_vocab = ["julia", "python", "jr"]
     test_tags_matrix = sparse([1, 2], [1, 3], [true, true], 2, 3)
     index = ChunkIndex(;
+        id = :indexX,
         sources = [".", "."],
         chunks = ["julia", "jr"],
         embeddings = test_embeddings,
@@ -435,7 +445,6 @@ end
     @test_throws ArgumentError find_tags(RandomTagFilter123(), index, ["hello"])
 
     ## Multi-index implementation
-    # TODO: add AnyTag
     emb1 = [0.1 0.2; 0.3 0.4; 0.5 0.6] |> x -> mapreduce(normalize, hcat, eachcol(x))
     index1 = ChunkEmbeddingsIndex(id = :index1, chunks = ["chunk1", "chunk2"],
         embeddings = emb1, sources = ["source1", "source2"])
@@ -453,6 +462,22 @@ end
     mcc = find_tags(NoTagFilter(), multi_index, nothing)
     @test mcc.positions == [1, 2, 3, 4]
     @test mcc.scores == [0.0, 0.0, 0.0, 0.0]
+
+    multi_index2 = MultiIndex(id = :multi2, indexes = [index, index2])
+    mcc2 = find_tags(AnyTagFilter(), multi_index2, "julia")
+    @test mcc2.index_ids == [:indexX]
+    @test mcc2.positions == [1]
+    @test mcc2.scores == [1.0]
+
+    mcc3 = find_tags(AnyTagFilter(), multi_index2, ["julia", "python", "jr"])
+    @test mcc3.index_ids == [:indexX, :indexX]
+    @test mcc3.positions == [1, 2]
+    @test mcc3.scores == [1.0, 1.0]
+
+    mcc4 = find_tags(AnyTagFilter(), multi_index2, [r"^j"])
+    @test mcc4.index_ids == [:indexX, :indexX]
+    @test mcc4.positions == [1, 2]
+    @test mcc4.scores == [1.0, 1.0]
 end
 
 @testset "rerank" begin
@@ -631,6 +656,7 @@ end
 
     # Create MultiFinder instance
     finder = MultiFinder([RT.CosineSimilarity(), RT.BM25Similarity()])
+
     retriever = SimpleRetriever(; processor = RT.KeywordsProcessor(), finder)
     result = retrieve(retriever, multi_index, question;
         reranker = NoReranker(), # we need to disable cohere as we cannot test it

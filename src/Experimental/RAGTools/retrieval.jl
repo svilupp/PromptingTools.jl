@@ -451,27 +451,6 @@ function find_closest(
     return positions, bm_scores[positions]
 end
 
-## TODO: Implement for MultiIndex
-## function find_closest(index::AbstractMultiIndex,
-##         query_emb::AbstractVector{<:Real};
-##         top_k::Int = 100, minimum_similarity::AbstractFloat = -1.0)
-##     all_candidates = CandidateChunks[]
-##     for idxs in indexes(index)
-##         candidates = find_closest(idxs, query_emb;
-##             top_k,
-##             minimum_similarity)
-##         if !isempty(candidates.positions)
-##             push!(all_candidates, candidates)
-##         end
-##     end
-##     ## build vector of all distances and pick top_k
-##     all_distances = mapreduce(x -> x.distances, vcat, all_candidates)
-##     top_k_order = all_distances |> sortperm |> x -> last(x, top_k)
-##     return CandidateChunks(index.id,
-##         all_candidates[top_k_order],
-##         all_distances[top_k_order])
-## end
-
 ### TAG Filtering
 
 function find_tags(::AbstractTagFilter, index::AbstractDocumentIndex,
@@ -532,26 +511,29 @@ function find_tags(method::NoTagFilter, index::AbstractChunkIndex,
 end
 
 ## Multi-index implementation
-# TODO: finish find_tags with AnyTagFilter
-
 function find_tags(method::AnyTagFilter, index::AbstractMultiIndex,
-        tag::Union{AbstractString, Regex}; kwargs...)
+        tag::Union{T, AbstractVector{<:T}}; kwargs...) where {T <:
+                                                              Union{AbstractString, Regex}}
     all_indexes = indexes(index)
-    all(isnothing(chunkdata(index)) for index in all_indexes) &&
+    all(isnothing(tags(index)) for index in all_indexes) &&
         return MultiCandidateChunks(; index_ids = Symbol[])
 
-    # Not finished - throw an error
-    throw(ArgumentError("Not implemented yet for type $(typeof(filter)) and index $(typeof(index))"))
-    ## tag_idx = if tag isa AbstractString
-    ##     findall(tags_vocab(index) .== tag)
-    ## else # assume it's a regex
-    ##     findall(occursin.(tag, tags_vocab(index)))
-    ## end
-    ## # getindex.(x, 1) is to get the first dimension in each CartesianIndex
-    ## match_row_idx = @view(tags(index)[:, tag_idx]) |> findall |>
-    ##                 x -> getindex.(x, 1) |> unique
-    ## return CandidateChunks(index.id, match_row_idx, ones(Float32, length(match_row_idx)))
-    return nothing
+    index_ids = Symbol[]
+    positions = Int[]
+    scores = Float32[]
+    for i in eachindex(all_indexes)
+        if isnothing(tags(all_indexes[i]))
+            continue
+        end
+        cc = find_tags(method, all_indexes[i], tag; kwargs...)
+        if !isempty(cc.positions)
+            append!(index_ids, fill(cc.index_id, length(cc.positions)))
+            append!(positions, cc.positions)
+            append!(scores, cc.scores)
+        end
+    end
+    idxs = sortperm(scores, rev = true)
+    return MultiCandidateChunks(index_ids[idxs], positions[idxs], scores[idxs])
 end
 
 function find_tags(method::NoTagFilter, index::AbstractMultiIndex,
@@ -665,16 +647,17 @@ function rerank(
         kwargs...)
 
     ## Unwrap re-ranked positions
+    index_ids = Vector{Symbol}(undef, length(r.response[:results]))
     positions = Vector{Int}(undef, length(r.response[:results]))
     scores = Vector{Float32}(undef, length(r.response[:results]))
     for i in eachindex(r.response[:results])
         doc = r.response[:results][i]
         positions[i] = candidates.positions[doc[:index] + 1]
         scores[i] = doc[:relevance_score]
-        index_ids = if candidates isa MultiCandidateChunks
+        index_ids[i] = if candidates isa MultiCandidateChunks
             candidates.index_ids[doc[:index] + 1]
         else
-            index.id
+            candidates.index_id
         end
     end
 
@@ -689,11 +672,9 @@ function rerank(
     end
     verbose && @info "Reranking done. $search_units_str"
 
-    index_ids = if candidates isa MultiCandidateChunks
-        MultiCandidateChunks(index_ids, positions, scores)
-    else
-        CandidateChunks(index_ids, positions, scores)
-    end
+    return candidates isa MultiCandidateChunks ?
+           MultiCandidateChunks(index_ids, positions, scores) :
+           CandidateChunks(index_ids, positions, scores)
 end
 
 ### Overall types for `retrieve`
@@ -968,7 +949,7 @@ function retrieve(retriever::AbstractRetriever,
         top_n, verbose = (verbose > 1), cost_tracker, reranker_kwargs_...)
 
     verbose > 0 &&
-        @info "Retrieval done. Identified $(length(reranked_candidates.positions)) chunks, total cost: \$$(cost_tracker[])."
+        @info "Retrieval done. Identified $(length(reranked_candidates.positions)) chunks, total cost: \$$(round(cost_tracker[], digits=2))."
 
     ## Return
     result = RAGResult(;

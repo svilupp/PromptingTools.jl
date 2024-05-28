@@ -8,20 +8,20 @@ struct ContextEnumerator <: AbstractContextBuilder end
 
 """
     build_context(contexter::ContextEnumerator,
-        index::AbstractChunkIndex, candidates::CandidateChunks;
+        index::AbstractDocumentIndex, candidates::AbstractCandidateChunks;
         verbose::Bool = true,
         chunks_window_margin::Tuple{Int, Int} = (1, 1), kwargs...)
 
         build_context!(contexter::ContextEnumerator,
-        index::AbstractChunkIndex, result::AbstractRAGResult; kwargs...)
+        index::AbstractDocumentIndex, result::AbstractRAGResult; kwargs...)
 
 Build context strings for each position in `candidates` considering a window margin around each position.
 If mutating version is used (`build_context!`), it will use `result.reranked_candidates` to update the `result.context` field.
 
 # Arguments
 - `contexter::ContextEnumerator`: The method to use for building the context. Enumerates the snippets.
-- `index::ChunkIndex`: The index containing chunks and sources.
-- `candidates::CandidateChunks`: Candidate chunks which contain positions to extract context from.
+- `index::AbstractDocumentIndex`: The index containing chunks and sources.
+- `candidates::AbstractCandidateChunks`: Candidate chunks which contain positions to extract context from.
 - `verbose::Bool`: If `true`, enables verbose logging.
 - `chunks_window_margin::Tuple{Int, Int}`: A tuple indicating the margin (before, after) around each position to include in the context. 
   Defaults to `(1,1)`, which means 1 preceding and 1 suceeding chunk will be included. With `(0,0)`, only the matching chunks will be included.
@@ -37,7 +37,7 @@ context = build_context(ContextEnumerator(), index, candidates; chunks_window_ma
 ```
 """
 function build_context(contexter::ContextEnumerator,
-        index::AbstractChunkIndex, candidates::CandidateChunks;
+        index::AbstractDocumentIndex, candidates::AbstractCandidateChunks;
         verbose::Bool = true,
         chunks_window_margin::Tuple{Int, Int} = (1, 1), kwargs...)
     ## Checks
@@ -45,24 +45,32 @@ function build_context(contexter::ContextEnumerator,
 
     context = String[]
     for (i, position) in enumerate(candidates.positions)
-        chunks_ = chunks(index)[max(1, position - chunks_window_margin[1]):min(end,
+        ## select the right index
+        id = candidates isa MultiCandidateChunks ? candidates.index_ids[i] :
+             candidates.index_id
+        index_ = index isa AbstractChunkIndex ? index : index[id]
+        isnothing(index_) && continue
+        ##
+        chunks_ = chunks(index_)[
+            max(1, position - chunks_window_margin[1]):min(end,
             position + chunks_window_margin[2])]
         ## Check if surrounding chunks are from the same source
-        is_same_source = sources(index)[max(1, position - chunks_window_margin[1]):min(end,
-            position + chunks_window_margin[2])] .== sources(index)[position]
+        is_same_source = sources(index_)[
+            max(1, position - chunks_window_margin[1]):min(end,
+            position + chunks_window_margin[2])] .== sources(index_)[position]
         push!(context, "$(i). $(join(chunks_[is_same_source], "\n"))")
     end
     return context
 end
 
 function build_context!(contexter::AbstractContextBuilder,
-        index::AbstractChunkIndex, result::AbstractRAGResult; kwargs...)
+        index::AbstractDocumentIndex, result::AbstractRAGResult; kwargs...)
     throw(ArgumentError("Contexter $(typeof(contexter)) not implemented"))
 end
 
 # Mutating version that dispatches on the result to the underlying implementation
 function build_context!(contexter::ContextEnumerator,
-        index::AbstractChunkIndex, result::AbstractRAGResult; kwargs...)
+        index::AbstractDocumentIndex, result::AbstractRAGResult; kwargs...)
     result.context = build_context(contexter, index, result.reranked_candidates; kwargs...)
     return result
 end
@@ -77,14 +85,14 @@ Default method for `answer!` method. Generates an answer using the `aigenerate` 
 struct SimpleAnswerer <: AbstractAnswerer end
 
 function answer!(
-        answerer::AbstractAnswerer, index::AbstractChunkIndex, result::AbstractRAGResult;
+        answerer::AbstractAnswerer, index::AbstractDocumentIndex, result::AbstractRAGResult;
         kwargs...)
     throw(ArgumentError("Answerer $(typeof(answerer)) not implemented"))
 end
 
 """
     answer!(
-        answerer::SimpleAnswerer, index::AbstractChunkIndex, result::AbstractRAGResult;
+        answerer::SimpleAnswerer, index::AbstractDocumentIndex, result::AbstractRAGResult;
         model::AbstractString = PT.MODEL_CHAT, verbose::Bool = true,
         template::Symbol = :RAGAnswerFromContext,
         cost_tracker = Threads.Atomic{Float64}(0.0),
@@ -97,7 +105,7 @@ Generates an answer using the `aigenerate` function with the provided `result.co
 
 # Arguments
 - `answerer::SimpleAnswerer`: The method to use for generating the answer. Uses `aigenerate`.
-- `index::AbstractChunkIndex`: The index containing chunks and sources.
+- `index::AbstractDocumentIndex`: The index containing chunks and sources.
 - `result::AbstractRAGResult`: The result containing the context and question to generate the answer for.
 - `model::AbstractString`: The model to use for generating the answer. Defaults to `PT.MODEL_CHAT`.
 - `verbose::Bool`: If `true`, enables verbose logging.
@@ -106,7 +114,7 @@ Generates an answer using the `aigenerate` function with the provided `result.co
 
 """
 function answer!(
-        answerer::SimpleAnswerer, index::AbstractChunkIndex, result::AbstractRAGResult;
+        answerer::SimpleAnswerer, index::AbstractDocumentIndex, result::AbstractRAGResult;
         model::AbstractString = PT.MODEL_CHAT, verbose::Bool = true,
         template::Symbol = :RAGAnswerFromContext,
         cost_tracker = Threads.Atomic{Float64}(0.0),
@@ -154,7 +162,7 @@ Refines the answer by executing a web search using the Tavily API. This method a
 struct TavilySearchRefiner <: AbstractRefiner end
 
 function refine!(
-        refiner::AbstractRefiner, index::AbstractChunkIndex, result::AbstractRAGResult;
+        refiner::AbstractRefiner, index::AbstractDocumentIndex, result::AbstractRAGResult;
         kwargs...)
     throw(ArgumentError("Refiner $(typeof(refiner)) not implemented"))
 end
@@ -167,7 +175,7 @@ end
 Simple no-op function for `refine`. It simply copies the `result.answer` and `result.conversations[:answer]` without any changes.
 """
 function refine!(
-        refiner::NoRefiner, index::AbstractChunkIndex, result::AbstractRAGResult;
+        refiner::NoRefiner, index::AbstractDocumentIndex, result::AbstractRAGResult;
         kwargs...)
     result.final_answer = result.answer
     if haskey(result.conversations, :answer)
@@ -178,7 +186,7 @@ end
 
 """
     refine!(
-        refiner::SimpleRefiner, index::AbstractChunkIndex, result::AbstractRAGResult;
+        refiner::SimpleRefiner, index::AbstractDocumentIndex, result::AbstractRAGResult;
         verbose::Bool = true,
         model::AbstractString = PT.MODEL_CHAT,
         template::Symbol = :RAGAnswerRefiner,
@@ -194,7 +202,7 @@ This method uses the same context as the original answer, however, it can be mod
 
 # Arguments
 - `refiner::SimpleRefiner`: The method to use for refining the answer. Uses `aigenerate`.
-- `index::AbstractChunkIndex`: The index containing chunks and sources.
+- `index::AbstractDocumentIndex`: The index containing chunks and sources.
 - `result::AbstractRAGResult`: The result containing the context and question to generate the answer for.
 - `model::AbstractString`: The model to use for generating the answer. Defaults to `PT.MODEL_CHAT`.
 - `verbose::Bool`: If `true`, enables verbose logging.
@@ -202,7 +210,7 @@ This method uses the same context as the original answer, however, it can be mod
 - `cost_tracker`: An atomic counter to track the cost of the operation.
 """
 function refine!(
-        refiner::SimpleRefiner, index::AbstractChunkIndex, result::AbstractRAGResult;
+        refiner::SimpleRefiner, index::AbstractDocumentIndex, result::AbstractRAGResult;
         verbose::Bool = true,
         model::AbstractString = PT.MODEL_CHAT,
         template::Symbol = :RAGAnswerRefiner,
@@ -232,7 +240,7 @@ end
 
 """
     refine!(
-        refiner::TavilySearchRefiner, index::AbstractChunkIndex, result::AbstractRAGResult;
+        refiner::TavilySearchRefiner, index::AbstractDocumentIndex, result::AbstractRAGResult;
         verbose::Bool = true,
         model::AbstractString = PT.MODEL_CHAT,
         include_answer::Bool = true,
@@ -253,7 +261,7 @@ Note: The web results and web answer (if requested) will be added to the context
 
 # Arguments
 - `refiner::TavilySearchRefiner`: The method to use for refining the answer. Uses `aigenerate` with a web search template.
-- `index::AbstractChunkIndex`: The index containing chunks and sources.
+- `index::AbstractDocumentIndex`: The index containing chunks and sources.
 - `result::AbstractRAGResult`: The result containing the context and question to generate the answer for.
 - `model::AbstractString`: The model to use for generating the answer. Defaults to `PT.MODEL_CHAT`.
 - `include_answer::Bool`: If `true`, includes the answer from Tavily in the web search.
@@ -280,7 +288,7 @@ pprint(result)
 ```
 """
 function refine!(
-        refiner::TavilySearchRefiner, index::AbstractChunkIndex, result::AbstractRAGResult;
+        refiner::TavilySearchRefiner, index::AbstractDocumentIndex, result::AbstractRAGResult;
         verbose::Bool = true,
         model::AbstractString = PT.MODEL_CHAT,
         include_answer::Bool = true,
@@ -345,13 +353,13 @@ Overload this method to add custom postprocessing steps, eg, logging, saving con
 """
 struct NoPostprocessor <: AbstractPostprocessor end
 
-function postprocess!(postprocessor::AbstractPostprocessor, index::AbstractChunkIndex,
+function postprocess!(postprocessor::AbstractPostprocessor, index::AbstractDocumentIndex,
         result::AbstractRAGResult; kwargs...)
     throw(ArgumentError("Postprocessor $(typeof(postprocessor)) not implemented"))
 end
 
 function postprocess!(
-        ::NoPostprocessor, index::AbstractChunkIndex, result::AbstractRAGResult; kwargs...)
+        ::NoPostprocessor, index::AbstractDocumentIndex, result::AbstractRAGResult; kwargs...)
     return result
 end
 
@@ -386,7 +394,7 @@ end
 
 """
     generate!(
-        generator::AbstractGenerator, index::AbstractChunkIndex, result::AbstractRAGResult;
+        generator::AbstractGenerator, index::AbstractDocumentIndex, result::AbstractRAGResult;
         verbose::Integer = 1,
         api_kwargs::NamedTuple = NamedTuple(),
         contexter::AbstractContextBuilder = generator.contexter,
@@ -416,7 +424,7 @@ Returns the mutated `result` with the `result.final_answer` and the full convers
 
 # Arguments
 - `generator::AbstractGenerator`: The `generator` to use for generating the answer. Can be `SimpleGenerator` or `AdvancedGenerator`.
-- `index::AbstractChunkIndex`: The index containing chunks and sources.
+- `index::AbstractDocumentIndex`: The index containing chunks and sources.
 - `result::AbstractRAGResult`: The result containing the context and question to generate the answer for.
 - `verbose::Integer`: If >0, enables verbose logging.
 - `api_kwargs::NamedTuple`: API parameters that will be forwarded to ALL of the API calls (`aiembed`, `aigenerate`, and `aiextract`).
@@ -451,7 +459,7 @@ result = generate!(index, result)
 ```
 """
 function generate!(
-        generator::AbstractGenerator, index::AbstractChunkIndex, result::AbstractRAGResult;
+        generator::AbstractGenerator, index::AbstractDocumentIndex, result::AbstractRAGResult;
         verbose::Integer = 1,
         api_kwargs::NamedTuple = NamedTuple(),
         contexter::AbstractContextBuilder = generator.contexter,
@@ -494,7 +502,7 @@ end
 
 # Set default behavior
 DEFAULT_GENERATOR = SimpleGenerator()
-function generate!(index::AbstractChunkIndex, result::AbstractRAGResult; kwargs...)
+function generate!(index::AbstractDocumentIndex, result::AbstractRAGResult; kwargs...)
     return generate!(DEFAULT_GENERATOR, index, result; kwargs...)
 end
 
@@ -514,7 +522,7 @@ To customize the components, replace corresponding fields for each step of the R
 end
 
 """
-    airag(cfg::AbstractRAGConfig, index::AbstractChunkIndex;
+    airag(cfg::AbstractRAGConfig, index::AbstractDocumentIndex;
         question::AbstractString,
         verbose::Integer = 1, return_all::Bool = false,
         api_kwargs::NamedTuple = NamedTuple(),
@@ -533,7 +541,7 @@ Eg, use `subtypes(AbstractRetriever)` to find the available options.
 
 # Arguments
 - `cfg::AbstractRAGConfig`: The configuration for the RAG pipeline. Defaults to `RAGConfig()`, where you can swap sub-types to customize the pipeline.
-- `index::AbstractChunkIndex`: The chunk index to search for relevant text.
+- `index::AbstractDocumentIndex`: The chunk index to search for relevant text.
 - `question::AbstractString`: The question to be answered.
 - `return_all::Bool`: If `true`, returns the details used for RAG along with the response.
 - `verbose::Integer`: If `>0`, enables verbose logging. The higher the number, the more nested functions will log.
@@ -559,7 +567,7 @@ Eg, use `subtypes(AbstractRetriever)` to find the available options.
 - If `return_all` is `false`, returns the generated message (`msg`).
 - If `return_all` is `true`, returns the detail of the full pipeline in `RAGResult` (see the docs).
 
-See also `build_index`, `retrieve`, `generate!`, `RAGResult`, `getpropertynested`, `setpropertynested`, `merge_kwargs_nested`.
+See also `build_index`, `retrieve`, `generate!`, `RAGResult`, `getpropertynested`, `setpropertynested`, `merge_kwargs_nested`, `ChunkKeywordsIndex`.
 
 # Examples
 
@@ -612,9 +620,32 @@ kwargs = (
 result = airag(cfg, index, question; kwargs...)
 ```
 
+If you want to use hybrid retrieval (embeddings + BM25), you can easily create an additional index based on keywords
+ and pass them both into a `MultiIndex`. 
+ 
+You need to provide an explicit config, so the pipeline knows how to handle each index in the search similarity phase (`finder`).
+
+```julia
+index = # your existing index
+
+# create the multi-index with the keywords index
+index_keywords = ChunkKeywordsIndex(index)
+multi_index = MultiIndex([index, index_keywords])
+
+# define the similarity measures for the indices that you have (same order)
+finder = RT.MultiFinder([RT.CosineSimilarity(), RT.BM25Similarity()])
+cfg = RAGConfig(; retriever=AdvancedRetriever(; processor=RT.KeywordsProcessor(), finder))
+
+# Run the pipeline with the new hybrid retrieval (return the `RAGResult` to see the details)
+result = airag(cfg, multi_index; question, return_all=true)
+
+# Pretty-print the result
+PT.pprint(result)
+```
+
 For easier manipulation of nested kwargs, see utilities `getpropertynested`, `setpropertynested`, `merge_kwargs_nested`.
 """
-function airag(cfg::AbstractRAGConfig, index::AbstractChunkIndex;
+function airag(cfg::AbstractRAGConfig, index::AbstractDocumentIndex;
         question::AbstractString,
         verbose::Integer = 1, return_all::Bool = false,
         api_kwargs::NamedTuple = NamedTuple(),
@@ -656,7 +687,7 @@ end
 
 # Default behavior
 const DEFAULT_RAG_CONFIG = RAGConfig()
-function airag(index::AbstractChunkIndex; question::AbstractString, kwargs...)
+function airag(index::AbstractDocumentIndex; question::AbstractString, kwargs...)
     return airag(DEFAULT_RAG_CONFIG, index; question, kwargs...)
 end
 
