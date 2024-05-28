@@ -1,26 +1,26 @@
 using PromptingTools.Experimental.RAGTools: _check_aiextract_capability,
-                                            merge_labeled_matrices
+                                            vcat_labeled_matrices, hcat_labeled_matrices
 using PromptingTools.Experimental.RAGTools: tokenize, trigrams, trigrams_hashed
 using PromptingTools.Experimental.RAGTools: token_with_boundaries, text_to_trigrams,
                                             text_to_trigrams_hashed
 using PromptingTools.Experimental.RAGTools: split_into_code_and_sentences
 using PromptingTools.Experimental.RAGTools: getpropertynested, setpropertynested,
                                             merge_kwargs_nested
-using PromptingTools.Experimental.RAGTools: pack_bits, unpack_bits
+using PromptingTools.Experimental.RAGTools: pack_bits, unpack_bits, preprocess_tokens
 
 @testset "_check_aiextract_capability" begin
     @test _check_aiextract_capability("gpt-3.5-turbo") == nothing
     @test_throws AssertionError _check_aiextract_capability("llama2")
 end
 
-@testset "merge_labeled_matrices" begin
+@testset "vcat_labeled_matrices" begin
     # Test with dense matrices and overlapping vocabulary
     mat1 = [1 2; 3 4]
     vocab1 = ["word1", "word2"]
     mat2 = [5 6; 7 8]
     vocab2 = ["word2", "word3"]
 
-    merged_mat, combined_vocab = merge_labeled_matrices(mat1, vocab1, mat2, vocab2)
+    merged_mat, combined_vocab = vcat_labeled_matrices(mat1, vocab1, mat2, vocab2)
 
     @test size(merged_mat) == (4, 3)
     @test combined_vocab == ["word1", "word2", "word3"]
@@ -32,7 +32,7 @@ end
     mat2 = sparse([3 0; 0 4])
     vocab2 = ["word3", "word4"]
 
-    merged_mat, combined_vocab = merge_labeled_matrices(mat1, vocab1, mat2, vocab2)
+    merged_mat, combined_vocab = vcat_labeled_matrices(mat1, vocab1, mat2, vocab2)
 
     @test size(merged_mat) == (4, 4)
     @test combined_vocab == ["word1", "word2", "word3", "word4"]
@@ -44,12 +44,51 @@ end
     mat2 = [5 6; 7 8]
     vocab2 = ["word2", "word3"]
 
-    merged_mat, combined_vocab = merge_labeled_matrices(mat1, vocab1, mat2, vocab2)
+    merged_mat, combined_vocab = vcat_labeled_matrices(mat1, vocab1, mat2, vocab2)
 
     @test eltype(merged_mat) == Float64
     @test size(merged_mat) == (4, 3)
     @test combined_vocab == ["word1", "word2", "word3"]
     @test merged_mat ≈ [1.0 2.0 0.0; 3.0 4.0 0.0; 0.0 5.0 6.0; 0.0 7.0 8.0]
+end
+
+@testset "hcat_labeled_matrices" begin
+    # Test with dense matrices and overlapping vocabulary
+    mat1 = [1 2; 3 4]
+    vocab1 = ["word1", "word2"]
+    mat2 = [5 6; 7 8]
+    vocab2 = ["word2", "word3"]
+
+    merged_mat, combined_vocab = hcat_labeled_matrices(mat1, vocab1, mat2, vocab2)
+
+    @test size(merged_mat) == (3, 4)
+    @test combined_vocab == ["word1", "word2", "word3"]
+    @test merged_mat == [1 2 0 0; 3 4 5 6; 0 0 7 8]
+
+    # Test with sparse matrices and disjoint vocabulary
+    mat1 = sparse([1 0; 0 2])
+    vocab1 = ["word1", "word2"]
+    mat2 = sparse([3 0; 0 4])
+    vocab2 = ["word3", "word4"]
+
+    merged_mat, combined_vocab = hcat_labeled_matrices(mat1, vocab1, mat2, vocab2)
+
+    @test size(merged_mat) == (4, 4)
+    @test combined_vocab == ["word1", "word2", "word3", "word4"]
+    @test merged_mat == sparse([1 0 0 0; 0 2 0 0; 0 0 3 0; 0 0 0 4])
+
+    # Test with different data types
+    mat1 = [1.0 2.0; 3.0 4.0]
+    vocab1 = ["word1", "word2"]
+    mat2 = [5 6; 7 8]
+    vocab2 = ["word2", "word3"]
+
+    merged_mat, combined_vocab = hcat_labeled_matrices(mat1, vocab1, mat2, vocab2)
+
+    @test eltype(merged_mat) == Float64
+    @test size(merged_mat) == (3, 4)
+    @test combined_vocab == ["word1", "word2", "word3"]
+    @test merged_mat ≈ [1.0 2.0 0.0 0.0; 3.0 4.0 5.0 6.0; 0.0 0.0 7.0 8.0]
 end
 
 ### Text-manipulation utilities
@@ -441,4 +480,71 @@ end
     # Wrong number type
     @test_throws ArgumentError pack_bits(rand(Float32, 128, 10))
     @test_throws ArgumentError unpack_bits(rand(Float32, 128, 10))
+end
+
+@testset "preprocess_tokens" begin
+    stemmer = Snowball.Stemmer("english")
+    stopwords = Set([
+        "a", "an", "and", "are", "as", "at", "be", "but", "by", "for", "if", "in",
+        "into", "is", "it", "no", "not", "of", "on", "or", "such", "some", "that", "the",
+        "their", "then", "there", "these", "they", "this", "to", "was", "will", "with"])
+    # Empty string
+    @test preprocess_tokens("") == []
+
+    # Simple case
+    @test preprocess_tokens("This is a test."; stopwords) == ["test"]
+
+    # Case insensitive
+    @test preprocess_tokens("This Is A Test."; stopwords) == ["test"]
+
+    # Punctuation and numbers
+    @test preprocess_tokens(
+        "This is a test, with punctuation and 123 numbers!", stemmer; stopwords) ==
+          ["test", "punctuat", "number"]
+
+    # Unicode and accents
+    @test preprocess_tokens(
+        "Thís is à tést wîth Ünïcôdë and áccênts.", stemmer; stopwords) ==
+          ["test", "unicod", "accent"]
+
+    # Multiple spaces
+    @test preprocess_tokens(
+        "This  is a   test with   multiple    spaces.", stemmer; stopwords) ==
+          ["test", "multipl", "space"]
+
+    # Stopwords
+    @test preprocess_tokens(
+        "This is a test with some stopwords like the and is.", stemmer; stopwords) ==
+          ["test", "stopword", "like"]
+
+    # Stemming
+    @test preprocess_tokens(
+        "This is a test with some words for stemming like testing and tested.",
+        stemmer; stopwords) == ["test", "word", "stem", "like", "test", "test"]
+
+    # Long text
+    long_text = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed euismod, nulla sit amet aliquam lacinia, nisl nisl aliquam nisl, nec aliquam nisl nisl sit amet nisl. Sed euismod, nulla sit amet aliquam lacinia, nisl nisl aliquam nisl, nec aliquam nisl nisl sit amet nisl. Sed euismod, nulla sit amet aliquam lacinia, nisl nisl aliquam nisl, nec aliquam nisl nisl sit amet nisl."
+    @test preprocess_tokens(long_text, stemmer; stopwords) ==
+          ["lorem", "ipsum", "dolor", "sit", "amet", "consectetur", "adipisc", "elit",
+        "sed", "euismod", "nulla", "sit", "amet", "aliquam", "lacinia", "nisl", "nisl",
+        "aliquam", "nisl", "nec", "aliquam", "nisl", "nisl", "sit", "amet", "nisl",
+        "sed", "euismod", "nulla", "sit", "amet", "aliquam", "lacinia", "nisl", "nisl",
+        "aliquam", "nisl", "nec", "aliquam", "nisl", "nisl", "sit", "amet", "nisl",
+        "sed", "euismod", "nulla", "sit", "amet", "aliquam", "lacinia", "nisl", "nisl",
+        "aliquam", "nisl", "nec", "aliquam", "nisl", "nisl", "sit", "amet", "nisl"]
+
+    # Edge case: non-English text
+    @test preprocess_tokens("Ceci n'est pas une pipe.", stemmer; stopwords) ==
+          ["ceci", "est", "pas", "une", "pipe"]
+
+    # Vector of inputs
+    @test preprocess_tokens(
+        ["This is a test, with punctuation and 123 numbers!",
+            "This is a test, with punctuation and 123 numbers!"],
+        stemmer;
+        stopwords) == [["test", "punctuat", "number"], ["test", "punctuat", "number"]]
+
+    # Check stubs that they throw
+    @test_throws ArgumentError RT._stem(nothing, "abc")
+    @test_throws ArgumentError RT._unicode_normalize(nothing)
 end

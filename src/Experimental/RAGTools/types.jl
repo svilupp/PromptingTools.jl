@@ -1,11 +1,62 @@
 
 # More advanced index would be: HybridChunkIndex
 
+### Shared methods
+chunkdata(index::AbstractChunkIndex) = index.chunkdata
+function embeddings(index::AbstractChunkIndex)
+    throw(ArgumentError("`embeddings` not implemented for $(typeof(index))"))
+end
+HasEmbeddings(::AbstractChunkIndex) = false
+HasKeywords(::AbstractChunkIndex) = false
+chunks(index::AbstractChunkIndex) = index.chunks
+tags(index::AbstractChunkIndex) = index.tags
+tags_vocab(index::AbstractChunkIndex) = index.tags_vocab
+sources(index::AbstractChunkIndex) = index.sources
+extras(index::AbstractChunkIndex) = index.extras
+
+Base.var"=="(i1::AbstractChunkIndex, i2::AbstractChunkIndex) = false
+function Base.var"=="(i1::T, i2::T) where {T <: AbstractChunkIndex}
+    ((sources(i1) == sources(i2)) && (tags_vocab(i1) == tags_vocab(i2)) &&
+     (chunkdata(i1) == chunkdata(i2)) && (chunks(i1) == chunks(i2)) &&
+     (tags(i1) == tags(i2)) && (extras(i1) == extras(i2)))
+end
+
+function Base.vcat(i1::AbstractDocumentIndex, i2::AbstractDocumentIndex)
+    throw(ArgumentError("Not implemented"))
+end
+function Base.vcat(i1::AbstractChunkIndex, i2::AbstractChunkIndex)
+    throw(ArgumentError("Not implemented"))
+end
+function Base.vcat(i1::T, i2::T) where {T <: AbstractChunkIndex}
+    tags_, tags_vocab_ = if (isnothing(tags(i1)) || isnothing(tags(i2)))
+        nothing, nothing
+    elseif tags_vocab(i1) == tags_vocab(i2)
+        vcat(tags(i1), tags(i2)), tags_vocab(i1)
+    else
+        vcat_labeled_matrices(tags(i1), tags_vocab(i1), tags(i2), tags_vocab(i2))
+    end
+    chunkdata_ = (isnothing(chunkdata(i1)) || isnothing(chunkdata(i2))) ? nothing :
+                 hcat(chunkdata(i1), chunkdata(i2))
+    extras_ = if isnothing(extras(i1)) || isnothing(extras(i2))
+        nothing
+    else
+        vcat(extras(i1), extras(i2))
+    end
+    T(i1.id, vcat(chunks(i1), chunks(i2)),
+        chunkdata_,
+        tags_,
+        tags_vocab_,
+        vcat(sources(i1), sources(i2)),
+        extras_)
+end
+
 # Stores document chunks and their embeddings
 """
-    ChunkIndex
+    ChunkEmbeddingsIndex
 
 Main struct for storing document chunks and their embeddings. It also stores tags and sources for each chunk.
+
+Previously, this struct was called `ChunkIndex`.
 
 # Fields
 - `id::Symbol`: unique identifier of each index (to ensure we're using the right index with `CandidateChunks`)
@@ -16,13 +67,13 @@ Main struct for storing document chunks and their embeddings. It also stores tag
 - `sources::Vector{<:AbstractString}`: sources of the chunks
 - `extras::Union{Nothing, AbstractVector}`: additional data, eg, metadata, source code, etc.
 """
-@kwdef struct ChunkIndex{
+@kwdef struct ChunkEmbeddingsIndex{
     T1 <: AbstractString,
     T2 <: Union{Nothing, Matrix{<:Real}},
     T3 <: Union{Nothing, AbstractMatrix{<:Bool}},
     T4 <: Union{Nothing, AbstractVector}
 } <: AbstractChunkIndex
-    id::Symbol = gensym("ChunkIndex")
+    id::Symbol = gensym("ChunkEmbeddingsIndex")
     # underlying document chunks / snippets
     chunks::Vector{T1}
     # for semantic search
@@ -35,38 +86,106 @@ Main struct for storing document chunks and their embeddings. It also stores tag
     sources::Vector{<:AbstractString}
     extras::T4 = nothing
 end
-embeddings(index::ChunkIndex) = index.embeddings
-chunks(index::ChunkIndex) = index.chunks
-tags(index::ChunkIndex) = index.tags
-tags_vocab(index::ChunkIndex) = index.tags_vocab
-sources(index::ChunkIndex) = index.sources
+embeddings(index::ChunkEmbeddingsIndex) = index.embeddings
+HasEmbeddings(::ChunkEmbeddingsIndex) = true
+chunkdata(index::ChunkEmbeddingsIndex) = embeddings(index)
 
-function Base.var"=="(i1::ChunkIndex, i2::ChunkIndex)
-    ((i1.sources == i2.sources) && (i1.tags_vocab == i2.tags_vocab) &&
-     (i1.embeddings == i2.embeddings) && (i1.chunks == i2.chunks) && (i1.tags == i2.tags))
+# For backward compatibility
+const ChunkIndex = ChunkEmbeddingsIndex
+
+"""
+    DocumentTermMatrix{T<:AbstractString}
+
+A sparse matrix of term frequencies and document lengths to allow calculation of BM25 similarity scores.
+"""
+struct DocumentTermMatrix{T1 <: AbstractMatrix{<:Real}, T2 <: AbstractString}
+    ## assumed to be SparseMatrixCSC{Float32, Int64}
+    tf::T1
+    vocab::Vector{T2}
+    vocab_lookup::Dict{T2, Int}
+    idf::Vector{Float32}
+    # |d|/avgDl
+    doc_rel_length::Vector{Float32}
 end
 
-function Base.vcat(i1::AbstractDocumentIndex, i2::AbstractDocumentIndex)
-    throw(ArgumentError("Not implemented"))
+function Base.hcat(d1::DocumentTermMatrix, d2::DocumentTermMatrix)
+    tf, vocab = vcat_labeled_matrices(d1.tf, d1.vocab, d2.tf, d2.vocab)
+    vocab_lookup = Dict(t => i for (i, t) in enumerate(vocab))
+
+    N, _ = size(tf)
+    doc_freq = [count(x -> x > 0, col) for col in eachcol(tf)]
+    idf = @. log(1.0f0 + (N - doc_freq + 0.5f0) / (doc_freq + 0.5f0))
+    doc_lengths = [count(x -> x > 0, row) for row in eachrow(tf)]
+    sumdl = sum(doc_lengths)
+    doc_rel_length = sumdl == 0 ? zeros(Float32, N) : (doc_lengths ./ (sumdl / N))
+
+    return DocumentTermMatrix(
+        tf, vocab, vocab_lookup, idf, convert(Vector{Float32}, doc_rel_length))
 end
 
-function Base.vcat(i1::ChunkIndex, i2::ChunkIndex)
-    tags_, tags_vocab_ = if (isnothing(tags(i1)) || isnothing(tags(i2)))
-        nothing, nothing
-    elseif tags_vocab(i1) == tags_vocab(i2)
-        vcat(tags(i1), tags(i2)), tags_vocab(i1)
-    else
-        merge_labeled_matrices(tags(i1), tags_vocab(i1), tags(i2), tags_vocab(i2))
-    end
-    embeddings_ = (isnothing(embeddings(i1)) || isnothing(embeddings(i2))) ? nothing :
-                  hcat(embeddings(i1), embeddings(i2))
-    ChunkIndex(;
-        chunks = vcat(chunks(i1), chunks(i2)),
-        embeddings = embeddings_,
-        tags = tags_,
-        tags_vocab = tags_vocab_,
-        sources = vcat(i1.sources, i2.sources))
+"""
+    ChunkKeywordsIndex
+
+Struct for storing chunks of text and associated keywords for BM25 similarity search.
+
+# Fields
+- `id::Symbol`: unique identifier of each index (to ensure we're using the right index with `CandidateChunks`)
+- `chunks::Vector{<:AbstractString}`: underlying document chunks / snippets
+- `chunkdata::Union{Nothing, AbstractMatrix{<:Real}}`: for similarity search, assumed to be `DocumentTermMatrix`
+- `tags::Union{Nothing, AbstractMatrix{<:Bool}}`: for exact search, filtering, etc. This is often a sparse matrix indicating which chunks have the given `tag` (see `tag_vocab` for the position lookup)
+- `tags_vocab::Union{Nothing, Vector{<:AbstractString}}`: vocabulary for the `tags` matrix (each column in `tags` is one item in `tags_vocab` and rows are the chunks)
+- `sources::Vector{<:AbstractString}`: sources of the chunks
+- `extras::Union{Nothing, AbstractVector}`: additional data, eg, metadata, source code, etc.
+
+# Example
+
+We can easily create a keywords-based index from a standard embeddings-based index.
+
+```julia
+
+# Let's assume we have a standard embeddings-based index
+index = build_index(SimpleIndexer(), texts; chunker_kwargs = (; max_length=10))
+
+# Creating an additional index for keyword-based search (BM25), is as simple as
+index_keywords = ChunkKeywordsIndex(index)
+
+# We can immediately create a MultiIndex (a hybrid index holding both indices)
+multi_index = MultiIndex([index, index_keywords])
+
+```
+
+You can also build the index via
+```julia
+# given some sentences and sources
+index_keywords = build_index(KeywordsIndexer(), sentences; chunker_kwargs=(; sources))
+
+# Retrive closest chunks with
+retriever = SimpleBM25Retriever()
+result = retrieve(retriever, index_keywords, "What are the best practices for parallel computing in Julia?")
+result.context
+```
+"""
+@kwdef struct ChunkKeywordsIndex{
+    T1 <: AbstractString,
+    T2 <: Union{Nothing, DocumentTermMatrix},
+    T3 <: Union{Nothing, AbstractMatrix{<:Bool}},
+    T4 <: Union{Nothing, AbstractVector}
+} <: AbstractChunkIndex
+    id::Symbol = gensym("ChunkKeywordsIndex")
+    # underlying document chunks / snippets
+    chunks::Vector{T1}
+    # for similarity search
+    chunkdata::T2 = nothing
+    # for exact search, filtering, etc.
+    # expected to be some sparse structure, eg, sparse matrix or nothing
+    # column oriented, ie, each column is one item in `tags_vocab` and rows are the chunks
+    tags::T3 = nothing
+    tags_vocab::Union{Nothing, Vector{<:AbstractString}} = nothing
+    sources::Vector{<:AbstractString}
+    extras::T4 = nothing
 end
+
+HasKeywords(::ChunkKeywordsIndex) = true
 
 ## TODO: implement a view(), make sure to recover the output positions correctly
 ## TODO: fields: parent, positions
@@ -74,9 +193,20 @@ end
 "Composite index that stores multiple ChunkIndex objects and their embeddings. It's not yet fully implemented."
 @kwdef struct MultiIndex <: AbstractMultiIndex
     id::Symbol = gensym("MultiIndex")
-    indexes::Vector{<:AbstractChunkIndex}
+    indexes::Vector{<:AbstractChunkIndex} = AbstractChunkIndex[]
 end
+
 indexes(index::MultiIndex) = index.indexes
+HasEmbeddings(index::AbstractMultiIndex) = any(HasEmbeddings, indexes(index))
+HasKeywords(index::AbstractMultiIndex) = any(HasKeywords, indexes(index))
+
+function MultiIndex(indexes::AbstractChunkIndex...)
+    MultiIndex(; indexes = collect(indexes))
+end
+function MultiIndex(indexes::AbstractVector{<:AbstractChunkIndex})
+    MultiIndex(; indexes = indexes)
+end
+
 # check that each index has a counterpart in the other MultiIndex
 function Base.var"=="(i1::MultiIndex, i2::MultiIndex)
     length(indexes(i1)) != length(indexes(i2)) && return false
@@ -282,31 +412,91 @@ function Base.var"&"(cc1::CandidateChunks{TP1, TD1},
     CandidateChunks(cc1.index_id, positions, scores)
 end
 
-# TODO: add method for intersection between two MultiChunkCandidates
+function Base.var"&"(mc1::MultiCandidateChunks{TP1, TD1},
+        mc2::MultiCandidateChunks{TP2, TD2}) where
+        {TP1 <: Integer, TP2 <: Integer, TD1 <: Real, TD2 <: Real}
+    ## if empty, skip the work
+    if isempty(mc1.scores) || isempty(mc2.scores)
+        return MultiCandidateChunks(;
+            index_ids = Symbol[], positions = TP1[], scores = TD1[])
+    end
+
+    keep_indexes = intersect(mc1.index_ids, mc2.index_ids)
+    keep_positions = intersect(mc1.positions, mc2.positions)
+    keep_candidates1 = falses(length(mc1.positions))
+    visited_candidates1 = Set{Tuple{Symbol, Int}}()
+    sizehint!(visited_candidates1, length(mc1.positions))
+    # Load up the scores from first candidates as a starting point
+    scores1 = Dict(id => Dict(pos => score
+                   for (pos, score, id_) in zip(mc1.positions, mc1.scores, mc1.index_ids)
+                   if id_ == id)
+    for id in keep_indexes)
+
+    ## Iterate through the candidates
+    for i in eachindex(mc1.positions, mc1.index_ids, mc1.scores)
+        pos, score, id = mc1.positions[i], mc1.scores[i], mc1.index_ids[i]
+        if id in keep_indexes && pos in keep_positions
+            ## check the other index manually only if it's a high chance it's a match
+            for j in eachindex(mc2.positions, mc2.index_ids, mc2.scores)
+                if mc2.index_ids[j] == id && mc2.positions[j] == pos
+                    if (id, pos) ∉ visited_candidates1
+                        # keep this item
+                        keep_candidates1[i] = true
+                        # remember not to save it again, that way we know `keep_candidates1` will return unique items
+                        push!(visited_candidates1, (id, pos))
+                    end
+                    # always save the highest score (from the tracker, current score, or candidates2)
+                    scores1[id][pos] = max(max(scores1[id][pos], score), mc2.scores[j])
+                end
+            end
+        end
+    end
+
+    ## Build the matching items
+    index_ids = @view(mc1.index_ids[keep_candidates1])
+    positions = @view(mc1.positions[keep_candidates1])
+    scores = TD1[scores1[id][pos] for (id, pos) in zip(index_ids, positions)]
+
+    ## Sort by maximum similarity
+    if !isempty(scores)
+        sorted_idxs = sortperm(scores, rev = true)
+        positions = positions[sorted_idxs]
+        index_ids = index_ids[sorted_idxs]
+        scores = scores[sorted_idxs]
+    else
+        ## take as is
+        index_ids = Symbol[]
+        positions = TP1[]
+    end
+
+    return MultiCandidateChunks(index_ids, positions, scores)
+end
+
 function Base.getindex(ci::AbstractDocumentIndex,
         candidate::AbstractCandidateChunks,
         field::Symbol)
     throw(ArgumentError("Not implemented"))
 end
-function Base.getindex(ci::ChunkIndex,
+function Base.getindex(ci::AbstractChunkIndex,
         candidate::CandidateChunks{TP, TD},
         field::Symbol = :chunks) where {TP <: Integer, TD <: Real}
-    @assert field in [:chunks, :embeddings, :sources] "Only `chunks`, `embeddings`, `sources` fields are supported for now"
+    @assert field in [:chunks, :embeddings, :chunkdata, :sources] "Only `chunks`, `embeddings`, `chunkdata`, `sources` fields are supported for now"
+    field = field == :embeddings ? :chunkdata : field
     len_ = length(chunks(ci))
     @assert all(1 .<= candidate.positions .<= len_) "Some positions are out of bounds"
     if ci.id == candidate.index_id
         if field == :chunks
             @views chunks(ci)[candidate.positions]
-        elseif field == :embeddings
-            @views embeddings(ci)[:, candidate.positions]
+        elseif field == :chunkdata
+            @views chunkdata(ci)[:, candidate.positions]
         elseif field == :sources
             @views sources(ci)[candidate.positions]
         end
     else
         if field == :chunks
             eltype(chunks(ci))[]
-        elseif field == :embeddings
-            eltype(embeddings(ci))[]
+        elseif field == :chunkdata
+            eltype(chunkdata(ci))[]
         elseif field == :sources
             eltype(sources(ci))[]
         end
@@ -315,25 +505,29 @@ end
 function Base.getindex(mi::MultiIndex,
         candidate::CandidateChunks{TP, TD},
         field::Symbol = :chunks) where {TP <: Integer, TD <: Real}
-    @assert field==:chunks "Only `chunks` field is supported for now"
+    @assert field in [:chunks, :sources] "Only `chunks`, `sources` fields are supported for now"
     valid_index = findfirst(x -> x.id == candidate.index_id, indexes(mi))
-    if isnothing(valid_index)
+    if isnothing(valid_index) && field == :chunks
+        String[]
+    elseif isnothing(valid_index) && field == :sources
         String[]
     else
-        getindex(indexes(mi)[valid_index], candidate)
+        getindex(indexes(mi)[valid_index], candidate, field)
     end
 end
 # Dispatch for multi-candidate chunks
-function Base.getindex(ci::ChunkIndex,
+function Base.getindex(ci::AbstractChunkIndex,
         candidate::MultiCandidateChunks{TP, TD},
         field::Symbol = :chunks; sorted::Bool = false) where {TP <: Integer, TD <: Real}
-    @assert field in [:chunks, :scores] "Only `chunks` and `scores` fields are supported for now"
+    @assert field in [:chunks, :sources, :scores] "Only `chunks`, `sources`, and `scores` fields are supported for now"
 
     index_pos = findall(==(ci.id), candidate.index_ids)
     if isempty(index_pos) && field == :chunks
         eltype(chunks(ci))[]
     elseif isempty(index_pos) && field == :scores
         eltype(candidate.scores)[]
+    elseif isempty(index_pos) && field == :sources
+        eltype(sources(ci))[]
     else
         # Sort if requested
         idx = if sorted
@@ -345,6 +539,8 @@ function Base.getindex(ci::ChunkIndex,
         end
         if field == :chunks
             getindex(chunks(ci), candidate.positions[idx])
+        elseif field == :sources
+            getindex(sources(ci), candidate.positions[idx])
         elseif field == :scores
             candidate.scores[idx]
         end
@@ -354,14 +550,15 @@ end
 function Base.getindex(mi::MultiIndex,
         candidate::MultiCandidateChunks{TP, TD},
         field::Symbol = :chunks; sorted::Bool = false) where {TP <: Integer, TD <: Real}
-    @assert field==:chunks "Only `chunks` field is supported for now"
+    @assert field in [:chunks, :sources, :scores] "Only `chunks`, `sources`, and `scores` fields are supported for now"
     if sorted
-        chunks = mapreduce(idxs -> Base.getindex(idxs, candidate, :chunks, sorted = false),
+        # values can be either of chunks or sources
+        values = mapreduce(idxs -> Base.getindex(idxs, candidate, field, sorted = false),
             vcat, indexes(mi))
         scores = mapreduce(idxs -> Base.getindex(idxs, candidate, :scores, sorted = false),
             vcat, indexes(mi))
         sorted_idx = sortperm(scores, rev = true)
-        chunks[sorted_idx]
+        values[sorted_idx]
     else
         mapreduce(idxs -> Base.getindex(idxs, candidate, field, sorted = false),
             vcat, indexes(mi))
@@ -397,13 +594,13 @@ See also: `pprint` (pretty printing), `annotate_support` (for annotating the ans
     final_answer::Union{Nothing, AbstractString} = nothing
     context::Vector{<:AbstractString} = String[]
     sources::Vector{<:AbstractString} = String[]
-    emb_candidates::CandidateChunks = CandidateChunks(
+    emb_candidates::Union{CandidateChunks, MultiCandidateChunks} = CandidateChunks(
         index_id = :NOTINDEX, positions = Int[], scores = Float32[])
-    tag_candidates::Union{Nothing, CandidateChunks} = CandidateChunks(
+    tag_candidates::Union{Nothing, CandidateChunks, MultiCandidateChunks} = CandidateChunks(
         index_id = :NOTINDEX, positions = Int[], scores = Float32[])
-    filtered_candidates::CandidateChunks = CandidateChunks(
+    filtered_candidates::Union{CandidateChunks, MultiCandidateChunks} = CandidateChunks(
         index_id = :NOTINDEX, positions = Int[], scores = Float32[])
-    reranked_candidates::CandidateChunks = CandidateChunks(
+    reranked_candidates::Union{CandidateChunks, MultiCandidateChunks} = CandidateChunks(
         index_id = :NOTINDEX, positions = Int[], scores = Float32[])
     conversations::Dict{Symbol, Vector{<:AbstractMessage}} = Dict{
         Symbol, Vector{<:AbstractMessage}}()
@@ -529,8 +726,9 @@ function StructTypes.constructfrom(::Type{RAGResult}, obj::Union{Dict, JSON3.Obj
     ## Retype where necessary
     for f in [
         :emb_candidates, :tag_candidates, :filtered_candidates, :reranked_candidates]
-        if haskey(obj, f)
-            @info obj[f]
+        if haskey(obj, f) && haskey(obj[f], :index_ids)
+            obj[f] = StructTypes.constructfrom(MultiCandidateChunks, obj[f])
+        elseif haskey(obj, f)
             obj[f] = StructTypes.constructfrom(CandidateChunks, obj[f])
         end
     end

@@ -2,6 +2,7 @@ using PromptingTools: TestEchoOpenAISchema
 using PromptingTools.Experimental.RAGTools: ContextEnumerator, NoRephraser, SimpleRephraser,
                                             HyDERephraser,
                                             CosineSimilarity, BinaryCosineSimilarity,
+                                            MultiFinder, BM25Similarity,
                                             NoTagFilter, AnyTagFilter,
                                             SimpleRetriever, AdvancedRetriever
 using PromptingTools.Experimental.RAGTools: AbstractRephraser, AbstractTagFilter,
@@ -12,6 +13,7 @@ using PromptingTools.Experimental.RAGTools: find_closest, hamming_distance, find
 using PromptingTools.Experimental.RAGTools: NoReranker, CohereReranker
 using PromptingTools.Experimental.RAGTools: hamming_distance, BitPackedCosineSimilarity,
                                             pack_bits, unpack_bits
+using PromptingTools.Experimental.RAGTools: bm25, document_term_matrix, DocumentTermMatrix
 
 @testset "rephrase" begin
     # Test rephrase with NoRephraser, simple passthrough
@@ -129,6 +131,58 @@ end
     @test hamming_dist_binary == hamming_dist_packed
 end
 
+@testset "bm25" begin
+    # Simple case
+    documents = [["this", "is", "a", "test"],
+        ["this", "is", "another", "test"], ["foo", "bar", "baz"]]
+    dtm = document_term_matrix(documents)
+    query = ["this"]
+    scores = bm25(dtm, query)
+    idf = log(1 + (3 - 2 + 0.5) / (2 + 0.5))
+    tf = 1
+    expected = idf * (tf * (1.2 + 1)) /
+               (tf + 1.2 * (1 - 0.75 + 0.75 * 4 / 3.666666666666667))
+    @test scores[1] ≈ expected
+    @test scores[2] ≈ expected
+    @test scores[3] ≈ 0
+
+    # Two words, both existing
+    query = ["this", "test"]
+    scores = bm25(dtm, query)
+    @test scores[1] ≈ expected * 2
+    @test scores[2] ≈ expected * 2
+    @test scores[3] ≈ 0
+
+    # Multiwords with no hits
+    query = ["baz", "unknown", "words", "xyz"]
+    scores = bm25(dtm, query)
+    idf = log(1 + (3 - 1 + 0.5) / (1 + 0.5))
+    tf = 1
+    expected = idf * (tf * (1.2 + 1)) /
+               (tf + 1.2 * (1 - 0.75 + 0.75 * 3 / 3.666666666666667))
+    @test scores[1] ≈ 0
+    @test scores[2] ≈ 0
+    @test scores[3] ≈ expected
+
+    # Edge case: empty query
+    @test bm25(dtm, String[]) == zeros(Float32, size(dtm.tf, 1))
+
+    # Edge case: query with no matches
+    query = ["food", "bard"]
+    @test bm25(dtm, query) == zeros(Float32, size(dtm.tf, 1))
+
+    # Edge case: query with multiple matches and repeats
+    query = ["this", "is", "this", "this"]
+    scores = bm25(dtm, query)
+    idf = log(1 + (3 - 2 + 0.5) / (2 + 0.5))
+    tf = 1
+    expected = idf * (tf * (1.2 + 1)) /
+               (tf + 1.2 * (1 - 0.75 + 0.75 * 4 / 3.666666666666667))
+    @test scores[1] ≈ expected * 4
+    @test scores[2] ≈ expected * 4
+    @test scores[3] ≈ 0
+end
+
 @testset "find_closest" begin
     finder = CosineSimilarity()
     test_embeddings = [1.0 2.0 -1.0; 3.0 4.0 -3.0; 5.0 6.0 -6.0] |>
@@ -200,14 +254,6 @@ end
     @test result.positions == [1]
     @test result.scores == [1.0]
 
-    ## find_closest with MultiIndex
-    ## mi = MultiIndex(id = :multi, indexes = [ci1, ci2])
-    ## query_emb = [0.5, 0.5] # Example query embedding vector
-    ## result = find_closest(mi, query_emb)
-    ## @test result isa CandidateChunks
-    ## @test result.positions == [1, 2]
-    ## @test all(1.0 .>= result.distances .>= -1.0)   # Assuming default minimum_similarity
-
     ### For Binary embeddings
     # Test for correct retrieval of closest positions and scores
     emb = [true false; false true]
@@ -256,6 +302,96 @@ end
     @test length(intersect(positions_cosine, positions_packed)) >= 1
 end
 
+## find_closest with MultiIndex
+## mi = MultiIndex(id = :multi, indexes = [ci1, ci2])
+## query_emb = [0.5, 0.5] # Example query embedding vector
+## result = find_closest(mi, query_emb)
+## @test result isa CandidateChunks
+## @test result.positions == [1, 2]
+## @test all(1.0 .>= result.distances .>= -1.0)   # Assuming default minimum_similarity
+
+@testset "find_closest-MultiIndex" begin
+    # Create mock data for testing
+    emb1 = [0.1 0.2; 0.3 0.4; 0.5 0.6] |> x -> mapreduce(normalize, hcat, eachcol(x))
+    emb2 = [0.7 0.8; 0.9 1.0; 1.1 1.2] |> x -> mapreduce(normalize, hcat, eachcol(x))
+    query_emb = [0.1, 0.2, 0.3] |> normalize
+
+    # Create ChunkIndex instances
+    index1 = ChunkEmbeddingsIndex(id = :index1, chunks = ["chunk1", "chunk2"],
+        embeddings = emb1, sources = ["source1", "source2"])
+    index2 = ChunkEmbeddingsIndex(id = :index2, chunks = ["chunk3", "chunk4"],
+        embeddings = emb2, sources = ["source3", "source4"])
+
+    # Create MultiIndex instance
+    multi_index = MultiIndex(id = :multi, indexes = [index1, index2])
+
+    # Create MultiFinder instance
+    multi_finder = MultiFinder([CosineSimilarity(), CosineSimilarity()])
+
+    # Perform find_closest with MultiFinder
+    result = find_closest(multi_finder, multi_index, query_emb; top_k = 2)
+    @test result isa MultiCandidateChunks
+    @test result.index_ids == [:index1, :index2]
+    @test result.positions == [2, 1]
+    @test query_emb' * emb1[:, 2] ≈ result.scores[1]
+    @test query_emb' * emb2[:, 1] ≈ result.scores[2]
+    # Check that the positions and scores are sorted correctly
+    @test result.scores[1] >= result.scores[2]
+
+    result = find_closest(multi_finder, multi_index, query_emb; top_k = 20)
+    @test length(result.index_ids) == 4
+    @test length(result.positions) == 4
+    @test length(result.scores) == 4
+
+    ## No embeddings
+    index1 = ChunkEmbeddingsIndex(id = :index1, chunks = ["chunk1", "chunk2"],
+        sources = ["source1", "source2"])
+    index2 = ChunkEmbeddingsIndex(id = :index2, chunks = ["chunk3", "chunk4"],
+        sources = ["source3", "source4"])
+    result = find_closest(MultiFinder([CosineSimilarity(), CosineSimilarity()]),
+        MultiIndex(id = :multi, indexes = [index1, index2]), query_emb; top_k = 20)
+    @test isempty(result.index_ids)
+    @test isempty(result.positions)
+    @test isempty(result.scores)
+
+    ### With mixed index types
+    # Create mock data for testing
+    emb1 = [0.1 0.2; 0.3 0.4; 0.5 0.6] |> x -> mapreduce(normalize, hcat, eachcol(x))
+    query_emb = [0.1, 0.2, 0.3] |> normalize
+    query_keywords = ["example", "query"]
+
+    # Create ChunkIndex instances
+    index1 = ChunkEmbeddingsIndex(id = :index1, chunks = ["chunk1", "chunk2"],
+        embeddings = emb1, sources = ["source1", "source2"])
+    index2 = ChunkKeywordsIndex(id = :index2, chunks = ["chunk3", "chunk4"],
+        chunkdata = document_term_matrix([["example", "query"], ["random", "words"]]),
+        sources = ["source3", "source4"])
+
+    # Create MultiIndex instance
+    multi_index = MultiIndex(id = :multi, indexes = [index1, index2])
+
+    # Create MultiFinder instance
+    multi_finder = MultiFinder([CosineSimilarity(), BM25Similarity()])
+
+    # Perform find_closest with MultiFinder
+    result = find_closest(multi_finder, multi_index, query_emb, query_keywords; top_k = 2)
+    @test result isa MultiCandidateChunks
+    @test result.index_ids == [:index2, :index1]
+    @test result.positions == [1, 2]
+    @test isapprox(result.scores, [1.387, 1.0], atol = 1e-1)
+    # Check that the positions and scores are sorted correctly
+    @test result.scores[1] >= result.scores[2]
+
+    result = find_closest(multi_finder, multi_index, query_emb, query_keywords; top_k = 20)
+    @test length(result.index_ids) == 4
+    @test length(result.positions) == 4
+    @test length(result.scores) == 4
+
+    @test HasEmbeddings(index1)
+    @test !HasEmbeddings(index2)
+    @test HasEmbeddings(multi_index)
+end
+
 @testset "find_tags" begin
     tagger = AnyTagFilter()
     test_embeddings = [1.0 2.0; 3.0 4.0; 5.0 6.0] |>
@@ -297,6 +433,26 @@ end
     struct RandomTagFilter123 <: AbstractTagFilter end
     @test_throws ArgumentError find_tags(RandomTagFilter123(), index, "hello")
     @test_throws ArgumentError find_tags(RandomTagFilter123(), index, ["hello"])
+
+    ## Multi-index implementation
+    # TODO: add AnyTag
+    emb1 = [0.1 0.2; 0.3 0.4; 0.5 0.6] |> x -> mapreduce(normalize, hcat, eachcol(x))
+    index1 = ChunkEmbeddingsIndex(id = :index1, chunks = ["chunk1", "chunk2"],
+        embeddings = emb1, sources = ["source1", "source2"])
+    index2 = ChunkKeywordsIndex(id = :index2, chunks = ["chunk3", "chunk4"],
+        chunkdata = document_term_matrix([["example", "query"], ["random", "words"]]),
+        sources = ["source3", "source4"])
+
+    # Create MultiIndex instance
+    multi_index = MultiIndex(id = :multi, indexes = [index1, index2])
+
+    mcc = find_tags(NoTagFilter(), multi_index, "julia")
+    @test mcc.positions == [1, 2, 3, 4]
+    @test mcc.scores == [0.0, 0.0, 0.0, 0.0]
+
+    mcc = find_tags(NoTagFilter(), multi_index, nothing)
+    @test mcc.positions == [1, 2, 3, 4]
+    @test mcc.scores == [0.0, 0.0, 0.0, 0.0]
 end
 
 @testset "rerank" begin
@@ -319,15 +475,19 @@ end
     @test reranked.positions == [2] # gets resorted by score
     @test reranked.scores == [0.4]
 
-    # Cohere assertion
     ci2 = ChunkIndex(id = :TestChunkIndex2,
         chunks = ["chunk1", "chunk2"],
         sources = ["source1", "source2"])
     mi = MultiIndex(; id = :multi, indexes = [ci1, ci2])
-    @test_throws ArgumentError rerank(CohereReranker(),
+    reranked = rerank(NoReranker(),
         mi,
         question,
         cc1)
+    @test reranked.positions == [2, 1] # gets resorted by score
+    @test reranked.scores == [0.4, 0.3]
+
+    # Cohere assertion
+    ## @test reranked isa MultiCandidateChunks
 
     # Bad top_n
     @test_throws AssertionError rerank(CohereReranker(),
@@ -463,6 +623,28 @@ end
     @test result.reranked_candidates.positions == [2, 1, 4, 3]
     @test result.context == ["chunk2", "chunk1", "chunk4", "chunk3"]
     @test result.sources isa Vector{String}
+
+    # Multi-index retriever
+    index_keywords = ChunkKeywordsIndex(index, index_id = :TestChunkIndexX)
+    # Create MultiIndex instance
+    multi_index = MultiIndex(id = :multi, indexes = [index, index_keywords])
+
+    # Create MultiFinder instance
+    finder = MultiFinder([RT.CosineSimilarity(), RT.BM25Similarity()])
+    retriever = SimpleRetriever(; processor = RT.KeywordsProcessor(), finder)
+    result = retrieve(retriever, multi_index, question;
+        reranker = NoReranker(), # we need to disable cohere as we cannot test it
+        rephraser_kwargs = (; model = "mock-gen"),
+        embedder_kwargs = (; model = "mock-emb"),
+        tagger_kwargs = (; model = "mock-meta"), api_kwargs = (;
+            url = "http://localhost:$(PORT)"))
+    @test result.question == question
+    @test result.rephrased_questions == [question]
+    @test result.answer == nothing
+    @test result.final_answer == nothing
+    @test result.reranked_candidates.positions == [2, 1, 4, 3]
+    @test result.context == ["chunk2", "chunk1", "chunk4", "chunk3"]
+    @test result.sources == ["source2", "source1", "source4", "source3"]
 
     # clean up
     close(echo_server)
