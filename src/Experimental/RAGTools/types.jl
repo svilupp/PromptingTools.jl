@@ -565,6 +565,15 @@ function Base.getindex(mi::MultiIndex,
     end
 end
 
+function Base.getindex(index::AbstractChunkIndex, id::Symbol)
+    id == index.id ? index : nothing
+end
+function Base.getindex(index::AbstractMultiIndex, id::Symbol)
+    id == index.id && return index
+    idx = findfirst(x -> x.id == id, indexes(index))
+    isnothing(idx) ? nothing : indexes(index)[idx]
+end
+
 """
     RAGResult
 
