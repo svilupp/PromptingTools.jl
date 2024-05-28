@@ -139,7 +139,7 @@ end
 ## "Build an index for RAG (Retriever-Augmented Generation) applications. REQUIRES SparseArrays and LinearAlgebra packages to be loaded!!"
 ## function build_index end
 
-"Shortcut to LinearAlgebra.normalize. Provided in the package extension `RAGToolsExperimentalExt` (Requires SparseArrays and LinearAlgebra)"
+"Shortcut to LinearAlgebra.normalize. Provided in the package extension `RAGToolsExperimentalExt` (Requires SparseArrays, Unicode, and LinearAlgebra)"
 function _normalize end
 
 """
@@ -269,7 +269,7 @@ function get_embeddings(embedder::BatchEmbedder, docs::AbstractVector{<:Abstract
     ## check if extension is available
     ext = Base.get_extension(PromptingTools, :RAGToolsExperimentalExt)
     if isnothing(ext)
-        error("You need to also import LinearAlgebra and SparseArrays to use this function")
+        error("You need to also import LinearAlgebra, Unicode, SparseArrays to use this function")
     end
     verbose && @info "Embedding $(length(docs)) documents..."
     # Notice that we embed multiple docs at once, not one by one
@@ -508,7 +508,7 @@ function get_tags(tagger::OpenTagger, docs::AbstractVector{<:AbstractString};
     ## check if extension is available
     ext = Base.get_extension(PromptingTools, :RAGToolsExperimentalExt)
     if isnothing(ext)
-        error("You need to also import LinearAlgebra and SparseArrays to use this function")
+        error("You need to also import LinearAlgebra, Unicode, and SparseArrays to use this function")
     end
     verbose && @info "Extracting metadata from $(length(docs)) documents..."
     tags_extracted = asyncmap(docs) do docs_chunk

@@ -1,6 +1,7 @@
 using PromptingTools: TestEchoOpenAISchema
-using PromptingTools.Experimental.RAGTools: ChunkIndex,
-                                            CandidateChunks, build_context, build_context!
+using PromptingTools.Experimental.RAGTools: ChunkEmbeddingsIndex,
+                                            CandidateChunks, MultiCandidateChunks,
+                                            MultiIndex, build_context, build_context!
 using PromptingTools.Experimental.RAGTools: MaybeTags, Tag, ContextEnumerator,
                                             AbstractContextBuilder
 using PromptingTools.Experimental.RAGTools: SimpleAnswerer, AbstractAnswerer, answer!,
@@ -12,7 +13,7 @@ using PromptingTools.Experimental.RAGTools: NoPostprocessor, AbstractPostprocess
                                             RAGResult
 
 @testset "build_context!" begin
-    index = ChunkIndex(;
+    index = ChunkEmbeddingsIndex(;
         sources = [".", ".", "."],
         chunks = ["a", "b", "c"],
         embeddings = zeros(128, 3),
@@ -53,11 +54,24 @@ using PromptingTools.Experimental.RAGTools: NoPostprocessor, AbstractPostprocess
     struct RandomContextEnumerator123 <: AbstractContextBuilder end
     @test_throws ArgumentError build_context!(
         RandomContextEnumerator123(), index, result)
+
+    # MultiCandidateChunks
+    mi = MultiIndex(indexes = [index])
+    mcc = MultiCandidateChunks([:a, :b], [1, 2], [0.1, 0.2])
+    context = build_context(contexter, mi, mcc)
+    @test context == String[]
+
+    mi = MultiIndex(indexes = [index])
+    mcc = MultiCandidateChunks([index.id, index.id], [1, 2], [0.1, 0.2])
+    context = build_context(contexter, mi, mcc)
+    expected_output = ["1. a\nb",
+        "2. a\nb\nc"]
+    @test context == expected_output
 end
 
 @testset "answer!" begin
     # Setup
-    index = ChunkIndex(id = :TestChunkIndex1,
+    index = ChunkEmbeddingsIndex(id = :TestChunkIndex1,
         chunks = ["chunk1", "chunk2"],
         sources = ["source1", "source2"],
         embeddings = ones(Float32, 2, 2))
@@ -92,7 +106,7 @@ end
 
 @testset "refine!" begin
     # Setup
-    index = ChunkIndex(id = :TestChunkIndex1,
+    index = ChunkEmbeddingsIndex(id = :TestChunkIndex1,
         chunks = ["chunk1", "chunk2"],
         sources = ["source1", "source2"],
         embeddings = ones(Float32, 2, 2))
@@ -141,7 +155,7 @@ end
     result = RAGResult(; question, rephrased_questions = [question], emb_candidates = cc1,
         tag_candidates = cc1, filtered_candidates = cc1, reranked_candidates = cc1,
         context = String[], sources = String[])
-    index = ChunkIndex(id = :TestChunkIndex1,
+    index = ChunkEmbeddingsIndex(id = :TestChunkIndex1,
         chunks = ["chunk1", "chunk2"],
         sources = ["source1", "source2"],
         embeddings = ones(Float32, 2, 2))
@@ -164,7 +178,7 @@ end
     schema = TestEchoOpenAISchema(; response, status = 200)
     PT.register_model!(; name = "mock-gen", schema)
 
-    index = ChunkIndex(id = :TestChunkIndex1,
+    index = ChunkEmbeddingsIndex(id = :TestChunkIndex1,
         chunks = ["chunk1", "chunk2"],
         sources = ["source1", "source2"],
         embeddings = ones(Float32, 2, 2))
@@ -242,7 +256,7 @@ end
     end
 
     ## Index
-    index = ChunkIndex(;
+    index = ChunkEmbeddingsIndex(;
         sources = [".", ".", "."],
         chunks = ["a", "b", "c"],
         embeddings = zeros(128, 3),

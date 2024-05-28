@@ -256,7 +256,7 @@ function get_embeddings end
 function get_keywords end
 function get_tags end
 # Sub-routing of get_tags, extended in ext/RAGToolsExperimentalExt.jl
-"Builds a matrix of tags and a vocabulary list. REQUIRES SparseArrays and LinearAlgebra packages to be loaded!!"
+"Builds a matrix of tags and a vocabulary list. REQUIRES SparseArrays, LinearAlgebra, Unicode packages to be loaded!!"
 function build_tags end
 
 # Retrieval stage -> ultimately returns `RAGResult`
