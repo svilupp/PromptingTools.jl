@@ -59,6 +59,28 @@ Implementation of `hamming_distance` is based on [TinyRAG](https://github.com/do
 struct BitPackedCosineSimilarity <: AbstractSimilarityFinder end
 
 """
+    BM25Similarity <: AbstractSimilarityFinder
+
+Finds the closest chunks to a query embedding by measuring the BM25 similarity between the query and the chunks' embeddings in binary form.
+
+Reference: [Wikipedia: BM25](https://en.wikipedia.org/wiki/Okapi_BM25).
+Implementation follows: [The Next Generation of Lucene Relevance](https://opensourceconnections.com/blog/2015/10/16/bm25-the-next-generation-of-lucene-relevation/).
+"""
+struct BM25Similarity <: AbstractSimilarityFinder end
+
+"""
+    MultiFinder <: AbstractSimilarityFinder 
+
+Composite finder for `MultiIndex` where we want to set multiple finders for each index.
+Positions correspond to `indexes(::MultiIndex)`.
+"""
+struct MultiFinder <: AbstractSimilarityFinder
+    finders::AbstractVector{<:AbstractSimilarityFinder}
+end
+Base.getindex(finder::MultiFinder, index::Int) = finder.finders[index]
+Base.length(finder::MultiFinder) = length(finder.finders)
+
+"""
     NoTagFilter <: AbstractTagFilter
 
 
@@ -148,13 +170,15 @@ end
 # General fallback
 function find_closest(
         finder::AbstractSimilarityFinder, emb::AbstractMatrix{<:Real},
-        query_emb::AbstractVector{<:Real}; kwargs...)
+        query_emb::AbstractVector{<:Real}, query_tokens::AbstractVector{<:AbstractString} = String[];
+        kwargs...)
     throw(ArgumentError("Not implemented yet for type $(typeof(finder))"))
 end
 
 """
-    find_closest(finder::CosineSimilarity, emb::AbstractMatrix{<:Real},
-        query_emb::AbstractVector{<:Real};
+    find_closest(
+        finder::CosineSimilarity, emb::AbstractMatrix{<:Real},
+        query_emb::AbstractVector{<:Real}, query_tokens::AbstractVector{<:AbstractString} = String[];
         top_k::Int = 100, minimum_similarity::AbstractFloat = -1.0, kwargs...)
 
 Finds the indices of chunks (represented by embeddings in `emb`) that are closest (in cosine similarity for `CosineSimilarity()`) to query embedding (`query_emb`). 
@@ -168,11 +192,11 @@ Returns only `top_k` closest indices.
 """
 function find_closest(
         finder::CosineSimilarity, emb::AbstractMatrix{<:Real},
-        query_emb::AbstractVector{<:Real};
+        query_emb::AbstractVector{<:Real}, query_tokens::AbstractVector{<:AbstractString} = String[];
         top_k::Int = 100, minimum_similarity::AbstractFloat = -1.0, kwargs...)
     # emb is an embedding matrix where the first dimension is the embedding dimension
     scores = query_emb' * emb |> vec
-    positions = scores |> sortperm |> reverse |> x -> first(x, top_k)
+    positions = scores |> sortperm |> x -> last(x, top_k) |> reverse
     if minimum_similarity > -1.0
         mask = scores[positions] .>= minimum_similarity
         positions = positions[mask]
@@ -183,7 +207,7 @@ end
 """
     find_closest(
         finder::AbstractSimilarityFinder, index::AbstractChunkIndex,
-        query_emb::AbstractVector{<:Real};
+        query_emb::AbstractVector{<:Real}, query_tokens::AbstractVector{<:AbstractString} = String[];
         top_k::Int = 100, kwargs...)
 
 Finds the indices of chunks (represented by embeddings in `index`) that are closest to query embedding (`query_emb`).
@@ -192,11 +216,11 @@ Returns only `top_k` closest indices.
 """
 function find_closest(
         finder::AbstractSimilarityFinder, index::AbstractChunkIndex,
-        query_emb::AbstractVector{<:Real};
+        query_emb::AbstractVector{<:Real}, query_tokens::AbstractVector{<:AbstractString} = String[];
         top_k::Int = 100, kwargs...)
-    isnothing(embeddings(index)) && return CandidateChunks(; index_id = index.id)
-    positions, scores = find_closest(finder, embeddings(index),
-        query_emb;
+    isnothing(chunkdata(index)) && return CandidateChunks(; index_id = index.id)
+    positions, scores = find_closest(finder, chunkdata(index),
+        query_emb, query_tokens;
         top_k, kwargs...)
     return CandidateChunks(index.id, positions, Float32.(scores))
 end
@@ -204,14 +228,76 @@ end
 # Dispatch to find scores for multiple embeddings
 function find_closest(
         finder::AbstractSimilarityFinder, index::AbstractChunkIndex,
-        query_emb::AbstractMatrix{<:Real};
+        query_emb::AbstractMatrix{<:Real}, query_tokens::AbstractVector{<:AbstractVector{<:AbstractString}} = Vector{Vector{String}}();
         top_k::Int = 100, kwargs...)
-    isnothing(embeddings(index)) && CandidateChunks(; index_id = index.id)
+    isnothing(chunkdata(index)) && CandidateChunks(; index_id = index.id)
     ## reduce top_k since we have more than one query
     top_k_ = top_k ÷ size(query_emb, 2)
     ## simply vcat together (gets sorted from the highest similarity to the lowest)
-    mapreduce(
-        c -> find_closest(finder, index, c; top_k = top_k_, kwargs...), vcat, eachcol(query_emb))
+    if isempty(query_tokens)
+        mapreduce(
+            c -> find_closest(finder, index, c; top_k = top_k_, kwargs...), vcat, eachcol(query_emb))
+    else
+        @assert length(query_tokens)==size(query_emb, 2) "Length of `query_tokens` must be equal to the number of columns in `query_emb`."
+        mapreduce(
+            (emb, tok) -> find_closest(finder, index, emb, tok; top_k = top_k_, kwargs...), vcat, eachcol(query_emb), query_tokens)
+    end
+end
+
+### For MultiIndex
+function find_closest(
+        finder::MultiFinder, index::AbstractMultiIndex,
+        query_emb::AbstractVector{<:Real}, query_tokens::AbstractVector{<:AbstractString} = String[];
+        top_k::Int = 100, kwargs...)
+    all_indexes = indexes(index)
+    all(isnothing(chunkdata(index)) for index in all_indexes) &&
+        return MultiCandidateChunks(; index_ids = Symbol[])
+
+    ## Get more than top_k candidates, then pick the top 100 by score
+    top_k_shard = ceil(Int, top_k / length(all_indexes))
+    index_ids = Symbol[]
+    positions = Int[]
+    scores = Float32[]
+    for i in eachindex(all_indexes, finder.finders)
+        positions_, scores_ = find_closest(finder[i], chunkdata(all_indexes[i]),
+            query_emb, query_tokens;
+            top_k = top_k_shard, kwargs...)
+        append!(index_ids, fill(all_indexes[i].id, length(positions_)))
+        append!(positions, positions_)
+        append!(scores, scores_)
+    end
+    idxs = sortperm(scores, rev = true) |> x -> first(x, top_k)
+    return MultiCandidateChunks(index_ids[idxs], positions[idxs], scores[idxs])
+end
+
+# If we have multi-index, convert to MultiFinder first
+function find_closest(
+        finder::AbstractSimilarityFinder, index::AbstractMultiIndex,
+        query_emb::AbstractVector{<:Real}, query_tokens::AbstractVector{<:AbstractString} = String[];
+        kwargs...)
+    new_finder = MultiFinder(fill(finder, length(indexes(index))))
+    find_closest(new_finder, index, query_emb, query_tokens; kwargs...)
+end
+
+# Method for multiple-queries at once (for rephrased queries)
+function find_closest(
+        finder::AbstractSimilarityFinder, index::AbstractMultiIndex,
+        query_emb::AbstractMatrix{<:Real}, query_tokens::AbstractVector{<:AbstractVector{<:AbstractString}} = Vector{Vector{String}}();
+        top_k::Int = 100, kwargs...)
+    all_indexes = indexes(index)
+    all(isnothing(chunkdata(index)) for index in all_indexes) &&
+        return MultiCandidateChunks(; index_ids = Symbol[])
+    ## reduce top_k since we have more than one query
+    top_k_ = top_k ÷ max(size(query_emb, 2), length(query_tokens))
+    ## simply vcat together (gets sorted from the highest similarity to the lowest)
+    if isempty(query_tokens)
+        mapreduce(
+            c -> find_closest(finder, index, c; top_k = top_k_, kwargs...), vcat, eachcol(query_emb))
+    else
+        @assert length(query_tokens)==size(query_emb, 2) "Length of `query_tokens` must be equal to the number of columns in `query_emb`. Provided: $(length(query_tokens)) vs $(size(query_emb, 2))"
+        mapreduce(
+            (emb, tok) -> find_closest(finder, index, emb, tok; top_k = top_k_, kwargs...), vcat, eachcol(query_emb), query_tokens)
+    end
 end
 
 #### For binary embeddings
@@ -259,7 +345,7 @@ end
 """
     find_closest(
         finder::BinaryCosineSimilarity, emb::AbstractMatrix{<:Bool},
-        query_emb::AbstractVector{<:Real};
+        query_emb::AbstractVector{<:Real}, query_tokens::AbstractVector{<:AbstractString} = String[];
         top_k::Int = 100, rescore_multiplier::Int = 4, minimum_similarity::AbstractFloat = -1.0, kwargs...)
 
 Finds the indices of chunks (represented by embeddings in `emb`) that are closest to query embedding (`query_emb`) using binary embeddings (in the index).
@@ -281,7 +367,7 @@ binary_emb = map(>(0), emb)
 """
 function find_closest(
         finder::BinaryCosineSimilarity, emb::AbstractMatrix{<:Bool},
-        query_emb::AbstractVector{<:Real};
+        query_emb::AbstractVector{<:Real}, query_tokens::AbstractVector{<:AbstractString} = String[];
         top_k::Int = 100, rescore_multiplier::Int = 4, minimum_similarity::AbstractFloat = -1.0, kwargs...)
     # emb is an embedding matrix where the first dimension is the embedding dimension
 
@@ -301,7 +387,7 @@ end
 """
     find_closest(
         finder::BitPackedCosineSimilarity, emb::AbstractMatrix{<:Bool},
-        query_emb::AbstractVector{<:Real};
+        query_emb::AbstractVector{<:Real}, query_tokens::AbstractVector{<:AbstractString} = String[];
         top_k::Int = 100, rescore_multiplier::Int = 4, minimum_similarity::AbstractFloat = -1.0, kwargs...)
 
 Finds the indices of chunks (represented by embeddings in `emb`) that are closest to query embedding (`query_emb`) using bit-packed binary embeddings (in the index).
@@ -322,7 +408,7 @@ bitpacked_emb = pack_bits(emb.>0)
 """
 function find_closest(
         finder::BitPackedCosineSimilarity, emb::AbstractMatrix{<:Integer},
-        query_emb::AbstractVector{<:Real};
+        query_emb::AbstractVector{<:Real}, query_tokens::AbstractVector{<:AbstractString} = String[];
         top_k::Int = 100, rescore_multiplier::Int = 4, minimum_similarity::AbstractFloat = -1.0, kwargs...)
     # emb is an embedding matrix where the first dimension is the embedding dimension
 
@@ -338,6 +424,31 @@ function find_closest(
 
     ## translate to original indices
     return positions[new_positions], scores
+end
+
+"""
+    find_closest(
+        finder::BM25Similarity, dtm::DocumentTermMatrix,
+        query_emb::AbstractVector{<:Real}, query_tokens::AbstractVector{<:AbstractString} = String[];
+        top_k::Int = 100, minimum_similarity::AbstractFloat = -1.0, kwargs...)
+
+Finds the indices of chunks (represented by DocumentTermMatrix in `dtm`) that are closest to query tokens (`query_tokens`) using BM25.
+
+Reference: [Wikipedia: BM25](https://en.wikipedia.org/wiki/Okapi_BM25).
+Implementation follows: [The Next Generation of Lucene Relevance](https://opensourceconnections.com/blog/2015/10/16/bm25-the-next-generation-of-lucene-relevation/).
+"""
+function find_closest(
+        finder::BM25Similarity, dtm::DocumentTermMatrix,
+        query_emb::AbstractVector{<:Real}, query_tokens::AbstractVector{<:AbstractString} = String[];
+        top_k::Int = 100, minimum_similarity::AbstractFloat = -1.0, kwargs...)
+    bm_scores = bm25(dtm, query_tokens)
+    positions = bm_scores |> sortperm |> x -> last(x, top_k) |> reverse
+
+    if minimum_similarity > -1.0
+        mask = scores[positions] .>= minimum_similarity
+        positions = positions[mask]
+    end
+    return positions, bm_scores[positions]
 end
 
 ## TODO: Implement for MultiIndex
@@ -363,10 +474,10 @@ end
 
 ### TAG Filtering
 
-function find_tags(::AbstractTagFilter, index::AbstractChunkIndex,
+function find_tags(::AbstractTagFilter, index::AbstractDocumentIndex,
         tag::Union{T, AbstractVector{<:T}}; kwargs...) where {T <:
                                                               Union{AbstractString, Regex}}
-    throw(ArgumentError("Not implemented yet for type $(typeof(filter))"))
+    throw(ArgumentError("Not implemented yet for type $(typeof(filter)) and index $(typeof(index))"))
 end
 
 """
@@ -413,10 +524,57 @@ function find_tags(method::NoTagFilter, index::AbstractChunkIndex,
     return CandidateChunks(
         index.id, collect(1:length(index.chunks)), zeros(Float32, length(index.chunks)))
 end
+
 function find_tags(method::NoTagFilter, index::AbstractChunkIndex,
         tags::Nothing; kwargs...)
     return CandidateChunks(
         index.id, collect(1:length(index.chunks)), zeros(Float32, length(index.chunks)))
+end
+
+## Multi-index implementation
+# TODO: finish find_tags with AnyTagFilter
+
+function find_tags(method::AnyTagFilter, index::AbstractMultiIndex,
+        tag::Union{AbstractString, Regex}; kwargs...)
+    all_indexes = indexes(index)
+    all(isnothing(chunkdata(index)) for index in all_indexes) &&
+        return MultiCandidateChunks(; index_ids = Symbol[])
+
+    # Not finished - throw an error
+    throw(ArgumentError("Not implemented yet for type $(typeof(filter)) and index $(typeof(index))"))
+    ## tag_idx = if tag isa AbstractString
+    ##     findall(tags_vocab(index) .== tag)
+    ## else # assume it's a regex
+    ##     findall(occursin.(tag, tags_vocab(index)))
+    ## end
+    ## # getindex.(x, 1) is to get the first dimension in each CartesianIndex
+    ## match_row_idx = @view(tags(index)[:, tag_idx]) |> findall |>
+    ##                 x -> getindex.(x, 1) |> unique
+    ## return CandidateChunks(index.id, match_row_idx, ones(Float32, length(match_row_idx)))
+    return nothing
+end
+
+function find_tags(method::NoTagFilter, index::AbstractMultiIndex,
+        tags::Union{T, AbstractVector{<:T}}; kwargs...) where {T <:
+                                                               Union{
+        AbstractString, Regex}}
+    indexes_ = indexes(index)
+    length_ = sum(x -> length(x.chunks), indexes_)
+    index_ids = [fill(x.id, length(x.chunks)) for x in indexes_] |> Base.Splat(vcat)
+
+    return MultiCandidateChunks(
+        index_ids, collect(1:length_),
+        zeros(Float32, length_))
+end
+function find_tags(method::NoTagFilter, index::AbstractMultiIndex,
+        tags::Nothing; kwargs...)
+    indexes_ = indexes(index)
+    length_ = sum(x -> length(x.chunks), indexes_)
+    index_ids = [fill(x.id, length(x.chunks)) for x in indexes_] |> Base.Splat(vcat)
+
+    return MultiCandidateChunks(
+        index_ids, collect(1:length_),
+        zeros(Float32, length_))
 end
 
 ### Reranking
@@ -441,7 +599,7 @@ function rerank(reranker::AbstractReranker,
 end
 
 function rerank(reranker::NoReranker,
-        index::AbstractChunkIndex,
+        index::AbstractDocumentIndex,
         question::AbstractString,
         candidates::AbstractCandidateChunks;
         top_n::Integer = length(candidates),
@@ -453,7 +611,7 @@ end
 
 """
     rerank(
-        reranker::CohereReranker, index::AbstractChunkIndex, question::AbstractString,
+        reranker::CohereReranker, index::AbstractDocumentIndex, question::AbstractString,
         candidates::AbstractCandidateChunks;
         verbose::Bool = false,
         api_key::AbstractString = PT.COHERE_API_KEY,
@@ -479,7 +637,7 @@ Re-ranks a list of candidate chunks using the Cohere Rerank API. See https://coh
     
 """
 function rerank(
-        reranker::CohereReranker, index::AbstractChunkIndex, question::AbstractString,
+        reranker::CohereReranker, index::AbstractDocumentIndex, question::AbstractString,
         candidates::AbstractCandidateChunks;
         verbose::Bool = false,
         api_key::AbstractString = PT.COHERE_API_KEY,
@@ -489,10 +647,11 @@ function rerank(
         cost_tracker = Threads.Atomic{Float64}(0.0),
         kwargs...)
     @assert top_n>0 "top_n must be a positive integer."
-    @assert index.id==candidates.index_id "The index id of the index and `candidates` must match."
 
     ## Call the API
     documents = index[candidates, :chunks]
+    @assert !(isempty(documents)) "The candidate chunks must not be empty for Cohere Reranker! Check the index IDs."
+
     verbose &&
         @info "Calling Cohere Rerank API with $(length(documents)) candidate chunks..."
     r = cohere_api(;
@@ -512,6 +671,11 @@ function rerank(
         doc = r.response[:results][i]
         positions[i] = candidates.positions[doc[:index] + 1]
         scores[i] = doc[:relevance_score]
+        index_ids = if candidates isa MultiCandidateChunks
+            candidates.index_ids[doc[:index] + 1]
+        else
+            index.id
+        end
     end
 
     ## Check the cost
@@ -525,7 +689,11 @@ function rerank(
     end
     verbose && @info "Reranking done. $search_units_str"
 
-    return CandidateChunks(index.id, positions, scores)
+    index_ids = if candidates isa MultiCandidateChunks
+        MultiCandidateChunks(index_ids, positions, scores)
+    else
+        CandidateChunks(index_ids, positions, scores)
+    end
 end
 
 ### Overall types for `retrieve`
@@ -539,6 +707,7 @@ Make sure to use consistent `embedder` and `tagger` with the Preparation Stage (
 # Fields
 - `rephraser::AbstractRephraser`: the rephrasing method, dispatching `rephrase` - uses `NoRephraser`
 - `embedder::AbstractEmbedder`: the embedding method, dispatching `get_embeddings` (see Preparation Stage for more details) - uses `BatchEmbedder`
+- `processor::AbstractProcessor`: the processor method, dispatching `get_keywords` (see Preparation Stage for more details) - uses `NoProcessor`
 - `finder::AbstractSimilarityFinder`: the similarity search method, dispatching `find_closest` - uses `CosineSimilarity`
 - `tagger::AbstractTagger`: the tag generating method, dispatching `get_tags` (see Preparation Stage for more details) - uses `NoTagger`
 - `filter::AbstractTagFilter`: the tag matching method, dispatching `find_tags` - uses `NoTagFilter`
@@ -547,7 +716,34 @@ Make sure to use consistent `embedder` and `tagger` with the Preparation Stage (
 @kwdef mutable struct SimpleRetriever <: AbstractRetriever
     rephraser::AbstractRephraser = NoRephraser()
     embedder::AbstractEmbedder = BatchEmbedder()
+    processor::AbstractProcessor = NoProcessor()
     finder::AbstractSimilarityFinder = CosineSimilarity()
+    tagger::AbstractTagger = NoTagger()
+    filter::AbstractTagFilter = NoTagFilter()
+    reranker::AbstractReranker = NoReranker()
+end
+
+"""
+    SimpleBM25Retriever <: AbstractRetriever
+
+Keyword-based implementation for `retrieve`. It does a simple similarity search via `BM25Similarity` and returns the results.
+
+Make sure to use consistent `processor` and `tagger` with the Preparation Stage (`build_index`)!
+
+# Fields
+- `rephraser::AbstractRephraser`: the rephrasing method, dispatching `rephrase` - uses `NoRephraser`
+- `embedder::AbstractEmbedder`: the embedding method, dispatching `get_embeddings` (see Preparation Stage for more details) - uses `NoEmbedder`
+- `processor::AbstractProcessor`: the processor method, dispatching `get_keywords` (see Preparation Stage for more details) - uses `KeywordsProcessor`
+- `finder::AbstractSimilarityFinder`: the similarity search method, dispatching `find_closest` - uses `CosineSimilarity`
+- `tagger::AbstractTagger`: the tag generating method, dispatching `get_tags` (see Preparation Stage for more details) - uses `NoTagger`
+- `filter::AbstractTagFilter`: the tag matching method, dispatching `find_tags` - uses `NoTagFilter`
+- `reranker::AbstractReranker`: the reranking method, dispatching `rerank` - uses `NoReranker`
+"""
+@kwdef mutable struct SimpleBM25Retriever <: AbstractRetriever
+    rephraser::AbstractRephraser = NoRephraser()
+    embedder::AbstractEmbedder = NoEmbedder()
+    processor::AbstractProcessor = KeywordsProcessor()
+    finder::AbstractSimilarityFinder = BM25Similarity()
     tagger::AbstractTagger = NoTagger()
     filter::AbstractTagFilter = NoTagFilter()
     reranker::AbstractReranker = NoReranker()
@@ -562,6 +758,7 @@ Compared to SimpleRetriever, it adds rephrasing the query and reranking the resu
 # Fields
 - `rephraser::AbstractRephraser`: the rephrasing method, dispatching `rephrase` - uses `HyDERephraser`
 - `embedder::AbstractEmbedder`: the embedding method, dispatching `get_embeddings` (see Preparation Stage for more details) - uses `BatchEmbedder`
+- `processor::AbstractProcessor`: the processor method, dispatching `get_keywords` (see Preparation Stage for more details) - uses `NoProcessor`
 - `finder::AbstractSimilarityFinder`: the similarity search method, dispatching `find_closest` - uses `CosineSimilarity`
 - `tagger::AbstractTagger`: the tag generating method, dispatching `get_tags` (see Preparation Stage for more details) - uses `NoTagger`
 - `filter::AbstractTagFilter`: the tag matching method, dispatching `find_tags` - uses `NoTagFilter`
@@ -570,6 +767,7 @@ Compared to SimpleRetriever, it adds rephrasing the query and reranking the resu
 @kwdef mutable struct AdvancedRetriever <: AbstractRetriever
     rephraser::AbstractRephraser = HyDERephraser()
     embedder::AbstractEmbedder = BatchEmbedder()
+    processor::AbstractProcessor = NoProcessor()
     finder::AbstractSimilarityFinder = CosineSimilarity()
     tagger::AbstractTagger = NoTagger()
     filter::AbstractTagFilter = NoTagFilter()
@@ -588,6 +786,8 @@ end
         rephraser_kwargs::NamedTuple = NamedTuple(),
         embedder::AbstractEmbedder = retriever.embedder,
         embedder_kwargs::NamedTuple = NamedTuple(),
+        processor::AbstractProcessor = retriever.processor,
+        processor_kwargs::NamedTuple = NamedTuple(),
         finder::AbstractSimilarityFinder = retriever.finder,
         finder_kwargs::NamedTuple = NamedTuple(),
         tagger::AbstractTagger = retriever.tagger,
@@ -630,6 +830,8 @@ If you're using locally-hosted models, you can pass the `api_kwargs` with the `u
     - `template`: The rephrasing template to use. Default is `:RAGQueryOptimizer` or `:RAGQueryHyDE` (depending on the `rephraser` selected).
 - `embedder`: The embedding method to use. Default is `retriever.embedder`.
 - `embedder_kwargs`: Additional keyword arguments to be passed to the embedder.
+- `processor`: The processor method to use when using Keyword-based index. Default is `retriever.processor`.
+- `processor_kwargs`: Additional keyword arguments to be passed to the processor.
 - `finder`: The similarity search method to use. Default is `retriever.finder`, often `CosineSimilarity`.
 - `finder_kwargs`: Additional keyword arguments to be passed to the similarity finder.
 - `tagger`: The tag generating method to use. Default is `retriever.tagger`.
@@ -642,7 +844,7 @@ If you're using locally-hosted models, you can pass the `api_kwargs` with the `u
     - `model`: The model to use for reranking. Default is `rerank-english-v2.0` if you use `reranker = CohereReranker()`.
 - `cost_tracker`: An atomic counter to track the cost of the retrieval. Default is `Threads.Atomic{Float64}(0.0)`.
 
-See also: `SimpleRetriever`, `AdvancedRetriever`, `build_index`, `rephrase`, `get_embeddings`, `find_closest`, `get_tags`, `find_tags`, `rerank`, `RAGResult`.
+See also: `SimpleRetriever`, `AdvancedRetriever`, `build_index`, `rephrase`, `get_embeddings`, `get_keywords`, `find_closest`, `get_tags`, `find_tags`, `rerank`, `RAGResult`.
 
 # Examples
 
@@ -685,7 +887,7 @@ result = retrieve(retriever, index, question;
 ```
 """
 function retrieve(retriever::AbstractRetriever,
-        index::AbstractChunkIndex,
+        index::AbstractDocumentIndex,
         question::AbstractString;
         verbose::Integer = 1,
         top_k::Integer = 100,
@@ -695,6 +897,8 @@ function retrieve(retriever::AbstractRetriever,
         rephraser_kwargs::NamedTuple = NamedTuple(),
         embedder::AbstractEmbedder = retriever.embedder,
         embedder_kwargs::NamedTuple = NamedTuple(),
+        processor::AbstractProcessor = retriever.processor,
+        processor_kwargs::NamedTuple = NamedTuple(),
         finder::AbstractSimilarityFinder = retriever.finder,
         finder_kwargs::NamedTuple = NamedTuple(),
         tagger::AbstractTagger = retriever.tagger,
@@ -712,14 +916,31 @@ function retrieve(retriever::AbstractRetriever,
         rephraser, question; verbose = (verbose > 1), cost_tracker, rephraser_kwargs_...)
 
     ## Embed one or more rephrased questions
-    embedder_kwargs_ = isempty(api_kwargs) ? embedder_kwargs :
-                       merge(embedder_kwargs, (; api_kwargs))
-    embeddings = get_embeddings(embedder, rephrased_questions;
-        verbose = (verbose > 1), cost_tracker, embedder_kwargs_...)
+    embeddings = if HasEmbeddings(index)
+        embedder_kwargs_ = isempty(api_kwargs) ? embedder_kwargs :
+                           merge(embedder_kwargs, (; api_kwargs))
+        embeddings = get_embeddings(embedder, rephrased_questions;
+            verbose = (verbose > 1), cost_tracker, embedder_kwargs_...)
+    else
+        embeddings = hcat([Float32[] for x in rephrased_questions]...)
+    end
+
+    ## Preprocess into keyword tokens if we're running BM25 
+    keywords = if HasKeywords(index)
+        ## Return only keywords, not DTM
+        keywords = get_keywords(processor, rephrased_questions;
+            verbose = (verbose > 1), processor_kwargs..., return_keywords = true)
+        ## Send warning for common error
+        verbose >= 1 && (keywords isa AbstractVector{<:AbstractVector{<:AbstractString}} ||
+         @warn "Processed Keywords is not a vector of tokenized queries. Have you used the correct processor? (provided: $(typeof(processor))).")
+        keywords
+    else
+        [String[] for x in rephrased_questions]
+    end
 
     finder_kwargs_ = isempty(api_kwargs) ? finder_kwargs :
                      merge(finder_kwargs, (; api_kwargs))
-    emb_candidates = find_closest(finder, index, embeddings;
+    emb_candidates = find_closest(finder, index, embeddings, keywords;
         verbose = (verbose > 1), top_k, finder_kwargs_...)
 
     ## Tagging - if you provide them explicitly, use tagger `PassthroughTagger` and `tagger_kwargs = (;tags = ...)`
@@ -755,8 +976,8 @@ function retrieve(retriever::AbstractRetriever,
         answer = nothing,
         rephrased_questions,
         final_answer = nothing,
-        context = chunks(index)[reranked_candidates.positions],
-        sources = sources(index)[reranked_candidates.positions],
+        context = collect(index[reranked_candidates, :chunks]),
+        sources = collect(index[reranked_candidates, :sources]),
         emb_candidates,
         tag_candidates,
         filtered_candidates,

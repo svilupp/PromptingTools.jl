@@ -130,6 +130,8 @@ abstract type AbstractIndexBuilder <: AbstractIndexingMethod end
 abstract type AbstractChunker <: AbstractIndexingMethod end
 # For get_embeddings function
 abstract type AbstractEmbedder <: AbstractIndexingMethod end
+# For get_keywords function
+abstract type AbstractProcessor <: AbstractIndexingMethod end
 # For get_tags function
 abstract type AbstractTagger <: AbstractIndexingMethod end
 
@@ -251,6 +253,7 @@ abstract type AbstractAnnotationStyler end
 function build_index end
 function get_chunks end
 function get_embeddings end
+function get_keywords end
 function get_tags end
 # Sub-routing of get_tags, extended in ext/RAGToolsExperimentalExt.jl
 "Builds a matrix of tags and a vocabulary list. REQUIRES SparseArrays and LinearAlgebra packages to be loaded!!"
