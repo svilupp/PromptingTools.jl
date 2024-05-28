@@ -9,9 +9,11 @@ Let's build a Retrieval-Augmented Generation (RAG) chatbot, tailored to navigate
 
 If you're not familiar with "RAG", start with this [article](https://towardsdatascience.com/add-your-own-data-to-an-llm-using-retrieval-augmented-generation-rag-b1958bf56a5a).
 
+Note: You must first import `LinearAlgebra`, `SparseArrays`, and `Unicode` to use this example!
+
 
 ````julia
-using LinearAlgebra, SparseArrays
+using LinearAlgebra, SparseArrays, Unicode
 using PromptingTools
 using PromptingTools.Experimental.RAGTools
 ## Note: RAGTools module is still experimental and will change in the future. Ideally, they will be cleaned up and moved to a dedicated package

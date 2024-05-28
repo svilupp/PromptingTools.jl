@@ -3,7 +3,7 @@
 
 Provides Retrieval-Augmented Generation (RAG) functionality.
 
-Requires: LinearAlgebra, SparseArrays, PromptingTools for proper functionality.
+Requires: LinearAlgebra, SparseArrays, Unicode, PromptingTools for proper functionality.
 
 This module is experimental and may change at any time. It is intended to be moved to a separate package in the future.
 """
