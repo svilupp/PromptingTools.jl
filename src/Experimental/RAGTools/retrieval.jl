@@ -294,7 +294,7 @@ function find_closest(
         mapreduce(
             c -> find_closest(finder, index, c; top_k = top_k_, kwargs...), vcat, eachcol(query_emb))
     else
-        @assert length(query_tokens)==size(query_emb, 2) "Length of `query_tokens` must be equal to the number of columns in `query_emb`."
+        @assert length(query_tokens)==size(query_emb, 2) "Length of `query_tokens` must be equal to the number of columns in `query_emb`. Provided: $(length(query_tokens)) vs $(size(query_emb, 2))"
         mapreduce(
             (emb, tok) -> find_closest(finder, index, emb, tok; top_k = top_k_, kwargs...), vcat, eachcol(query_emb), query_tokens)
     end
@@ -599,7 +599,7 @@ function rerank(reranker::AbstractReranker,
 end
 
 function rerank(reranker::NoReranker,
-        index::AbstractMultiIndex,
+        index::AbstractDocumentIndex,
         question::AbstractString,
         candidates::AbstractCandidateChunks;
         top_n::Integer = length(candidates),
@@ -611,7 +611,7 @@ end
 
 """
     rerank(
-        reranker::CohereReranker, index::AbstractChunkIndex, question::AbstractString,
+        reranker::CohereReranker, index::AbstractDocumentIndex, question::AbstractString,
         candidates::AbstractCandidateChunks;
         verbose::Bool = false,
         api_key::AbstractString = PT.COHERE_API_KEY,
@@ -637,7 +637,7 @@ Re-ranks a list of candidate chunks using the Cohere Rerank API. See https://coh
     
 """
 function rerank(
-        reranker::CohereReranker, index::AbstractChunkIndex, question::AbstractString,
+        reranker::CohereReranker, index::AbstractDocumentIndex, question::AbstractString,
         candidates::AbstractCandidateChunks;
         verbose::Bool = false,
         api_key::AbstractString = PT.COHERE_API_KEY,
@@ -647,10 +647,11 @@ function rerank(
         cost_tracker = Threads.Atomic{Float64}(0.0),
         kwargs...)
     @assert top_n>0 "top_n must be a positive integer."
-    @assert index.id==candidates.index_id "The index id of the index and `candidates` must match."
 
     ## Call the API
     documents = index[candidates, :chunks]
+    @assert !(isempty(documents)) "The candidate chunks must not be empty for Cohere Reranker! Check the index IDs."
+
     verbose &&
         @info "Calling Cohere Rerank API with $(length(documents)) candidate chunks..."
     r = cohere_api(;
@@ -670,6 +671,11 @@ function rerank(
         doc = r.response[:results][i]
         positions[i] = candidates.positions[doc[:index] + 1]
         scores[i] = doc[:relevance_score]
+        index_ids = if index isa AbstractMultiIndex
+            candidates.index_ids[doc[:index] + 1]
+        else
+            index.id
+        end
     end
 
     ## Check the cost
@@ -683,7 +689,11 @@ function rerank(
     end
     verbose && @info "Reranking done. $search_units_str"
 
-    return CandidateChunks(index.id, positions, scores)
+    index_ids = if index isa AbstractMultiIndex
+        MultiCandidateChunks(index_ids, positions, scores)
+    else
+        CandidateChunks(index_ids, positions, scores)
+    end
 end
 
 ### Overall types for `retrieve`
@@ -966,8 +976,8 @@ function retrieve(retriever::AbstractRetriever,
         answer = nothing,
         rephrased_questions,
         final_answer = nothing,
-        context = index[reranked_candidates, :chunks],
-        sources = index[reranked_candidates, :sources],
+        context = collect(index[reranked_candidates, :chunks]),
+        sources = collect(index[reranked_candidates, :sources]),
         emb_candidates,
         tag_candidates,
         filtered_candidates,

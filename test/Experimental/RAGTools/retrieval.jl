@@ -620,6 +620,28 @@ end
     @test result.context == ["chunk2", "chunk1", "chunk4", "chunk3"]
     @test result.sources isa Vector{String}
 
+    # Multi-index retriever
+    index_keywords = ChunkKeywordsIndex(index, index_id = :TestChunkIndexX)
+    # Create MultiIndex instance
+    multi_index = MultiIndex(id = :multi, indexes = [index, index_keywords])
+
+    # Create MultiFinder instance
+    finder = MultiFinder([RT.CosineSimilarity(), RT.BM25Similarity()])
+    retriever = SimpleRetriever(; processor = RT.KeywordsProcessor(), finder)
+    result = retrieve(retriever, multi_index, question;
+        reranker = NoReranker(), # we need to disable cohere as we cannot test it
+        rephraser_kwargs = (; model = "mock-gen"),
+        embedder_kwargs = (; model = "mock-emb"),
+        tagger_kwargs = (; model = "mock-meta"), api_kwargs = (;
+            url = "http://localhost:$(PORT)"))
+    @test result.question == question
+    @test result.rephrased_questions == [question]
+    @test result.answer == nothing
+    @test result.final_answer == nothing
+    @test result.reranked_candidates.positions == [2, 1, 4, 3]
+    @test result.context == ["chunk2", "chunk1", "chunk4", "chunk3"]
+    @test result.sources == ["source2", "source1", "source4", "source3"]
+
     # clean up
     close(echo_server)
 end
