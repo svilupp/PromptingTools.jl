@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.28.0]
+
+### Added
+- Added Mistral coding-oriented [Codestral](https://mistral.ai/news/codestral/) to the model registry, aliased as `codestral` or `mistralc`. It's very fast, performant and much cheaper than similar models.
+
 ## [0.27.0]
 
 ### Added
