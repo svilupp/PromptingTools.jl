@@ -1,7 +1,7 @@
 using Documenter, DocumenterVitepress
 using PromptingTools
 const PT = PromptingTools
-using SparseArrays, LinearAlgebra, Markdown
+using SparseArrays, LinearAlgebra, Markdown, Unicode, FlashRank
 using PromptingTools.Experimental.RAGTools
 using PromptingTools.Experimental.AgentTools
 using JSON3, Serialization, DataFramesMeta
