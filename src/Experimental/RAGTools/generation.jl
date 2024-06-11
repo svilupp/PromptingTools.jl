@@ -520,6 +520,9 @@ To customize the components, replace corresponding fields for each step of the R
     retriever::AbstractRetriever = SimpleRetriever()
     generator::AbstractGenerator = SimpleGenerator()
 end
+function Base.show(io::IO, cfg::AbstractRAGConfig)
+    dump(io, cfg; maxdepth = 2)
+end
 
 """
     airag(cfg::AbstractRAGConfig, index::AbstractDocumentIndex;

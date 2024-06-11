@@ -575,6 +575,36 @@ Rerank strategy using the Cohere Rerank API. Requires an API key.
 """
 struct CohereReranker <: AbstractReranker end
 
+"""
+    FlashRanker <: AbstractReranker
+
+Rerank strategy using the package FlashRank.jl and local models.
+
+You must first import the FlashRank.jl package.
+To automatically download any required models, set your 
+`ENV["DATADEPS_ALWAYS_ACCEPT"] = true` (see [DataDeps](https://www.oxinabox.net/DataDeps.jl/dev/z10-for-end-users/) for more details).
+
+# Example
+```julia
+using FlashRank
+
+# Wrap the model to be a valid Ranker recognized by RAGTools
+# It will be provided to the airag/rerank function to avoid instantiating it on every call
+reranker = FlashRank.RankerModel(:mini) |> FlashRanker
+# You can choose :tiny or :mini
+
+## Apply to the pipeline configuration, eg, 
+cfg = RAGConfig(; retriever = AdvancedRetriever(; reranker))
+
+# Ask a question (assumes you have some `index`)
+question = "What are the best practices for parallel computing in Julia?"
+result = airag(cfg, index; question, return_all = true)
+```
+"""
+struct FlashRanker{T} <: AbstractReranker
+    model::T
+end
+
 function rerank(reranker::AbstractReranker,
         index::AbstractDocumentIndex, question::AbstractString, candidates::AbstractCandidateChunks; kwargs...)
     throw(ArgumentError("Not implemented yet"))
