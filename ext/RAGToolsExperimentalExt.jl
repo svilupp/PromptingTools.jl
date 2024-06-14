@@ -18,16 +18,16 @@ end
 """
     RT.build_tags(
         tagger::RT.AbstractTagger, chunk_metadata::AbstractVector{
-            <:AbstractVector{String},
+            <:AbstractVector{<:AbstractString},
         })
 
 Builds a sparse matrix of tags and a vocabulary from the given vector of chunk metadata.
 """
 function RT.build_tags(
         tagger::RT.AbstractTagger, chunk_metadata::AbstractVector{
-            <:AbstractVector{String},
+            <:AbstractVector{<:AbstractString},
         })
-    tags_vocab_ = vcat(chunk_metadata...) |> unique |> sort
+    tags_vocab_ = vcat(chunk_metadata...) |> unique |> sort .|> String
     tags_vocab_index = Dict{String, Int}(t => i for (i, t) in enumerate(tags_vocab_))
     Is, Js = Int[], Int[]
     for i in eachindex(chunk_metadata)
