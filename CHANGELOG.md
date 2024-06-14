@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.30.0]
+
+### Fixed
+- Fixed a bug on Julia 1.11 beta by adding REPL stdlib as a direct dependency.
+- Fixed too restrictive argument types for `RAGTools.build_tags` method.
+
 ## [0.29.0]
 
 ### Added

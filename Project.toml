@@ -1,7 +1,7 @@
 name = "PromptingTools"
 uuid = "670122d1-24a8-4d70-bfce-740807c42192"
 authors = ["J S @svilupp and contributors"]
-version = "0.29.0"
+version = "0.30.0"
 
 [deps]
 AbstractTrees = "1520ce14-60c1-5f80-bbc7-55ef81b5835c"
@@ -14,6 +14,7 @@ OpenAI = "e9f21f70-7185-4079-aca2-91159181367c"
 Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 PrecompileTools = "aea7be01-6a6a-4083-8856-8a6e6704d82a"
 Preferences = "21216c6a-2e73-6563-6e65-726566657250"
+REPL = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
@@ -49,6 +50,7 @@ OpenAI = "0.9"
 Pkg = "<0.0.1, 1"
 PrecompileTools = "1"
 Preferences = "1"
+REPL = "<0.0.1, 1"
 Random = "<0.0.1, 1"
 SparseArrays = "<0.0.1, 1"
 Statistics = "<0.0.1, 1"
