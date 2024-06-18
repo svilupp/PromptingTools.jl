@@ -650,3 +650,12 @@ function auth_header(api_key::Union{Nothing, AbstractString};
         pushfirst!(headers, "x-api-key" => "$api_key")
     return headers
 end
+
+"""
+    unique_permutation(inputs::AbstractVector)
+
+Returns indices of unique items in a vector `inputs`. Access the unique values as `inputs[unique_permutation(inputs)]`.
+"""
+function unique_permutation(inputs::AbstractVector)
+    return unique(i -> inputs[i], eachindex(inputs))
+end
