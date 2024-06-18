@@ -5,7 +5,8 @@ using PromptingTools: _extract_handlebar_variables, call_cost, call_cost_alterna
 using PromptingTools: _string_to_vector, _encode_local_image
 using PromptingTools: DataMessage, AIMessage
 using PromptingTools: push_conversation!,
-                      resize_conversation!, @timeout, preview, pprint, auth_header
+                      resize_conversation!, @timeout, preview, pprint, auth_header,
+                      unique_permutation
 
 @testset "replace_words" begin
     words = ["Disney", "Snow White", "Mickey Mouse"]
@@ -370,4 +371,60 @@ end
         "Accept" => "application/json",
         "version" => "1.0"
     ]
+end
+
+@testset "unique_permutation" begin
+    # Test with an empty array
+    @test unique_permutation([]) == []
+
+    # Test with an array of integers
+    @test unique_permutation([1, 2, 3, 2, 1]) == [1, 2, 3]
+
+    # Test with an array of strings
+    @test unique_permutation(["apple", "banana", "apple", "orange"]) == [1, 2, 4]
+
+    # Test with repeated identical elements
+    @test unique_permutation([4, 4, 4, 4]) == [1]
+
+    # Test with non-consecutive duplicates
+    @test unique_permutation([1, 2, 3, 1, 2, 3, 1, 2, 3]) == [1, 2, 3]
+    @test unique_permutation([1, 2, 1, 2, 1, 2, 3, 1, 2, 3]) == [1, 2, 7]
+
+    # Test with an array of negative integers
+    @test unique_permutation([-1, -2, -3, -2, -1]) == [1, 2, 3]
+
+    # Test with an array of mixed positive and negative integers
+    @test unique_permutation([1, -1, 2, -2, 1, -1]) == [1, 2, 3, 4]
+
+    # Test with an array of floating point numbers
+    @test unique_permutation([1.1, 2.2, 3.3, 2.2, 1.1]) == [1, 2, 3]
+
+    # Test with an array of mixed integers and floating point numbers
+    @test unique_permutation([1, 2.0, 3, 2.0, 1]) == [1, 2, 3]
+
+    # Test with an array of very large integers
+    @test unique_permutation([10^10, 10^10, 10^12, 10^11, 10^12]) == [1, 3, 4]
+
+    # Test with an array of very small floating point numbers
+    @test unique_permutation([1e-10, 1e-10, 1e-12, 1e-11, 1e-12]) == [1, 3, 4]
+
+    # Test with an array of strings with different cases
+    @test unique_permutation(["Apple", "apple", "Banana", "banana", "Apple"]) ==
+          [1, 2, 3, 4]
+
+    # Test with an array of mixed data types
+    @test unique_permutation([1, "1", 2, "2", 1]) == [1, 2, 3, 4]
+
+    # Test with an array of complex numbers
+    @test unique_permutation([1 + 1im, 2 + 2im, 1 + 1im, 3 + 3im]) == [1, 2, 4]
+
+    # Test with an array of tuples
+    @test unique_permutation([(1, 2), (3, 4), (1, 2), (5, 6)]) == [1, 2, 4]
+
+    # Test with an array of arrays
+    @test unique_permutation([[1, 2], [3, 4], [5, 6], [1, 2]]) == [1, 2, 3]
+
+    # Test with an array of dictionaries
+    @test unique_permutation([
+        Dict(:a => 1), Dict(:b => 2), Dict(:a => 1), Dict(:c => 3)]) == [1, 2, 4]
 end
