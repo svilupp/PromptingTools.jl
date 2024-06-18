@@ -479,7 +479,7 @@ function Base.getindex(ci::AbstractDocumentIndex,
 end
 function Base.getindex(ci::AbstractChunkIndex,
         candidate::CandidateChunks{TP, TD},
-        field::Symbol = :chunks) where {TP <: Integer, TD <: Real}
+        field::Symbol = :chunks; sorted::Bool = true) where {TP <: Integer, TD <: Real}
     @assert field in [:chunks, :embeddings, :chunkdata, :sources] "Only `chunks`, `embeddings`, `chunkdata`, `sources` fields are supported for now"
     field = field == :embeddings ? :chunkdata : field
     len_ = length(chunks(ci))
@@ -504,7 +504,8 @@ function Base.getindex(ci::AbstractChunkIndex,
 end
 function Base.getindex(mi::MultiIndex,
         candidate::CandidateChunks{TP, TD},
-        field::Symbol = :chunks) where {TP <: Integer, TD <: Real}
+        field::Symbol = :chunks; sorted::Bool = true) where {TP <: Integer, TD <: Real}
+    ## Always sorted!
     @assert field in [:chunks, :sources] "Only `chunks`, `sources` fields are supported for now"
     valid_index = findfirst(x -> x.id == candidate.index_id, indexes(mi))
     if isnothing(valid_index) && field == :chunks
@@ -549,7 +550,7 @@ end
 # Getindex on Multiindex, pool the individual hits
 function Base.getindex(mi::MultiIndex,
         candidate::MultiCandidateChunks{TP, TD},
-        field::Symbol = :chunks; sorted::Bool = false) where {TP <: Integer, TD <: Real}
+        field::Symbol = :chunks; sorted::Bool = true) where {TP <: Integer, TD <: Real}
     @assert field in [:chunks, :sources, :scores] "Only `chunks`, `sources`, and `scores` fields are supported for now"
     if sorted
         # values can be either of chunks or sources

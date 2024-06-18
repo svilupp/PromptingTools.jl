@@ -196,10 +196,14 @@ function find_closest(
         top_k::Int = 100, minimum_similarity::AbstractFloat = -1.0, kwargs...)
     # emb is an embedding matrix where the first dimension is the embedding dimension
     scores = query_emb' * emb |> vec
-    positions = scores |> sortperm |> x -> last(x, top_k) |> reverse
+    top_k_min = min(top_k, length(scores))
+    positions = partialsortperm(scores, 1:top_k_min, rev = true)
     if minimum_similarity > -1.0
         mask = scores[positions] .>= minimum_similarity
         positions = positions[mask]
+    else
+        ## we want to materialize the view
+        positions = collect(positions)
     end
     return positions, scores[positions]
 end
@@ -374,7 +378,8 @@ function find_closest(
     ## First pass, both in binary with Hamming, get rescore_multiplier times top_k
     binary_query_emb = map(>(0), query_emb)
     scores = hamming_distance(emb, binary_query_emb)
-    positions = scores |> sortperm |> x -> first(x, top_k * rescore_multiplier)
+    num_candidates = min(top_k * rescore_multiplier, length(scores))
+    positions = partialsortperm(scores, 1:num_candidates)
 
     ## Second pass, rescore with float embeddings and return top_k
     new_positions, scores = find_closest(CosineSimilarity(), @view(emb[:, positions]),
@@ -415,7 +420,8 @@ function find_closest(
     ## First pass, both in binary with Hamming, get rescore_multiplier times top_k
     bit_query_emb = pack_bits(query_emb .> 0)
     scores = hamming_distance(emb, bit_query_emb)
-    positions = scores |> sortperm |> x -> first(x, top_k * rescore_multiplier)
+    num_candidates = min(top_k * rescore_multiplier, length(scores))
+    positions = partialsortperm(scores, 1:num_candidates)
 
     ## Second pass, rescore with float embeddings and return top_k
     unpacked_emb = unpack_bits(@view(emb[:, positions]))
@@ -442,11 +448,15 @@ function find_closest(
         query_emb::AbstractVector{<:Real}, query_tokens::AbstractVector{<:AbstractString} = String[];
         top_k::Int = 100, minimum_similarity::AbstractFloat = -1.0, kwargs...)
     bm_scores = bm25(dtm, query_tokens)
-    positions = bm_scores |> sortperm |> x -> last(x, top_k) |> reverse
+    top_k_min = min(top_k, length(bm_scores))
+    positions = partialsortperm(bm_scores, 1:top_k_min, rev = true)
 
     if minimum_similarity > -1.0
         mask = scores[positions] .>= minimum_similarity
         positions = positions[mask]
+    else
+        # materialize the vector
+        positions = positions |> collect
     end
     return positions, bm_scores[positions]
 end
@@ -455,7 +465,8 @@ end
 
 function find_tags(::AbstractTagFilter, index::AbstractDocumentIndex,
         tag::Union{T, AbstractVector{<:T}}; kwargs...) where {T <:
-                                                              Union{AbstractString, Regex}}
+                                                              Union{
+        AbstractString, Regex, Nothing}}
     throw(ArgumentError("Not implemented yet for type $(typeof(filter)) and index $(typeof(index))"))
 end
 
@@ -492,24 +503,19 @@ end
 
 """
     find_tags(method::NoTagFilter, index::AbstractChunkIndex,
+        tags::Union{T, AbstractVector{<:T}}; kwargs...) where {T <:
+                                                               Union{
+        AbstractString, Regex, Nothing}}
         tags; kwargs...)
 
-Returns all chunks in the index, ie, no filtering.
+Returns all chunks in the index, ie, no filtering, so we simply return `nothing` (easier for dispatch).
 """
 function find_tags(method::NoTagFilter, index::AbstractChunkIndex,
         tags::Union{T, AbstractVector{<:T}}; kwargs...) where {T <:
                                                                Union{
-        AbstractString, Regex}}
-    return CandidateChunks(
-        index.id, collect(1:length(index.chunks)), zeros(Float32, length(index.chunks)))
+        AbstractString, Regex, Nothing}}
+    return nothing
 end
-
-function find_tags(method::NoTagFilter, index::AbstractChunkIndex,
-        tags::Nothing; kwargs...)
-    return CandidateChunks(
-        index.id, collect(1:length(index.chunks)), zeros(Float32, length(index.chunks)))
-end
-
 ## Multi-index implementation
 function find_tags(method::AnyTagFilter, index::AbstractMultiIndex,
         tag::Union{T, AbstractVector{<:T}}; kwargs...) where {T <:
@@ -539,24 +545,8 @@ end
 function find_tags(method::NoTagFilter, index::AbstractMultiIndex,
         tags::Union{T, AbstractVector{<:T}}; kwargs...) where {T <:
                                                                Union{
-        AbstractString, Regex}}
-    indexes_ = indexes(index)
-    length_ = sum(x -> length(x.chunks), indexes_)
-    index_ids = [fill(x.id, length(x.chunks)) for x in indexes_] |> Base.Splat(vcat)
-
-    return MultiCandidateChunks(
-        index_ids, collect(1:length_),
-        zeros(Float32, length_))
-end
-function find_tags(method::NoTagFilter, index::AbstractMultiIndex,
-        tags::Nothing; kwargs...)
-    indexes_ = indexes(index)
-    length_ = sum(x -> length(x.chunks), indexes_)
-    index_ids = [fill(x.id, length(x.chunks)) for x in indexes_] |> Base.Splat(vcat)
-
-    return MultiCandidateChunks(
-        index_ids, collect(1:length_),
-        zeros(Float32, length_))
+        AbstractString, Regex, Nothing}}
+    return nothing
 end
 
 ### Reranking
@@ -966,6 +956,7 @@ function retrieve(retriever::AbstractRetriever,
         filter, index, tags; verbose = (verbose > 1), filter_kwargs_...)
 
     ## Combine the two sets of candidates, looks for intersection (hard filter)!
+    # With tagger=NoTagger() get_tags returns `nothing` find_tags simply passes it through to skip the intersection
     filtered_candidates = isnothing(tag_candidates) ? emb_candidates :
                           (emb_candidates & tag_candidates)
     ## TODO: Future implementation should be to apply tag filtering BEFORE the find_closest,
