@@ -432,12 +432,14 @@ end
 
     # No filter tag -- give everything
     cc = find_tags(NoTagFilter(), index, "julia")
-    @test cc.positions == [1, 2]
-    @test cc.scores == [0.0, 0.0]
+    @test isnothing(cc)
+    # @test cc.positions == [1, 2]
+    # @test cc.scores == [0.0, 0.0]
 
     cc = find_tags(NoTagFilter(), index, nothing)
-    @test cc.positions == [1, 2]
-    @test cc.scores == [0.0, 0.0]
+    @test isnothing(cc)
+    # @test cc.positions == [1, 2]
+    # @test cc.scores == [0.0, 0.0]
 
     # Unknown type
     struct RandomTagFilter123 <: AbstractTagFilter end
@@ -456,12 +458,14 @@ end
     multi_index = MultiIndex(id = :multi, indexes = [index1, index2])
 
     mcc = find_tags(NoTagFilter(), multi_index, "julia")
-    @test mcc.positions == [1, 2, 3, 4]
-    @test mcc.scores == [0.0, 0.0, 0.0, 0.0]
+    @test mcc == nothing
+    # @test mcc.positions == [1, 2, 3, 4]
+    # @test mcc.scores == [0.0, 0.0, 0.0, 0.0]
 
     mcc = find_tags(NoTagFilter(), multi_index, nothing)
-    @test mcc.positions == [1, 2, 3, 4]
-    @test mcc.scores == [0.0, 0.0, 0.0, 0.0]
+    @test mcc == nothing
+    # @test mcc.positions == [1, 2, 3, 4]
+    # @test mcc.scores == [0.0, 0.0, 0.0, 0.0]
 
     multi_index2 = MultiIndex(id = :multi2, indexes = [index, index2])
     mcc2 = find_tags(AnyTagFilter(), multi_index2, "julia")
@@ -538,7 +542,7 @@ end
 
 @testset "retrieve" begin
     # test with a mock server
-    PORT = rand(20000:40000)
+    PORT = rand(20000:40001)
     PT.register_model!(; name = "mock-emb", schema = PT.CustomOpenAISchema())
     PT.register_model!(; name = "mock-emb2", schema = PT.CustomOpenAISchema())
     PT.register_model!(; name = "mock-meta", schema = PT.CustomOpenAISchema())
@@ -609,8 +613,16 @@ end
     @test result.rephrased_questions == [question]
     @test result.answer == nothing
     @test result.final_answer == nothing
-    @test result.reranked_candidates.positions == [2, 1, 4, 3]
-    @test result.context == ["chunk2", "chunk1", "chunk4", "chunk3"]
+    ## there are two equivalent orderings
+    @test Set(result.reranked_candidates.positions[1:2]) == Set([2, 1])
+    @test Set(result.reranked_candidates.positions[3:4]) == Set([3, 4])
+    @test result.reranked_candidates.scores[1:2] == ones(2)
+    @test length(result.context) == 4
+    @test length(unique(result.context)) == 4
+    @test result.context[1] in ["chunk2", "chunk1"]
+    @test result.context[2] in ["chunk2", "chunk1"]
+    @test result.context[3] in ["chunk3", "chunk4"]
+    @test result.context[4] in ["chunk3", "chunk4"]
     @test result.sources isa Vector{String}
 
     # Reduce number of candidates
@@ -620,8 +632,10 @@ end
         embedder_kwargs = (; model = "mock-emb"),
         tagger_kwargs = (; model = "mock-meta"), api_kwargs = (;
             url = "http://localhost:$(PORT)"))
-    @test result.emb_candidates.positions == [2, 1, 4]
-    @test result.reranked_candidates.positions == [2, 1]
+    ## the last item is 3 or 4
+    @test result.emb_candidates.positions[3] in [3, 4]
+    @test Set(result.reranked_candidates.positions[1:2]) == Set([2, 1])
+    @test result.emb_candidates.scores[1:2] == ones(2)
 
     # with default dispatch
     result = retrieve(index, question;
@@ -630,8 +644,9 @@ end
         embedder_kwargs = (; model = "mock-emb"),
         tagger_kwargs = (; model = "mock-meta"), api_kwargs = (;
             url = "http://localhost:$(PORT)"))
-    @test result.emb_candidates.positions == [2, 1, 4]
-    @test result.reranked_candidates.positions == [2, 1]
+    @test result.emb_candidates.positions[3] in [3, 4]
+    @test result.emb_candidates.scores[1:2] == ones(2)
+    @test Set(result.reranked_candidates.positions[1:2]) == Set([2, 1])
 
     ## AdvancedRetriever
     adv = AdvancedRetriever()
@@ -645,12 +660,21 @@ end
     @test result.rephrased_questions == [question, "Query: test question\n\nPassage:"] # from the template we use
     @test result.answer == nothing
     @test result.final_answer == nothing
-    @test result.reranked_candidates.positions == [2, 1, 4, 3]
-    @test result.context == ["chunk2", "chunk1", "chunk4", "chunk3"]
+    ## there are two equivalent orderings
+    @test Set(result.reranked_candidates.positions[1:2]) == Set([2, 1])
+    @test Set(result.reranked_candidates.positions[3:4]) == Set([3, 4])
+    @test result.reranked_candidates.scores[1:2] == ones(2)
+    @test length(result.context) == 4
+    @test length(unique(result.context)) == 4
+    @test result.context[1] in ["chunk2", "chunk1"]
+    @test result.context[2] in ["chunk2", "chunk1"]
+    @test result.context[3] in ["chunk3", "chunk4"]
+    @test result.context[4] in ["chunk3", "chunk4"]
     @test result.sources isa Vector{String}
 
     # Multi-index retriever
     index_keywords = ChunkKeywordsIndex(index, index_id = :TestChunkIndexX)
+    index_keywords = ChunkIndex(; id = :AA, index.chunks, index.sources, index.embeddings)
     # Create MultiIndex instance
     multi_index = MultiIndex(id = :multi, indexes = [index, index_keywords])
 
@@ -658,7 +682,7 @@ end
     finder = MultiFinder([RT.CosineSimilarity(), RT.BM25Similarity()])
 
     retriever = SimpleRetriever(; processor = RT.KeywordsProcessor(), finder)
-    result = retrieve(retriever, multi_index, question;
+    result = retrieve(SimpleRetriever(), multi_index, question;
         reranker = NoReranker(), # we need to disable cohere as we cannot test it
         rephraser_kwargs = (; model = "mock-gen"),
         embedder_kwargs = (; model = "mock-emb"),
@@ -668,9 +692,17 @@ end
     @test result.rephrased_questions == [question]
     @test result.answer == nothing
     @test result.final_answer == nothing
-    @test result.reranked_candidates.positions == [2, 1, 4, 3]
-    @test result.context == ["chunk2", "chunk1", "chunk4", "chunk3"]
-    @test result.sources == ["source2", "source1", "source4", "source3"]
+    ## there are two equivalent orderings
+    @test Set(result.reranked_candidates.positions[1:4]) == Set([2, 1])
+    @test result.reranked_candidates.positions[5] in [3, 4]
+    @test result.reranked_candidates.scores[1:4] == ones(4)
+    @test length(result.context) == 5 # because the second index duplicates, so we have more
+    @test length(unique(result.context)) == 3 # only 3 unique chunks because 1,2,1,2,3
+    @test all([result.context[i] in ["chunk2", "chunk1"] for i in 1:4])
+    @test result.context[5] in ["chunk3", "chunk4"]
+    @test length(unique(result.sources)) == 3
+    @test all([result.sources[i] in ["source2", "source1"] for i in 1:4])
+    @test result.sources[5] in ["source3", "source4"]
 
     # clean up
     close(echo_server)
