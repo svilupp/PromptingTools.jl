@@ -537,8 +537,20 @@ binx = unpack_bits(binint)
 @assert bin == binx
 ```
 """
+# function unpack_bits(packed_vector::AbstractVector{UInt64})
+#     return Bool[((x >> i) & 1) == 1 for x in packed_vector for i in 0:63]
+# end
 function unpack_bits(packed_vector::AbstractVector{UInt64})
-    return Bool[((x >> i) & 1) == 1 for x in packed_vector for i in 0:63]
+    n = length(packed_vector)
+    result = Vector{Bool}(undef, n * 64)
+    @inbounds @simd for i in 1:n
+        x = packed_vector[i]
+        for j in 1:64
+            result[(i - 1) * 64 + j] = (x & 1) == 1
+            x >>= 1
+        end
+    end
+    return result
 end
 function unpack_bits(packed_matrix::AbstractMatrix{UInt64})
     num_rows, num_cols = size(packed_matrix)
