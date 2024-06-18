@@ -62,8 +62,8 @@ function RT.rerank(
     documents = index[candidates, :chunks]
     @assert !(isempty(documents)) "The candidate chunks must not be empty for Cohere Reranker! Check the index IDs."
 
-    index_ids = candidates isa RT.MultiCandidateChunks ? candidates.index_ids :
-                candidates.index_id
+    is_multi_cand = candidates isa RT.MultiCandidateChunks
+    index_ids = is_multi_cand ? candidates.index_ids : candidates.index_id
     positions = candidates.positions
     ## Find unique only items
     if unique_chunks
@@ -71,7 +71,7 @@ function RT.rerank(
         unique_idxs = PT.unique_permutation(documents)
         documents = documents[unique_idxs]
         positions = positions[unique_idxs]
-        index_ids = index_ids[unique_idxs]
+        index_ids = is_multi_cand ? index_ids[unique_idxs] : index_ids
     end
 
     ## Run re-ranker
@@ -82,9 +82,9 @@ function RT.rerank(
     scores = result.scores
     positions = positions[result.positions]
 
-    verbose && @info "Reranking done in $(round(res.elapsed; digits=1)) seconds."
+    verbose && @info "Reranking done in $(round(result.elapsed; digits=1)) seconds."
 
-    return candidates isa RT.MultiCandidateChunks ?
+    return is_multi_cand ?
            RT.MultiCandidateChunks(index_ids[result.positions], positions, scores) :
            RT.CandidateChunks(index_ids, positions, scores)
 end
