@@ -8,7 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-### Fixed
+## [0.31.1]
+
+### Updated
+- Improved the implementation of `RAGTools.unpack_bits` to be faster with fewer allocations.
 
 ## [0.31.0]
 
