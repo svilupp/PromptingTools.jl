@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+## Fixed
+
+## [0.32.0]
+
+## Updated
+- Changed behavior of `RAGTools.rerank(::FlashRanker,...)` to always dedupe input chunks (to reduce compute requirements).
+
 ## [0.31.1]
 
 ### Updated

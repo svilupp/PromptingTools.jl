@@ -14,6 +14,7 @@ using FlashRank
         candidates::RT.AbstractCandidateChunks;
         verbose::Bool = false,
         top_n::Integer = length(candidates.scores),
+        unique_chunks::Bool = true,
         kwargs...)
 
 Re-ranks a list of candidate chunks using the FlashRank.jl local models.
@@ -25,6 +26,7 @@ Re-ranks a list of candidate chunks using the FlashRank.jl local models.
 - `candidates`: The candidate chunks to be re-ranked.
 - `top_n`: The number of most relevant documents to return. Default is `length(documents)`.
 - `verbose`: A boolean flag indicating whether to print verbose logging. Default is `false`.
+- `unique_chunks`: A boolean flag indicating whether to remove duplicates from the candidate chunks prior to reranking (saves compute time). Default is `true`.
     
 # Example
 
@@ -54,10 +56,23 @@ function RT.rerank(
         candidates::RT.AbstractCandidateChunks;
         verbose::Bool = false,
         top_n::Integer = length(candidates.scores),
+        unique_chunks::Bool = true,
         kwargs...)
     @assert top_n>0 "top_n must be a positive integer."
     documents = index[candidates, :chunks]
     @assert !(isempty(documents)) "The candidate chunks must not be empty for Cohere Reranker! Check the index IDs."
+
+    index_ids = candidates isa RT.MultiCandidateChunks ? candidates.index_ids :
+                candidates.index_id
+    positions = candidates.positions
+    ## Find unique only items
+    if unique_chunks
+        verbose && @info "Removing duplicates from candidate chunks prior to reranking"
+        unique_idxs = PT.unique_permutation(documents)
+        documents = documents[unique_idxs]
+        positions = positions[unique_idxs]
+        index_ids = index_ids[unique_idxs]
+    end
 
     ## Run re-ranker
     ranker = reranker.model
@@ -65,17 +80,12 @@ function RT.rerank(
 
     ## Unwrap re-ranked positions
     scores = result.scores
-    positions = candidates.positions[result.positions]
-    index_ids = if candidates isa RT.MultiCandidateChunks
-        candidates.index_ids[result.positions]
-    else
-        candidates.index_id
-    end
+    positions = positions[result.positions]
 
     verbose && @info "Reranking done in $(round(res.elapsed; digits=1)) seconds."
 
     return candidates isa RT.MultiCandidateChunks ?
-           RT.MultiCandidateChunks(index_ids, positions, scores) :
+           RT.MultiCandidateChunks(index_ids[result.positions], positions, scores) :
            RT.CandidateChunks(index_ids, positions, scores)
 end
 
