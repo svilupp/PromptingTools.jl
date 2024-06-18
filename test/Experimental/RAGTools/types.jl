@@ -539,11 +539,16 @@ end
         index_ids = [Symbol("TestChunkIndex"), Symbol("TestChunkIndex2")],
         positions = [1, 3],  # Assuming chunks_data has only 3 elements, position 4 is out of bounds
         scores = [0.5, 0.7])
-    @test mi[mc1] == ["First chunk", "6"]
+    ## sorted=true by default
+    @test mi[mc1] == ["6", "First chunk"]
     @test Base.getindex(mi, mc1, :chunks; sorted = true) == ["6", "First chunk"]
     @test Base.getindex(mi, mc1, :sources; sorted = true) ==
           ["other_source3", "test_source1"]
     @test Base.getindex(mi, mc1, :scores; sorted = true) == [0.7, 0.5]
+    @test Base.getindex(mi, mc1, :chunks; sorted = false) == ["First chunk", "6"]
+    @test Base.getindex(mi, mc1, :sources; sorted = false) ==
+          ["test_source1", "other_source3"]
+    @test Base.getindex(mi, mc1, :scores; sorted = false) == [0.5, 0.7]
 end
 
 @testset "RAGResult" begin

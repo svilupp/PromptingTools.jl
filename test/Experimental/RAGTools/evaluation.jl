@@ -155,6 +155,7 @@ end
         embeddings = zeros(128, 3),
         tags = vcat(trues(2, 2), falses(1, 2)),
         tags_vocab = ["yes", "no"])
+    index.embeddings[1, 1] = 1
 
     # Test for successful Q&A extraction from document chunks
     qa_evals = build_qa_evals(chunks(index),
@@ -193,7 +194,7 @@ end
         api_kwargs = (; url = "http://localhost:$(PORT)"),
         parameters_dict = Dict(:key1 => "value1", :key2 => 2))
     @test result.retrieval_score == 1.0
-    @test result.retrieval_rank == 2
+    @test result.retrieval_rank == 1
     @test result.answer_score == 5
     @test result.parameters == Dict(:key1 => "value1", :key2 => 2)
 
