@@ -350,9 +350,9 @@ aliases = merge(
         "mistralc" => "codestral-latest",
         "codestral" => "codestral-latest",
         ## Default to Sonnet as a the medium offering
-        "claude" => "claude-3-sonnet-20240229",
+        "claude" => "claude-3-5-sonnet-20240620",
         "claudeo" => "claude-3-opus-20240229",
-        "claudes" => "claude-3-sonnet-20240229",
+        "claudes" => "claude-3-5-sonnet-20240620",
         "claudeh" => "claude-3-haiku-20240307",
         ## Groq
         "gllama3" => "llama3-8b-8192",
@@ -653,6 +653,11 @@ registry = Dict{String, ModelSpec}(
         9e-7,
         "Meta Llama3 70b from Mistral, hosted by Together.ai. For more information, see [models](https://docs.together.ai/docs/inference-models)."),
     ### Anthropic models
+    "claude-3-5-sonnet-20240620" => ModelSpec("claude-3-5-sonnet-20240620",
+        AnthropicSchema(),
+        3e-6,
+        1.5e-5,
+        "Anthropic's latest and strongest model Claude 3 Sonent 3.5. Max output 4096 tokens, 200K context. See details [here](https://docs.anthropic.com/claude/docs/models-overview)"),
     "claude-3-opus-20240229" => ModelSpec("claude-3-opus-20240229",
         AnthropicSchema(),
         1.5e-5,
