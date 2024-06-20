@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.33.0]
+
+### Added
+- Added registry record for Anthropic Claude 3.5 Sonnet with ID `claude-3-5-sonnet-20240620` (read the [blog post](https://www.anthropic.com/news/claude-3-5-sonnet)). Aliases "claude" and "claudes" have been linked to this latest Sonnet model.
+
 ## [0.32.0]
 
 ### Updated

@@ -174,7 +174,7 @@ end
     @test msg == expected_output
     @test schema2.inputs.system == "Act as a helpful AI assistant"
     @test schema2.inputs.messages == [Dict("role" => "user", "content" => "Hello World")]
-    @test schema2.model_id == "claude-3-sonnet-20240229"
+    @test schema2.model_id == "claude-3-5-sonnet-20240620"
 end
 
 @testset "aiextract-Anthropic" begin
