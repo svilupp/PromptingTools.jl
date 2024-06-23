@@ -4,7 +4,7 @@ using SparseArrays, LinearAlgebra, Markdown
 using Statistics
 using Dates: now
 using Test, Pkg, Random
-const PT = PromptingTools
+global PT::Module = PromptingTools
 using Snowball, FlashRank
 using Aqua
 
