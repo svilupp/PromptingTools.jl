@@ -12,6 +12,7 @@ using Aqua
     # Skipping unbound_args check because we need our `MaybeExtract` type to be unboard
     Aqua.test_all(PromptingTools; unbound_args = false)
 end
+
 @testset "PromptingTools.jl" begin
     include("utils.jl")
     include("messages.jl")
@@ -52,4 +53,10 @@ end
     include("Experimental/RAGTools/runtests.jl")
     include("Experimental/AgentTools/runtests.jl")
     include("Experimental/APITools/runtests.jl")
+end
+
+# New test for global PT::Module
+@testset "Global PT::Module" begin
+    @test isdefined(Main, :PT)
+    @test PT === PromptingTools
 end
