@@ -1,3 +1,5 @@
+using Parameters: @with_kw
+
 # Defines the important Globals, model registry and user preferences
 # See below (eg, MODEL_REGISTRY, ModelSpec)
 
@@ -55,10 +57,10 @@ Preferences.jl takes priority over ENV variables, so if you set a preference, it
 
 WARNING: NEVER EVER sync your `LocalPreferences.toml` file! It contains your API key and other sensitive information!!!
 """
-global PREFERENCES::Nothing = nothing
+global PREFERENCES = nothing
 
 "Keys that are allowed to be set via `set_preferences!`"
-global ALLOWED_PREFERENCES::Vector{String} = ["MISTRALAI_API_KEY",
+global ALLOWED_PREFERENCES = ["MISTRALAI_API_KEY",
     "OPENAI_API_KEY",
     "COHERE_API_KEY",
     "DATABRICKS_API_KEY",
@@ -124,10 +126,10 @@ function get_preferences(key::String)
 end
 
 ## Load up GLOBALS
-global MODEL_CHAT::String = @load_preference("MODEL_CHAT", default="gpt-3.5-turbo")
-global MODEL_EMBEDDING::String = @load_preference("MODEL_EMBEDDING",
+global MODEL_CHAT = @load_preference("MODEL_CHAT", default="gpt-3.5-turbo")
+global MODEL_EMBEDDING = @load_preference("MODEL_EMBEDDING",
     default="text-embedding-3-small")
-global MODEL_IMAGE_GENERATION::String = @load_preference("MODEL_IMAGE_GENERATION",
+global MODEL_IMAGE_GENERATION = @load_preference("MODEL_IMAGE_GENERATION",
     default="dall-e-3")
 # the prompt schema default is defined in llm_interace.jl !
 # const PROMPT_SCHEMA = OpenAISchema()
@@ -135,68 +137,68 @@ global MODEL_IMAGE_GENERATION::String = @load_preference("MODEL_IMAGE_GENERATION
 # First, load from preferences, then from environment variables
 # Note: We load first into a variable `temp_` to avoid inlining of the get(ENV...) call
 _temp = get(ENV, "OPENAI_API_KEY", "")
-global OPENAI_API_KEY::String = @load_preference("OPENAI_API_KEY",
+global OPENAI_API_KEY = @load_preference("OPENAI_API_KEY",
     default=_temp);
 # Note: Disable this warning by setting OPENAI_API_KEY to anything
 isempty(OPENAI_API_KEY) &&
     @warn "OPENAI_API_KEY variable not set! OpenAI models will not be available - set API key directly via `PromptingTools.OPENAI_API_KEY=<api-key>`!"
 
 _temp = get(ENV, "MISTRALAI_API_KEY", "")
-global MISTRALAI_API_KEY::String = @load_preference("MISTRALAI_API_KEY",
+global MISTRALAI_API_KEY = @load_preference("MISTRALAI_API_KEY",
     default=_temp);
 
 _temp = get(ENV, "COHERE_API_KEY", "")
-global COHERE_API_KEY::String = @load_preference("COHERE_API_KEY",
+global COHERE_API_KEY = @load_preference("COHERE_API_KEY",
     default=_temp);
 
 _temp = get(ENV, "DATABRICKS_API_KEY", "")
-global DATABRICKS_API_KEY::String = @load_preference("DATABRICKS_API_KEY",
+global DATABRICKS_API_KEY = @load_preference("DATABRICKS_API_KEY",
     default=_temp);
 
 _temp = get(ENV, "DATABRICKS_HOST", "")
-global DATABRICKS_HOST::String = @load_preference("DATABRICKS_HOST",
+global DATABRICKS_HOST = @load_preference("DATABRICKS_HOST",
     default=_temp);
 
 _temp = get(ENV, "TAVILY_API_KEY", "")
-global TAVILY_API_KEY::String = @load_preference("TAVILY_API_KEY",
+global TAVILY_API_KEY = @load_preference("TAVILY_API_KEY",
     default=_temp);
 
 _temp = get(ENV, "GOOGLE_API_KEY", "")
-global GOOGLE_API_KEY::String = @load_preference("GOOGLE_API_KEY",
+global GOOGLE_API_KEY = @load_preference("GOOGLE_API_KEY",
     default=_temp);
 
 _temp = get(ENV, "TOGETHER_API_KEY", "")
-global TOGETHER_API_KEY::String = @load_preference("TOGETHER_API_KEY",
+global TOGETHER_API_KEY = @load_preference("TOGETHER_API_KEY",
     default=_temp);
 
 _temp = get(ENV, "FIREWORKS_API_KEY", "")
-global FIREWORKS_API_KEY::String = @load_preference("FIREWORKS_API_KEY",
+global FIREWORKS_API_KEY = @load_preference("FIREWORKS_API_KEY",
     default=_temp);
 
 _temp = get(ENV, "ANTHROPIC_API_KEY", "")
-global ANTHROPIC_API_KEY::String = @load_preference("ANTHROPIC_API_KEY",
+global ANTHROPIC_API_KEY = @load_preference("ANTHROPIC_API_KEY",
     default=_temp);
 
 _temp = get(ENV, "VOYAGE_API_KEY", "")
-global VOYAGE_API_KEY::String = @load_preference("VOYAGE_API_KEY",
+global VOYAGE_API_KEY = @load_preference("VOYAGE_API_KEY",
     default=_temp);
 
 _temp = get(ENV, "GROQ_API_KEY", "")
-global GROQ_API_KEY::String = @load_preference("GROQ_API_KEY",
+global GROQ_API_KEY = @load_preference("GROQ_API_KEY",
     default=_temp);
 
 _temp = get(ENV, "DEEPSEEK_API_KEY", "")
-global DEEPSEEK_API_KEY::String = @load_preference("DEEPSEEK_API_KEY",
+global DEEPSEEK_API_KEY = @load_preference("DEEPSEEK_API_KEY",
     default=_temp);
 
 _temp = get(ENV, "LOCAL_SERVER", "http://localhost:10897/v1")
 ## Address of the local server
-global LOCAL_SERVER::String = @load_preference("LOCAL_SERVER",
+global LOCAL_SERVER = @load_preference("LOCAL_SERVER",
     default=_temp);
 
 _temp = get(ENV, "LOG_DIR", joinpath(pwd(), "log"))
 ## Address of the local server
-global LOG_DIR::String = @load_preference("LOG_DIR",
+global LOG_DIR = @load_preference("LOG_DIR",
     default=_temp);
 
 ## CONVERSATION HISTORY
@@ -210,9 +212,9 @@ Preference available: MAX_HISTORY_LENGTH, which sets how many last messages shou
 See also: `push_conversation!`, `resize_conversation!`
 
 """
-global CONV_HISTORY::Vector{Vector{<:Any}} = Vector{Vector{<:Any}}()
-global CONV_HISTORY_LOCK::ReentrantLock = ReentrantLock()
-global MAX_HISTORY_LENGTH::Union{Int, Nothing} = @load_preference("MAX_HISTORY_LENGTH",
+global CONV_HISTORY = Vector{Vector{<:Any}}()
+global CONV_HISTORY_LOCK = ReentrantLock()
+global MAX_HISTORY_LENGTH = @load_preference("MAX_HISTORY_LENGTH",
     default=5)
 
 ## Model registry
