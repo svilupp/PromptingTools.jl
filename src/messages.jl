@@ -17,14 +17,14 @@ const ALLOWED_PROMPT_TYPE = Union{
 
 # Workaround to be able to add metadata to serialized conversations, templates, etc.
 # Ignored by `render` directives
-Base.@kwdef struct MetadataMessage{T <: AbstractString} <: AbstractChatMessage
+@with_kw struct MetadataMessage{T <: AbstractString} <: AbstractChatMessage
     content::T
     description::String = ""
     version::String = "1"
     source::String = ""
     _type::Symbol = :metadatamessage
 end
-Base.@kwdef struct SystemMessage{T <: AbstractString} <: AbstractChatMessage
+@with_kw struct SystemMessage{T <: AbstractString} <: AbstractChatMessage
     content::T
     variables::Vector{Symbol} = _extract_handlebar_variables(content)
     _type::Symbol = :systemmessage
@@ -37,7 +37,7 @@ function SystemMessage(content::T,
     @assert length(not_allowed_kwargs)==0 "Error: Some placeholders are invalid, as they are reserved for `ai*` functions. Change: $(join(not_allowed_kwargs,","))"
     return SystemMessage{T}(content, variables, type)
 end
-Base.@kwdef struct UserMessage{T <: AbstractString} <: AbstractChatMessage
+@with_kw struct UserMessage{T <: AbstractString} <: AbstractChatMessage
     content::T
     variables::Vector{Symbol} = _extract_handlebar_variables(content)
     _type::Symbol = :usermessage
@@ -50,7 +50,7 @@ function UserMessage(content::T,
     @assert length(not_allowed_kwargs)==0 "Error: Some placeholders are invalid, as they are reserved for `ai*` functions. Change: $(join(not_allowed_kwargs,","))"
     return UserMessage{T}(content, variables, type)
 end
-Base.@kwdef struct UserMessageWithImages{T <: AbstractString} <: AbstractChatMessage
+@with_kw struct UserMessageWithImages{T <: AbstractString} <: AbstractChatMessage
     content::T
     image_url::Vector{String} # no default! fail when not provided
     variables::Vector{Symbol} = _extract_handlebar_variables(content)
@@ -68,9 +68,9 @@ end
 """
     AIMessage
 
-A message type for AI-generated text-based responses. 
+A message type for AI-generated text-based responses.
 Returned by `aigenerate`, `aiclassify`, and `aiscan` functions.
-    
+
 # Fields
 - `content::Union{AbstractString, Nothing}`: The content of the message.
 - `status::Union{Int, Nothing}`: The status of the message from the API.
@@ -82,7 +82,7 @@ Returned by `aigenerate`, `aiclassify`, and `aiscan` functions.
 - `run_id::Union{Nothing, Int}`: The unique ID of the run.
 - `sample_id::Union{Nothing, Int}`: The unique ID of the sample (if multiple samples are generated, they will all have the same `run_id`).
 """
-Base.@kwdef struct AIMessage{T <: Union{AbstractString, Nothing}} <: AbstractChatMessage
+@with_kw struct AIMessage{T <: Union{AbstractString, Nothing}} <: AbstractChatMessage
     content::T = nothing
     status::Union{Int, Nothing} = nothing
     tokens::Tuple{Int, Int} = (-1, -1)
@@ -98,9 +98,9 @@ end
 """
     DataMessage
 
-A message type for AI-generated data-based responses, ie, different `content` than text. 
+A message type for AI-generated data-based responses, ie, different `content` than text.
 Returned by `aiextract`, and `aiextract` functions.
-    
+
 # Fields
 - `content::Union{AbstractString, Nothing}`: The content of the message.
 - `status::Union{Int, Nothing}`: The status of the message from the API.
@@ -112,7 +112,7 @@ Returned by `aiextract`, and `aiextract` functions.
 - `run_id::Union{Nothing, Int}`: The unique ID of the run.
 - `sample_id::Union{Nothing, Int}`: The unique ID of the sample (if multiple samples are generated, they will all have the same `run_id`).
 """
-Base.@kwdef struct DataMessage{T <: Any} <: AbstractDataMessage
+@with_kw struct DataMessage{T <: Any} <: AbstractDataMessage
     content::T
     status::Union{Int, Nothing} = nothing
     tokens::Tuple{Int, Int} = (-1, -1)
@@ -246,9 +246,9 @@ msg # isa TracerMessage
 msg.content # access content like if it was the message
 ```
 """
-Base.@kwdef mutable struct TracerMessage{T <:
-                                         Union{AbstractChatMessage, AbstractDataMessage}} <:
-                           AbstractTracerMessage{T}
+@with_kw mutable struct TracerMessage{T <:
+                                      Union{AbstractChatMessage, AbstractDataMessage}} <:
+                        AbstractTracerMessage{T}
     object::T
     from::Union{Nothing, Symbol} = nothing # who sent it
     to::Union{Nothing, Symbol} = nothing # who received it
@@ -290,7 +290,7 @@ This structure is particularly useful for systems that involve complex interacti
 
 All fields are optional besides the `object`.
 """
-@kwdef mutable struct TracerMessageLike{T <: Any} <: AbstractTracer{T}
+@with_kw mutable struct TracerMessageLike{T <: Any} <: AbstractTracer{T}
     object::T
     from::Union{Nothing, Symbol} = nothing # who sent it
     to::Union{Nothing, Symbol} = nothing # who received it

@@ -15,6 +15,7 @@ using PrecompileTools
 using Test, Pkg
 ## Added REPL because it extends methods in Base.docs for extraction of docstrings
 using REPL
+using Parameters
 
 # GLOBALS and Preferences are managed by Preferences.jl - see src/preferences.jl for details
 
