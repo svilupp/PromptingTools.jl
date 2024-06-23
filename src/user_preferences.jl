@@ -258,7 +258,7 @@ PromptingTools.register_model!(
     description = "GPT-3.5 Turbo is a 175B parameter model and a common default on the OpenAI API.")
 ```
 """
-@kwdef mutable struct ModelSpec
+@with_kw mutable struct ModelSpec
     name::String
     schema::Union{AbstractPromptSchema, Nothing} = nothing
     cost_of_token_prompt::Float64 = 0.0
