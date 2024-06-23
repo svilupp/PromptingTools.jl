@@ -1,3 +1,5 @@
+using Parameters
+
 # This file defines all key types that the various function dispatch on.
 # New LLM interfaces should define:
 # - corresponding schema to dispatch on (`schema <: AbstractPromptSchema`)
@@ -47,8 +49,8 @@ struct OpenAISchema <: AbstractOpenAISchema end
 end
 
 """
-    CustomOpenAISchema 
-    
+    CustomOpenAISchema
+
 CustomOpenAISchema() allows user to call any OpenAI-compatible API.
 
 All user needs to do is to pass this schema as the first argument and provide the BASE URL of the API to call (`api_kwargs.url`).
@@ -255,7 +257,7 @@ Ollama by default manages different models and their associated prompt schemas w
 
 Warning: It works only for 1 system message and 1 user message, so anything more than that has to be rejected.
 
-If you need to pass more messagese / longer conversational history, you can use define the model-specific schema directly and pass your Ollama requests with `raw=true`, 
+If you need to pass more messagese / longer conversational history, you can use define the model-specific schema directly and pass your Ollama requests with `raw=true`,
  which disables and templating and schema management by Ollama.
 """
 struct OllamaManagedSchema <: AbstractOllamaManagedSchema end
@@ -348,7 +350,7 @@ end
 """
     SaverSchema <: AbstractTracerSchema
 
-SaverSchema is a schema that automatically saves the conversation to the disk. 
+SaverSchema is a schema that automatically saves the conversation to the disk.
 It's useful for debugging and for persistent logging.
 
 It can be composed with any other schema, eg, `TracerSchema` to save additional metadata.
