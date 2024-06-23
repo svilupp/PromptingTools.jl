@@ -8,7 +8,7 @@ You can set preferences for PromptingTools by setting environment variables or b
     It will create a `LocalPreferences.toml` file in your current directory and will reload your prefences from there.
 
 Check your preferences by calling `get_preferences(key::String)`.
-    
+
 # Available Preferences (for `set_preferences!`)
 - `OPENAI_API_KEY`: The API key for the OpenAI API. See [OpenAI's documentation](https://platform.openai.com/docs/quickstart?context=python) for more information.
 - `MISTRALAI_API_KEY`: The API key for the Mistral AI API. See [Mistral AI's documentation](https://docs.mistral.ai/) for more information.
@@ -33,11 +33,11 @@ Check your preferences by calling `get_preferences(key::String)`.
     See `?LocalServerOpenAISchema` for more information and examples.
 - `LOG_DIR`: The directory to save the logs to, eg, when using `SaverSchema <: AbstractTracerSchema`. Defaults to `joinpath(pwd(), "log")`. Refer to `?SaverSchema` for more information on how it works and examples.
 
-At the moment it is not possible to persist changes to `MODEL_REGISTRY` across sessions. 
+At the moment it is not possible to persist changes to `MODEL_REGISTRY` across sessions.
 Define your `register_model!()` calls in your `startup.jl` file to make them available across sessions or put them at the top of your script.
 
 # Available ENV Variables
-- `OPENAI_API_KEY`: The API key for the OpenAI API. 
+- `OPENAI_API_KEY`: The API key for the OpenAI API.
 - `MISTRALAI_API_KEY`: The API key for the Mistral AI API.
 - `COHERE_API_KEY`: The API key for the Cohere API.
 - `LOCAL_SERVER`: The URL of the local server to use for `ai*` calls. Defaults to `http://localhost:10897/v1`. This server is called when you call `model="local"`
@@ -55,10 +55,10 @@ Preferences.jl takes priority over ENV variables, so if you set a preference, it
 
 WARNING: NEVER EVER sync your `LocalPreferences.toml` file! It contains your API key and other sensitive information!!!
 """
-const PREFERENCES = nothing
+global PREFERENCES::Nothing = nothing
 
 "Keys that are allowed to be set via `set_preferences!`"
-const ALLOWED_PREFERENCES = ["MISTRALAI_API_KEY",
+global ALLOWED_PREFERENCES::Vector{String} = ["MISTRALAI_API_KEY",
     "OPENAI_API_KEY",
     "COHERE_API_KEY",
     "DATABRICKS_API_KEY",
@@ -80,7 +80,7 @@ const ALLOWED_PREFERENCES = ["MISTRALAI_API_KEY",
 """
     set_preferences!(pairs::Pair{String, <:Any}...)
 
-Set preferences for PromptingTools. See `?PREFERENCES` for more information. 
+Set preferences for PromptingTools. See `?PREFERENCES` for more information.
 
 See also: `get_preferences`
 
@@ -124,10 +124,10 @@ function get_preferences(key::String)
 end
 
 ## Load up GLOBALS
-const MODEL_CHAT::String = @load_preference("MODEL_CHAT", default="gpt-3.5-turbo")
-const MODEL_EMBEDDING::String = @load_preference("MODEL_EMBEDDING",
+global MODEL_CHAT::String = @load_preference("MODEL_CHAT", default="gpt-3.5-turbo")
+global MODEL_EMBEDDING::String = @load_preference("MODEL_EMBEDDING",
     default="text-embedding-3-small")
-const MODEL_IMAGE_GENERATION = @load_preference("MODEL_IMAGE_GENERATION",
+global MODEL_IMAGE_GENERATION::String = @load_preference("MODEL_IMAGE_GENERATION",
     default="dall-e-3")
 # the prompt schema default is defined in llm_interace.jl !
 # const PROMPT_SCHEMA = OpenAISchema()
@@ -135,68 +135,68 @@ const MODEL_IMAGE_GENERATION = @load_preference("MODEL_IMAGE_GENERATION",
 # First, load from preferences, then from environment variables
 # Note: We load first into a variable `temp_` to avoid inlining of the get(ENV...) call
 _temp = get(ENV, "OPENAI_API_KEY", "")
-const OPENAI_API_KEY::String = @load_preference("OPENAI_API_KEY",
+global OPENAI_API_KEY::String = @load_preference("OPENAI_API_KEY",
     default=_temp);
 # Note: Disable this warning by setting OPENAI_API_KEY to anything
 isempty(OPENAI_API_KEY) &&
     @warn "OPENAI_API_KEY variable not set! OpenAI models will not be available - set API key directly via `PromptingTools.OPENAI_API_KEY=<api-key>`!"
 
 _temp = get(ENV, "MISTRALAI_API_KEY", "")
-const MISTRALAI_API_KEY::String = @load_preference("MISTRALAI_API_KEY",
+global MISTRALAI_API_KEY::String = @load_preference("MISTRALAI_API_KEY",
     default=_temp);
 
 _temp = get(ENV, "COHERE_API_KEY", "")
-const COHERE_API_KEY::String = @load_preference("COHERE_API_KEY",
+global COHERE_API_KEY::String = @load_preference("COHERE_API_KEY",
     default=_temp);
 
 _temp = get(ENV, "DATABRICKS_API_KEY", "")
-const DATABRICKS_API_KEY::String = @load_preference("DATABRICKS_API_KEY",
+global DATABRICKS_API_KEY::String = @load_preference("DATABRICKS_API_KEY",
     default=_temp);
 
 _temp = get(ENV, "DATABRICKS_HOST", "")
-const DATABRICKS_HOST::String = @load_preference("DATABRICKS_HOST",
+global DATABRICKS_HOST::String = @load_preference("DATABRICKS_HOST",
     default=_temp);
 
 _temp = get(ENV, "TAVILY_API_KEY", "")
-const TAVILY_API_KEY::String = @load_preference("TAVILY_API_KEY",
+global TAVILY_API_KEY::String = @load_preference("TAVILY_API_KEY",
     default=_temp);
 
 _temp = get(ENV, "GOOGLE_API_KEY", "")
-const GOOGLE_API_KEY::String = @load_preference("GOOGLE_API_KEY",
+global GOOGLE_API_KEY::String = @load_preference("GOOGLE_API_KEY",
     default=_temp);
 
 _temp = get(ENV, "TOGETHER_API_KEY", "")
-const TOGETHER_API_KEY::String = @load_preference("TOGETHER_API_KEY",
+global TOGETHER_API_KEY::String = @load_preference("TOGETHER_API_KEY",
     default=_temp);
 
 _temp = get(ENV, "FIREWORKS_API_KEY", "")
-const FIREWORKS_API_KEY::String = @load_preference("FIREWORKS_API_KEY",
+global FIREWORKS_API_KEY::String = @load_preference("FIREWORKS_API_KEY",
     default=_temp);
 
 _temp = get(ENV, "ANTHROPIC_API_KEY", "")
-const ANTHROPIC_API_KEY::String = @load_preference("ANTHROPIC_API_KEY",
+global ANTHROPIC_API_KEY::String = @load_preference("ANTHROPIC_API_KEY",
     default=_temp);
 
 _temp = get(ENV, "VOYAGE_API_KEY", "")
-const VOYAGE_API_KEY::String = @load_preference("VOYAGE_API_KEY",
+global VOYAGE_API_KEY::String = @load_preference("VOYAGE_API_KEY",
     default=_temp);
 
 _temp = get(ENV, "GROQ_API_KEY", "")
-const GROQ_API_KEY::String = @load_preference("GROQ_API_KEY",
+global GROQ_API_KEY::String = @load_preference("GROQ_API_KEY",
     default=_temp);
 
 _temp = get(ENV, "DEEPSEEK_API_KEY", "")
-const DEEPSEEK_API_KEY::String = @load_preference("DEEPSEEK_API_KEY",
+global DEEPSEEK_API_KEY::String = @load_preference("DEEPSEEK_API_KEY",
     default=_temp);
 
 _temp = get(ENV, "LOCAL_SERVER", "http://localhost:10897/v1")
 ## Address of the local server
-const LOCAL_SERVER::String = @load_preference("LOCAL_SERVER",
+global LOCAL_SERVER::String = @load_preference("LOCAL_SERVER",
     default=_temp);
 
 _temp = get(ENV, "LOG_DIR", joinpath(pwd(), "log"))
 ## Address of the local server
-const LOG_DIR::String = @load_preference("LOG_DIR",
+global LOG_DIR::String = @load_preference("LOG_DIR",
     default=_temp);
 
 ## CONVERSATION HISTORY
@@ -210,10 +210,10 @@ Preference available: MAX_HISTORY_LENGTH, which sets how many last messages shou
 See also: `push_conversation!`, `resize_conversation!`
 
 """
-const CONV_HISTORY = Vector{Vector{<:Any}}()
-const CONV_HISTORY_LOCK = ReentrantLock()
-const MAX_HISTORY_LENGTH = @load_preference("MAX_HISTORY_LENGTH",
-    default=5)::Union{Int, Nothing}
+global CONV_HISTORY::Vector{Vector{<:Any}} = Vector{Vector{<:Any}}()
+global CONV_HISTORY_LOCK::ReentrantLock = ReentrantLock()
+global MAX_HISTORY_LENGTH::Union{Int, Nothing} = @load_preference("MAX_HISTORY_LENGTH",
+    default=5)
 
 ## Model registry
 # A dictionary of model names and their specs (ie, name, costs per token, etc.)
@@ -228,7 +228,7 @@ A struct that contains information about a model, such as its name, schema, cost
 # Fields
 - `name::String`: The name of the model. This is the name that will be used to refer to the model in the `ai*` functions.
 - `schema::AbstractPromptSchema`: The schema of the model. This is the schema that will be used to generate prompts for the model, eg, `:OpenAISchema`.
-- `cost_of_token_prompt::Float64`: The cost of 1 token in the prompt for this model. This is used to calculate the cost of a prompt. 
+- `cost_of_token_prompt::Float64`: The cost of 1 token in the prompt for this model. This is used to calculate the cost of a prompt.
     Note: It is often provided online as cost per 1000 tokens, so make sure to convert it correctly!
 - `cost_of_token_generation::Float64`: The cost of 1 token generated by this model. This is used to calculate the cost of a generation.
     Note: It is often provided online as cost per 1000 tokens, so make sure to convert it correctly!
@@ -275,14 +275,14 @@ end
         cost_of_token_generation::Float64 = 0.0,
         description::String = "")
 
-Register a new AI model with `name` and its associated `schema`. 
+Register a new AI model with `name` and its associated `schema`.
 
 Registering a model helps with calculating the costs and automatically selecting the right prompt schema.
 
 # Arguments
 - `name`: The name of the model. This is the name that will be used to refer to the model in the `ai*` functions.
 - `schema`: The schema of the model. This is the schema that will be used to generate prompts for the model, eg, `OpenAISchema()`.
-- `cost_of_token_prompt`: The cost of a token in the prompt for this model. This is used to calculate the cost of a prompt. 
+- `cost_of_token_prompt`: The cost of a token in the prompt for this model. This is used to calculate the cost of a prompt.
    Note: It is often provided online as cost per 1000 tokens, so make sure to convert it correctly!
 - `cost_of_token_generation`: The cost of a token generated by this model. This is used to calculate the cost of a generation.
     Note: It is often provided online as cost per 1000 tokens, so make sure to convert it correctly!

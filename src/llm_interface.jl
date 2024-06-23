@@ -1,4 +1,5 @@
 using Parameters
+using Parameters: @with_kw
 
 # This file defines all key types that the various function dispatch on.
 # New LLM interfaces should define:
@@ -41,7 +42,7 @@ It's recommended to separate sections in your prompt with markdown headers (e.g.
 struct OpenAISchema <: AbstractOpenAISchema end
 
 "Echoes the user's input back to them. Used for testing the implementation"
-@kwdef mutable struct TestEchoOpenAISchema <: AbstractOpenAISchema
+@with_kw mutable struct TestEchoOpenAISchema <: AbstractOpenAISchema
     response::AbstractDict
     status::Integer
     model_id::String = ""
@@ -224,7 +225,7 @@ It's very similar to OpenAISchema, but it appends images differently.
 struct OllamaSchema <: AbstractOllamaSchema end
 
 "Echoes the user's input back to them. Used for testing the implementation"
-@kwdef mutable struct TestEchoOllamaSchema <: AbstractOllamaSchema
+@with_kw mutable struct TestEchoOllamaSchema <: AbstractOllamaSchema
     response::AbstractDict
     status::Integer
     model_id::String = ""
@@ -263,7 +264,7 @@ If you need to pass more messagese / longer conversational history, you can use 
 struct OllamaManagedSchema <: AbstractOllamaManagedSchema end
 
 "Echoes the user's input back to them. Used for testing the implementation"
-@kwdef mutable struct TestEchoOllamaManagedSchema <: AbstractOllamaManagedSchema
+@with_kw mutable struct TestEchoOllamaManagedSchema <: AbstractOllamaManagedSchema
     response::AbstractDict
     status::Integer
     model_id::String = ""
@@ -276,7 +277,7 @@ abstract type AbstractGoogleSchema <: AbstractPromptSchema end
 struct GoogleSchema <: AbstractGoogleSchema end
 
 "Echoes the user's input back to them. Used for testing the implementation"
-@kwdef mutable struct TestEchoGoogleSchema <: AbstractGoogleSchema
+@with_kw mutable struct TestEchoGoogleSchema <: AbstractGoogleSchema
     text::Any
     response_status::Integer
     model_id::String = ""
@@ -301,7 +302,7 @@ It's recommended to separate sections in your prompt with XML markup (e.g. `<doc
 struct AnthropicSchema <: AbstractAnthropicSchema end
 
 "Echoes the user's input back to them. Used for testing the implementation"
-@kwdef mutable struct TestEchoAnthropicSchema <: AbstractAnthropicSchema
+@with_kw mutable struct TestEchoAnthropicSchema <: AbstractAnthropicSchema
     response::AbstractDict
     status::Integer
     model_id::String = ""
