@@ -134,55 +134,70 @@ global MODEL_IMAGE_GENERATION::String = @load_preference("MODEL_IMAGE_GENERATION
 
 # First, load from preferences, then from environment variables
 # Note: We load first into a variable `temp_` to avoid inlining of the get(ENV...) call
+temp_ = get(ENV, "OPENAI_API_KEY", "")
 global OPENAI_API_KEY::String = @load_preference("OPENAI_API_KEY",
-    default=get(ENV, "OPENAI_API_KEY", ""));
+    default=temp_);
 # Note: Disable this warning by setting OPENAI_API_KEY to anything
 isempty(OPENAI_API_KEY) &&
     @warn "OPENAI_API_KEY variable not set! OpenAI models will not be available - set API key directly via `PromptingTools.OPENAI_API_KEY=<api-key>`!"
 
+temp_ = get(ENV, "MISTRALAI_API_KEY", "")
 global MISTRALAI_API_KEY::String = @load_preference("MISTRALAI_API_KEY",
-    default=get(ENV, "MISTRALAI_API_KEY", ""));
+    default=temp_);
 
+temp_ = get(ENV, "COHERE_API_KEY", "")
 global COHERE_API_KEY::String = @load_preference("COHERE_API_KEY",
-    default=get(ENV, "COHERE_API_KEY", ""));
+    default=temp_);
 
+temp_ = get(ENV, "DATABRICKS_API_KEY", "")
 global DATABRICKS_API_KEY::String = @load_preference("DATABRICKS_API_KEY",
-    default=get(ENV, "DATABRICKS_API_KEY", ""));
+    default=temp_);
 
+temp_ = get(ENV, "DATABRICKS_HOST", "")
 global DATABRICKS_HOST::String = @load_preference("DATABRICKS_HOST",
-    default=get(ENV, "DATABRICKS_HOST", ""));
+    default=temp_);
 
+temp_ = get(ENV, "TAVILY_API_KEY", "")
 global TAVILY_API_KEY::String = @load_preference("TAVILY_API_KEY",
-    default=get(ENV, "TAVILY_API_KEY", ""));
+    default=temp_);
 
+temp_ = get(ENV, "GOOGLE_API_KEY", "")
 global GOOGLE_API_KEY::String = @load_preference("GOOGLE_API_KEY",
-    default=get(ENV, "GOOGLE_API_KEY", ""));
+    default=temp_);
 
+temp_ = get(ENV, "TOGETHER_API_KEY", "")
 global TOGETHER_API_KEY::String = @load_preference("TOGETHER_API_KEY",
-    default=get(ENV, "TOGETHER_API_KEY", ""));
+    default=temp_);
 
+temp_ = get(ENV, "FIREWORKS_API_KEY", "")
 global FIREWORKS_API_KEY::String = @load_preference("FIREWORKS_API_KEY",
-    default=get(ENV, "FIREWORKS_API_KEY", ""));
+    default=temp_);
 
+temp_ = get(ENV, "ANTHROPIC_API_KEY", "")
 global ANTHROPIC_API_KEY::String = @load_preference("ANTHROPIC_API_KEY",
-    default=get(ENV, "ANTHROPIC_API_KEY", ""));
+    default=temp_);
 
+temp_ = get(ENV, "VOYAGE_API_KEY", "")
 global VOYAGE_API_KEY::String = @load_preference("VOYAGE_API_KEY",
-    default=get(ENV, "VOYAGE_API_KEY", ""));
+    default=temp_);
 
+temp_ = get(ENV, "GROQ_API_KEY", "")
 global GROQ_API_KEY::String = @load_preference("GROQ_API_KEY",
-    default=get(ENV, "GROQ_API_KEY", ""));
+    default=temp_);
 
+temp_ = get(ENV, "DEEPSEEK_API_KEY", "")
 global DEEPSEEK_API_KEY::String = @load_preference("DEEPSEEK_API_KEY",
-    default=get(ENV, "DEEPSEEK_API_KEY", ""));
+    default=temp_);
 
 ## Address of the local server
+temp_ = get(ENV, "LOCAL_SERVER", "")
 global LOCAL_SERVER::String = @load_preference("LOCAL_SERVER",
-    default=get(ENV, "LOCAL_SERVER", "http://localhost:10897/v1"));
+    default=temp_);
 
 ## Address of the local server
+temp_ = get(ENV, "LOG_DIR", "")
 global LOG_DIR::String = @load_preference("LOG_DIR",
-    default=get(ENV, "LOG_DIR", joinpath(pwd(), "log")));
+    default=temp_);
 
 ## CONVERSATION HISTORY
 """
