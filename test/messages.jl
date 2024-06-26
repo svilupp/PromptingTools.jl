@@ -37,6 +37,12 @@ using PromptingTools: TracerSchema, SaverSchema
     @test AIMessage(; content) |> isaimessage
     @test UserMessage(content) |> AIMessage |> isaimessage
     @test UserMessage(content) != AIMessage(content)
+    ## check handling other types
+    @test isusermessage(1) == false
+    @test issystemmessage(nothing) == false
+    @test isdatamessage(1) == false
+    @test isaimessage(missing) == false
+    @test istracermessage(1) == false
 end
 @testset "UserMessageWithImages" begin
     content = "Hello, world!"

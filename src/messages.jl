@@ -137,11 +137,12 @@ function (MSG::Type{<:AbstractChatMessage})(msg::AbstractTracerMessage{<:Abstrac
     MSG(; msg.content)
 end
 
-isusermessage(m::AbstractMessage) = m isa UserMessage
-issystemmessage(m::AbstractMessage) = m isa SystemMessage
-isdatamessage(m::AbstractMessage) = m isa DataMessage
-isaimessage(m::AbstractMessage) = m isa AIMessage
-istracermessage(m::AbstractMessage) = m isa AbstractTracerMessage
+## It checks types so it should be defined for all inputs
+isusermessage(m::Any) = m isa UserMessage
+issystemmessage(m::Any) = m isa SystemMessage
+isdatamessage(m::Any) = m isa DataMessage
+isaimessage(m::Any) = m isa AIMessage
+istracermessage(m::Any) = m isa AbstractTracerMessage
 isusermessage(m::AbstractTracerMessage) = isusermessage(m.object)
 issystemmessage(m::AbstractTracerMessage) = issystemmessage(m.object)
 isdatamessage(m::AbstractTracerMessage) = isdatamessage(m.object)
