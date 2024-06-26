@@ -736,9 +736,10 @@ function StructTypes.constructfrom(::Type{RAGResult}, obj::Union{Dict, JSON3.Obj
     ## Retype where necessary
     for f in [
         :emb_candidates, :tag_candidates, :filtered_candidates, :reranked_candidates]
-        if haskey(obj, f) && haskey(obj[f], :index_ids)
+        ## Check for nothing value, because tag_candidates can be empty
+        if haskey(obj, f) && !isnothing(obj[f]) && haskey(obj[f], :index_ids)
             obj[f] = StructTypes.constructfrom(MultiCandidateChunks, obj[f])
-        elseif haskey(obj, f)
+        elseif haskey(obj, f) && !isnothing(obj[f])
             obj[f] = StructTypes.constructfrom(CandidateChunks, obj[f])
         end
     end

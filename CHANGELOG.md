@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Fixed
+- Fixed loading RAGResult when one of the candidate fields was `nothing`.
 
 ## [0.33.0]
 
