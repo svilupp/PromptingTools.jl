@@ -88,6 +88,9 @@ include("Experimental/Experimental.jl")
 function __init__()
     # Load templates
     load_templates!()
+
+    # Load ENV variables
+    load_api_keys!()
 end
 
 # Enable precompilation to reduce start time, disabled logging
