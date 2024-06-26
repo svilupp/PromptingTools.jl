@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.33.2]
+
+### Fixed
+- Add back accidentally dropped DBKS keys
+
 ## [0.33.1]
 
 ### Fixed

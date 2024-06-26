@@ -138,8 +138,11 @@ global OPENAI_API_KEY::String = ""
 global MISTRALAI_API_KEY::String = ""
 global COHERE_API_KEY::String = ""
 global DATABRICKS_API_KEY::String = ""
+global DATABRICKS_HOST::String = ""
 global TAVILY_API_KEY::String = ""
 global GOOGLE_API_KEY::String = ""
+global TOGETHER_API_KEY::String = ""
+global FIREWORKS_API_KEY::String = ""
 global ANTHROPIC_API_KEY::String = ""
 global VOYAGE_API_KEY::String = ""
 global GROQ_API_KEY::String = ""
@@ -166,6 +169,9 @@ function load_api_keys!()
     global DATABRICKS_API_KEY
     DATABRICKS_API_KEY = @load_preference("DATABRICKS_API_KEY",
         default=get(ENV, "DATABRICKS_API_KEY", ""))
+    global DATABRICKS_HOST
+    DATABRICKS_HOST = @load_preference("DATABRICKS_HOST",
+        default=get(ENV, "DATABRICKS_HOST", ""))
     global TAVILY_API_KEY
     TAVILY_API_KEY = @load_preference("TAVILY_API_KEY",
         default=get(ENV, "TAVILY_API_KEY", ""))
