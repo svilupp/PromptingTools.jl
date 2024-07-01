@@ -1,5 +1,5 @@
 using Test
-using SparseArrays, LinearAlgebra
+using SparseArrays, LinearAlgebra, Unicode
 using PromptingTools.Experimental.RAGTools
 using PromptingTools
 using PromptingTools.AbstractTrees
@@ -12,6 +12,7 @@ using JSON3, HTTP
     include("utils.jl")
     include("types.jl")
     include("preparation.jl")
+    include("rank_gpt.jl")
     include("retrieval.jl")
     include("generation.jl")
     include("annotation.jl")
