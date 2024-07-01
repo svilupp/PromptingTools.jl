@@ -595,6 +595,17 @@ struct FlashRanker{T} <: AbstractReranker
     model::T
 end
 
+"""
+    RankGPTReranker <: AbstractReranker
+
+Rerank strategy using the RankGPT algorithm (calling LLMs). 
+
+# Reference
+[1] [Is ChatGPT Good at Search? Investigating Large Language Models as Re-Ranking Agents by W. Sun et al.](https://arxiv.org/abs/2304.09542)
+[2] [RankGPT Github](https://github.com/sunnweiwei/RankGPT)
+"""
+struct RankGPTReranker <: AbstractReranker end
+
 function rerank(reranker::AbstractReranker,
         index::AbstractDocumentIndex, question::AbstractString, candidates::AbstractCandidateChunks; kwargs...)
     throw(ArgumentError("Not implemented yet"))
@@ -694,6 +705,101 @@ function rerank(
 
     return candidates isa MultiCandidateChunks ?
            MultiCandidateChunks(index_ids, positions, scores) :
+           CandidateChunks(index_ids, positions, scores)
+end
+
+"""
+    rerank(
+        reranker::CohereReranker, index::AbstractDocumentIndex, question::AbstractString,
+        candidates::AbstractCandidateChunks;
+        verbose::Integer = 1,
+        api_key::AbstractString = PT.OPENAI_API_KEY,
+        top_n::Integer = length(candidates.scores),
+        model::AbstractString = PT.MODEL_CHAT,
+        cost_tracker = Threads.Atomic{Float64}(0.0),
+        kwargs...)
+
+
+Re-ranks a list of candidate chunks using the RankGPT algorithm. See https://github.com/sunnweiwei/RankGPT for more details. 
+
+It uses LLM calls to rank the candidate chunks.
+
+# Arguments
+- `reranker`: Using Cohere API
+- `index`: The index that holds the underlying chunks to be re-ranked.
+- `question`: The query to be used for the search.
+- `candidates`: The candidate chunks to be re-ranked.
+- `top_n`: The number of most relevant documents to return. Default is `length(documents)`.
+- `model`: The model to use for reranking. Default is `rerank-english-v3.0`.
+- `verbose`: A boolean flag indicating whether to print verbose logging. Default is `1`.
+- `unique_chunks`: A boolean flag indicating whether to remove duplicates from the candidate chunks prior to reranking (saves compute time). Default is `true`.
+
+# Examples
+
+```julia
+index = <some index>
+question = "What are the best practices for parallel computing in Julia?"
+
+cfg = RAGConfig(; retriever = SimpleRetriever(; reranker = RT.RankGPTReranker()))
+msg = airag(cfg, index; question, return_all = true)
+```
+To get full verbosity of logs, set `verbose = 5` (anything higher than 3).
+```julia
+msg = airag(cfg, index; question, return_all = true, verbose = 5)
+```
+
+
+# Reference
+[1] [Is ChatGPT Good at Search? Investigating Large Language Models as Re-Ranking Agents by W. Sun et al.](https://arxiv.org/abs/2304.09542)
+[2] [RankGPT Github](https://github.com/sunnweiwei/RankGPT)
+"""
+function rerank(
+        reranker::RankGPTReranker, index::AbstractDocumentIndex, question::AbstractString,
+        candidates::AbstractCandidateChunks;
+        api_key::AbstractString = PT.OPENAI_API_KEY,
+        model::AbstractString = PT.MODEL_CHAT,
+        verbose::Bool = false,
+        top_n::Integer = length(candidates.scores),
+        unique_chunks::Bool = true,
+        cost_tracker = Threads.Atomic{Float64}(0.0),
+        kwargs...)
+    @assert top_n>0 "top_n must be a positive integer."
+    documents = index[candidates, :chunks]
+    @assert !(isempty(documents)) "The candidate chunks must not be empty! Check the index IDs."
+
+    is_multi_cand = candidates isa MultiCandidateChunks
+    index_ids = is_multi_cand ? candidates.index_ids : candidates.index_id
+    positions = candidates.positions
+    ## Find unique only items
+    if unique_chunks
+        verbose && @info "Removing duplicates from candidate chunks prior to reranking"
+        unique_idxs = PT.unique_permutation(documents)
+        documents = documents[unique_idxs]
+        positions = positions[unique_idxs]
+        index_ids = is_multi_cand ? index_ids[unique_idxs] : index_ids
+    end
+
+    ## Run re-ranker via RankGPT
+    rank_end = max(get(kwargs, :rank_end, length(documents)), length(documents))
+    step = min(get(kwargs, :step, top_n), top_n, rank_end)
+    window_size = max(min(get(kwargs, :window_size, 20), rank_end), step)
+    verbose &&
+        @info "RankGPT parameters: rank_end = $rank_end, step = $step, window_size = $window_size"
+    result = rank_gpt(
+        documents, question; verbose = verbose * 3, api_key,
+        model, kwargs..., rank_end, step, window_size)
+
+    ## Unwrap re-ranked positions
+    ranked_positions = first(result.positions, top_n)
+    positions = positions[ranked_positions]
+    ## TODO: add reciprocal rank fusion and multiple passes
+    scores = ones(Float32, length(positions)) # no scores available
+
+    verbose && @info "Reranking done in $(round(result.elapsed; digits=1)) seconds."
+    Threads.atomic_add!(cost_tracker, result.cost)
+
+    return is_multi_cand ?
+           MultiCandidateChunks(index_ids[ranked_positions], positions, scores) :
            CandidateChunks(index_ids, positions, scores)
 end
 

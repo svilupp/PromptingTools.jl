@@ -60,7 +60,7 @@ function RT.rerank(
         kwargs...)
     @assert top_n>0 "top_n must be a positive integer."
     documents = index[candidates, :chunks]
-    @assert !(isempty(documents)) "The candidate chunks must not be empty for Cohere Reranker! Check the index IDs."
+    @assert !(isempty(documents)) "The candidate chunks must not be empty! Check the index IDs."
 
     is_multi_cand = candidates isa RT.MultiCandidateChunks
     index_ids = is_multi_cand ? candidates.index_ids : candidates.index_id
