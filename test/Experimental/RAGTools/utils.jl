@@ -6,7 +6,8 @@ using PromptingTools.Experimental.RAGTools: token_with_boundaries, text_to_trigr
 using PromptingTools.Experimental.RAGTools: split_into_code_and_sentences
 using PromptingTools.Experimental.RAGTools: getpropertynested, setpropertynested,
                                             merge_kwargs_nested
-using PromptingTools.Experimental.RAGTools: pack_bits, unpack_bits, preprocess_tokens
+using PromptingTools.Experimental.RAGTools: pack_bits, unpack_bits, preprocess_tokens,
+                                            reciprocal_rank_fusion
 
 @testset "_check_aiextract_capability" begin
     @test _check_aiextract_capability("gpt-3.5-turbo") == nothing
@@ -547,4 +548,54 @@ end
     # Check stubs that they throw
     @test_throws ArgumentError RT._stem(nothing, "abc")
     @test_throws ArgumentError RT._unicode_normalize(nothing)
+end
+
+@testset "reciprocal_rank_fusion" begin
+    # Test with two simple lists
+    positions, scores = reciprocal_rank_fusion([1, 2, 3], [4, 5, 6]; k = 0)
+    @test Set(positions) == Set([1, 2, 3, 4, 5, 6])
+    @test Set(positions[1:2]) == Set([1, 4])
+    @test Set(positions[3:4]) == Set([2, 5])
+    @test Set(positions[5:6]) == Set([3, 6])
+    @test scores == Dict(1 => 1.0, 2 => 0.5, 3 => 0.3333333333333333,
+        4 => 1.0, 5 => 0.5, 6 => 0.3333333333333333)
+
+    # Test with overlapping lists
+    positions, scores = reciprocal_rank_fusion([1, 2, 3], [2, 3, 4]; k = 0)
+    @test Set(positions) == Set([2, 3, 1, 4])
+    @test positions[1] == 2
+    @test positions[2] == 1
+    @test positions[3] == 3
+    @test positions[4] == 4
+
+    # Higher discount to reward more appearances
+    positions, scores = reciprocal_rank_fusion([1, 2, 3], [2, 3, 4]; k = 60)
+    @test Set(positions) == Set([2, 3, 1, 4])
+    @test positions[1] == 2
+    @test positions[2] == 3
+    @test positions[3] == 1
+    @test positions[4] == 4
+
+    # Test with three lists
+    positions, scores = reciprocal_rank_fusion([1, 2, 3], [2, 3, 4], [3, 4, 5]; k = 0)
+    @test Set(positions) == Set([3, 2, 4, 1, 5])
+    @test positions[1] == 3
+    @test positions[2] == 2
+    @test positions[3] == 1
+    @test positions[4] == 4
+    @test positions[5] == 5
+
+    # Test with empty list
+    @test reciprocal_rank_fusion([]; k = 0) == ([], Dict{Int, Float64}())
+
+    # Test with one empty and one non-empty list
+    @test reciprocal_rank_fusion([], [1, 2, 3]; k = 0) ==
+          ([1, 2, 3], Dict(1 => 1.0, 2 => 0.5, 3 => 0.3333333333333333))
+
+    # Test with different lengths of lists
+    positions, scores = reciprocal_rank_fusion([1, 2], [3, 4, 5]; k = 0)
+    @test Set(positions) == Set([1, 2, 3, 4, 5])
+    @test Set(positions[1:2]) == Set([1, 3])
+    @test Set(positions[3:4]) == Set([2, 4])
+    @test positions[5] == 5
 end

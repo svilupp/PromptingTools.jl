@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.35.0]
+
+### Added
+- Added a utility function to RAGTools `reciprocal_rank_fusion`, as a principled way to merge multiple rankings. See `?RAGTools.Experimental.reciprocal_rank_fusion` for more information.
+
 ## [0.34.0]
 
 ### Added
