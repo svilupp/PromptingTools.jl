@@ -563,3 +563,32 @@ function unpack_bits(packed_matrix::AbstractMatrix{UInt64})
 
     return output_matrix
 end
+
+"""
+    reciprocal_rank_fusion(args...; k::Int=60)
+
+Merges multiple rankings and calculates the reciprocal rank score for each chunk (discounted by the inverse of the rank).
+
+# Example
+```julia
+positions1 = [1, 3, 5, 7, 9]
+positions2 = [2, 4, 6, 8, 10]
+positions3 = [2, 4, 6, 11, 12]
+
+merged_positions, scores = reciprocal_rank_fusion(positions1, positions2, positions3)
+```
+"""
+function reciprocal_rank_fusion(args...; k::Int = 60)
+    merged = Vector{Int}()
+    scores = Dict{Int, Float64}()
+
+    for positions in args
+        for (idx, pos) in enumerate(positions)
+            scores[pos] = get(scores, pos, 0.0) + 1.0 / (k + idx)
+        end
+    end
+
+    merged = [first(item) for item in sort(collect(scores), by = last, rev = true)]
+
+    return merged, scores
+end
