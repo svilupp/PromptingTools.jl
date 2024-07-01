@@ -6,7 +6,8 @@ using PromptingTools.Experimental.RAGTools: ContextEnumerator, NoRephraser, Simp
                                             NoTagFilter, AnyTagFilter,
                                             SimpleRetriever, AdvancedRetriever
 using PromptingTools.Experimental.RAGTools: AbstractRephraser, AbstractTagFilter,
-                                            AbstractSimilarityFinder, AbstractReranker
+                                            AbstractSimilarityFinder, AbstractReranker,
+                                            RankGPTReranker
 using PromptingTools.Experimental.RAGTools: find_closest, hamming_distance, find_tags,
                                             rerank, rephrase,
                                             retrieve, HasEmbeddings, MultiCandidateChunks,

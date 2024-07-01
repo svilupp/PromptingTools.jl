@@ -40,6 +40,8 @@ export build_index, get_chunks, get_embeddings, get_keywords, get_tags, SimpleIn
        KeywordsIndexer
 include("preparation.jl")
 
+include("rank_gpt.jl")
+
 export retrieve, SimpleRetriever, SimpleBM25Retriever, AdvancedRetriever
 export find_closest, find_tags, rerank, rephrase
 include("retrieval.jl")
