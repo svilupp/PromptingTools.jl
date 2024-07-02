@@ -679,7 +679,7 @@ function PT.pprint(
         print(io, "\n", "-"^20, "\n")
         print(io, content, "\n\n")
     end
-    if !isempty(r.final_answer)
+    if !isnothing(r.final_answer) && !isempty(r.final_answer)
         annotater = TrigramAnnotater()
         root = annotate_support(annotater, r; annotater_kwargs...)
         print(io, "-"^20, "\n")
@@ -687,7 +687,7 @@ function PT.pprint(
         print(io, "\n", "-"^20, "\n")
         pprint(io, root; text_width)
     end
-    if add_context
+    if add_context && !isempty(r.context)
         print(io, "\n" * "-"^20, "\n")
         printstyled(io, "CONTEXT", color = :blue, bold = true)
         print(io, "\n", "-"^20, "\n")
