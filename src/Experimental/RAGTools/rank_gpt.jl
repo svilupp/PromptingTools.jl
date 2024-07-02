@@ -44,7 +44,7 @@ function create_permutation_instruction(
     rank = 0
     for ctx in context[rank_start:rank_end_adj]
         rank += 1
-        push!(messages, PT.UserMessage("[$rank] $(strip(ctx)[1:min(end, max_length)])"))
+        push!(messages, PT.UserMessage("[$rank] $(first(strip(ctx),max_length))"))
         push!(messages, PT.AIMessage("Received passage [$rank]."))
     end
     push!(messages, last_msg)
@@ -121,7 +121,7 @@ function rank_sliding_window!(
     @assert rank_end>=window_size>=step "rank_end must be greater than or equal to window_size, which must be greater than or equal to step (Provided: rank_end=$rank_end, window_size=$window_size, step=$step)"
     end_pos = min(rank_end, length(result.chunks))
     start_pos = max(end_pos - window_size, 1)
-    while start_pos >= rank_start
+    while start_pos > rank_start
         (verbose >= 1) && @info "Ranking chunks in positions $start_pos to $end_pos"
         permutation_step!(result; rank_start = start_pos, rank_end = end_pos,
             model, verbose = (verbose >= 1), kwargs...)
@@ -129,6 +129,13 @@ function rank_sliding_window!(
         end_pos -= step
         start_pos -= step
     end
+    ## Don't skip the last window, but ensure it's not negative
+    start_pos = max(start_pos, rank_start)
+    end_pos = max(end_pos, start_pos)
+    (verbose >= 1) && @info "Ranking chunks in positions $start_pos to $end_pos"
+    permutation_step!(result; rank_start = start_pos, rank_end = end_pos,
+        model, verbose = (verbose >= 1), kwargs...)
+    (verbose >= 2) && @info "Current ranking: $(result.positions)"
     return result
 end
 
