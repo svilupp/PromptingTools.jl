@@ -329,7 +329,7 @@ end
     # Test with custom rank_start and rank_end
     result = rank_gpt(["chunk1", "chunk2", "chunk3", "chunk4"],
         "What is AI?"; rank_start = 2, rank_end = 3, window_size = 3, step = 2, model = "mock-gen")
-    @test result.positions == [1, 2, 3, 4] # Check positions with custom rank_start and rank_end
+    @test result.positions == [1, 3, 2, 4] # Flips because the signal say [2] > [1]
     result = rank_gpt(["chunk1", "chunk2", "chunk3", "chunk4"],
         "What is AI?"; rank_start = 1, rank_end = 4, window_size = 4,
         step = 2, model = "mock-gen")

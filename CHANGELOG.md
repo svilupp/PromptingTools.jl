@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.36.0]
+
+### Added
+- Added a prompt template for RAG query expansion for BM25 (`RAGQueryKeywordExpander`)
+
+### Fixed
+- Fixed a small bug in the truncation step of the RankGPT's `permutation_step!` (bad indexing of string characters).
+- Fixed a bug where a certain combination of `rank_start` and `rank_end` would not result the last sliding window.
+- Fixed a bug where partially filled `RAGResult` would fail pretty-printing with `pprint`
+
 ## [0.35.0]
 
 ### Added
