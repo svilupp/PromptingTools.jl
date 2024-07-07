@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.37.0]
+
+### Updated
+- Increase compat bound for FlashRank to 0.4
+
 ## [0.36.0]
 
 ### Added
