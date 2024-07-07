@@ -1,7 +1,7 @@
 name = "PromptingTools"
 uuid = "670122d1-24a8-4d70-bfce-740807c42192"
 authors = ["J S @svilupp and contributors"]
-version = "0.36.0"
+version = "0.37.0"
 
 [deps]
 AbstractTrees = "1520ce14-60c1-5f80-bbc7-55ef81b5835c"
@@ -39,7 +39,7 @@ AbstractTrees = "0.4"
 Aqua = "0.7"
 Base64 = "<0.0.1, 1"
 Dates = "<0.0.1, 1"
-FlashRank = "0.2"
+FlashRank = "0.4"
 GoogleGenAI = "0.3"
 HTTP = "1"
 JSON3 = "1"
