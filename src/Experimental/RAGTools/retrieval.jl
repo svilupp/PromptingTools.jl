@@ -678,6 +678,7 @@ function rerank(
         kwargs...)
 
     ## Unwrap re-ranked positions
+    is_multi_cand = candidates isa MultiCandidateChunks
     index_ids = Vector{Symbol}(undef, length(r.response[:results]))
     positions = Vector{Int}(undef, length(r.response[:results]))
     scores = Vector{Float32}(undef, length(r.response[:results]))
@@ -685,7 +686,7 @@ function rerank(
         doc = r.response[:results][i]
         positions[i] = candidates.positions[doc[:index] + 1]
         scores[i] = doc[:relevance_score]
-        index_ids[i] = if candidates isa MultiCandidateChunks
+        index_ids[i] = if is_multi_cand
             candidates.index_ids[doc[:index] + 1]
         else
             candidates.index_id
@@ -703,22 +704,22 @@ function rerank(
     end
     verbose && @info "Reranking done. $search_units_str"
 
-    return candidates isa MultiCandidateChunks ?
+    return is_multi_cand ?
            MultiCandidateChunks(index_ids, positions, scores) :
-           CandidateChunks(index_ids, positions, scores)
+           CandidateChunks(index_ids[1], positions, scores)
 end
 
 """
     rerank(
-        reranker::CohereReranker, index::AbstractDocumentIndex, question::AbstractString,
+        reranker::RankGPTReranker, index::AbstractDocumentIndex, question::AbstractString,
         candidates::AbstractCandidateChunks;
-        verbose::Integer = 1,
         api_key::AbstractString = PT.OPENAI_API_KEY,
-        top_n::Integer = length(candidates.scores),
         model::AbstractString = PT.MODEL_CHAT,
+        verbose::Bool = false,
+        top_n::Integer = length(candidates.scores),
+        unique_chunks::Bool = true,
         cost_tracker = Threads.Atomic{Float64}(0.0),
         kwargs...)
-
 
 Re-ranks a list of candidate chunks using the RankGPT algorithm. See https://github.com/sunnweiwei/RankGPT for more details. 
 
