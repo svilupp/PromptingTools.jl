@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.37.1]
+
+### Fixed
+- Fixed a bug in CohereReranker when it wouldn't handle correctly CandidateChunks.
+
 ## [0.37.0]
 
 ### Updated
