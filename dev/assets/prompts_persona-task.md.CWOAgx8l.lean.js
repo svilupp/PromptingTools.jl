@@ -39,13 +39,13 @@ const _hoisted_55 = /* @__PURE__ */ createBaseVNode("li", null, [
   ])
 ], -1);
 const _hoisted_56 = /* @__PURE__ */ createBaseVNode("li", null, [
-  /* @__PURE__ */ createBaseVNode("p", null, "Word count: 1204")
+  /* @__PURE__ */ createBaseVNode("p", null, "Word count: 1501")
 ], -1);
 const _hoisted_57 = /* @__PURE__ */ createBaseVNode("li", null, [
   /* @__PURE__ */ createBaseVNode("p", null, "Source:")
 ], -1);
 const _hoisted_58 = /* @__PURE__ */ createBaseVNode("li", null, [
-  /* @__PURE__ */ createBaseVNode("p", null, "Version: 1.1")
+  /* @__PURE__ */ createBaseVNode("p", null, "Version: 1.2")
 ], -1);
 const _hoisted_59 = /* @__PURE__ */ createStaticVNode("", 41);
 const _hoisted_100 = /* @__PURE__ */ createBaseVNode("code", null, "code", -1);
