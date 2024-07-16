@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Added a new tagging filter `RT.AllTagFilter` to `RT.find_tags`, which requires all tags to be present in a chunk.
 - Added an option in `RT.get_keywords` to set the minimum length of the keywords.
+- Added a new method for `reciprocal_rank_fusion` and utility for standardizing candidate chunk scores (`score_to_unit_scale`).
 
 ## [0.37.1]
 

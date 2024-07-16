@@ -592,3 +592,60 @@ function reciprocal_rank_fusion(args...; k::Int = 60)
 
     return merged, scores
 end
+
+"""
+    reciprocal_rank_fusion(
+        positions1::AbstractVector{<:Integer}, scores1::AbstractVector{<:T},
+        positions2::AbstractVector{<:Integer},
+        scores2::AbstractVector{<:T}; k::Int = 60) where {T <: Real}
+
+Merges two sets of rankings and their joint scores. Calculates the reciprocal rank score for each chunk (discounted by the inverse of the rank).
+
+# Example
+```julia
+positions1 = [1, 3, 5, 7, 9]
+scores1 = [0.9, 0.8, 0.7, 0.6, 0.5]
+positions2 = [2, 4, 6, 8, 10]
+scores2 = [0.5, 0.6, 0.7, 0.8, 0.9]
+
+merged, scores = reciprocal_rank_fusion(positions1, scores1, positions2, scores2; k = 60)
+```
+"""
+function reciprocal_rank_fusion(
+        positions1::AbstractVector{<:Integer}, scores1::AbstractVector{<:T},
+        positions2::AbstractVector{<:Integer},
+        scores2::AbstractVector{<:T}; k::Int = 60) where {T <: Real}
+    merged = Vector{Int}()
+    scores = Dict{Int, T}()
+
+    for (idx, (pos, sc)) in enumerate(zip(positions1, scores1))
+        scores[pos] = get(scores, pos, 0.0) + sc / (k + idx)
+    end
+    for (idx, (pos, sc)) in enumerate(zip(positions2, scores2))
+        scores[pos] = get(scores, pos, 0.0) + sc / (k + idx)
+    end
+
+    merged = [first(item) for item in sort(collect(scores), by = last, rev = true)]
+
+    return merged, scores
+end
+
+"""
+    score_to_unit_scale(x::AbstractVector{T}) where T<:Real
+
+Shift and scale a vector of scores to the unit scale [0, 1].
+
+# Example
+```julia
+x = [1.0, 2.0, 3.0, 4.0, 5.0]
+scaled_x = score_to_unit_scale(x)
+```
+"""
+function score_to_unit_scale(x::AbstractVector{T}) where {T <: Real}
+    ex = extrema(x)
+    if ex[2] - ex[1] < eps(T)
+        ones(T, length(x))
+    else
+        (x .- ex[1]) ./ (ex[2] - ex[1] + eps(T))
+    end
+end
