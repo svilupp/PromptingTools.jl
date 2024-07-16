@@ -3,7 +3,7 @@ using PromptingTools.Experimental.RAGTools: ContextEnumerator, NoRephraser, Simp
                                             HyDERephraser,
                                             CosineSimilarity, BinaryCosineSimilarity,
                                             MultiFinder, BM25Similarity,
-                                            NoTagFilter, AnyTagFilter,
+                                            NoTagFilter, AllTagFilter, AnyTagFilter,
                                             SimpleRetriever, AdvancedRetriever
 using PromptingTools.Experimental.RAGTools: AbstractRephraser, AbstractTagFilter,
                                             AbstractSimilarityFinder, AbstractReranker,
@@ -431,6 +431,20 @@ end
     # Test with multiple tags in vocab
     @test find_tags(tagger, index, ["python", "jr", "x"]).positions == [2]
 
+    ## With AllTagFilter -- no difference for individual
+    tagger2 = AllTagFilter()
+    @test find_tags(tagger2, index, "julia").positions == [1]
+    @test find_tags(tagger2, index, "julia").scores == [1.0]
+    @test find_tags(tagger2, index, "python").positions |> isempty
+    @test find_tags(tagger2, index, "java").positions |> isempty
+    @test find_tags(tagger2, index, r"^j").positions |> isempty
+    @test find_tags(tagger2, index, "jr").positions == [2]
+
+    @test find_tags(tagger2, index, ["python", "jr", "x"]).positions |> isempty
+    @test find_tags(tagger2, index, ["julia", "jr"]).positions |> isempty
+    @test find_tags(tagger2, index, ["julia", "julia"]).positions == [1]
+    @test find_tags(tagger2, index, ["julia", "julia"]).scores == [1.0]
+
     # No filter tag -- give everything
     cc = find_tags(NoTagFilter(), index, "julia")
     @test isnothing(cc)
@@ -483,6 +497,11 @@ end
     @test mcc4.index_ids == [:indexX, :indexX]
     @test mcc4.positions == [1, 2]
     @test mcc4.scores == [1.0, 1.0]
+
+    mcc5 = find_tags(AllTagFilter(), multi_index2, [r"^j"])
+    @test mcc5.index_ids |> isempty
+    @test mcc5.positions |> isempty
+    @test mcc5.scores |> isempty
 end
 
 @testset "rerank" begin
