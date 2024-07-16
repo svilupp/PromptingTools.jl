@@ -7,7 +7,7 @@ using PromptingTools.Experimental.RAGTools: split_into_code_and_sentences
 using PromptingTools.Experimental.RAGTools: getpropertynested, setpropertynested,
                                             merge_kwargs_nested
 using PromptingTools.Experimental.RAGTools: pack_bits, unpack_bits, preprocess_tokens,
-                                            reciprocal_rank_fusion
+                                            reciprocal_rank_fusion, score_to_unit_scale
 
 @testset "_check_aiextract_capability" begin
     @test _check_aiextract_capability("gpt-3.5-turbo") == nothing
@@ -598,4 +598,58 @@ end
     @test Set(positions[1:2]) == Set([1, 3])
     @test Set(positions[3:4]) == Set([2, 4])
     @test positions[5] == 5
+
+    ## Paired reciprocal rank
+    positions1 = [1, 2, 3, 4, 5]
+    scores1 = [0.9, 0.8, 0.7, 0.6, 0.5]
+    positions2 = [3, 4, 5, 6, 7]
+    scores2 = [0.5, 0.6, 0.7, 0.9, 0.9]
+
+    merged, scores = reciprocal_rank_fusion(positions1, scores1, positions2, scores2; k = 0)
+    @test length(merged) == 7
+    @test Set(merged) == Set(1:7)
+    @test merged[1] == 1
+    @test scores[1] == 0.9
+    @test merged[2] == 3
+    @test scores[3] == 0.7 / 3 + 0.5
+    @test merged[end] == 7
+    @test scores[7] == 0.9 / 5
+
+    merged, scores = reciprocal_rank_fusion(
+        positions1, scores1, positions2, scores2; k = 60)
+    @test length(merged) == 7
+    @test merged[1] == 3
+    @test merged[2] == 4
+    @test merged[3] == 5
+    @test scores[3] > scores[4]
+    @test scores[4] > scores[5]
+    @test scores[5] > scores[6]
+    @test scores[6] > scores[7]
+end
+
+@testset "score_to_unit_scale" begin
+    # Test with a normal range of values
+    x = [1.0, 2.0, 3.0, 4.0, 5.0]
+    scaled_x = score_to_unit_scale(x)
+    @test extrema(scaled_x) == (0.0, 1.0)
+
+    # Test with all values the same
+    y = [2.0, 2.0, 2.0, 2.0, 2.0]
+    scaled_y = score_to_unit_scale(y)
+    @test all(scaled_y .== 1.0)
+
+    # Test with a single value
+    z = [3.0]
+    scaled_z = score_to_unit_scale(z)
+    @test scaled_z == [1.0]
+
+    # Test with a range of negative values
+    w = [-5.0, -4.0, -3.0, -2.0, -1.0]
+    scaled_w = score_to_unit_scale(w)
+    @test extrema(scaled_w) == (0.0, 1.0)
+
+    # Test with a mix of positive and negative values
+    v = [-1.0, 0.0, 1.0]
+    scaled_v = score_to_unit_scale(v)
+    @test extrema(scaled_v) == (0.0, 1.0)
 end
