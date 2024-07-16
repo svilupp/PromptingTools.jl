@@ -95,6 +95,13 @@ Finds the chunks that have ANY OF the specified tag(s).
 """
 struct AnyTagFilter <: AbstractTagFilter end
 
+"""
+    AllTagFilter <: AbstractTagFilter
+
+Finds the chunks that have ALL OF the specified tag(s).
+"""
+struct AllTagFilter <: AbstractTagFilter end
+
 ### Functions
 function rephrase(rephraser::AbstractRephraser, question::AbstractString; kwargs...)
     throw(ArgumentError("Not implemented yet for type $(typeof(rephraser))"))
@@ -502,6 +509,39 @@ function find_tags(method::AnyTagFilter, index::AbstractChunkIndex,
 end
 
 """
+    find_tags(method::AllTagFilter, index::AbstractChunkIndex,
+        tag::Union{AbstractString, Regex}; kwargs...)
+
+    find_tags(method::AllTagFilter, index::AbstractChunkIndex,
+        tags::Vector{T}; kwargs...) where {T <: Union{AbstractString, Regex}}
+
+Finds the indices of chunks (represented by tags in `index`) that have ALL OF the specified `tag` or `tags`.
+"""
+function find_tags(method::AllTagFilter, index::AbstractChunkIndex,
+        tags_vec::Vector{T}; kwargs...) where {T <: Union{AbstractString, Regex}}
+    isnothing(tags(index)) && CandidateChunks(; index_id = index.id)
+    tag_idx = Int[]
+    for tag in tags_vec
+        if tag isa AbstractString
+            append!(tag_idx, findall(tags_vocab(index) .== tag))
+        else # assume it's a regex
+            append!(tag_idx, findall(occursin.(Ref(tag), tags_vocab(index))))
+        end
+    end
+    ## get rows with all values true
+    match_row_idx = if length(tag_idx) > 0
+        reduce(.&, eachcol(@view(tags(index)[:, tag_idx]))) |> findall
+    else
+        Int[]
+    end
+    return CandidateChunks(index.id, match_row_idx, ones(Float32, length(match_row_idx)))
+end
+function find_tags(method::AllTagFilter, index::AbstractChunkIndex,
+        tag::Union{AbstractString, Regex}; kwargs...)
+    find_tags(method, index, [tag]; kwargs...)
+end
+
+"""
     find_tags(method::NoTagFilter, index::AbstractChunkIndex,
         tags::Union{T, AbstractVector{<:T}}; kwargs...) where {T <:
                                                                Union{
@@ -516,8 +556,8 @@ function find_tags(method::NoTagFilter, index::AbstractChunkIndex,
         AbstractString, Regex, Nothing}}
     return nothing
 end
-## Multi-index implementation
-function find_tags(method::AnyTagFilter, index::AbstractMultiIndex,
+## Multi-index implementation -- logic differs within each index and then we simply vcat them together
+function find_tags(method::Union{AnyTagFilter, AllTagFilter}, index::AbstractMultiIndex,
         tag::Union{T, AbstractVector{<:T}}; kwargs...) where {T <:
                                                               Union{AbstractString, Regex}}
     all_indexes = indexes(index)

@@ -17,6 +17,7 @@ RT._stem(stemmer::Snowball.Stemmer, text::AbstractString) = Snowball.stem(stemme
         stemmer = nothing,
         stopwords::Set{String} = Set(STOPWORDS),
         return_keywords::Bool = false,
+        min_length::Integer = 3,
         kwargs...)
 
 Generate a `DocumentTermMatrix` from a vector of `docs` using the provided `stemmer` and `stopwords`.
@@ -27,6 +28,7 @@ Generate a `DocumentTermMatrix` from a vector of `docs` using the provided `stem
 - `stemmer`: A stemmer to use for stemming. Default is `nothing`.
 - `stopwords`: A set of stopwords to remove. Default is `Set(STOPWORDS)`.
 - `return_keywords`: A boolean flag for returning the keywords. Default is `false`. Useful for query processing in search time.
+- `min_length`: The minimum length of the keywords. Default is `3`.
 """
 function RT.get_keywords(
         processor::RT.KeywordsProcessor, docs::AbstractVector{<:AbstractString};
@@ -34,6 +36,7 @@ function RT.get_keywords(
         stemmer = nothing,
         stopwords::Set{String} = Set(RT.STOPWORDS),
         return_keywords::Bool = false,
+        min_length::Integer = 3,
         kwargs...)
     ## check if extension is available
     ext = Base.get_extension(PromptingTools, :RAGToolsExperimentalExt)
@@ -47,7 +50,7 @@ function RT.get_keywords(
     ## Preprocess text into tokens
     stemmer = !isnothing(stemmer) ? stemmer : Snowball.Stemmer("english")
     # Single-threaded as stemmer is not thread-safe
-    keywords = RT.preprocess_tokens(docs, stemmer; stopwords, min_length = 3)
+    keywords = RT.preprocess_tokens(docs, stemmer; stopwords, min_length)
 
     ## Early exit if we only want keywords (search time)
     return_keywords && return keywords
