@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.39.0]
+
+### Added
+- Introduces `RAGTools.SubChunkIndex` to allow projecting `views` of various indices. Useful for pre-filtering your data (faster retrieval). See `?RT.SubChunkIndex` for more information.
+
 ## [0.38.0]
 
 ### Added

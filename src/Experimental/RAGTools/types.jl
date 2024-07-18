@@ -2,6 +2,8 @@
 # More advanced index would be: HybridChunkIndex
 
 ### Shared methods
+Base.parent(index::AbstractDocumentIndex) = index
+indexid(index::AbstractDocumentIndex) = index.id
 chunkdata(index::AbstractChunkIndex) = index.chunkdata
 function embeddings(index::AbstractChunkIndex)
     throw(ArgumentError("`embeddings` not implemented for $(typeof(index))"))
@@ -42,7 +44,7 @@ function Base.vcat(i1::T, i2::T) where {T <: AbstractChunkIndex}
     else
         vcat(extras(i1), extras(i2))
     end
-    T(i1.id, vcat(chunks(i1), chunks(i2)),
+    T(indexid(i1), vcat(chunks(i1), chunks(i2)),
         chunkdata_,
         tags_,
         tags_vocab_,
@@ -222,6 +224,90 @@ function Base.var"=="(i1::MultiIndex, i2::MultiIndex)
     end
     return true
 end
+
+# # Views
+### SingleIndex view object
+"""
+    SubChunkIndex
+
+A view of the parent index. All methods and accessors working for `AbstractChunkIndex` also work for `SubChunkIndex`.
+
+# Fields
+- `parent::AbstractChunkIndex`: the parent index from which the chunks are drawn
+- `positions::Vector{Int}`: the positions of the chunks in the parent index
+
+# Example
+```julia
+
+```
+"""
+@kwdef struct SubChunkIndex{T <: AbstractChunkIndex} <: AbstractChunkIndex
+    parent::T
+    positions::Vector{Int}
+end
+
+positions(index::SubChunkIndex) = index.positions
+Base.parent(index::SubChunkIndex) = index.parent
+HasEmbeddings(index::SubChunkIndex) = HasEmbeddings(index)
+HasKeywords(index::SubChunkIndex) = HasKeywords(index)
+
+chunks(index::SubChunkIndex) = @view(chunks(parent(index))[positions(index)])
+sources(index::SubChunkIndex) = @view(sources(parent(index))[positions(index)])
+function chunkdata(index::SubChunkIndex)
+    chkdata = chunkdata(parent(index))
+    isnothing(chkdata) && return nothing
+    @view(chunkdata(parent(index))[positions(index)])
+end
+function embeddings(index::SubChunkIndex)
+    if HasEmbeddings(index)
+        @view(embeddings(parent(index))[positions(index)])
+    else
+        throw(ArgumentError("`embeddings` not implemented for $(typeof(index))"))
+    end
+end
+function tags(index::SubChunkIndex)
+    tagsdata = tags(parent(index))
+    isnothing(tagsdata) && return nothing
+    @view(tagsdata[positions(index), :])
+end
+function tags_vocab(index::SubChunkIndex)
+    vocab = tags_vocab(parent(index))
+    isnothing(vocab) && return nothing
+    @view(vocab[positions(index)])
+end
+function extras(index::SubChunkIndex)
+    extrasdata = extras(parent(index))
+    isnothing(extrasdata) && return nothing
+    @view(extrasdata[positions(index)])
+end
+# ==
+# vcat
+# hcat
+# &
+function Base.vcat(i1::SubChunkIndex, i2::SubChunkIndex)
+    throw(ArgumentError("vcat not implemented for type $(typeof(i1)) and $(typeof(i2))"))
+end
+## TODO: finish vcat
+function Base.vcat(i1::T, i2::T) where {T <: SubChunkIndex}
+    ## Check if can be merged
+    if indexid(parent(i1)) != indexid(parent(i2))
+        throw(ArgumentError("Parent indices must be the same (provided: $(indexid(parent(i1))) and $(indexid(parent(i2))))"))
+    end
+    return SubChunkIndex(parent(i1), vcat(positions(i1), positions(i2)))
+end
+function Base.unique(index::SubChunkIndex)
+    return SubChunkIndex(parent(index), unique(positions(index)))
+end
+function Base.length(index::SubChunkIndex)
+    return length(positions(index))
+end
+
+function Base.show(io::IO, index::SubChunkIndex)
+    print(io,
+        "A view of $(typeof(parent(index))) (id: $(indexid(parent(index)))) with $(length(index)) chunks")
+end
+
+# # CandidateChunks for Retrieval
 
 """
     CandidateChunks
@@ -484,7 +570,7 @@ function Base.getindex(ci::AbstractChunkIndex,
     field = field == :embeddings ? :chunkdata : field
     len_ = length(chunks(ci))
     @assert all(1 .<= candidate.positions .<= len_) "Some positions are out of bounds"
-    if ci.id == candidate.index_id
+    if indexid(ci) == candidate.index_id
         if field == :chunks
             @views chunks(ci)[candidate.positions]
         elseif field == :chunkdata
@@ -507,7 +593,7 @@ function Base.getindex(mi::MultiIndex,
         field::Symbol = :chunks; sorted::Bool = true) where {TP <: Integer, TD <: Real}
     ## Always sorted!
     @assert field in [:chunks, :sources] "Only `chunks`, `sources` fields are supported for now"
-    valid_index = findfirst(x -> x.id == candidate.index_id, indexes(mi))
+    valid_index = findfirst(x -> indexid(x) == candidate.index_id, indexes(mi))
     if isnothing(valid_index) && field == :chunks
         String[]
     elseif isnothing(valid_index) && field == :sources
@@ -522,7 +608,7 @@ function Base.getindex(ci::AbstractChunkIndex,
         field::Symbol = :chunks; sorted::Bool = false) where {TP <: Integer, TD <: Real}
     @assert field in [:chunks, :sources, :scores] "Only `chunks`, `sources`, and `scores` fields are supported for now"
 
-    index_pos = findall(==(ci.id), candidate.index_ids)
+    index_pos = findall(==(indexid(ci)), candidate.index_ids)
     if isempty(index_pos) && field == :chunks
         eltype(chunks(ci))[]
     elseif isempty(index_pos) && field == :scores
@@ -567,11 +653,11 @@ function Base.getindex(mi::MultiIndex,
 end
 
 function Base.getindex(index::AbstractChunkIndex, id::Symbol)
-    id == index.id ? index : nothing
+    id == indexid(index) ? index : nothing
 end
 function Base.getindex(index::AbstractMultiIndex, id::Symbol)
-    id == index.id && return index
-    idx = findfirst(x -> x.id == id, indexes(index))
+    id == indexid(index) && return index
+    idx = findfirst(x -> indexid(x) == id, indexes(index))
     isnothing(idx) ? nothing : indexes(index)[idx]
 end
 
