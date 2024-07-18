@@ -238,7 +238,8 @@ A view of the parent index. All methods and accessors working for `AbstractChunk
 
 # Example
 ```julia
-
+cc = CandidateChunks(index.id, 1:10)
+sub_index = @view(index[cc])
 ```
 """
 @kwdef struct SubChunkIndex{T <: AbstractChunkIndex} <: AbstractChunkIndex
@@ -280,14 +281,9 @@ function extras(index::SubChunkIndex)
     isnothing(extrasdata) && return nothing
     @view(extrasdata[positions(index)])
 end
-# ==
-# vcat
-# hcat
-# &
 function Base.vcat(i1::SubChunkIndex, i2::SubChunkIndex)
     throw(ArgumentError("vcat not implemented for type $(typeof(i1)) and $(typeof(i2))"))
 end
-## TODO: finish vcat
 function Base.vcat(i1::T, i2::T) where {T <: SubChunkIndex}
     ## Check if can be merged
     if indexid(parent(i1)) != indexid(parent(i2))
@@ -301,7 +297,6 @@ end
 function Base.length(index::SubChunkIndex)
     return length(positions(index))
 end
-
 function Base.show(io::IO, index::SubChunkIndex)
     print(io,
         "A view of $(typeof(parent(index))) (id: $(indexid(parent(index)))) with $(length(index)) chunks")
@@ -327,6 +322,8 @@ It's the result of the retrieval stage of RAG.
     positions::Vector{TP} = Int[]
     scores::Vector{TD} = Float32[]
 end
+indexid(cc::CandidateChunks) = cc.index_id
+positions(cc::CandidateChunks) = cc.positions
 Base.length(cc::CandidateChunks) = length(cc.positions)
 function Base.first(cc::CandidateChunks, k::Integer)
     sorted_idxs = sortperm(cc.scores, rev = true) |> x -> first(x, k)
@@ -363,7 +360,12 @@ This struct is useful for scenarios where candidates are drawn from multiple ind
     positions::Vector{TP} = Int[]
     scores::Vector{TD} = Float32[]
 end
-Base.length(cc::MultiCandidateChunks) = length(cc.positions)
+indexids(cc::MultiCandidateChunks) = cc.index_ids
+## for compatibility
+indexids(cc::CandidateChunks) = fill(indexid(cc), length(positions(cc)))
+
+positions(cc::MultiCandidateChunks) = cc.positions
+Base.length(cc::MultiCandidateChunks) = length(positions(cc))
 function Base.first(cc::MultiCandidateChunks, k::Integer)
     sorted_idxs = sortperm(cc.scores, rev = true) |> x -> first(x, k)
     MultiCandidateChunks(
@@ -558,6 +560,29 @@ function Base.var"&"(mc1::MultiCandidateChunks{TP1, TD1},
     return MultiCandidateChunks(index_ids, positions, scores)
 end
 
+# # Views and Getindex
+function Base.view(index::AbstractChunkIndex, cc::AbstractCandidateChunks)
+    throw(ArgumentError("Not implemented for type $(typeof(index)) and $(typeof(cc))"))
+end
+function Base.view(index::AbstractChunkIndex, cc::CandidateChunks)
+    return SubChunkIndex(index, cc.positions)
+end
+function Base.view(index::AbstractChunkIndex, cc::MultiCandidateChunks)
+    valid_positions = findall(==(indexid(index)), indexids(cc))
+    return SubChunkIndex(index, positions(cc)[valid_positions])
+end
+function SubChunkIndex(index::SubChunkIndex, cc::CandidateChunks)
+    intersect_pos = intersect(positions(index), positions(cc))
+    return SubChunkIndex(parent(index), intersect_pos)
+end
+function SubChunkIndex(index::SubChunkIndex, cc::MultiCandidateChunks)
+    valid_positions = findall(==(indexid(index)), indexids(cc))
+    intersect_pos = intersect(positions(index), @view(positions(cc)[valid_positions]))
+    return SubChunkIndex(parent(index), intersect_pos)
+end
+
+## Getindex
+
 function Base.getindex(ci::AbstractDocumentIndex,
         candidate::AbstractCandidateChunks,
         field::Symbol)
@@ -567,16 +592,17 @@ function Base.getindex(ci::AbstractChunkIndex,
         candidate::CandidateChunks{TP, TD},
         field::Symbol = :chunks; sorted::Bool = true) where {TP <: Integer, TD <: Real}
     @assert field in [:chunks, :embeddings, :chunkdata, :sources] "Only `chunks`, `embeddings`, `chunkdata`, `sources` fields are supported for now"
+    ## embeddings is a compatibility alias, use chunkdata
     field = field == :embeddings ? :chunkdata : field
     len_ = length(chunks(ci))
-    @assert all(1 .<= candidate.positions .<= len_) "Some positions are out of bounds"
-    if indexid(ci) == candidate.index_id
+    @assert all(1 .<= positions(candidate) .<= len_) "Some positions are out of bounds"
+    if indexid(ci) == indexid(candidate)
         if field == :chunks
-            @views chunks(ci)[candidate.positions]
+            chunks(@view(ci[candidate]))
         elseif field == :chunkdata
-            @views chunkdata(ci)[:, candidate.positions]
+            chunkdata(@view(ci)[candidate])
         elseif field == :sources
-            @views sources(ci)[candidate.positions]
+            sources(@view(ci)[candidate])
         end
     else
         if field == :chunks
