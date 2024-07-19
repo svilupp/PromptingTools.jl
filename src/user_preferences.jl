@@ -124,7 +124,7 @@ function get_preferences(key::String)
 end
 
 ## Load up GLOBALS
-global MODEL_CHAT::String = @load_preference("MODEL_CHAT", default="gpt-3.5-turbo")
+global MODEL_CHAT::String = @load_preference("MODEL_CHAT", default="gpt-4o-mini")
 global MODEL_EMBEDDING::String = @load_preference("MODEL_EMBEDDING",
     default="text-embedding-3-small")
 global MODEL_IMAGE_GENERATION::String = @load_preference("MODEL_IMAGE_GENERATION",
@@ -325,6 +325,7 @@ aliases = merge(
     Dict("gpt3" => "gpt-3.5-turbo",
         "gpt4" => "gpt-4",
         "gpt4o" => "gpt-4o",
+        "gpt4om" => "gpt-4o-mini",
         "gpt4v" => "gpt-4-vision-preview", # 4v is for "4 vision"
         "gpt4t" => "gpt-4-turbo", # 4t is for "4 turbo"
         "gpt3t" => "gpt-3.5-turbo-0125", # 3t is for "3 turbo"
@@ -431,7 +432,17 @@ registry = Dict{String, ModelSpec}(
         OpenAISchema(),
         5e-6,
         1.5e-5,
-        "GPT-4 Omni, the latest GPT4 model that is faster and cheaper than GPT-4 Turbo is an updated version of GPT4 that is much faster and the cheaper to use. Currently points to version gpt-4o-2024-05-13."),
+        "GPT-4 Omni, the latest GPT4 model that is faster and cheaper than GPT-4 Turbo is an updated version of GPT4 that is much faster and the cheaper to use. Context of 128K, knowledge until October 2023. Currently points to version gpt-4o-2024-05-13."),
+    "gpt-4o-mini" => ModelSpec("gpt-4o-mini",
+        OpenAISchema(),
+        1.5e-7,
+        6e-7,
+        "GPT-4 Omni Mini, the smallest and fastest model based on GPT4 (and cheaper than GPT3.5Turbo)."),
+    "gpt-4o-mini-2024-07-18" => ModelSpec("gpt-4o-mini-2024-07-18",
+        OpenAISchema(),
+        1.5e-7,
+        6e-7,
+        "GPT-4 Omni Mini, the smallest and fastest model based on GPT4 (and cheaper than GPT3.5Turbo). Context of 128K, knowledge until October 2023. Currently points to version gpt-4o-2024-07-18."),
     "gpt-4-vision-preview" => ModelSpec(
         "gpt-4-vision-preview",
         OpenAISchema(),
