@@ -13,7 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.40.0]
 
 ### Added
-- Introduces `RAGTools.SubChunkIndex` to allow projecting `views` of various indices. Useful for pre-filtering your data (faster retrieval). See `?RT.SubChunkIndex` for more information.
+- Introduces `RAGTools.SubChunkIndex` to allow projecting `views` of various indices. Useful for pre-filtering your data (faster and more precise retrieval). See `?RT.SubChunkIndex` for more information and how to use it.
+
+### Fixed 
+- Fixed a bug in `find_closest(finder::BM25Similarity, ...)` where `minimum_similarity` kwarg was not implemented.
 
 ## [0.39.0]
 

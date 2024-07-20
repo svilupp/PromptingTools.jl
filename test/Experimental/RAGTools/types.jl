@@ -9,6 +9,7 @@ using PromptingTools.Experimental.RAGTools: ChunkEmbeddingsIndex, ChunkKeywordsI
 using PromptingTools.Experimental.RAGTools: embeddings, chunks, tags, tags_vocab, sources,
                                             extras,
                                             RAGResult, chunkdata, preprocess_tokens
+using PromptingTools.Experimental.RAGTools: SubChunkIndex, indexid, indexids
 using PromptingTools: last_message, last_output
 
 @testset "ChunkEmbeddingsIndex" begin
@@ -398,7 +399,7 @@ end
         embeddings = embeddings_data,
         tags = tags_data,
         tags_vocab = tags_vocab_data,
-        sources = repeat(["test_source"], 3),
+        sources = ["test_source$i" for i in 1:3],
         id = chunk_sym)
 
     # Test to get chunks based on valid CandidateChunks
@@ -406,10 +407,11 @@ end
         positions = [1, 3],
         scores = [0.1, 0.2])
     @test collect(test_chunk_index[candidate_chunks]) == ["First chunk", "Third chunk"]
-    @test collect(test_chunk_index[candidate_chunks, :chunks]) ==
-          ["First chunk", "Third chunk"]
+    @test collect(test_chunk_index[candidate_chunks, :chunks, sorted = true]) ==
+          ["Third chunk", "First chunk"]
+    @test collect(test_chunk_index[candidate_chunks, :scores]) == [0.1, 0.2]
     @test collect(test_chunk_index[candidate_chunks, :sources]) ==
-          ["test_source", "test_source"]
+          ["test_source1", "test_source3"]
     @test collect(test_chunk_index[candidate_chunks, :embeddings]) ==
           embeddings_data[:, [1, 3]]
     @test collect(test_chunk_index[candidate_chunks, :chunkdata]) ==
@@ -429,7 +431,7 @@ end
     candidate_chunks_oob = CandidateChunks(index_id = chunk_sym,
         positions = [10, -1],
         scores = [0.5, 0.6])
-    @test_throws AssertionError test_chunk_index[candidate_chunks_oob]
+    @test_throws BoundsError test_chunk_index[candidate_chunks_oob]
 
     # Test with an incorrect index_id, which should also result in an empty array
     wrong_sym = Symbol("InvalidIndex")
