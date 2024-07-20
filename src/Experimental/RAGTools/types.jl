@@ -5,12 +5,16 @@
 Base.parent(index::AbstractDocumentIndex) = index
 indexid(index::AbstractDocumentIndex) = index.id
 chunkdata(index::AbstractChunkIndex) = index.chunkdata
+function chunkdata(index::AbstractDocumentIndex)
+    throw(ArgumentError("`chunkdata` not implemented for $(typeof(index))"))
+end
 function embeddings(index::AbstractChunkIndex)
     throw(ArgumentError("`embeddings` not implemented for $(typeof(index))"))
 end
 HasEmbeddings(::AbstractChunkIndex) = false
 HasKeywords(::AbstractChunkIndex) = false
 chunks(index::AbstractChunkIndex) = index.chunks
+Base.length(index::AbstractChunkIndex) = length(chunks(index))
 tags(index::AbstractChunkIndex) = index.tags
 tags_vocab(index::AbstractChunkIndex) = index.tags_vocab
 sources(index::AbstractChunkIndex) = index.sources
@@ -189,9 +193,6 @@ end
 
 HasKeywords(::ChunkKeywordsIndex) = true
 
-## TODO: implement a view(), make sure to recover the output positions correctly
-## TODO: fields: parent, positions
-
 "Composite index that stores multiple ChunkIndex objects and their embeddings. It's not yet fully implemented."
 @kwdef struct MultiIndex <: AbstractMultiIndex
     id::Symbol = gensym("MultiIndex")
@@ -247,21 +248,22 @@ sub_index = @view(index[cc])
     positions::Vector{Int}
 end
 
+indexid(index::SubChunkIndex) = parent(index) |> indexid
 positions(index::SubChunkIndex) = index.positions
 Base.parent(index::SubChunkIndex) = index.parent
-HasEmbeddings(index::SubChunkIndex) = HasEmbeddings(index)
-HasKeywords(index::SubChunkIndex) = HasKeywords(index)
+HasEmbeddings(index::SubChunkIndex) = HasEmbeddings(parent(index))
+HasKeywords(index::SubChunkIndex) = HasKeywords(parent(index))
 
-chunks(index::SubChunkIndex) = @view(chunks(parent(index))[positions(index)])
-sources(index::SubChunkIndex) = @view(sources(parent(index))[positions(index)])
+chunks(index::SubChunkIndex) = view(chunks(parent(index)), positions(index))
+sources(index::SubChunkIndex) = view(sources(parent(index)), positions(index))
 function chunkdata(index::SubChunkIndex)
     chkdata = chunkdata(parent(index))
     isnothing(chkdata) && return nothing
-    @view(chunkdata(parent(index))[positions(index)])
+    view(chunkdata(parent(index)), :, positions(index))
 end
 function embeddings(index::SubChunkIndex)
     if HasEmbeddings(index)
-        @view(embeddings(parent(index))[positions(index)])
+        view(embeddings(parent(index)), :, positions(index))
     else
         throw(ArgumentError("`embeddings` not implemented for $(typeof(index))"))
     end
@@ -269,17 +271,15 @@ end
 function tags(index::SubChunkIndex)
     tagsdata = tags(parent(index))
     isnothing(tagsdata) && return nothing
-    @view(tagsdata[positions(index), :])
+    view(tagsdata, positions(index), :)
 end
 function tags_vocab(index::SubChunkIndex)
-    vocab = tags_vocab(parent(index))
-    isnothing(vocab) && return nothing
-    @view(vocab[positions(index)])
+    tags_vocab(parent(index))
 end
 function extras(index::SubChunkIndex)
     extrasdata = extras(parent(index))
     isnothing(extrasdata) && return nothing
-    @view(extrasdata[positions(index)])
+    view(extrasdata, positions(index))
 end
 function Base.vcat(i1::SubChunkIndex, i2::SubChunkIndex)
     throw(ArgumentError("vcat not implemented for type $(typeof(i1)) and $(typeof(i2))"))
@@ -299,7 +299,7 @@ function Base.length(index::SubChunkIndex)
 end
 function Base.show(io::IO, index::SubChunkIndex)
     print(io,
-        "A view of $(typeof(parent(index))) (id: $(indexid(parent(index)))) with $(length(index)) chunks")
+        "A view of $(typeof(parent(index))|>nameof) (id: $(indexid(parent(index)))) with $(length(index)) chunks")
 end
 
 # # CandidateChunks for Retrieval
@@ -324,20 +324,26 @@ It's the result of the retrieval stage of RAG.
 end
 indexid(cc::CandidateChunks) = cc.index_id
 positions(cc::CandidateChunks) = cc.positions
+scores(cc::CandidateChunks) = cc.scores
 Base.length(cc::CandidateChunks) = length(cc.positions)
 function Base.first(cc::CandidateChunks, k::Integer)
-    sorted_idxs = sortperm(cc.scores, rev = true) |> x -> first(x, k)
-    CandidateChunks(cc.index_id, cc.positions[sorted_idxs], cc.scores[sorted_idxs])
+    sorted_idxs = sortperm(scores(cc), rev = true) |> x -> first(x, k)
+    CandidateChunks(indexid(cc), positions(cc)[sorted_idxs], scores(cc)[sorted_idxs])
 end
 function Base.copy(cc::CandidateChunks{TP, TD}) where {TP <: Integer, TD <: Real}
-    CandidateChunks{TP, TD}(cc.index_id, copy(cc.positions), copy(cc.scores))
+    CandidateChunks{TP, TD}(indexid(cc), copy(positions(cc)), copy(scores(cc)))
 end
 function Base.isempty(cc::CandidateChunks)
-    isempty(cc.positions)
+    isempty(positions(cc))
 end
 function Base.var"=="(cc1::CandidateChunks, cc2::CandidateChunks)
     all(
         getfield(cc1, f) == getfield(cc2, f) for f in fieldnames(CandidateChunks))
+end
+
+function CandidateChunks(index::AbstractChunkIndex, positions::AbstractVector{<:Integer},
+        scores = fill(0.0f0, length(positions)))
+    CandidateChunks(indexid(index), convert(Vector{Int}, positions), scores)
 end
 
 """
@@ -363,23 +369,31 @@ end
 indexids(cc::MultiCandidateChunks) = cc.index_ids
 ## for compatibility
 indexids(cc::CandidateChunks) = fill(indexid(cc), length(positions(cc)))
-
 positions(cc::MultiCandidateChunks) = cc.positions
+scores(cc::MultiCandidateChunks) = cc.scores
 Base.length(cc::MultiCandidateChunks) = length(positions(cc))
+
 function Base.first(cc::MultiCandidateChunks, k::Integer)
-    sorted_idxs = sortperm(cc.scores, rev = true) |> x -> first(x, k)
+    sorted_idxs = sortperm(scores(cc), rev = true) |> x -> first(x, k)
     MultiCandidateChunks(
-        cc.index_ids[sorted_idxs], cc.positions[sorted_idxs], cc.scores[sorted_idxs])
+        indexids(cc)[sorted_idxs], positions(cc)[sorted_idxs], scores(cc)[sorted_idxs])
 end
 function Base.copy(cc::MultiCandidateChunks{TP, TD}) where {TP <: Integer, TD <: Real}
-    MultiCandidateChunks{TP, TD}(copy(cc.index_ids), copy(cc.positions), copy(cc.scores))
+    MultiCandidateChunks{TP, TD}(copy(indexids(cc)), copy(positions(cc)), copy(scores(cc)))
 end
 function Base.isempty(cc::MultiCandidateChunks)
-    isempty(cc.positions)
+    isempty(positions(cc))
 end
 function Base.var"=="(cc1::MultiCandidateChunks, cc2::MultiCandidateChunks)
     all(
         getfield(cc1, f) == getfield(cc2, f) for f in fieldnames(MultiCandidateChunks))
+end
+
+function MultiCandidateChunks(
+        index::AbstractChunkIndex, positions::AbstractVector{<:Integer},
+        scores = fill(0.0f0, length(positions)))
+    index_ids = fill(indexid(index), length(positions))
+    MultiCandidateChunks(index_ids, convert(Vector{Int}, positions), scores)
 end
 
 # join and sort two candidate chunks
@@ -387,71 +401,68 @@ function Base.vcat(cc1::AbstractCandidateChunks, cc2::AbstractCandidateChunks)
     throw(ArgumentError("Not implemented for type $(typeof(cc1)) and $(typeof(cc2))"))
 end
 
-## function _vcat(cc1::T, cc2::T) where {T <: AbstractCandidateChunks}
-## end
-
 function Base.vcat(cc1::CandidateChunks{TP1, TD1},
         cc2::CandidateChunks{TP2, TD2}) where {
         TP1 <: Integer, TP2 <: Integer, TD1 <: Real, TD2 <: Real}
     ## Check validity
-    cc1.index_id != cc2.index_id &&
-        throw(ArgumentError("Index ids must match (provided: $(cc1.index_id) and $(cc2.index_id))"))
+    indexid(cc1) != indexid(cc2) &&
+        throw(ArgumentError("Index ids must match (provided: $(indexid(cc1)) and $(indexid(cc2)))"))
 
-    positions = vcat(cc1.positions, cc2.positions)
+    positions_ = vcat(positions(cc1), positions(cc2))
     # operates on maximum similarity principle, ie, take the max similarity
-    scores = if !isempty(cc1.scores) && !isempty(cc2.scores)
-        vcat(cc1.scores, cc2.scores)
+    scores_ = if !isempty(scores(cc1)) && !isempty(scores(cc2))
+        vcat(scores(cc1), scores(cc2))
     else
         TD1[]
     end
-    if !isempty(scores)
+    if !isempty(scores_)
         ## Get sorted by maximum similarity (scores are similarity)
-        sorted_idxs = sortperm(scores, rev = true)
-        positions_sorted = @view(positions[sorted_idxs])
+        sorted_idxs = sortperm(scores_, rev = true)
+        positions_sorted = view(positions_, sorted_idxs)
         ## get the positions of unique elements
         unique_idxs = unique(i -> positions_sorted[i], eachindex(positions_sorted))
-        positions = positions_sorted[unique_idxs]
+        positions_ = positions_sorted[unique_idxs]
         ## apply the sorting and then the filtering
-        scores = @view(scores[sorted_idxs])[unique_idxs]
+        scores_ = view(scores_, sorted_idxs)[unique_idxs]
     else
-        positions = unique(positions)
+        positions_ = unique(positions_)
     end
-    CandidateChunks(cc1.index_id, positions, scores)
+    CandidateChunks(indexid(cc1), positions_, scores_)
 end
 
 function Base.vcat(cc1::MultiCandidateChunks{TP1, TD1},
         cc2::MultiCandidateChunks{TP2, TD2}) where {
         TP1 <: Integer, TP2 <: Integer, TD1 <: Real, TD2 <: Real}
     # operates on maximum similarity principle, ie, take the max similarity
-    scores = if !isempty(cc1.scores) && !isempty(cc2.scores)
-        vcat(cc1.scores, cc2.scores)
+    scores_ = if !isempty(scores(cc1)) && !isempty(scores(cc2))
+        vcat(scores(cc1), scores(cc2))
     else
         TD1[]
     end
-    positions = vcat(cc1.positions, cc2.positions)
+    positions_ = vcat(positions(cc1), positions(cc2))
     # pool the index ids
-    index_ids = vcat(cc1.index_ids, cc2.index_ids)
+    index_ids = vcat(indexids(cc1), indexids(cc2))
 
-    if !isempty(scores)
+    if !isempty(scores_)
         ## Get sorted by maximum similarity (scores are similarity)
-        sorted_idxs = sortperm(scores, rev = true)
-        view_positions = @view(positions[sorted_idxs])
-        view_indices = @view(index_ids[sorted_idxs])
+        sorted_idxs = sortperm(scores_, rev = true)
+        view_positions = view(positions_, sorted_idxs)
+        view_indices = view(index_ids, sorted_idxs)
         ## get the positions of unique elements
         unique_idxs = unique(
             i -> (view_indices[i], view_positions[i]), eachindex(
                 view_positions, view_indices))
-        positions = view_positions[unique_idxs]
+        positions_ = view_positions[unique_idxs]
         index_ids = view_indices[unique_idxs]
         ## apply the sorting and then the filtering
-        scores = @view(scores[sorted_idxs])[unique_idxs]
+        scores_ = view(scores_, sorted_idxs)[unique_idxs]
     else
         unique_idxs = unique(
-            i -> (positions[i], index_ids[i]), eachindex(positions, index_ids))
-        positions = positions[unique_idxs]
+            i -> (positions_[i], index_ids[i]), eachindex(positions_, index_ids))
+        positions_ = positions_[unique_idxs]
         index_ids = index_ids[unique_idxs]
     end
-    MultiCandidateChunks(index_ids, positions, scores)
+    MultiCandidateChunks(index_ids, positions_, scores_)
 end
 
 # combine/intersect two candidate chunks. take the maximum of the score if available
@@ -463,25 +474,25 @@ function Base.var"&"(cc1::CandidateChunks{TP1, TD1},
         cc2::CandidateChunks{TP2, TD2}) where
         {TP1 <: Integer, TP2 <: Integer, TD1 <: Real, TD2 <: Real}
     ##
-    cc1.index_id != cc2.index_id && return CandidateChunks(; index_id = cc1.index_id)
+    indexid(cc1) != indexid(cc2) && return CandidateChunks(; index_id = indexid(cc1))
 
-    positions = intersect(cc1.positions, cc2.positions)
+    positions_ = intersect(positions(cc1), positions(cc2))
 
-    scores = if !isempty(cc1.scores) && !isempty(cc2.scores)
-        valid_scores = fill(TD1(-1), length(positions))
+    scores_ = if !isempty(scores(cc1)) && !isempty(scores(cc2))
+        valid_scores = fill(TD1(-1), length(positions_))
         # identify maximum scores from each CC
         # scan the first CC
-        for i in eachindex(cc1.positions, cc1.scores)
-            pos = cc1.positions[i]
-            idx = findfirst(==(pos), positions)
+        for i in eachindex(positions(cc1), scores(cc1))
+            pos = positions(cc1)[i]
+            idx = findfirst(==(pos), positions_)
             if !isnothing(idx)
-                valid_scores[idx] = max(valid_scores[idx], cc1.scores[i])
+                valid_scores[idx] = max(valid_scores[idx], scores(cc1)[i])
             end
         end
         # scan the second CC
-        for i in eachindex(cc2.positions, cc2.scores)
-            pos = cc2.positions[i]
-            idx = findfirst(==(pos), positions)
+        for i in eachindex(positions(cc2), scores(cc2))
+            pos = positions(cc2)[i]
+            idx = findfirst(==(pos), positions_)
             if !isnothing(idx)
                 valid_scores[idx] = max(valid_scores[idx], cc2.scores[i])
             end
@@ -491,42 +502,42 @@ function Base.var"&"(cc1::CandidateChunks{TP1, TD1},
         TD1[]
     end
     ## Sort by maximum similarity
-    if !isempty(scores)
-        sorted_idxs = sortperm(scores, rev = true)
-        positions = positions[sorted_idxs]
-        scores = scores[sorted_idxs]
+    if !isempty(scores_)
+        sorted_idxs = sortperm(scores_, rev = true)
+        positions_ = positions_[sorted_idxs]
+        scores_ = scores_[sorted_idxs]
     end
 
-    CandidateChunks(cc1.index_id, positions, scores)
+    CandidateChunks(indexid(cc1), positions_, scores_)
 end
 
 function Base.var"&"(mc1::MultiCandidateChunks{TP1, TD1},
         mc2::MultiCandidateChunks{TP2, TD2}) where
         {TP1 <: Integer, TP2 <: Integer, TD1 <: Real, TD2 <: Real}
     ## if empty, skip the work
-    if isempty(mc1.scores) || isempty(mc2.scores)
+    if isempty(scores(mc1)) || isempty(scores(mc2))
         return MultiCandidateChunks(;
             index_ids = Symbol[], positions = TP1[], scores = TD1[])
     end
 
-    keep_indexes = intersect(mc1.index_ids, mc2.index_ids)
-    keep_positions = intersect(mc1.positions, mc2.positions)
-    keep_candidates1 = falses(length(mc1.positions))
+    keep_indexes = intersect(indexids(mc1), indexids(mc2))
+    keep_positions = intersect(positions(mc1), positions(mc2))
+    keep_candidates1 = falses(length(positions(mc1)))
     visited_candidates1 = Set{Tuple{Symbol, Int}}()
-    sizehint!(visited_candidates1, length(mc1.positions))
+    sizehint!(visited_candidates1, length(positions(mc1)))
     # Load up the scores from first candidates as a starting point
     scores1 = Dict(id => Dict(pos => score
-                   for (pos, score, id_) in zip(mc1.positions, mc1.scores, mc1.index_ids)
+                   for (pos, score, id_) in zip(positions(mc1), scores(mc1), indexids(mc1))
                    if id_ == id)
     for id in keep_indexes)
 
     ## Iterate through the candidates
-    for i in eachindex(mc1.positions, mc1.index_ids, mc1.scores)
-        pos, score, id = mc1.positions[i], mc1.scores[i], mc1.index_ids[i]
+    for i in eachindex(positions(mc1), indexids(mc1), scores(mc1))
+        pos, score, id = positions(mc1)[i], scores(mc1)[i], indexids(mc1)[i]
         if id in keep_indexes && pos in keep_positions
             ## check the other index manually only if it's a high chance it's a match
-            for j in eachindex(mc2.positions, mc2.index_ids, mc2.scores)
-                if mc2.index_ids[j] == id && mc2.positions[j] == pos
+            for j in eachindex(positions(mc2), indexids(mc2), scores(mc2))
+                if indexids(mc2)[j] == id && positions(mc2)[j] == pos
                     if (id, pos) ∉ visited_candidates1
                         # keep this item
                         keep_candidates1[i] = true
@@ -534,50 +545,82 @@ function Base.var"&"(mc1::MultiCandidateChunks{TP1, TD1},
                         push!(visited_candidates1, (id, pos))
                     end
                     # always save the highest score (from the tracker, current score, or candidates2)
-                    scores1[id][pos] = max(max(scores1[id][pos], score), mc2.scores[j])
+                    scores1[id][pos] = max(max(scores1[id][pos], score), scores(mc2)[j])
                 end
             end
         end
     end
 
     ## Build the matching items
-    index_ids = @view(mc1.index_ids[keep_candidates1])
-    positions = @view(mc1.positions[keep_candidates1])
-    scores = TD1[scores1[id][pos] for (id, pos) in zip(index_ids, positions)]
+    index_ids = view(indexids(mc1), keep_candidates1)
+    positions_ = view(positions(mc1), keep_candidates1)
+    scores_ = TD1[scores1[id][pos] for (id, pos) in zip(index_ids, positions_)]
 
     ## Sort by maximum similarity
-    if !isempty(scores)
-        sorted_idxs = sortperm(scores, rev = true)
-        positions = positions[sorted_idxs]
+    if !isempty(scores_)
+        sorted_idxs = sortperm(scores_, rev = true)
+        positions_ = positions_[sorted_idxs]
         index_ids = index_ids[sorted_idxs]
-        scores = scores[sorted_idxs]
+        scores_ = scores_[sorted_idxs]
     else
         ## take as is
         index_ids = Symbol[]
-        positions = TP1[]
+        positions_ = TP1[]
     end
 
-    return MultiCandidateChunks(index_ids, positions, scores)
+    return MultiCandidateChunks(index_ids, positions_, scores_)
 end
 
 # # Views and Getindex
-function Base.view(index::AbstractChunkIndex, cc::AbstractCandidateChunks)
+function Base.view(index::AbstractDocumentIndex, cc::AbstractCandidateChunks)
     throw(ArgumentError("Not implemented for type $(typeof(index)) and $(typeof(cc))"))
 end
-function Base.view(index::AbstractChunkIndex, cc::CandidateChunks)
-    return SubChunkIndex(index, cc.positions)
+Base.@propagate_inbounds function Base.view(index::AbstractChunkIndex, cc::CandidateChunks)
+    @boundscheck let chk_vector = chunks(parent(index))
+        if !checkbounds(Bool, axes(chk_vector, 1), positions(cc))
+            ## Avoid printing huge position arrays, show the extremas of the attempted range
+            max_pos = extrema(positions(cc))
+            throw(BoundsError(chk_vector, max_pos))
+        end
+    end
+    return SubChunkIndex(parent(index), positions(cc))
 end
-function Base.view(index::AbstractChunkIndex, cc::MultiCandidateChunks)
-    valid_positions = findall(==(indexid(index)), indexids(cc))
-    return SubChunkIndex(index, positions(cc)[valid_positions])
+Base.@propagate_inbounds function Base.view(
+        index::AbstractChunkIndex, cc::MultiCandidateChunks)
+    valid_items = findall(==(indexid(index)), indexids(cc))
+    valid_positions = positions(cc)[valid_items]
+    @boundscheck let chk_vector = chunks(parent(index))
+        if !checkbounds(Bool, axes(chk_vector, 1), valid_positions)
+            ## Avoid printing huge position arrays, show the extremas of the attempted range
+            max_pos = extrema(valid_positions)
+            throw(BoundsError(chk_vector, max_pos))
+        end
+    end
+    return SubChunkIndex(parent(index), valid_positions)
 end
-function SubChunkIndex(index::SubChunkIndex, cc::CandidateChunks)
-    intersect_pos = intersect(positions(index), positions(cc))
+Base.@propagate_inbounds function SubChunkIndex(index::SubChunkIndex, cc::CandidateChunks)
+    intersect_pos = intersect(positions(cc), positions(index))
+    @boundscheck let chk_vector = chunks(parent(index))
+        if !checkbounds(Bool, axes(chk_vector, 1), intersect_pos)
+            ## Avoid printing huge position arrays, show the extremas of the attempted range
+            max_pos = extrema(intersect_pos)
+            throw(BoundsError(chk_vector, max_pos))
+        end
+    end
     return SubChunkIndex(parent(index), intersect_pos)
 end
-function SubChunkIndex(index::SubChunkIndex, cc::MultiCandidateChunks)
-    valid_positions = findall(==(indexid(index)), indexids(cc))
-    intersect_pos = intersect(positions(index), @view(positions(cc)[valid_positions]))
+Base.@propagate_inbounds function SubChunkIndex(
+        index::SubChunkIndex, cc::MultiCandidateChunks)
+    valid_items = findall(==(indexid(index)), indexids(cc))
+    valid_positions = positions(cc)[valid_items]
+    intersect_pos = intersect(valid_positions, positions(index))
+    @boundscheck let chk_vector = chunks(parent(index))
+        if !checkbounds(Bool, axes(chk_vector, 1), intersect_pos)
+            ## Avoid printing huge position arrays, show the extremas of the attempted range
+            max_pos = extrema(intersect_pos)
+            throw(BoundsError(chk_vector, max_pos))
+        end
+    end
     return SubChunkIndex(parent(index), intersect_pos)
 end
 
@@ -590,27 +633,36 @@ function Base.getindex(ci::AbstractDocumentIndex,
 end
 function Base.getindex(ci::AbstractChunkIndex,
         candidate::CandidateChunks{TP, TD},
-        field::Symbol = :chunks; sorted::Bool = true) where {TP <: Integer, TD <: Real}
-    @assert field in [:chunks, :embeddings, :chunkdata, :sources] "Only `chunks`, `embeddings`, `chunkdata`, `sources` fields are supported for now"
+        field::Symbol = :chunks; sorted::Bool = false) where {TP <: Integer, TD <: Real}
+    @assert field in [:chunks, :embeddings, :chunkdata, :sources, :scores] "Only `chunks`, `embeddings`, `chunkdata`, `sources`, `scores` fields are supported for now"
     ## embeddings is a compatibility alias, use chunkdata
     field = field == :embeddings ? :chunkdata : field
-    len_ = length(chunks(ci))
-    @assert all(1 .<= positions(candidate) .<= len_) "Some positions are out of bounds"
+
     if indexid(ci) == indexid(candidate)
+        # Sort if requested
+        sorted_idx = sorted ? sortperm(scores(candidate), rev = true) :
+                     eachindex(scores(candidate))
+        sub_index = view(ci, candidate)
         if field == :chunks
-            chunks(@view(ci[candidate]))
+            chunks(sub_index)[sorted_idx]
         elseif field == :chunkdata
-            chunkdata(@view(ci)[candidate])
+            chunkdata(sub_index)[:, sorted_idx]
         elseif field == :sources
-            sources(@view(ci)[candidate])
+            sources(sub_index)[sorted_idx]
+        elseif field == :scores
+            scores(candidate)[sorted_idx]
         end
     else
         if field == :chunks
             eltype(chunks(ci))[]
         elseif field == :chunkdata
-            eltype(chunkdata(ci))[]
+            TypeItem = typeof(chunkdata(ci))
+            init_dim = ntuple(i -> 0, ndims(chunkdata(ci)))
+            TypeItem(undef, init_dim)
         elseif field == :sources
             eltype(sources(ci))[]
+        elseif field == :scores
+            TD[]
         end
     end
 end
@@ -618,12 +670,14 @@ function Base.getindex(mi::MultiIndex,
         candidate::CandidateChunks{TP, TD},
         field::Symbol = :chunks; sorted::Bool = true) where {TP <: Integer, TD <: Real}
     ## Always sorted!
-    @assert field in [:chunks, :sources] "Only `chunks`, `sources` fields are supported for now"
-    valid_index = findfirst(x -> indexid(x) == candidate.index_id, indexes(mi))
+    @assert field in [:chunks, :sources, :scores] "Only `chunks`, `sources`, `scores` fields are supported for now"
+    valid_index = findfirst(x -> indexid(x) == indexid(candidate), indexes(mi))
     if isnothing(valid_index) && field == :chunks
         String[]
     elseif isnothing(valid_index) && field == :sources
         String[]
+    elseif isnothing(valid_index) && field == :scores
+        TD[]
     else
         getindex(indexes(mi)[valid_index], candidate, field)
     end
@@ -632,45 +686,29 @@ end
 function Base.getindex(ci::AbstractChunkIndex,
         candidate::MultiCandidateChunks{TP, TD},
         field::Symbol = :chunks; sorted::Bool = false) where {TP <: Integer, TD <: Real}
-    @assert field in [:chunks, :sources, :scores] "Only `chunks`, `sources`, and `scores` fields are supported for now"
+    @assert field in [:chunks, :embeddings, :chunkdata, :sources, :scores] "Only `chunks`, `embeddings`, `chunkdata`, `sources`, `scores` fields are supported for now"
 
-    index_pos = findall(==(indexid(ci)), candidate.index_ids)
-    if isempty(index_pos) && field == :chunks
-        eltype(chunks(ci))[]
-    elseif isempty(index_pos) && field == :scores
-        eltype(candidate.scores)[]
-    elseif isempty(index_pos) && field == :sources
-        eltype(sources(ci))[]
-    else
-        # Sort if requested
-        idx = if sorted
-            scores = @view(candidate.scores[index_pos])
-            sorted_idx = sortperm(scores, rev = true)
-            index_pos[sorted_idx]
-        else
-            index_pos
-        end
-        if field == :chunks
-            getindex(chunks(ci), candidate.positions[idx])
-        elseif field == :sources
-            getindex(sources(ci), candidate.positions[idx])
-        elseif field == :scores
-            candidate.scores[idx]
-        end
-    end
+    index_pos = findall(==(indexid(ci)), indexids(candidate))
+    ## Convert to CandidateChunks and re-use method above
+    cc = CandidateChunks(
+        indexid(ci), positions(candidate)[index_pos], scores(candidate)[index_pos])
+    getindex(ci, cc, field; sorted)
 end
 # Getindex on Multiindex, pool the individual hits
 function Base.getindex(mi::MultiIndex,
         candidate::MultiCandidateChunks{TP, TD},
         field::Symbol = :chunks; sorted::Bool = true) where {TP <: Integer, TD <: Real}
-    @assert field in [:chunks, :sources, :scores] "Only `chunks`, `sources`, and `scores` fields are supported for now"
+    @assert field in [:chunks, :sources] "Only `chunks`, and `sources` fields are supported for now"
     if sorted
         # values can be either of chunks or sources
+        # ineffective but easier to implement
+        # TODO: remove the duplication later
         values = mapreduce(idxs -> Base.getindex(idxs, candidate, field, sorted = false),
             vcat, indexes(mi))
-        scores = mapreduce(idxs -> Base.getindex(idxs, candidate, :scores, sorted = false),
+        scores_ = mapreduce(
+            idxs -> Base.getindex(idxs, candidate, :scores, sorted = false),
             vcat, indexes(mi))
-        sorted_idx = sortperm(scores, rev = true)
+        sorted_idx = sortperm(scores_, rev = true)
         values[sorted_idx]
     else
         mapreduce(idxs -> Base.getindex(idxs, candidate, field, sorted = false),
