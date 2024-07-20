@@ -10,10 +10,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-## [0.39.0]
+## [0.40.0]
 
 ### Added
 - Introduces `RAGTools.SubChunkIndex` to allow projecting `views` of various indices. Useful for pre-filtering your data (faster retrieval). See `?RT.SubChunkIndex` for more information.
+
+## [0.39.0]
+
+### Breaking Changes
+- Changed the default model for `ai*` chat functions (`PT.MODEL_CHAT`) from `gpt3t` to `gpt4om` (GPT-4o-mini). See the LLM-Leaderboard results and the release [blog post](https://openai.com/index/gpt-4o-mini-advancing-cost-efficient-intelligence/).
+
+### Added
+- Added the new GPT-4o-mini to the model registry (alias `gpt4om`). It's the smallest and fastest model based on GPT4 that is cheaper than GPT3.5Turbo.
 
 ## [0.38.0]
 

@@ -390,7 +390,7 @@ end
     @test schema1.inputs ==
           [Dict("role" => "system", "content" => "Act as a helpful AI assistant")
            Dict("role" => "user", "content" => "Hello World")]
-    @test schema1.model_id == "gpt-3.5-turbo"
+    @test schema1.model_id == "gpt-4o-mini"
 
     # Test different input combinations and different prompts
     schema2 = TestEchoOpenAISchema(; response, status = 200)
