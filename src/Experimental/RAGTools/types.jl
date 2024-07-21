@@ -372,8 +372,9 @@ function Base.var"=="(cc1::CandidateChunks, cc2::CandidateChunks)
 end
 
 function CandidateChunks(index::AbstractChunkIndex, positions::AbstractVector{<:Integer},
-        scores = fill(0.0f0, length(positions)))
-    CandidateChunks(indexid(index), convert(Vector{Int}, positions), scores)
+        scores::AbstractVector{<:Real} = fill(0.0f0, length(positions)))
+    CandidateChunks(
+        indexid(index), convert(Vector{Int}, positions), convert(Vector{Float32}, scores))
 end
 
 """
@@ -421,9 +422,10 @@ end
 
 function MultiCandidateChunks(
         index::AbstractChunkIndex, positions::AbstractVector{<:Integer},
-        scores = fill(0.0f0, length(positions)))
+        scores::AbstractVector{<:Real} = fill(0.0f0, length(positions)))
     index_ids = fill(indexid(index), length(positions))
-    MultiCandidateChunks(index_ids, convert(Vector{Int}, positions), scores)
+    MultiCandidateChunks(
+        index_ids, convert(Vector{Int}, positions), convert(Vector{Float32}, scores))
 end
 
 # join and sort two candidate chunks
@@ -509,25 +511,23 @@ function Base.var"&"(cc1::CandidateChunks{TP1, TD1},
     positions_ = intersect(positions(cc1), positions(cc2))
 
     scores_ = if !isempty(scores(cc1)) && !isempty(scores(cc2))
-        valid_scores = fill(TD1(-1), length(positions_))
         # identify maximum scores from each CC
+        scores_dict = Dict(pos => -Inf for pos in positions_)
         # scan the first CC
         for i in eachindex(positions(cc1), scores(cc1))
             pos = positions(cc1)[i]
-            idx = findfirst(==(pos), positions_)
-            if !isnothing(idx)
-                valid_scores[idx] = max(valid_scores[idx], scores(cc1)[i])
+            if haskey(scores_dict, pos)
+                scores_dict[pos] = max(scores_dict[pos], scores(cc1)[i])
             end
         end
         # scan the second CC
         for i in eachindex(positions(cc2), scores(cc2))
             pos = positions(cc2)[i]
-            idx = findfirst(==(pos), positions_)
-            if !isnothing(idx)
-                valid_scores[idx] = max(valid_scores[idx], cc2.scores[i])
+            if haskey(scores_dict, pos)
+                scores_dict[pos] = max(scores_dict[pos], scores(cc2)[i])
             end
         end
-        valid_scores
+        [scores_dict[pos] for pos in positions_]
     else
         TD1[]
     end
