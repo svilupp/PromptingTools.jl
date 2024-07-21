@@ -541,6 +541,19 @@ end
     @test parent(sub_sub_index) == ci1
     @test parent(@view sub_sub_index[cc_sub]) == ci1
 
+    cc_oob = CandidateChunks(ci1, [10])
+    @test_throws BoundsError view(ci1, cc_oob)
+
+    ## Nest deeper
+    sub_sub_index = SubChunkIndex(sub_sub_index, cc_sub)
+    @test parent(sub_sub_index) == ci1
+    @test length(sub_sub_index) == 1
+    @test chunks(sub_sub_index) == ["chunk1"]
+    @test sources(sub_sub_index) == ["source1"]
+
+    sub_oob = SubChunkIndex(sub_sub_index, [10])
+    @test_throws BoundsError SubChunkIndex(sub_oob, cc_oob)
+
     # Test edge cases for SubChunkIndex created from SubChunkIndex
     # Empty positions
     cc_empty_sub = CandidateChunks(sub_index, Int[])
@@ -585,6 +598,18 @@ end
     @test length(sub_sub_index) == 2
     @test chunks(sub_sub_index) == ["chunk2", "chunk3"]
     @test sources(sub_sub_index) == ["source2", "source3"]
+    mcc_oob = MultiCandidateChunks(ci2, [10])
+    @test_throws BoundsError view(ci2, mcc_oob)
+
+    ## Nest deeper
+    sub_sub_index = SubChunkIndex(sub_sub_index, mcc)
+    @test parent(sub_sub_index) == ci2
+    @test length(sub_sub_index) == 2
+    @test chunks(sub_sub_index) == ["chunk2", "chunk3"]
+    @test sources(sub_sub_index) == ["source2", "source3"]
+
+    sub_oob = SubChunkIndex(sub_sub_index, [10])
+    @test_throws BoundsError SubChunkIndex(sub_oob, mcc_oob)
 
     ## With keyword index
     chunks_ = ["chunk1", "chunk2"]
