@@ -297,6 +297,9 @@ end
 function Base.length(index::SubChunkIndex)
     return length(positions(index))
 end
+function Base.isempty(index::SubChunkIndex)
+    return isempty(positions(index))
+end
 function Base.show(io::IO, index::SubChunkIndex)
     print(io,
         "A view of $(typeof(parent(index))|>nameof) (id: $(indexid(parent(index)))) with $(length(index)) chunks")
@@ -646,7 +649,8 @@ function Base.getindex(ci::AbstractChunkIndex,
         if field == :chunks
             chunks(sub_index)[sorted_idx]
         elseif field == :chunkdata
-            chunkdata(sub_index)[:, sorted_idx]
+            chkdata = chunkdata(sub_index)
+            isnothing(chkdata) ? nothing : chkdata[:, sorted_idx]
         elseif field == :sources
             sources(sub_index)[sorted_idx]
         elseif field == :scores
@@ -656,8 +660,10 @@ function Base.getindex(ci::AbstractChunkIndex,
         if field == :chunks
             eltype(chunks(ci))[]
         elseif field == :chunkdata
-            TypeItem = typeof(chunkdata(ci))
-            init_dim = ntuple(i -> 0, ndims(chunkdata(ci)))
+            chkdata = chunkdata(ci)
+            isnothing(chkdata) && return nothing
+            TypeItem = typeof(chkdata)
+            init_dim = ntuple(i -> 0, ndims(chkdata))
             TypeItem(undef, init_dim)
         elseif field == :sources
             eltype(sources(ci))[]
@@ -668,7 +674,7 @@ function Base.getindex(ci::AbstractChunkIndex,
 end
 function Base.getindex(mi::MultiIndex,
         candidate::CandidateChunks{TP, TD},
-        field::Symbol = :chunks; sorted::Bool = true) where {TP <: Integer, TD <: Real}
+        field::Symbol = :chunks; sorted::Bool = false) where {TP <: Integer, TD <: Real}
     ## Always sorted!
     @assert field in [:chunks, :sources, :scores] "Only `chunks`, `sources`, `scores` fields are supported for now"
     valid_index = findfirst(x -> indexid(x) == indexid(candidate), indexes(mi))
@@ -695,10 +701,11 @@ function Base.getindex(ci::AbstractChunkIndex,
     getindex(ci, cc, field; sorted)
 end
 # Getindex on Multiindex, pool the individual hits
+# Sorted defaults to false --> similarly to Dict which doesn't guarantee ordering of values returned
 function Base.getindex(mi::MultiIndex,
         candidate::MultiCandidateChunks{TP, TD},
-        field::Symbol = :chunks; sorted::Bool = true) where {TP <: Integer, TD <: Real}
-    @assert field in [:chunks, :sources] "Only `chunks`, and `sources` fields are supported for now"
+        field::Symbol = :chunks; sorted::Bool = false) where {TP <: Integer, TD <: Real}
+    @assert field in [:chunks, :sources, :scores] "Only `chunks`, `sources`, and `scores` fields are supported for now"
     if sorted
         # values can be either of chunks or sources
         # ineffective but easier to implement
