@@ -551,40 +551,31 @@ function Base.var"&"(mc1::MultiCandidateChunks{TP1, TD1},
     end
 
     keep_indexes = intersect(indexids(mc1), indexids(mc2))
-    keep_positions = intersect(positions(mc1), positions(mc2))
-    keep_candidates1 = falses(length(positions(mc1)))
-    visited_candidates1 = Set{Tuple{Symbol, Int}}()
-    sizehint!(visited_candidates1, length(positions(mc1)))
-    # Load up the scores from first candidates as a starting point
-    scores1 = Dict(id => Dict(pos => score
-                   for (pos, score, id_) in zip(positions(mc1), scores(mc1), indexids(mc1))
-                   if id_ == id)
+
+    ## Build the scores dict from first candidates
+    ## Structure: id=>position=>max_score
+    scores_dict = Dict(id => Dict(pos => score
+                       for (pos, score, id_) in zip(
+                               positions(mc1), scores(mc1), indexids(mc1))
+                       if id_ == id)
     for id in keep_indexes)
 
-    ## Iterate through the candidates
-    for i in eachindex(positions(mc1), indexids(mc1), scores(mc1))
-        pos, score, id = positions(mc1)[i], scores(mc1)[i], indexids(mc1)[i]
-        if id in keep_indexes && pos in keep_positions
-            ## check the other index manually only if it's a high chance it's a match
-            for j in eachindex(positions(mc2), indexids(mc2), scores(mc2))
-                if indexids(mc2)[j] == id && positions(mc2)[j] == pos
-                    if (id, pos) ∉ visited_candidates1
-                        # keep this item
-                        keep_candidates1[i] = true
-                        # remember not to save it again, that way we know `keep_candidates1` will return unique items
-                        push!(visited_candidates1, (id, pos))
-                    end
-                    # always save the highest score (from the tracker, current score, or candidates2)
-                    scores1[id][pos] = max(max(scores1[id][pos], score), scores(mc2)[j])
-                end
+    ## Iterate the second candidate set and directly save to output arrays
+    index_ids = Symbol[]
+    positions_ = TP1[]
+    scores_ = TD1[]
+    for i in eachindex(positions(mc2), indexids(mc2), scores(mc2))
+        pos, score, id = positions(mc2)[i], scores(mc2)[i], indexids(mc2)[i]
+        if haskey(scores_dict, id)
+            index_dict = scores_dict[id]
+            if haskey(index_dict, pos)
+                ## This item was found in both -> set to true as intersection
+                push!(index_ids, id)
+                push!(positions_, pos)
+                push!(scores_, max(index_dict[pos], score))
             end
         end
     end
-
-    ## Build the matching items
-    index_ids = view(indexids(mc1), keep_candidates1)
-    positions_ = view(positions(mc1), keep_candidates1)
-    scores_ = TD1[scores1[id][pos] for (id, pos) in zip(index_ids, positions_)]
 
     ## Sort by maximum similarity
     if !isempty(scores_)
