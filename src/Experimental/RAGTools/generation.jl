@@ -44,20 +44,20 @@ function build_context(contexter::ContextEnumerator,
     @assert chunks_window_margin[1] >= 0&&chunks_window_margin[2] >= 0 "Both `chunks_window_margin` values must be non-negative"
 
     context = String[]
-    for (i, position) in enumerate(candidates.positions)
+    for (i, position) in enumerate(positions(candidates))
         ## select the right index
         id = candidates isa MultiCandidateChunks ? candidates.index_ids[i] :
              candidates.index_id
         index_ = index isa AbstractChunkIndex ? index : index[id]
         isnothing(index_) && continue
-        ##
-        chunks_ = chunks(index_)[
+        ## Refer to parent in case index is a SubChunkIndex (bc positions refer to the underlying parent chunks)
+        chunks_ = chunks(parent(index_))[
             max(1, position - chunks_window_margin[1]):min(end,
             position + chunks_window_margin[2])]
         ## Check if surrounding chunks are from the same source
-        is_same_source = sources(index_)[
+        is_same_source = sources(parent(index_))[
             max(1, position - chunks_window_margin[1]):min(end,
-            position + chunks_window_margin[2])] .== sources(index_)[position]
+            position + chunks_window_margin[2])] .== sources(parent(index_))[position]
         push!(context, "$(i). $(join(chunks_[is_same_source], "\n"))")
     end
     return context

@@ -5,10 +5,12 @@ using PromptingTools.Experimental.RAGTools: ChunkEmbeddingsIndex, ChunkKeywordsI
                                             AbstractCandidateChunks, DocumentTermMatrix,
                                             document_term_matrix, HasEmbeddings,
                                             HasKeywords,
-                                            ChunkKeywordsIndex
+                                            ChunkKeywordsIndex, AbstractChunkIndex,
+                                            AbstractDocumentIndex
 using PromptingTools.Experimental.RAGTools: embeddings, chunks, tags, tags_vocab, sources,
-                                            extras,
+                                            extras, positions, scores, parent,
                                             RAGResult, chunkdata, preprocess_tokens
+using PromptingTools.Experimental.RAGTools: SubChunkIndex, indexid, indexids
 using PromptingTools: last_message, last_output
 
 @testset "ChunkEmbeddingsIndex" begin
@@ -30,6 +32,7 @@ using PromptingTools: last_message, last_output
     @test tags(ci) == tags_test
     @test tags_vocab(ci) == tags_vocab_test
     @test sources(ci) == sources_test
+    @test length(ci) == 2
 
     # Test identity/equality
     ci1 = ChunkEmbeddingsIndex(
@@ -69,6 +72,7 @@ using PromptingTools: last_message, last_output
     @test length(unique(vcat(tags_vocab(ci1), tags_vocab(ci2)))) ==
           length(tags_vocab(combined_ci))
     @test sources(combined_ci) == vcat(sources(ci1), (sources(ci2)))
+    @test length(combined_ci) == 4
 
     # Test base var"==" with ChunkEmbeddingsIndex
     ci1 = ChunkEmbeddingsIndex(chunks = ["chunk1"],
@@ -89,6 +93,25 @@ using PromptingTools: last_message, last_output
     # Getindex
     @test ci1[:ci1] == ci1
     @test ci1[:ci2] == nothing
+
+    ## Test general accessors
+    @kwdef struct TestBadMultiIndex <: AbstractDocumentIndex
+        indices::Vector{AbstractChunkIndex} = [ChunkEmbeddingsIndex(
+            chunks = ["chunk1"], sources = ["source1"])]
+    end
+    bad_idx = TestBadMultiIndex()
+    @test_throws ArgumentError chunkdata(bad_idx)
+    @test_throws ArgumentError embeddings(bad_idx)
+    @test_throws ArgumentError tags(bad_idx)
+    @test_throws ArgumentError tags_vocab(bad_idx)
+    @test_throws ArgumentError extras(bad_idx)
+
+    @kwdef struct TestBadChunkIndex <: AbstractChunkIndex
+        chunks::Vector{String}
+        sources::Vector{String}
+    end
+    bad_chunk_idx = TestBadChunkIndex(chunks = ["chunk1"], sources = ["source1"])
+    @test_throws ArgumentError embeddings(bad_chunk_idx)
 end
 
 @testset "ChunkKeywordsIndex" begin
@@ -134,6 +157,7 @@ end
     # HasEmbeddings
     @test HasEmbeddings(ci1) == false
     @test HasKeywords(ci1) == true
+    @test_throws ArgumentError embeddings(ci1)
 end
 
 @testset "DocumentTermMatrix" begin
@@ -252,6 +276,8 @@ end
     out = Base.first(cc1, 1)
     @test out.positions == [3]
     @test out.scores == [0.2]
+    @test indexid(cc1) == chunk_sym
+    @test indexids(cc1) == [chunk_sym, chunk_sym]
 
     # Test intersection &
     cc2 = CandidateChunks(index_id = chunk_sym,
@@ -324,6 +350,7 @@ end
     out = Base.first(mcc1, 1)
     @test out.positions == [3]
     @test out.scores == [0.2]
+    @test indexids(mcc1) == [chunk_sym1, chunk_sym2]
 
     # Test vcat
     mcc2 = MultiCandidateChunks(index_ids = [chunk_sym1, chunk_sym2],
@@ -387,6 +414,230 @@ end
     @test_throws ArgumentError (mcc1&RandomMultiCandidateChunks123())
 end
 
+@testset "SubChunkIndex" begin
+    ci1 = ChunkEmbeddingsIndex(chunks = ["chunk1", "chunk2", "chunk3"],
+        embeddings = nothing,
+        tags = nothing,
+        tags_vocab = nothing,
+        sources = ["source1", "source2", "source3"],
+        id = Symbol("TestChunkIndex"))
+
+    # Test creating a SubChunkIndex with CandidateChunks
+    cc = CandidateChunks(ci1, 1:2)
+    sub_index = view(ci1, cc)
+    @test chunks(sub_index) == ["chunk1", "chunk2"]
+
+    # Test creating a SubChunkIndex with different CandidateChunks
+    cc = CandidateChunks(ci1, [2, 3])
+    sub_index = view(ci1, cc)
+    @test chunks(sub_index) == ["chunk2", "chunk3"]
+    @test sources(sub_index) == ["source2", "source3"]
+
+    # Test accessing chunks from SubChunkIndex
+    cc = CandidateChunks(ci1, [2])
+    sub_index = view(ci1, cc)
+    @test sub_index[cc, :chunks] == ["chunk2"]
+    @test sub_index[cc, :sources] == ["source2"]
+    @test sub_index[cc, :embeddings] == nothing
+    @test sub_index[cc, :chunkdata] == nothing
+    @test parent(sub_index)[cc, :chunks] == ["chunk2"]
+
+    # Test creating a SubChunkIndex with out-of-bounds CandidateChunks
+    cc = CandidateChunks(ci1, [4])
+    @test_throws BoundsError view(ci1, cc)
+    cc = CandidateChunks(ci1, 1:4)
+    @test_throws BoundsError view(ci1, cc)
+
+    chunks_test = ["chunk1", "chunk2", "chunk3"]
+    emb_test = ones(2, 3) ./ (1:3)'
+    tags_test = sparse([1, 2, 3], [1, 2, 3], [true, true, true], 3, 3)
+    tags_vocab_test = ["vocab1", "vocab2", "vocab3"]
+    sources_test = ["source1", "source2", "source3"]
+    ci2 = ChunkEmbeddingsIndex(id = :TestChunkIndex2, chunks = chunks_test,
+        embeddings = emb_test,
+        tags = tags_test,
+        tags_vocab = tags_vocab_test,
+        sources = sources_test)
+
+    # Create a SubChunkIndex for testing
+    cc11 = CandidateChunks(ci2, [1, 2])
+    sub_index11 = @view ci2[cc11]
+
+    @test indexid(sub_index11) == indexid(ci2)
+    @test positions(sub_index11) == [1, 2]
+    @test parent(sub_index11) == ci2
+    @test HasEmbeddings(sub_index11) == true
+    @test HasKeywords(sub_index11) == false
+    @test chunks(sub_index11) == ["chunk1", "chunk2"]
+    @test sources(sub_index11) == ["source1", "source2"]
+    @test chunkdata(sub_index11) ≈ [1.0 0.5; 1.0 0.5]
+    @test embeddings(sub_index11) ≈ [1.0 0.5; 1.0 0.5]
+    @test tags(sub_index11) == Bool[1 0 0; 0 1 0]
+    @test tags_vocab(sub_index11) == tags_vocab_test
+    @test extras(sub_index11) == nothing
+    @test length(sub_index11) == 2
+    @test unique(sub_index11) == sub_index11
+
+    cc2 = CandidateChunks(ci2, [1, 2, 1, 2])
+    sub_index2 = @view ci2[cc2]
+    @test length(sub_index2) == 4
+    @test chunks(sub_index2) == ["chunk1", "chunk2", "chunk1", "chunk2"]
+    @test sources(sub_index2) == ["source1", "source2", "source1", "source2"]
+    @test unique(sub_index2) == sub_index11
+    @test positions(vcat(sub_index11, sub_index2)) == [1, 2, 1, 2, 1, 2]
+
+    # Test vcat not implemented for different types
+    ci3 = ChunkEmbeddingsIndex(chunks = ["chunk4", "chunk5"],
+        embeddings = nothing,
+        tags = nothing,
+        tags_vocab = nothing,
+        sources = ["source4", "source5"],
+        id = Symbol("TestChunkIndex3"))
+    cc3 = CandidateChunks(ci3, [1, 2])
+    sub_index3 = view(ci3, cc3)
+    @test_throws ArgumentError vcat(sub_index, sub_index3)
+
+    # Test vcat for same parent
+    cc = CandidateChunks(ci1, [1, 2])
+    sub_index = view(ci1, cc)
+    cc4 = CandidateChunks(ci1, [3])
+    sub_index4 = view(ci1, cc4)
+    vcat_index = vcat(sub_index, sub_index4)
+    @test vcat_index == SubChunkIndex(ci1, [1, 2, 3])
+
+    # Test edge cases
+    # Empty positions
+    cc_empty = CandidateChunks(ci1, Int[])
+    sub_index_empty = view(ci1, cc_empty)
+    @test length(sub_index_empty) == 0
+    @test chunks(sub_index_empty) == String[]
+    @test sources(sub_index_empty) == String[]
+    @test isempty(sub_index_empty) == true
+
+    # Out of bounds positions
+    cc_oob = CandidateChunks(ci1, [10])
+    @test_throws BoundsError view(ci1, cc_oob)
+
+    # Duplicate positions
+    cc_dup = CandidateChunks(ci1, [1, 1, 2])
+    sub_index_dup = view(ci1, cc_dup)
+    @test length(sub_index_dup) == 3
+    @test chunks(sub_index_dup) == ["chunk1", "chunk1", "chunk2"]
+    @test unique(sub_index_dup) == SubChunkIndex(ci1, [1, 2])
+
+    # Test show method
+    io = IOBuffer()
+    show(io, sub_index)
+    @test String(take!(io)) ==
+          "A view of ChunkEmbeddingsIndex (id: TestChunkIndex) with 2 chunks"
+
+    ## Nested SubChunkIndex
+    # Test SubChunkIndex created from SubChunkIndex
+    cc_sub = CandidateChunks(sub_index, [1])
+    sub_sub_index = view(sub_index, cc_sub)
+    @test length(sub_sub_index) == 1
+    @test chunks(sub_sub_index) == ["chunk1"]
+    @test sources(sub_sub_index) == ["source1"]
+    @test parent(sub_sub_index) == ci1
+    @test parent(@view sub_sub_index[cc_sub]) == ci1
+
+    cc_oob = CandidateChunks(ci1, [10])
+    @test_throws BoundsError view(ci1, cc_oob)
+
+    ## Nest deeper
+    sub_sub_index = SubChunkIndex(sub_sub_index, cc_sub)
+    @test parent(sub_sub_index) == ci1
+    @test length(sub_sub_index) == 1
+    @test chunks(sub_sub_index) == ["chunk1"]
+    @test sources(sub_sub_index) == ["source1"]
+
+    sub_oob = SubChunkIndex(sub_sub_index, [10])
+    @test_throws BoundsError SubChunkIndex(sub_oob, cc_oob)
+
+    # Test edge cases for SubChunkIndex created from SubChunkIndex
+    # Empty positions
+    cc_empty_sub = CandidateChunks(sub_index, Int[])
+    sub_index_empty_sub = view(sub_index, cc_empty_sub)
+    @test length(sub_index_empty_sub) == 0
+    @test chunks(sub_index_empty_sub) == String[]
+    @test sources(sub_index_empty_sub) == String[]
+    @test isempty(sub_index_empty_sub) == true
+
+    # Out of bounds positions
+    cc_oob_sub = CandidateChunks(sub_index, [10])
+    @test_throws BoundsError view(sub_index, cc_oob_sub)
+
+    # Duplicate positions
+    cc_dup_sub = CandidateChunks(sub_index, [1, 1, 2])
+    sub_index_dup_sub = view(sub_index, cc_dup_sub)
+    @test length(sub_index_dup_sub) == 3
+    @test chunks(sub_index_dup_sub) == ["chunk1", "chunk1", "chunk2"]
+    @test unique(sub_index_dup_sub) == SubChunkIndex(ci1, [1, 2])
+
+    # Test show method for SubChunkIndex created from SubChunkIndex
+    io_sub = IOBuffer()
+    show(io_sub, sub_sub_index)
+    @test String(take!(io_sub)) ==
+          "A view of ChunkEmbeddingsIndex (id: TestChunkIndex) with 1 chunks"
+
+    ## MultiCandidateChunks
+    # Test SubChunkIndex with MultiCandidateChunks
+    mcc = MultiCandidateChunks(ci2, [2, 3])
+    sub_index_mcc = view(ci2, mcc)
+    @test length(sub_index_mcc) == 2
+    @test chunks(sub_index_mcc) == ["chunk2", "chunk3"]
+    @test sources(sub_index_mcc) == ["source2", "source3"]
+    @test chunkdata(sub_index_mcc) ≈ [0.5 0.3333333333333333; 0.5 0.3333333333333333]
+    @test embeddings(sub_index_mcc) ≈ [0.5 0.3333333333333333; 0.5 0.3333333333333333]
+    @test tags(sub_index_mcc) == Bool[0 1 0; 0 0 1]
+    @test tags_vocab(sub_index_mcc) == tags_vocab_test
+    @test extras(sub_index_mcc) == nothing
+
+    ## Nested sub-chunk index
+    sub_sub_index = @view sub_index_mcc[mcc]
+    @test length(sub_sub_index) == 2
+    @test chunks(sub_sub_index) == ["chunk2", "chunk3"]
+    @test sources(sub_sub_index) == ["source2", "source3"]
+    mcc_oob = MultiCandidateChunks(ci2, [10])
+    @test_throws BoundsError view(ci2, mcc_oob)
+
+    ## Nest deeper
+    sub_sub_index = SubChunkIndex(sub_sub_index, mcc)
+    @test parent(sub_sub_index) == ci2
+    @test length(sub_sub_index) == 2
+    @test chunks(sub_sub_index) == ["chunk2", "chunk3"]
+    @test sources(sub_sub_index) == ["source2", "source3"]
+
+    sub_oob = SubChunkIndex(sub_sub_index, [10])
+    @test_throws BoundsError SubChunkIndex(sub_oob, mcc_oob)
+
+    ## With keyword index
+    chunks_ = ["chunk1", "chunk2"]
+    sources_ = ["source1", "source2"]
+    cki = ChunkKeywordsIndex(chunks = chunks_, sources = sources_)
+    cck = CandidateChunks(cki, [2])
+    sub_cki = @view cki[cck]
+    @test length(cki) == 2
+    @test length(cck) == 1
+    @test length(sub_cki) == 1
+    @test chunks(sub_cki) == ["chunk2"]
+    @test sources(sub_cki) == ["source2"]
+    @test parent(sub_cki) == cki
+    @test chunkdata(sub_cki) == nothing
+    @test HasEmbeddings(sub_cki) == false
+    @test HasKeywords(sub_cki) == true
+    @test_throws ArgumentError embeddings(sub_cki)
+    @test tags(sub_cki) == nothing
+    @test tags_vocab(sub_cki) == nothing
+    @test extras(sub_cki) == nothing
+
+    ## MultiIndex not implemented yet
+    mi = MultiIndex(indexes = [ci1, cki])
+    mccx = MultiCandidateChunks(index_ids = [:TestChunkIndex1, :TestChunkIndex2],
+        positions = [1, 2], scores = [0.1, 0.2])
+    @test_throws ArgumentError @view mi[mccx]
+end
+
 @testset "getindex-CandidateChunks" begin
     # Initialize a ChunkEmbeddingsIndex with test data
     chunks_data = ["First chunk", "Second chunk", "Third chunk"]
@@ -398,7 +649,7 @@ end
         embeddings = embeddings_data,
         tags = tags_data,
         tags_vocab = tags_vocab_data,
-        sources = repeat(["test_source"], 3),
+        sources = ["test_source$i" for i in 1:3],
         id = chunk_sym)
 
     # Test to get chunks based on valid CandidateChunks
@@ -406,10 +657,11 @@ end
         positions = [1, 3],
         scores = [0.1, 0.2])
     @test collect(test_chunk_index[candidate_chunks]) == ["First chunk", "Third chunk"]
-    @test collect(test_chunk_index[candidate_chunks, :chunks]) ==
-          ["First chunk", "Third chunk"]
+    @test collect(test_chunk_index[candidate_chunks, :chunks, sorted = true]) ==
+          ["Third chunk", "First chunk"]
+    @test collect(test_chunk_index[candidate_chunks, :scores]) == [0.1, 0.2]
     @test collect(test_chunk_index[candidate_chunks, :sources]) ==
-          ["test_source", "test_source"]
+          ["test_source1", "test_source3"]
     @test collect(test_chunk_index[candidate_chunks, :embeddings]) ==
           embeddings_data[:, [1, 3]]
     @test collect(test_chunk_index[candidate_chunks, :chunkdata]) ==
@@ -429,7 +681,7 @@ end
     candidate_chunks_oob = CandidateChunks(index_id = chunk_sym,
         positions = [10, -1],
         scores = [0.5, 0.6])
-    @test_throws AssertionError test_chunk_index[candidate_chunks_oob]
+    @test_throws BoundsError test_chunk_index[candidate_chunks_oob]
 
     # Test with an incorrect index_id, which should also result in an empty array
     wrong_sym = Symbol("InvalidIndex")
@@ -437,6 +689,12 @@ end
         positions = [1, 2],
         scores = [0.3, 0.4])
     @test isempty(test_chunk_index[candidate_chunks_wrong_id])
+    @test isempty(test_chunk_index[candidate_chunks_wrong_id, :chunks])
+    @test isempty(test_chunk_index[candidate_chunks_wrong_id, :embeddings])
+    @test isempty(test_chunk_index[candidate_chunks_wrong_id, :chunkdata])
+    @test size(test_chunk_index[candidate_chunks_wrong_id, :chunkdata]) == (0, 0) # check that it's an array to maintain type
+    @test isempty(test_chunk_index[candidate_chunks_wrong_id, :sources])
+    @test isempty(test_chunk_index[candidate_chunks_wrong_id, :scores])
 
     # Test when chunks are requested from a MultiIndex, only chunks from the corresponding ChunkEmbeddingsIndex should be returned
     another_chunk_index = ChunkEmbeddingsIndex(chunks = chunks_data,
@@ -471,6 +729,8 @@ end
     @test ci2[cc] == ["chunk2x"]
     @test Base.getindex(ci1, cc, :chunks; sorted = true) == ["chunk2"]
     @test Base.getindex(ci1, cc, :scores; sorted = true) == [0.4]
+    @test Base.getindex(ci1, cc, :chunks; sorted = false) == ["chunk2"]
+    @test Base.getindex(ci1, cc, :scores; sorted = false) == [0.4]
 
     # Wrong index
     cc_wrong = MultiCandidateChunks(index_ids = [:TestChunkIndex2xxx, :TestChunkIndex1xxx],
@@ -481,8 +741,15 @@ end
 
     # with MultiIndex
     mi = MultiIndex(; id = :multi, indexes = [ci1, ci2])
-    @test mi[cc] == ["chunk2", "chunk2x"]
+    @test mi[cc] == ["chunk2", "chunk2x"]  # default is sorted=false
     @test Base.getindex(mi, cc, :chunks; sorted = true) == ["chunk2", "chunk2x"]
+    @test Base.getindex(mi, cc, :chunks; sorted = false) == ["chunk2", "chunk2x"]
+
+    # with MultiIndex -- flip the order of indices
+    mi = MultiIndex(; id = :multi, indexes = [ci2, ci1])
+    @test mi[cc] == ["chunk2x", "chunk2"] # default is sorted=false
+    @test Base.getindex(mi, cc, :chunks; sorted = true) == ["chunk2", "chunk2x"]
+    @test Base.getindex(mi, cc, :chunks; sorted = false) == ["chunk2x", "chunk2"]
 end
 
 @testset "getindex-MultiCandidateChunks" begin
@@ -507,6 +774,12 @@ end
           ["Third chunk", "First chunk"]
     @test Base.getindex(test_chunk_index, multi_candidate_chunks, :scores; sorted = true) ==
           [0.6, 0.5]
+    @test Base.getindex(
+        test_chunk_index, multi_candidate_chunks, :chunks; sorted = false) ==
+          ["First chunk", "Third chunk"]
+    @test Base.getindex(
+        test_chunk_index, multi_candidate_chunks, :scores; sorted = false) ==
+          [0.5, 0.6]
 
     # Test with incorrect index_id, expect empty array
     wrong_multi_candidate_chunks = MultiCandidateChunks(
@@ -539,12 +812,18 @@ end
         index_ids = [Symbol("TestChunkIndex"), Symbol("TestChunkIndex2")],
         positions = [1, 3],  # Assuming chunks_data has only 3 elements, position 4 is out of bounds
         scores = [0.5, 0.7])
-    ## sorted=true by default
-    @test mi[mc1] == ["6", "First chunk"]
+    ## sorted=false by default (Dict-like where order isn't guaranteed)
+    ## sorting follows index order
+    @test mi[mc1] == ["First chunk", "6"]
     @test Base.getindex(mi, mc1, :chunks; sorted = true) == ["6", "First chunk"]
     @test Base.getindex(mi, mc1, :sources; sorted = true) ==
           ["other_source3", "test_source1"]
+    @test Base.getindex(mi, mc1, :chunks; sorted = false) == ["First chunk", "6"]
+    @test Base.getindex(mi, mc1, :sources; sorted = false) ==
+          ["test_source1", "other_source3"]
+    ##
     @test Base.getindex(mi, mc1, :scores; sorted = true) == [0.7, 0.5]
+    @test Base.getindex(mi, mc1, :scores; sorted = false) == [0.5, 0.7]
     @test Base.getindex(mi, mc1, :chunks; sorted = false) == ["First chunk", "6"]
     @test Base.getindex(mi, mc1, :sources; sorted = false) ==
           ["test_source1", "other_source3"]
