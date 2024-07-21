@@ -5,7 +5,8 @@ using PromptingTools.Experimental.RAGTools: ChunkEmbeddingsIndex, ChunkKeywordsI
                                             AbstractCandidateChunks, DocumentTermMatrix,
                                             document_term_matrix, HasEmbeddings,
                                             HasKeywords,
-                                            ChunkKeywordsIndex
+                                            ChunkKeywordsIndex, AbstractChunkIndex,
+                                            AbstractDocumentIndex
 using PromptingTools.Experimental.RAGTools: embeddings, chunks, tags, tags_vocab, sources,
                                             extras, positions, scores, parent,
                                             RAGResult, chunkdata, preprocess_tokens
@@ -31,6 +32,7 @@ using PromptingTools: last_message, last_output
     @test tags(ci) == tags_test
     @test tags_vocab(ci) == tags_vocab_test
     @test sources(ci) == sources_test
+    @test length(ci) == 2
 
     # Test identity/equality
     ci1 = ChunkEmbeddingsIndex(
@@ -70,6 +72,7 @@ using PromptingTools: last_message, last_output
     @test length(unique(vcat(tags_vocab(ci1), tags_vocab(ci2)))) ==
           length(tags_vocab(combined_ci))
     @test sources(combined_ci) == vcat(sources(ci1), (sources(ci2)))
+    @test length(combined_ci) == 4
 
     # Test base var"==" with ChunkEmbeddingsIndex
     ci1 = ChunkEmbeddingsIndex(chunks = ["chunk1"],
@@ -90,6 +93,25 @@ using PromptingTools: last_message, last_output
     # Getindex
     @test ci1[:ci1] == ci1
     @test ci1[:ci2] == nothing
+
+    ## Test general accessors
+    @kwdef struct TestBadMultiIndex <: AbstractDocumentIndex
+        indices::Vector{AbstractChunkIndex} = [ChunkEmbeddingsIndex(
+            chunks = ["chunk1"], sources = ["source1"])]
+    end
+    bad_idx = TestBadMultiIndex()
+    @test_throws ArgumentError chunkdata(bad_idx)
+    @test_throws ArgumentError embeddings(bad_idx)
+    @test_throws ArgumentError tags(bad_idx)
+    @test_throws ArgumentError tags_vocab(bad_idx)
+    @test_throws ArgumentError extras(bad_idx)
+
+    @kwdef struct TestBadChunkIndex <: AbstractChunkIndex
+        chunks::Vector{String}
+        sources::Vector{String}
+    end
+    bad_chunk_idx = TestBadChunkIndex(chunks = ["chunk1"], sources = ["source1"])
+    @test_throws ArgumentError embeddings(bad_chunk_idx)
 end
 
 @testset "ChunkKeywordsIndex" begin
@@ -135,6 +157,7 @@ end
     # HasEmbeddings
     @test HasEmbeddings(ci1) == false
     @test HasKeywords(ci1) == true
+    @test_throws ArgumentError embeddings(ci1)
 end
 
 @testset "DocumentTermMatrix" begin
@@ -253,6 +276,8 @@ end
     out = Base.first(cc1, 1)
     @test out.positions == [3]
     @test out.scores == [0.2]
+    @test indexid(cc1) == chunk_sym
+    @test indexids(cc1) == [chunk_sym, chunk_sym]
 
     # Test intersection &
     cc2 = CandidateChunks(index_id = chunk_sym,
@@ -325,6 +350,7 @@ end
     out = Base.first(mcc1, 1)
     @test out.positions == [3]
     @test out.scores == [0.2]
+    @test indexids(mcc1) == [chunk_sym1, chunk_sym2]
 
     # Test vcat
     mcc2 = MultiCandidateChunks(index_ids = [chunk_sym1, chunk_sym2],
@@ -553,6 +579,38 @@ end
     @test tags(sub_index_mcc) == Bool[0 1 0; 0 0 1]
     @test tags_vocab(sub_index_mcc) == tags_vocab_test
     @test extras(sub_index_mcc) == nothing
+
+    ## Nested sub-chunk index
+    sub_sub_index = @view sub_index_mcc[mcc]
+    @test length(sub_sub_index) == 2
+    @test chunks(sub_sub_index) == ["chunk2", "chunk3"]
+    @test sources(sub_sub_index) == ["source2", "source3"]
+
+    ## With keyword index
+    chunks_ = ["chunk1", "chunk2"]
+    sources_ = ["source1", "source2"]
+    cki = ChunkKeywordsIndex(chunks = chunks_, sources = sources_)
+    cck = CandidateChunks(cki, [2])
+    sub_cki = @view cki[cck]
+    @test length(cki) == 2
+    @test length(cck) == 1
+    @test length(sub_cki) == 1
+    @test chunks(sub_cki) == ["chunk2"]
+    @test sources(sub_cki) == ["source2"]
+    @test parent(sub_cki) == cki
+    @test chunkdata(sub_cki) == nothing
+    @test HasEmbeddings(sub_cki) == false
+    @test HasKeywords(sub_cki) == true
+    @test_throws ArgumentError embeddings(sub_cki)
+    @test tags(sub_cki) == nothing
+    @test tags_vocab(sub_cki) == nothing
+    @test extras(sub_cki) == nothing
+
+    ## MultiIndex not implemented yet
+    mi = MultiIndex(indexes = [ci1, cki])
+    mccx = MultiCandidateChunks(index_ids = [:TestChunkIndex1, :TestChunkIndex2],
+        positions = [1, 2], scores = [0.1, 0.2])
+    @test_throws ArgumentError @view mi[mccx]
 end
 
 @testset "getindex-CandidateChunks" begin
