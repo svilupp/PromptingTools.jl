@@ -664,6 +664,12 @@ end
         positions = [1, 2],
         scores = [0.3, 0.4])
     @test isempty(test_chunk_index[candidate_chunks_wrong_id])
+    @test isempty(test_chunk_index[candidate_chunks_wrong_id, :chunks])
+    @test isempty(test_chunk_index[candidate_chunks_wrong_id, :embeddings])
+    @test isempty(test_chunk_index[candidate_chunks_wrong_id, :chunkdata])
+    @test size(test_chunk_index[candidate_chunks_wrong_id, :chunkdata]) == (0, 0) # check that it's an array to maintain type
+    @test isempty(test_chunk_index[candidate_chunks_wrong_id, :sources])
+    @test isempty(test_chunk_index[candidate_chunks_wrong_id, :scores])
 
     # Test when chunks are requested from a MultiIndex, only chunks from the corresponding ChunkEmbeddingsIndex should be returned
     another_chunk_index = ChunkEmbeddingsIndex(chunks = chunks_data,

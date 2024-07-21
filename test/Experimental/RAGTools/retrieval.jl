@@ -232,6 +232,12 @@ end
     @test result.positions == [1, 2]
     @test all(1.0 .>= result.scores .>= -1.0)   # Assuming default minimum_similarity
 
+    ## test with high minimum similarity
+    result_high = find_closest(finder, ci1, query_emb; minimum_similarity = 0.99)
+    @test isempty(result_high.positions)
+    @test isempty(result_high.scores)
+    @test result_high.index_id == :TestChunkIndex1
+
     ## empty index
     query_emb = [0.5, 0.5] # Example query embedding vector
     result = find_closest(finder, ci3, query_emb)
@@ -400,6 +406,13 @@ end
     @test HasEmbeddings(index1)
     @test !HasEmbeddings(index2)
     @test HasEmbeddings(multi_index)
+
+    ## Test with high minimum similarity
+    result = find_closest(multi_finder, multi_index, query_emb, query_keywords;
+        top_k = 20, minimum_similarity = 100.0)
+    @test isempty(result.index_ids)
+    @test isempty(result.positions)
+    @test isempty(result.scores)
 end
 
 @testset "find_tags" begin
