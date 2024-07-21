@@ -1,5 +1,5 @@
 using Test
-using SparseArrays, LinearAlgebra, Unicode
+using SparseArrays, LinearAlgebra, Unicode, Random
 using PromptingTools.Experimental.RAGTools
 using PromptingTools
 using PromptingTools.AbstractTrees
