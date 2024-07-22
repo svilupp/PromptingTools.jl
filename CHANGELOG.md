@@ -10,6 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.41.0]
+
+### Added 
+- Introduced a "view" of `DocumentTermMatrix` (=`SubDocumentTermMatrix`) to allow views of Keyword-based indices (`ChunkKeywordsIndex`). It's not a pure view (TF matrix is materialized to prevent performance degradation).
+
+### Fixed
+- Fixed a bug in `find_closest(finder::BM25Similarity, ...)` where the view of `DocumentTermMatrix` (ie, `view(DocumentTermMatrix(...), ...)`) was undefined.
+- Fixed a bug where a view of a view of a `ChunkIndex` wouldn't intersect the positions (it was returning only the latest requested positions).
+
 ## [0.40.0]
 
 ### Added

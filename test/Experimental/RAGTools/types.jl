@@ -3,14 +3,17 @@ using PromptingTools.Experimental.RAGTools: ChunkEmbeddingsIndex, ChunkKeywordsI
                                             CandidateChunks,
                                             MultiCandidateChunks,
                                             AbstractCandidateChunks, DocumentTermMatrix,
+                                            SubDocumentTermMatrix,
                                             document_term_matrix, HasEmbeddings,
                                             HasKeywords,
                                             ChunkKeywordsIndex, AbstractChunkIndex,
                                             AbstractDocumentIndex
 using PromptingTools.Experimental.RAGTools: embeddings, chunks, tags, tags_vocab, sources,
                                             extras, positions, scores, parent,
-                                            RAGResult, chunkdata, preprocess_tokens
-using PromptingTools.Experimental.RAGTools: SubChunkIndex, indexid, indexids
+                                            RAGResult, chunkdata, preprocess_tokens, tf,
+                                            vocab, vocab_lookup, idf, doc_rel_length
+using PromptingTools.Experimental.RAGTools: SubChunkIndex, indexid, indexids,
+                                            translate_positions_to_parent
 using PromptingTools: last_message, last_output
 
 @testset "ChunkEmbeddingsIndex" begin
@@ -33,6 +36,8 @@ using PromptingTools: last_message, last_output
     @test tags_vocab(ci) == tags_vocab_test
     @test sources(ci) == sources_test
     @test length(ci) == 2
+    @test translate_positions_to_parent(ci, [2, 1]) == [2, 1]
+    @test translate_positions_to_parent(ci, [4, 6]) == [4, 6]
 
     # Test identity/equality
     ci1 = ChunkEmbeddingsIndex(
@@ -125,6 +130,10 @@ end
     @test tags(ci) == nothing
     @test tags_vocab(ci) == nothing
     @test extras(ci) == nothing
+    @test translate_positions_to_parent(ci, [1]) == [1]
+    @test translate_positions_to_parent(ci, [2, 1]) == [2, 1]
+    @test translate_positions_to_parent(ci, [4, 6]) == [4, 6]
+    @test translate_positions_to_parent(ci, Int[]) == Int[]
 
     # Test equality of ChunkKeywordsIndex
     chunks_ = ["this is a test", "this is another test", "foo bar baz"]
@@ -160,63 +169,115 @@ end
     @test_throws ArgumentError embeddings(ci1)
 end
 
-@testset "DocumentTermMatrix" begin
-    # Simple case
-    documents = [["this", "is", "a", "test"],
-        ["this", "is", "another", "test"], ["foo", "bar", "baz"]]
-    dtm = document_term_matrix(documents)
-    @test size(dtm.tf) == (3, 8)
-    @test Set(dtm.vocab) == Set(["a", "another", "bar", "baz", "foo", "is", "test", "this"])
-    avgdl = 3.666666666666667
-    @test all(dtm.doc_rel_length .≈ [4 / avgdl, 4 / avgdl, 3 / avgdl])
-    @test length(dtm.idf) == 8
+# @testset "DocumentTermMatrix" begin
+# Simple case
+documents = [["this", "is", "a", "test"],
+    ["this", "is", "another", "test"], ["foo", "bar", "baz"]]
+dtm = document_term_matrix(documents)
+@test size(dtm.tf) == (3, 8)
+@test Set(dtm.vocab) == Set(["a", "another", "bar", "baz", "foo", "is", "test", "this"])
+avgdl = 3.666666666666667
+@test all(dtm.doc_rel_length .≈ [4 / avgdl, 4 / avgdl, 3 / avgdl])
+@test length(dtm.idf) == 8
 
-    # Edge case: single document
-    documents = [["this", "is", "a", "test"]]
-    dtm = document_term_matrix(documents)
-    @test size(dtm.tf) == (1, 4)
-    @test Set(dtm.vocab) == Set(["a", "is", "test", "this"])
-    @test dtm.doc_rel_length == ones(1)
-    @test length(dtm.idf) == 4
+# Edge case: single document
+documents = [["this", "is", "a", "test"]]
+dtm = document_term_matrix(documents)
+@test size(dtm.tf) == (1, 4)
+@test Set(dtm.vocab) == Set(["a", "is", "test", "this"])
+@test dtm.doc_rel_length == ones(1)
+@test length(dtm.idf) == 4
 
-    # Edge case: duplicate tokens
-    documents = [["this", "is", "this", "test"],
-        ["this", "is", "another", "test"], ["this", "bar", "baz"]]
-    dtm = document_term_matrix(documents)
-    @test size(dtm.tf) == (3, 6)
-    @test Set(dtm.vocab) == Set(["another", "bar", "baz", "is", "test", "this"])
-    avgdl = 3.666666666666667
-    @test all(dtm.doc_rel_length .≈ [4 / avgdl, 4 / avgdl, 3 / avgdl])
-    @test length(dtm.idf) == 6
+# Edge case: duplicate tokens
+documents = [["this", "is", "this", "test"],
+    ["this", "is", "another", "test"], ["this", "bar", "baz"]]
+dtm = document_term_matrix(documents)
+@test size(dtm.tf) == (3, 6)
+@test Set(dtm.vocab) == Set(["another", "bar", "baz", "is", "test", "this"])
+avgdl = 3.666666666666667
+@test all(dtm.doc_rel_length .≈ [4 / avgdl, 4 / avgdl, 3 / avgdl])
+@test length(dtm.idf) == 6
 
-    # Edge case: no tokens
-    documents = [String[], String[], String[]]
-    dtm = document_term_matrix(documents)
-    @test size(dtm.tf) == (3, 0)
-    @test isempty(dtm.vocab)
-    @test isempty(dtm.vocab_lookup)
-    @test isempty(dtm.idf)
-    @test dtm.doc_rel_length == zeros(3)
+# Edge case: no tokens
+documents = [String[], String[], String[]]
+dtm = document_term_matrix(documents)
+@test size(dtm.tf) == (3, 0)
+@test isempty(dtm.vocab)
+@test isempty(dtm.vocab_lookup)
+@test isempty(dtm.idf)
+@test dtm.doc_rel_length == zeros(3)
 
-    ## Methods - hcat
-    documents = [["this", "is", "a", "test"],
-        ["this", "is", "another", "test"], ["foo", "bar", "baz"]]
-    dtm1 = document_term_matrix(documents)
-    documents = [["this", "is", "a", "test"],
-        ["this", "is", "another", "test"], ["foo", "bar", "baz"]]
-    dtm2 = document_term_matrix(documents)
-    dtm = hcat(dtm1, dtm2)
-    @test size(dtm.tf) == (6, 8)
-    @test length(dtm.vocab) == 8
-    @test length(dtm.idf) == 8
-    @test isapprox(dtm.doc_rel_length,
-        [4 / 3.666666666666667, 4 / 3.666666666666667, 3 / 3.666666666666667,
-            4 / 3.666666666666667, 4 / 3.666666666666667, 3 / 3.666666666666667])
+## Methods - hcat
+documents = [["this", "is", "a", "test"],
+    ["this", "is", "another", "test"], ["foo", "bar", "baz"]]
+dtm1 = document_term_matrix(documents)
+documents = [["this", "is", "a", "test"],
+    ["this", "is", "another", "test"], ["foo", "bar", "baz"]]
+dtm2 = document_term_matrix(documents)
+dtm = hcat(dtm1, dtm2)
+@test size(dtm.tf) == (6, 8)
+@test length(dtm.vocab) == 8
+@test length(dtm.idf) == 8
+@test isapprox(dtm.doc_rel_length,
+    [4 / 3.666666666666667, 4 / 3.666666666666667, 3 / 3.666666666666667,
+        4 / 3.666666666666667, 4 / 3.666666666666667, 3 / 3.666666666666667])
 
-    # Check stubs that they throw
-    @test_throws ArgumentError RT._stem(nothing, "abc")
-    @test_throws ArgumentError RT._unicode_normalize(nothing)
-end
+# Check stubs that they throw
+@test_throws ArgumentError RT._stem(nothing, "abc")
+@test_throws ArgumentError RT._unicode_normalize(nothing)
+# end
+
+# @testset "SubDocumentTermMatrix" begin
+# Create a parent DocumentTermMatrix
+documents = [["this", "is", "a", "test"], ["another", "test", "document"]]
+dtm = document_term_matrix(documents)
+
+# Create a SubDocumentTermMatrix
+sub_dtm = view(dtm, [1], :)
+
+# Test parent method
+@test parent(sub_dtm) == dtm
+
+# Test positions method
+@test positions(sub_dtm) == [1]
+
+# Test tf method
+@test tf(sub_dtm) == dtm.tf[1:1, :]
+
+# Test vocab method
+@test vocab(sub_dtm) == vocab(dtm)
+
+# Test vocab_lookup method
+@test vocab_lookup(sub_dtm) == vocab_lookup(dtm)
+
+# Test idf method
+@test idf(sub_dtm) == idf(dtm)
+
+# Test doc_rel_length method
+@test doc_rel_length(sub_dtm) == doc_rel_length(dtm)[1:1]
+
+# Test view method for SubDocumentTermMatrix
+sub_dtm_view = view(sub_dtm, [1], :)
+@test parent(sub_dtm_view) == dtm
+@test positions(sub_dtm_view) == [1]
+@test tf(sub_dtm_view) == dtm.tf[1:1, :]
+
+# Nested view // no intersection
+sub_sub_dtm_view = view(sub_dtm_view, [2], :)
+@test parent(sub_sub_dtm_view) == dtm
+@test isempty(positions(sub_sub_dtm_view))
+@test tf(sub_sub_dtm_view) |> isempty
+
+# Test view method with out of bounds positions
+@test_throws BoundsError view(sub_dtm, [10], :)
+
+# Test view method with intersecting positions
+sub_dtm_intersect = view(dtm, [1, 2], :)
+sub_dtm_view_intersect = view(sub_dtm_intersect, [2], :)
+@test parent(sub_dtm_view_intersect) == dtm
+@test positions(sub_dtm_view_intersect) == [2]
+@test tf(sub_dtm_view_intersect) == dtm.tf[2:2, :]
+# end
 
 @testset "MultiIndex" begin
     # Test constructors/accessors
@@ -432,6 +493,7 @@ end
     sub_index = view(ci1, cc)
     @test chunks(sub_index) == ["chunk2", "chunk3"]
     @test sources(sub_index) == ["source2", "source3"]
+    @test translate_positions_to_parent(sub_index, [2, 1]) == [3, 2]
 
     # Test accessing chunks from SubChunkIndex
     cc = CandidateChunks(ci1, [2])
@@ -441,6 +503,11 @@ end
     @test sub_index[cc, :embeddings] == nothing
     @test sub_index[cc, :chunkdata] == nothing
     @test parent(sub_index)[cc, :chunks] == ["chunk2"]
+
+    # Wrong Index ID -> empty
+    cc_wrongid = CandidateChunks(:bad_id, [2], [0.1f0])
+    sub_index_wrongid = view(ci1, cc_wrongid)
+    @test isempty(sub_index_wrongid)
 
     # Test creating a SubChunkIndex with out-of-bounds CandidateChunks
     cc = CandidateChunks(ci1, [4])
@@ -554,6 +621,15 @@ end
     sub_oob = SubChunkIndex(sub_sub_index, [10])
     @test_throws BoundsError SubChunkIndex(sub_oob, cc_oob)
 
+    # return empty if it's wrong index id
+    cc_wrongid = CandidateChunks(:bad_id, [2], [0.1f0])
+    sub_index_wrongid = SubChunkIndex(sub_sub_index, cc_wrongid)
+    @test isempty(sub_index_wrongid)
+
+    # views produce intersection, so if they don't match it becomes empty view
+    cc_sub_notmatch = CandidateChunks(sub_sub_index, [2])
+    @test view(sub_sub_index, cc_sub_notmatch) |> isempty
+
     # Test edge cases for SubChunkIndex created from SubChunkIndex
     # Empty positions
     cc_empty_sub = CandidateChunks(sub_index, Int[])
@@ -564,12 +640,12 @@ end
     @test isempty(sub_index_empty_sub) == true
 
     # Out of bounds positions
-    cc_oob_sub = CandidateChunks(sub_index, [10])
-    @test_throws BoundsError view(sub_index, cc_oob_sub)
+    cc_oob_sub = CandidateChunks(ci1, [10])
+    @test_throws BoundsError view(ci1, cc_oob_sub)
 
     # Duplicate positions
-    cc_dup_sub = CandidateChunks(sub_index, [1, 1, 2])
-    sub_index_dup_sub = view(sub_index, cc_dup_sub)
+    cc_dup_sub = CandidateChunks(ci1, [1, 1, 2])
+    sub_index_dup_sub = view(ci1, cc_dup_sub)
     @test length(sub_index_dup_sub) == 3
     @test chunks(sub_index_dup_sub) == ["chunk1", "chunk1", "chunk2"]
     @test unique(sub_index_dup_sub) == SubChunkIndex(ci1, [1, 2])
@@ -608,8 +684,12 @@ end
     @test chunks(sub_sub_index) == ["chunk2", "chunk3"]
     @test sources(sub_sub_index) == ["source2", "source3"]
 
-    sub_oob = SubChunkIndex(sub_sub_index, [10])
+    sub_oob = SubChunkIndex(ci2, [10])
     @test_throws BoundsError SubChunkIndex(sub_oob, mcc_oob)
+
+    # views produce intersection, so if they don't match it becomes empty view
+    mcc_notmatch = MultiCandidateChunks(sub_sub_index, [1])
+    @test view(sub_sub_index, mcc_notmatch) |> isempty
 
     ## With keyword index
     chunks_ = ["chunk1", "chunk2"]
