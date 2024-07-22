@@ -5,8 +5,21 @@ using Base: parent
 Base.parent(index::AbstractDocumentIndex) = index
 indexid(index::AbstractDocumentIndex) = index.id
 chunkdata(index::AbstractChunkIndex) = index.chunkdata
+"Access chunkdata for a subset of chunks, `chunk_idx` is a vector of chunk indices in the index"
+function chunkdata(index::AbstractChunkIndex, chunk_idx::AbstractVector{<:Integer})
+    ## We need this accessor because different chunk indices can have chunks in different dimensions!!
+    chkdata = chunkdata(index)
+    if isnothing(chkdata)
+        return nothing
+    end
+    return view(chkdata, :, chunk_idx)
+end
+
 function chunkdata(index::AbstractDocumentIndex)
     throw(ArgumentError("`chunkdata` not implemented for $(typeof(index))"))
+end
+function chunkdata(index::AbstractDocumentIndex, chunk_idx::AbstractVector{<:Integer})
+    throw(ArgumentError("`chunkdata` not implemented for $(typeof(index)) and chunk indices: $(typeof(chunk_idx))"))
 end
 function embeddings(index::AbstractDocumentIndex)
     throw(ArgumentError("`embeddings` not implemented for $(typeof(index))"))
@@ -116,6 +129,7 @@ end
 embeddings(index::ChunkEmbeddingsIndex) = index.embeddings
 HasEmbeddings(::ChunkEmbeddingsIndex) = true
 chunkdata(index::ChunkEmbeddingsIndex) = embeddings(index)
+# It's column aligned so we don't have to re-define `chunkdata(index, chunk_idx)`
 
 # For backward compatibility
 const ChunkIndex = ChunkEmbeddingsIndex
@@ -300,6 +314,15 @@ airag(cfg, index_keywords;
 end
 
 HasKeywords(::ChunkKeywordsIndex) = true
+"Access chunkdata for a subset of chunks, `chunk_idx` is a vector of chunk indices in the index"
+function chunkdata(index::ChunkKeywordsIndex, chunk_idx::AbstractVector{<:Integer})
+    chkdata = index.chunkdata
+    if isnothing(chkdata)
+        return nothing
+    end
+    ## Keyword index is row-oriented, ie, chunks are rows, tokens are columns 
+    return view(chkdata, chunk_idx, :)
+end
 
 """
     MultiIndex
@@ -417,9 +440,14 @@ HasKeywords(index::SubChunkIndex) = HasKeywords(parent(index))
 chunks(index::SubChunkIndex) = view(chunks(parent(index)), positions(index))
 sources(index::SubChunkIndex) = view(sources(parent(index)), positions(index))
 function chunkdata(index::SubChunkIndex)
-    chkdata = chunkdata(parent(index))
-    isnothing(chkdata) && return nothing
-    view(chunkdata(parent(index)), :, positions(index))
+    chkdata = chunkdata(parent(index), positions(index))
+end
+"Access chunkdata for a subset of chunks, `chunk_idx` is a vector of chunk indices in the index"
+function chunkdata(index::SubChunkIndex, chunk_idx::AbstractVector{<:Integer})
+    ## We need this accessor because different chunk indices can have chunks in different dimensions!!
+    index_chunk_idx = translate_positions_to_parent(index, chunk_idx)
+    pos = intersect(positions(index), index_chunk_idx)
+    chkdata = chunkdata(parent(index), pos)
 end
 function embeddings(index::SubChunkIndex)
     if HasEmbeddings(index)
@@ -819,14 +847,12 @@ function Base.getindex(ci::AbstractChunkIndex,
         sorted_idx = sorted ? sortperm(scores(candidate), rev = true) :
                      eachindex(scores(candidate))
         sub_index = view(ci, candidate)
-        # @info "ci" ci.positions
-        # @info "candidate" candidate.positions
-        # @info "sub_index" sub_index
         if field == :chunks
             chunks(sub_index)[sorted_idx]
         elseif field == :chunkdata
-            chkdata = chunkdata(sub_index)
-            isnothing(chkdata) ? nothing : chkdata[:, sorted_idx]
+            ## If embeddings, chunks are columns
+            ## If keywords (DTM), chunks are rows
+            chkdata = chunkdata(sub_index, sorted_idx)
         elseif field == :sources
             sources(sub_index)[sorted_idx]
         elseif field == :scores

@@ -132,13 +132,6 @@ function RT.bm25(
             scores[di] += score
         end
     end
-    ## if it's a view, stretch the scores to the original size
-    if dtm isa RT.SubDocumentTermMatrix
-        full_scores = zeros(Float32, size(tf(parent(dtm)), 1))
-        pos = RT.positions(dtm)
-        full_scores[pos] .= scores
-        scores = full_scores
-    end
 
     return scores
 end
