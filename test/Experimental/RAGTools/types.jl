@@ -32,6 +32,7 @@ using PromptingTools: last_message, last_output
     @test chunks(ci) == chunks_test
     @test (embeddings(ci)) == emb_test
     @test (chunkdata(ci)) == emb_test
+    @test chunkdata(ci, [1]) == view(emb_test, :, [1])
     @test tags(ci) == tags_test
     @test tags_vocab(ci) == tags_vocab_test
     @test sources(ci) == sources_test
@@ -78,6 +79,8 @@ using PromptingTools: last_message, last_output
           length(tags_vocab(combined_ci))
     @test sources(combined_ci) == vcat(sources(ci1), (sources(ci2)))
     @test length(combined_ci) == 4
+    @test chunkdata(combined_ci) == nothing
+    @test chunkdata(combined_ci, [1]) == nothing
 
     # Test base var"==" with ChunkEmbeddingsIndex
     ci1 = ChunkEmbeddingsIndex(chunks = ["chunk1"],
@@ -134,6 +137,8 @@ end
     @test translate_positions_to_parent(ci, [2, 1]) == [2, 1]
     @test translate_positions_to_parent(ci, [4, 6]) == [4, 6]
     @test translate_positions_to_parent(ci, Int[]) == Int[]
+    @test chunkdata(ci) == nothing
+    @test chunkdata(ci, [1]) == nothing
 
     # Test equality of ChunkKeywordsIndex
     chunks_ = ["this is a test", "this is another test", "foo bar baz"]
@@ -142,6 +147,8 @@ end
     ci1 = ChunkKeywordsIndex(chunks = chunks_, sources = sources_, chunkdata = dtm)
     ci2 = ChunkKeywordsIndex(chunks = chunks_, sources = sources_, chunkdata = dtm)
     @test ci1 == ci2
+    @test chunkdata(ci1) == dtm
+    @test chunkdata(ci1, [1]) == view(dtm, [1], :)
 
     ci3 = ChunkKeywordsIndex(chunks = ["chunk2"], sources = ["source2"])
     @test ci1 != ci3
@@ -503,6 +510,8 @@ end
     @test sub_index[cc, :embeddings] == nothing
     @test sub_index[cc, :chunkdata] == nothing
     @test parent(sub_index)[cc, :chunks] == ["chunk2"]
+    @test chunkdata(sub_index) == nothing
+    @test chunkdata(sub_index, [1]) == nothing
 
     # Wrong Index ID -> empty
     cc_wrongid = CandidateChunks(:bad_id, [2], [0.1f0])
@@ -538,6 +547,7 @@ end
     @test chunks(sub_index11) == ["chunk1", "chunk2"]
     @test sources(sub_index11) == ["source1", "source2"]
     @test chunkdata(sub_index11) ≈ [1.0 0.5; 1.0 0.5]
+    @test chunkdata(sub_index11, [2]) ≈ [0.5, 0.5]
     @test embeddings(sub_index11) ≈ [1.0 0.5; 1.0 0.5]
     @test tags(sub_index11) == Bool[1 0 0; 0 1 0]
     @test tags_vocab(sub_index11) == tags_vocab_test
