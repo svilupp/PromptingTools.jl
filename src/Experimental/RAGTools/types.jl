@@ -1,12 +1,25 @@
-
 # More advanced index would be: HybridChunkIndex
+using Base: parent
 
 ### Shared methods
 Base.parent(index::AbstractDocumentIndex) = index
 indexid(index::AbstractDocumentIndex) = index.id
 chunkdata(index::AbstractChunkIndex) = index.chunkdata
+"Access chunkdata for a subset of chunks, `chunk_idx` is a vector of chunk indices in the index"
+function chunkdata(index::AbstractChunkIndex, chunk_idx::AbstractVector{<:Integer})
+    ## We need this accessor because different chunk indices can have chunks in different dimensions!!
+    chkdata = chunkdata(index)
+    if isnothing(chkdata)
+        return nothing
+    end
+    return view(chkdata, :, chunk_idx)
+end
+
 function chunkdata(index::AbstractDocumentIndex)
     throw(ArgumentError("`chunkdata` not implemented for $(typeof(index))"))
+end
+function chunkdata(index::AbstractDocumentIndex, chunk_idx::AbstractVector{<:Integer})
+    throw(ArgumentError("`chunkdata` not implemented for $(typeof(index)) and chunk indices: $(typeof(chunk_idx))"))
 end
 function embeddings(index::AbstractDocumentIndex)
     throw(ArgumentError("`embeddings` not implemented for $(typeof(index))"))
@@ -28,6 +41,18 @@ tags(index::AbstractChunkIndex) = index.tags
 tags_vocab(index::AbstractChunkIndex) = index.tags_vocab
 sources(index::AbstractChunkIndex) = index.sources
 extras(index::AbstractChunkIndex) = index.extras
+
+"""
+    translate_positions_to_parent(index::AbstractChunkIndex, positions::AbstractVector{<:Integer})
+
+Translate positions to the parent index. Useful to convert between positions in a view and the original index.
+
+Used whenever a `chunkdata()` is used to re-align positions in case index is a view.
+"""
+function translate_positions_to_parent(
+        index::AbstractChunkIndex, positions::AbstractVector{<:Integer})
+    return positions
+end
 
 Base.var"=="(i1::AbstractChunkIndex, i2::AbstractChunkIndex) = false
 function Base.var"=="(i1::T, i2::T) where {T <: AbstractChunkIndex}
@@ -104,38 +129,118 @@ end
 embeddings(index::ChunkEmbeddingsIndex) = index.embeddings
 HasEmbeddings(::ChunkEmbeddingsIndex) = true
 chunkdata(index::ChunkEmbeddingsIndex) = embeddings(index)
+# It's column aligned so we don't have to re-define `chunkdata(index, chunk_idx)`
 
 # For backward compatibility
 const ChunkIndex = ChunkEmbeddingsIndex
+abstract type AbstractDocumentTermMatrix end
 
 """
     DocumentTermMatrix{T<:AbstractString}
 
 A sparse matrix of term frequencies and document lengths to allow calculation of BM25 similarity scores.
 """
-struct DocumentTermMatrix{T1 <: AbstractMatrix{<:Real}, T2 <: AbstractString}
+struct DocumentTermMatrix{
+    T1 <: AbstractMatrix{<:Real}, T2 <: AbstractString} <:
+       AbstractDocumentTermMatrix
     ## assumed to be SparseMatrixCSC{Float32, Int64}
     tf::T1
     vocab::Vector{T2}
     vocab_lookup::Dict{T2, Int}
-    idf::Vector{Float32}
+    idf::Vector{Float32} # length of vocab
     # |d|/avgDl
     doc_rel_length::Vector{Float32}
 end
+function Base.parent(dtm::AbstractDocumentTermMatrix)
+    dtm
+end
+function tf(dtm::AbstractDocumentTermMatrix)
+    dtm.tf
+end
+function vocab(dtm::AbstractDocumentTermMatrix)
+    dtm.vocab
+end
+function vocab_lookup(dtm::AbstractDocumentTermMatrix)
+    dtm.vocab_lookup
+end
+function idf(dtm::AbstractDocumentTermMatrix)
+    dtm.idf
+end
+function doc_rel_length(dtm::AbstractDocumentTermMatrix)
+    dtm.doc_rel_length
+end
 
+Base.var"=="(dtm1::AbstractDocumentTermMatrix, dtm2::AbstractDocumentTermMatrix) = false
+# Must be the same type and same content
+function Base.var"=="(dtm1::T, dtm2::T) where {T <: AbstractDocumentTermMatrix}
+    tf(dtm1) == tf(dtm2) && vocab(dtm1) == vocab(dtm2) &&
+        vocab_lookup(dtm1) == vocab_lookup(dtm2) && idf(dtm1) == idf(dtm2) &&
+        doc_rel_length(dtm1) == doc_rel_length(dtm2)
+end
+
+function Base.hcat(d1::AbstractDocumentTermMatrix, d2::AbstractDocumentTermMatrix)
+    throw(ArgumentError("A hcat not implemented for DTMs of type $(typeof(d1)) and $(typeof(d2))"))
+end
 function Base.hcat(d1::DocumentTermMatrix, d2::DocumentTermMatrix)
-    tf, vocab = vcat_labeled_matrices(d1.tf, d1.vocab, d2.tf, d2.vocab)
-    vocab_lookup = Dict(t => i for (i, t) in enumerate(vocab))
+    tf_, vocab_ = vcat_labeled_matrices(tf(d1), vocab(d1), tf(d2), vocab(d2))
+    vocab_lookup_ = Dict(t => i for (i, t) in enumerate(vocab_))
 
-    N, _ = size(tf)
-    doc_freq = [count(x -> x > 0, col) for col in eachcol(tf)]
+    N, _ = size(tf_)
+    doc_freq = [count(x -> x > 0, col) for col in eachcol(tf_)]
     idf = @. log(1.0f0 + (N - doc_freq + 0.5f0) / (doc_freq + 0.5f0))
-    doc_lengths = [count(x -> x > 0, row) for row in eachrow(tf)]
+    doc_lengths = [count(x -> x > 0, row) for row in eachrow(tf_)]
     sumdl = sum(doc_lengths)
-    doc_rel_length = sumdl == 0 ? zeros(Float32, N) : (doc_lengths ./ (sumdl / N))
+    doc_rel_length_ = sumdl == 0 ? zeros(Float32, N) : (doc_lengths ./ (sumdl / N))
 
     return DocumentTermMatrix(
-        tf, vocab, vocab_lookup, idf, convert(Vector{Float32}, doc_rel_length))
+        tf_, vocab_, vocab_lookup_, idf, convert(Vector{Float32}, doc_rel_length_))
+end
+
+"A partial view of a DocumentTermMatrix, `tf` is MATERIALIZED for performance and fewer allocations."
+struct SubDocumentTermMatrix{T <: DocumentTermMatrix,
+    T1 <: AbstractMatrix{<:Real}} <: AbstractDocumentTermMatrix
+    parent::T
+    tf::T1 ## Materialize the sub-matrix, because it's too expensive to use otherwise (row-view of SparseMatrixCSC)
+    positions::Vector{Int}
+end
+Base.parent(dtm::SubDocumentTermMatrix) = dtm.parent
+positions(dtm::SubDocumentTermMatrix) = dtm.positions
+tf(dtm::SubDocumentTermMatrix) = dtm.tf
+vocab(dtm::SubDocumentTermMatrix) = Base.parent(dtm) |> vocab
+vocab_lookup(dtm::SubDocumentTermMatrix) = Base.parent(dtm) |> vocab_lookup
+idf(dtm::SubDocumentTermMatrix) = Base.parent(dtm) |> idf
+function doc_rel_length(dtm::SubDocumentTermMatrix)
+    view(doc_rel_length(Base.parent(dtm)), positions(dtm))
+end
+# hcat for SubDocumentTermMatrix does not make sense -> the vocabulary is the same / shared
+
+function Base.view(
+        dtm::AbstractDocumentTermMatrix, doc_idx::AbstractVector{<:Integer}, token_idx)
+    throw(ArgumentError("A view not implemented for type $(typeof(dtm)) across docs: $(typeof(doc_idx)) and tokens: $(typeof(token_idx))"))
+end
+Base.@propagate_inbounds function Base.view(
+        dtm::AbstractDocumentTermMatrix, doc_idx::AbstractVector{<:Integer}, token_idx::Colon)
+    tf_mat = tf(parent(dtm))
+    @boundscheck if !checkbounds(Bool, axes(tf_mat, 1), doc_idx)
+        ## Avoid printing huge position arrays, show the extremas of the attempted range
+        max_pos = extrema(doc_idx)
+        throw(BoundsError(tf_mat, max_pos))
+    end
+    ## computations on top of views of sparse arrays are expensive, materialize the view
+    tf_ = tf_mat[doc_idx, :]
+    SubDocumentTermMatrix(dtm, tf_, collect(doc_idx))
+end
+function Base.view(
+        dtm::SubDocumentTermMatrix, doc_idx::AbstractVector{<:Integer}, token_idx::Colon)
+    tf_mat = tf(parent(dtm))
+    @boundscheck if !checkbounds(Bool, axes(tf_mat, 1), doc_idx)
+        ## Avoid printing huge position arrays, show the extremas of the attempted range
+        max_pos = extrema(doc_idx)
+        throw(BoundsError(tf_mat, max_pos))
+    end
+    intersect_pos = intersect(positions(dtm), doc_idx)
+    return SubDocumentTermMatrix(
+        parent(dtm), tf_mat[intersect_pos, :], intersect_pos)
 end
 
 """
@@ -169,7 +274,7 @@ multi_index = MultiIndex([index, index_keywords])
 
 ```
 
-You can also build the index via
+You can also build the index via build_index
 ```julia
 # given some sentences and sources
 index_keywords = build_index(KeywordsIndexer(), sentences; chunker_kwargs=(; sources))
@@ -178,6 +283,14 @@ index_keywords = build_index(KeywordsIndexer(), sentences; chunker_kwargs=(; sou
 retriever = SimpleBM25Retriever()
 result = retrieve(retriever, index_keywords, "What are the best practices for parallel computing in Julia?")
 result.context
+```
+
+If you want to use airag, don't forget to specify the config to make sure keywords are processed (ie, tokenized)
+ and that BM25 is used for searching candidates
+```julia
+cfg = RAGConfig(; retriever = SimpleBM25Retriever());
+airag(cfg, index_keywords;
+    question = "What are the best practices for parallel computing in Julia?")
 ```
 """
 @kwdef struct ChunkKeywordsIndex{
@@ -201,8 +314,51 @@ result.context
 end
 
 HasKeywords(::ChunkKeywordsIndex) = true
+"Access chunkdata for a subset of chunks, `chunk_idx` is a vector of chunk indices in the index"
+function chunkdata(index::ChunkKeywordsIndex, chunk_idx::AbstractVector{<:Integer})
+    chkdata = index.chunkdata
+    if isnothing(chkdata)
+        return nothing
+    end
+    ## Keyword index is row-oriented, ie, chunks are rows, tokens are columns 
+    return view(chkdata, chunk_idx, :)
+end
 
-"Composite index that stores multiple ChunkIndex objects and their embeddings. It's not yet fully implemented."
+"""
+    MultiIndex
+
+Composite index that stores multiple ChunkIndex objects and their embeddings.
+
+# Fields
+- `id::Symbol`: unique identifier of each index (to ensure we're using the right index with `CandidateChunks`)
+- `indexes::Vector{<:AbstractChunkIndex}`: the indexes to be combined
+
+Use accesor `indexes` to access the individual indexes.
+
+# Examples
+
+We can create a `MultiIndex` from a vector of `AbstractChunkIndex` objects.
+```julia
+index = build_index(SimpleIndexer(), texts; chunker_kwargs = (; sources))
+index_keywords = ChunkKeywordsIndex(index) # same chunks as above but adds BM25 instead of embeddings
+
+multi_index = MultiIndex([index, index_keywords])
+```
+
+To use `airag` with different types of indices, we need to specify how to find the closest items for each index
+```julia
+# Cosine similarity for embeddings and BM25 for keywords, same order as indexes in MultiIndex
+finder = RT.MultiFinder([RT.CosineSimilarity(), RT.BM25Similarity()])
+
+# Notice that we add `processor` to make sure keywords are processed (ie, tokenized) as well
+cfg = RAGConfig(; retriever = SimpleRetriever(; processor = RT.KeywordsProcessor(), finder))
+
+# Ask questions
+msg = airag(cfg, multi_index; question = "What are the best practices for parallel computing in Julia?")
+pprint(msg) # prettify the answer
+```
+
+"""
 @kwdef struct MultiIndex <: AbstractMultiIndex
     id::Symbol = gensym("MultiIndex")
     indexes::Vector{<:AbstractChunkIndex} = AbstractChunkIndex[]
@@ -284,9 +440,14 @@ HasKeywords(index::SubChunkIndex) = HasKeywords(parent(index))
 chunks(index::SubChunkIndex) = view(chunks(parent(index)), positions(index))
 sources(index::SubChunkIndex) = view(sources(parent(index)), positions(index))
 function chunkdata(index::SubChunkIndex)
-    chkdata = chunkdata(parent(index))
-    isnothing(chkdata) && return nothing
-    view(chunkdata(parent(index)), :, positions(index))
+    chkdata = chunkdata(parent(index), positions(index))
+end
+"Access chunkdata for a subset of chunks, `chunk_idx` is a vector of chunk indices in the index"
+function chunkdata(index::SubChunkIndex, chunk_idx::AbstractVector{<:Integer})
+    ## We need this accessor because different chunk indices can have chunks in different dimensions!!
+    index_chunk_idx = translate_positions_to_parent(index, chunk_idx)
+    pos = intersect(positions(index), index_chunk_idx)
+    chkdata = chunkdata(parent(index), pos)
 end
 function embeddings(index::SubChunkIndex)
     if HasEmbeddings(index)
@@ -330,6 +491,20 @@ end
 function Base.show(io::IO, index::SubChunkIndex)
     print(io,
         "A view of $(typeof(parent(index))|>nameof) (id: $(indexid(parent(index)))) with $(length(index)) chunks")
+end
+
+"""
+    translate_positions_to_parent(
+        index::SubChunkIndex, pos::AbstractVector{<:Integer})
+
+Translate positions to the parent index. Useful to convert between positions in a view and the original index.
+
+Used whenever a `chunkdata()` or `tags()` are used to re-align positions to the "parent" index.
+"""
+function translate_positions_to_parent(
+        index::SubChunkIndex, pos::AbstractVector{<:Integer})
+    sub_positions = positions(index)
+    return sub_positions[pos]
 end
 
 # # CandidateChunks for Retrieval
@@ -592,7 +767,7 @@ function Base.var"&"(mc1::MultiCandidateChunks{TP1, TD1},
     return MultiCandidateChunks(index_ids, positions_, scores_)
 end
 
-# # Views and Getindex
+# # Index Views and Getindex
 function Base.view(index::AbstractDocumentIndex, cc::AbstractCandidateChunks)
     throw(ArgumentError("Not implemented for type $(typeof(index)) and $(typeof(cc))"))
 end
@@ -604,7 +779,11 @@ Base.@propagate_inbounds function Base.view(index::AbstractChunkIndex, cc::Candi
             throw(BoundsError(chk_vector, max_pos))
         end
     end
-    return SubChunkIndex(parent(index), positions(cc))
+    pos = indexid(index) == indexid(cc) ? positions(cc) : Int[]
+    return SubChunkIndex(parent(index), pos)
+end
+Base.@propagate_inbounds function Base.view(index::SubChunkIndex, cc::CandidateChunks)
+    SubChunkIndex(index, cc)
 end
 Base.@propagate_inbounds function Base.view(
         index::AbstractChunkIndex, cc::MultiCandidateChunks)
@@ -619,8 +798,12 @@ Base.@propagate_inbounds function Base.view(
     end
     return SubChunkIndex(parent(index), valid_positions)
 end
+Base.@propagate_inbounds function Base.view(index::SubChunkIndex, cc::MultiCandidateChunks)
+    SubChunkIndex(index, cc)
+end
 Base.@propagate_inbounds function SubChunkIndex(index::SubChunkIndex, cc::CandidateChunks)
-    intersect_pos = intersect(positions(cc), positions(index))
+    pos = indexid(index) == indexid(cc) ? positions(cc) : Int[]
+    intersect_pos = intersect(pos, positions(index))
     @boundscheck let chk_vector = chunks(parent(index))
         if !checkbounds(Bool, axes(chk_vector, 1), intersect_pos)
             ## Avoid printing huge position arrays, show the extremas of the attempted range
@@ -667,8 +850,9 @@ function Base.getindex(ci::AbstractChunkIndex,
         if field == :chunks
             chunks(sub_index)[sorted_idx]
         elseif field == :chunkdata
-            chkdata = chunkdata(sub_index)
-            isnothing(chkdata) ? nothing : chkdata[:, sorted_idx]
+            ## If embeddings, chunks are columns
+            ## If keywords (DTM), chunks are rows
+            chkdata = chunkdata(sub_index, sorted_idx)
         elseif field == :sources
             sources(sub_index)[sorted_idx]
         elseif field == :scores
