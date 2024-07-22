@@ -234,6 +234,8 @@ function find_closest(
     positions, scores = find_closest(finder, chunkdata(index),
         query_emb, query_tokens;
         top_k, kwargs...)
+    ## translate positions to original indices
+    positions = translate_positions_to_parent(index, positions)
     return CandidateChunks(indexid(index), positions, Float32.(scores))
 end
 
@@ -274,6 +276,8 @@ function find_closest(
         positions_, scores_ = find_closest(finder[i], chunkdata(all_indexes[i]),
             query_emb, query_tokens;
             top_k = top_k_shard, kwargs...)
+        ## translate positions to original indices
+        positions_ = translate_positions_to_parent(all_indexes[i], positions_)
         append!(index_ids, fill(indexid(all_indexes[i]), length(positions_)))
         append!(positions, positions_)
         append!(scores, scores_)
@@ -446,7 +450,7 @@ end
 
 """
     find_closest(
-        finder::BM25Similarity, dtm::DocumentTermMatrix,
+        finder::BM25Similarity, dtm::AbstractDocumentTermMatrix,
         query_emb::AbstractVector{<:Real}, query_tokens::AbstractVector{<:AbstractString} = String[];
         top_k::Int = 100, minimum_similarity::AbstractFloat = -1.0, kwargs...)
 
@@ -456,7 +460,7 @@ Reference: [Wikipedia: BM25](https://en.wikipedia.org/wiki/Okapi_BM25).
 Implementation follows: [The Next Generation of Lucene Relevance](https://opensourceconnections.com/blog/2015/10/16/bm25-the-next-generation-of-lucene-relevation/).
 """
 function find_closest(
-        finder::BM25Similarity, dtm::DocumentTermMatrix,
+        finder::BM25Similarity, dtm::AbstractDocumentTermMatrix,
         query_emb::AbstractVector{<:Real}, query_tokens::AbstractVector{<:AbstractString} = String[];
         top_k::Int = 100, minimum_similarity::AbstractFloat = -1.0, kwargs...)
     scores = bm25(dtm, query_tokens)
@@ -505,9 +509,7 @@ function find_tags(method::AnyTagFilter, index::AbstractChunkIndex,
     match_row_idx = @view(tags(index)[:, tag_idx]) |> findall .|> Base.Fix2(getindex, 1) |>
                     unique
     ## Index can be a SubChunkIndex, so we need to convert to the original indices
-    if index isa SubChunkIndex
-        match_row_idx = positions(index)[match_row_idx]
-    end
+    match_row_idx = translate_positions_to_parent(index, match_row_idx)
     return CandidateChunks(
         indexid(index), match_row_idx, ones(Float32, length(match_row_idx)))
 end
@@ -546,10 +548,8 @@ function find_tags(method::AllTagFilter, index::AbstractChunkIndex,
     else
         Int[]
     end
-    ## Index can be a SubChunkIndex, so we need to convert to the original indices
-    if index isa SubChunkIndex
-        match_row_idx = positions(index)[match_row_idx]
-    end
+    ## translate to original indices
+    match_row_idx = translate_positions_to_parent(index, match_row_idx)
     return CandidateChunks(
         indexid(index), match_row_idx, ones(Float32, length(match_row_idx)))
 end

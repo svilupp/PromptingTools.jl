@@ -5,6 +5,7 @@ using LinearAlgebra
 const PT = PromptingTools
 
 using PromptingTools.Experimental.RAGTools
+using PromptingTools.Experimental.RAGTools: tf, vocab, vocab_lookup, idf, doc_rel_length
 const RT = PromptingTools.Experimental.RAGTools
 
 # forward to LinearAlgebra.normalize
@@ -92,7 +93,7 @@ function RT.document_term_matrix(documents::AbstractVector{<:AbstractString})
 end
 
 """
-    RT.bm25(dtm::DocumentTermMatrix, query::Vector{String}; k1::Float32=1.2f0, b::Float32=0.75f0)
+    RT.bm25(dtm::AbstractDocumentTermMatrix, query::Vector{String}; k1::Float32=1.2f0, b::Float32=0.75f0)
 
 Scores all documents in `dtm` based on the `query`.
 
@@ -107,30 +108,39 @@ scores = bm25(dtm, query)
 # Returns array with 3 scores (one for each document)
 ```
 """
-function RT.bm25(dtm::RT.DocumentTermMatrix, query::AbstractVector{<:AbstractString};
+function RT.bm25(
+        dtm::RT.AbstractDocumentTermMatrix, query::AbstractVector{<:AbstractString};
         k1::Float32 = 1.2f0, b::Float32 = 0.75f0)
-    scores = zeros(Float32, size(dtm.tf, 1))
+    scores = zeros(Float32, size(tf(dtm), 1))
     ## Identify non-zero items to leverage the sparsity
-    nz_rows = rowvals(dtm.tf)
-    nz_vals = nonzeros(dtm.tf)
+    nz_rows = rowvals(tf(dtm))
+    nz_vals = nonzeros(tf(dtm))
     for i in eachindex(query)
         t = query[i]
-        t_id = get(dtm.vocab_lookup, t, nothing)
+        t_id = get(vocab_lookup(dtm), t, nothing)
         t_id === nothing && continue
-        idf = dtm.idf[t_id]
+        idf_ = idf(dtm)[t_id]
         # Scan only documents that have this token
-        @inbounds @simd for j in nzrange(dtm.tf, t_id)
+        @inbounds @simd for j in nzrange(tf(dtm), t_id)
             ## index into the sparse matrix
-            di, tf = nz_rows[j], nz_vals[j]
-            doc_len = dtm.doc_rel_length[di]
-            tf_top = (tf * (k1 + 1.0f0))
-            tf_bottom = (tf + k1 * (1.0f0 - b + b * doc_len))
-            score = idf * tf_top / tf_bottom
+            di, tf_ = nz_rows[j], nz_vals[j]
+            doc_len = doc_rel_length(dtm)[di]
+            tf_top = (tf_ * (k1 + 1.0f0))
+            tf_bottom = (tf_ + k1 * (1.0f0 - b + b * doc_len))
+            score = idf_ * tf_top / tf_bottom
             ## @info "di: $di, tf: $tf, doc_len: $doc_len, idf: $idf, tf_top: $tf_top, tf_bottom: $tf_bottom, score: $score"
             scores[di] += score
         end
     end
-    scores
+    ## if it's a view, stretch the scores to the original size
+    if dtm isa RT.SubDocumentTermMatrix
+        full_scores = zeros(Float32, size(tf(parent(dtm)), 1))
+        pos = RT.positions(dtm)
+        full_scores[pos] .= scores
+        scores = full_scores
+    end
+
+    return scores
 end
 
 end # end of module
