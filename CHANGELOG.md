@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.42.0]
+
+### Added
+- Registered new Meta Llama 3.1 models hosted on GroqCloud and Together.ai (eg, Groq-hosted `gllama370` has been updated to point to the latest available model and 405b model now has alias `gllama3405`). Because that's quite clunky, I've added abbreviations based on sizes small/medium/large (that is 8b, 70b, 405b) under `gls/glm/gll` for Llama 3.1 hosted on GroqCloud (similarly, we now have `tls/tlm/tll` for Llama3.1 on Together.ai).
+- Generic model aliases for Groq and Together.ai for Llama3 models have been updated to point to the latest available models (Llama 3.1).
+- Added Gemma2 9b model hosted on GroqCloud to the model registry (alias `ggemma9`).
+
+### Updated
+- Minor optimizations to `SubDocumentTermMatrix` to reduce memory allocations and improve performance.
+
 ## [0.41.0]
 
 ### Added 

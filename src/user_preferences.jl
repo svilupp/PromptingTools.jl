@@ -346,8 +346,12 @@ aliases = merge(
         ## t-mixtral -> Together.ai Mixtral
         "tmixtral" => "mistralai/Mixtral-8x7B-Instruct-v0.1",
         "tmixtral22" => "mistralai/Mixtral-8x22B-Instruct-v0.1",
-        "tllama3" => "meta-llama/Llama-3-8b-chat-hf",
-        "tllama370" => "meta-llama/Llama-3-70b-chat-hf",
+        "tllama3" => "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
+        "tllama370" => "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo",
+        "tllama3405" => "meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo",
+        "tls" => "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo", #s for small
+        "tlm" => "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo", #m for medium
+        "tll" => "meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo", #l for large
         ## Mistral AI
         "mistral-tiny" => "mistral-tiny",
         "mistral-small" => "mistral-small-latest",
@@ -365,11 +369,17 @@ aliases = merge(
         "claudes" => "claude-3-5-sonnet-20240620",
         "claudeh" => "claude-3-haiku-20240307",
         ## Groq
-        "gllama3" => "llama3-8b-8192",
-        "gl3" => "llama3-8b-8192",
-        "gllama370" => "llama3-70b-8192",
-        "gl70" => "llama3-70b-8192",
+        "gllama3" => "llama-3.1-8b-instant",
+        "gl3" => "llama-3.1-8b-instant",
+        "gllama370" => "llama-3.1-70b-versatile",
+        "gl70" => "llama-3.1-70b-versatile",
+        "gllama3405" => "llama-3.1-405b-reasoning",
+        "gl405" => "llama-3.1-405b-reasoning",
+        "gls" => "llama-3.1-8b-instant", #s for small
+        "glm" => "llama-3.1-70b-versatile", #m for medium
+        "gll" => "llama-3.1-405b-reasoning", #l for large
         "gmixtral" => "mixtral-8x7b-32768",
+        "ggemma9" => "gemma2-9b-it",
         ## DeepSeek
         "dschat" => "deepseek-chat",
         "dscode" => "deepseek-coder"
@@ -665,13 +675,31 @@ registry = Dict{String, ModelSpec}(
         TogetherOpenAISchema(),
         2e-7,
         2e-7,
-        "Meta Llama3 8b from Mistral, hosted by Together.ai. For more information, see [models](https://docs.together.ai/docs/inference-models)."),
+        "Meta Llama3 8b, hosted by Together.ai. For more information, see [models](https://docs.together.ai/docs/inference-models)."),
     "meta-llama/Llama-3-70b-chat-hf" => ModelSpec(
         "meta-llama/Llama-3-70b-chat-hf",
         TogetherOpenAISchema(),
         9e-7,
         9e-7,
-        "Meta Llama3 70b from Mistral, hosted by Together.ai. For more information, see [models](https://docs.together.ai/docs/inference-models)."),
+        "Meta Llama3 70b, hosted by Together.ai. For more information, see [models](https://docs.together.ai/docs/inference-models)."),
+    "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo" => ModelSpec(
+        "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
+        TogetherOpenAISchema(),
+        1e-7,
+        1.8e-7,
+        "Meta Llama3.1 8b, hosted by Together.ai. For more information, see [models](https://docs.together.ai/docs/inference-models)."),
+    "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo" => ModelSpec(
+        "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo",
+        TogetherOpenAISchema(),
+        5.4e-7,
+        8.8e-7,
+        "Meta Llama3.1 70b, hosted by Together.ai. For more information, see [models](https://docs.together.ai/docs/inference-models)."),
+    "meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo" => ModelSpec(
+        "meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo",
+        TogetherOpenAISchema(),
+        5e-6,
+        1.5e-5,
+        "Meta Llama3.1 405b, hosted by Together.ai. For more information, see [models](https://docs.together.ai/docs/inference-models)."),
     ### Anthropic models
     "claude-3-5-sonnet-20240620" => ModelSpec("claude-3-5-sonnet-20240620",
         AnthropicSchema(),
@@ -699,10 +727,25 @@ registry = Dict{String, ModelSpec}(
         2.4e-5,
         "Anthropic's Claude 2.1 model."),
     ## Groq -- using preliminary pricing on https://wow.groq.com/
+    "llama-3.1-405b-reasoning" => ModelSpec("llama-3.1-405b-reasoning",
+        GroqOpenAISchema(),
+        5e-6, # based on prices at together.ai... likely it will be much cheaper
+        1.5e-5, # based on prices at together.ai... likely it will be much cheaper
+        "Meta's Llama3.1 405b, hosted by Groq. Max output 16384 tokens, 131K context - during preview window limited to max tokens=16K. See details [here](https://console.groq.com/docs/models)"),
+    "llama-3.1-70b-versatile" => ModelSpec("llama-3.1-70b-versatile",
+        GroqOpenAISchema(),
+        5.9e-7,
+        7.9e-7,
+        "Meta's Llama3.1 70b, hosted by Groq. Max output 8192 tokens, 131K context - during preview window limited to max tokens=8K. See details [here](https://console.groq.com/docs/models)"),
+    "llama-3.1-8b-instant" => ModelSpec("llama-3.1-8b-instant",
+        GroqOpenAISchema(),
+        5e-8,
+        8e-8,
+        "Meta's Llama3.1 8b, hosted by Groq. Max output 8192 tokens, 131K context - during preview window limited to max tokens=8K. See details [here](https://console.groq.com/docs/models)"),
     "llama3-8b-8192" => ModelSpec("llama3-8b-8192",
         GroqOpenAISchema(),
         5e-8,
-        1e-7,
+        8e-8,
         "Meta's Llama3 8b, hosted by Groq. Max output 8192 tokens, 8K context. See details [here](https://console.groq.com/docs/models)"),
     "llama3-70b-8192" => ModelSpec("llama3-70b-8192",
         GroqOpenAISchema(),
@@ -714,6 +757,11 @@ registry = Dict{String, ModelSpec}(
         2.7e-7,
         2.7e-7,
         "Mistral.ai Mixtral 8x7b, hosted by Groq. Max 32K context. See details [here](https://console.groq.com/docs/models)"),
+    "gemma2-9b-it" => ModelSpec("gemma2-9b-it",
+        GroqOpenAISchema(),
+        2e-7,
+        2e-7,
+        "Google's Gemma 2 9b, hosted by Groq. Max 8K context. See details [here](https://console.groq.com/docs/models)"),
     "deepseek-chat" => ModelSpec("deepseek-chat",
         DeepSeekOpenAISchema(),
         1.4e-7,
