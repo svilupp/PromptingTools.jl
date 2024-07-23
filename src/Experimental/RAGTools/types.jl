@@ -6,7 +6,8 @@ Base.parent(index::AbstractDocumentIndex) = index
 indexid(index::AbstractDocumentIndex) = index.id
 chunkdata(index::AbstractChunkIndex) = index.chunkdata
 "Access chunkdata for a subset of chunks, `chunk_idx` is a vector of chunk indices in the index"
-function chunkdata(index::AbstractChunkIndex, chunk_idx::AbstractVector{<:Integer})
+Base.@propagate_inbounds function chunkdata(
+        index::AbstractChunkIndex, chunk_idx::AbstractVector{<:Integer})
     ## We need this accessor because different chunk indices can have chunks in different dimensions!!
     chkdata = chunkdata(index)
     if isnothing(chkdata)
@@ -209,7 +210,7 @@ tf(dtm::SubDocumentTermMatrix) = dtm.tf
 vocab(dtm::SubDocumentTermMatrix) = Base.parent(dtm) |> vocab
 vocab_lookup(dtm::SubDocumentTermMatrix) = Base.parent(dtm) |> vocab_lookup
 idf(dtm::SubDocumentTermMatrix) = Base.parent(dtm) |> idf
-function doc_rel_length(dtm::SubDocumentTermMatrix)
+Base.@propagate_inbounds function doc_rel_length(dtm::SubDocumentTermMatrix)
     view(doc_rel_length(Base.parent(dtm)), positions(dtm))
 end
 # hcat for SubDocumentTermMatrix does not make sense -> the vocabulary is the same / shared
@@ -227,6 +228,7 @@ Base.@propagate_inbounds function Base.view(
         throw(BoundsError(tf_mat, max_pos))
     end
     ## computations on top of views of sparse arrays are expensive, materialize the view
+    ## Moreover, nonzeros and rowvals accessors for SparseCSCMatrix are not defined for views
     tf_ = tf_mat[doc_idx, :]
     SubDocumentTermMatrix(dtm, tf_, collect(doc_idx))
 end
@@ -315,7 +317,8 @@ end
 
 HasKeywords(::ChunkKeywordsIndex) = true
 "Access chunkdata for a subset of chunks, `chunk_idx` is a vector of chunk indices in the index"
-function chunkdata(index::ChunkKeywordsIndex, chunk_idx::AbstractVector{<:Integer})
+Base.@propagate_inbounds function chunkdata(
+        index::ChunkKeywordsIndex, chunk_idx::AbstractVector{<:Integer})
     chkdata = index.chunkdata
     if isnothing(chkdata)
         return nothing
@@ -437,13 +440,18 @@ Base.parent(index::SubChunkIndex) = index.parent
 HasEmbeddings(index::SubChunkIndex) = HasEmbeddings(parent(index))
 HasKeywords(index::SubChunkIndex) = HasKeywords(parent(index))
 
-chunks(index::SubChunkIndex) = view(chunks(parent(index)), positions(index))
-sources(index::SubChunkIndex) = view(sources(parent(index)), positions(index))
-function chunkdata(index::SubChunkIndex)
-    chkdata = chunkdata(parent(index), positions(index))
+Base.@propagate_inbounds function chunks(index::SubChunkIndex)
+    view(chunks(parent(index)), positions(index))
+end
+Base.@propagate_inbounds function sources(index::SubChunkIndex)
+    view(sources(parent(index)), positions(index))
+end
+Base.@propagate_inbounds function chunkdata(index::SubChunkIndex)
+    chunkdata(parent(index), positions(index))
 end
 "Access chunkdata for a subset of chunks, `chunk_idx` is a vector of chunk indices in the index"
-function chunkdata(index::SubChunkIndex, chunk_idx::AbstractVector{<:Integer})
+Base.@propagate_inbounds function chunkdata(
+        index::SubChunkIndex, chunk_idx::AbstractVector{<:Integer})
     ## We need this accessor because different chunk indices can have chunks in different dimensions!!
     index_chunk_idx = translate_positions_to_parent(index, chunk_idx)
     pos = intersect(positions(index), index_chunk_idx)
@@ -501,7 +509,7 @@ Translate positions to the parent index. Useful to convert between positions in 
 
 Used whenever a `chunkdata()` or `tags()` are used to re-align positions to the "parent" index.
 """
-function translate_positions_to_parent(
+Base.@propagate_inbounds function translate_positions_to_parent(
         index::SubChunkIndex, pos::AbstractVector{<:Integer})
     sub_positions = positions(index)
     return sub_positions[pos]

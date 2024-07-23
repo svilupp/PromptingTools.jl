@@ -230,7 +230,9 @@ function find_closest(
         finder::AbstractSimilarityFinder, index::AbstractChunkIndex,
         query_emb::AbstractVector{<:Real}, query_tokens::AbstractVector{<:AbstractString} = String[];
         top_k::Int = 100, kwargs...)
-    isnothing(chunkdata(index)) && return CandidateChunks(; index_id = indexid(index))
+    if isnothing(chunkdata(parent(index)))
+        return CandidateChunks(; index_id = indexid(index))
+    end
     positions, scores = find_closest(finder, chunkdata(index),
         query_emb, query_tokens;
         top_k, kwargs...)
@@ -244,7 +246,9 @@ function find_closest(
         finder::AbstractSimilarityFinder, index::AbstractChunkIndex,
         query_emb::AbstractMatrix{<:Real}, query_tokens::AbstractVector{<:AbstractVector{<:AbstractString}} = Vector{Vector{String}}();
         top_k::Int = 100, kwargs...)
-    isnothing(chunkdata(index)) && CandidateChunks(; index_id = indexid(index))
+    if isnothing(chunkdata(parent(index)))
+        return CandidateChunks(; index_id = indexid(index))
+    end
     ## reduce top_k since we have more than one query
     top_k_ = top_k ÷ size(query_emb, 2)
     ## simply vcat together (gets sorted from the highest similarity to the lowest)
