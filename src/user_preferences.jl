@@ -343,6 +343,12 @@ aliases = merge(
         ## f-mixtral -> Fireworks.ai Mixtral
         "fmixtral" => "accounts/fireworks/models/mixtral-8x7b-instruct",
         "firefunction" => "accounts/fireworks/models/firefunction-v1",
+        "fllama3" => "accounts/fireworks/models/llama-v3p1-8b-instruct",
+        "fllama370" => "accounts/fireworks/models/llama-v3p1-70b-instruct",
+        "fllama3405" => "accounts/fireworks/models/llama-v3p1-405b-instruct",
+        "fls" => "accounts/fireworks/models/llama-v3p1-8b-instruct", #s for small
+        "flm" => "accounts/fireworks/models/llama-v3p1-70b-instruct", #m for medium
+        "fll" => "accounts/fireworks/models/llama-v3p1-405b-instruct", #l for large
         ## t-mixtral -> Together.ai Mixtral
         "tmixtral" => "mistralai/Mixtral-8x7B-Instruct-v0.1",
         "tmixtral22" => "mistralai/Mixtral-8x22B-Instruct-v0.1",
@@ -657,6 +663,24 @@ registry = Dict{String, ModelSpec}(
         0.0, #unknown, expected to be the same as Mixtral
         0.0, #unknown, expected to be the same as Mixtral
         "Fireworks' open-source function calling model (fine-tuned Mixtral). Useful for `aiextract` calls. For more information, see [models](https://fireworks.ai/models/fireworks/firefunction-v1)."),
+    "accounts/fireworks/models/llama-v3p1-405b-instruct" => ModelSpec(
+        "accounts/fireworks/models/llama-v3p1-405b-instruct",
+        FireworksOpenAISchema(),
+        3e-6,
+        3e-6,
+        "Meta Llama 3.1 405b, hosted by Fireworks.ai. Context 131K tokens. For more information, see [models](https://fireworks.ai/models/fireworks/llama-v3p1-405b-instruct)."),
+    "accounts/fireworks/models/llama-v3p1-70b-instruct" => ModelSpec(
+        "accounts/fireworks/models/llama-v3p1-70b-instruct",
+        FireworksOpenAISchema(),
+        9e-7,
+        9e-7,
+        "Meta Llama 3.1 70b, hosted by Fireworks.ai. Context 131K tokens. For more information, see [models](https://fireworks.ai/models/fireworks/llama-v3p1-70b-instruct)."),
+    "accounts/fireworks/models/llama-v3p1-8b-instruct" => ModelSpec(
+        "accounts/fireworks/models/llama-v3p1-8b-instruct",
+        FireworksOpenAISchema(),
+        2e-7,
+        2e-7,
+        "Meta Llama 3.1 8b, hosted by Fireworks.ai. Context 131K tokens. For more information, see [models](https://fireworks.ai/models/fireworks/llama-v3p1-8b-instruct)."),
     ## Together AI
     "mistralai/Mixtral-8x7B-Instruct-v0.1" => ModelSpec(
         "mistralai/Mixtral-8x7B-Instruct-v0.1",
