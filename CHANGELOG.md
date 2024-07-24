@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.43.0]
+
+### Added
+- Added Llama 3.1 registry records for Fireworks.ai (alias `fllama3`, `fllama370`, `fllama3405` and `fls`, `flm`, `fll` for small/medium/large similar to the other providers).
+
 ## [0.42.0]
 
 ### Added
