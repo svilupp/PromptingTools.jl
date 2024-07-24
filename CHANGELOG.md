@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.44.0]
+
+### Added
+- Added Mistral Large 2 and Mistral-Nemo to the model registry (alias `mistral-nemo`).
+
 ## [0.43.0]
 
 ### Added
