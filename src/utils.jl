@@ -231,8 +231,10 @@ function wrap_string(str::AbstractString,
                 current_line_length = 0
             end
             while word_length > text_width
-                write(output, word[1:(text_width - 1)], "-$newline")
-                word = word[text_width:end]
+                chop_idx = prevind(word, text_width, 1)
+                write(output, word[1:(chop_idx)], "-$newline")
+                start_idx = nextind(word, chop_idx, 1)
+                word = word[start_idx:end]
                 word_length -= text_width - 1
             end
         end

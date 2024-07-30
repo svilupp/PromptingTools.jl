@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.44.1]
+
+### Fixed
+- Fixed a bug where `wrap_string` would not correctly split very long Unicode words.
+
+
 ## [0.44.0]
 
 ### Added
