@@ -20,6 +20,13 @@ Chunker when you provide text to `get_chunks` functions. Inputs are directly chu
 """
 struct TextChunker <: AbstractChunker end
 
+"""
+    NoChunker <: AbstractChunker
+
+
+"""
+struct NoChunker <: AbstractChunker end
+
 ### Embedding Types
 """
     NoEmbedder <: AbstractEmbedder
@@ -134,6 +141,19 @@ It uses `TextChunker`, `KeywordsProcessor`, and `NoTagger` as default chunker, p
     tagger::AbstractTagger = NoTagger()
 end
 
+"""
+    PTPineconeIndexer <: AbstractIndexBuilder
+
+Pinecone index to be returned by `build_index`.
+
+It uses `NoChunker`, `NoEmbedder`, and `NoTagger` as default chunker, embedder, and tagger.
+"""
+@kwdef mutable struct PTPineconeIndexer <: AbstractIndexBuilder
+    chunker::AbstractChunker = NoChunker()
+    embedder::AbstractEmbedder = NoEmbedder()
+    tagger::AbstractTagger = NoTagger()
+end
+
 ### Functions
 
 ## "Build an index for RAG (Retriever-Augmented Generation) applications. REQUIRES SparseArrays and LinearAlgebra packages to be loaded!!"
@@ -165,6 +185,10 @@ function load_text(chunker::TextChunker, input::AbstractString;
         source::AbstractString = input, kwargs...)
     @assert length(source)<=512 "Each `source` should be less than 512 characters long. Detected: $(length(source)) characters. You must provide sources for each text when using `TextChunker`"
     return input, source
+end
+function load_text(chunker::NoChunker, input::AbstractString = "";
+    source::AbstractString = input, kwargs...)
+return input, source
 end
 
 """
@@ -698,6 +722,37 @@ function build_index(
 
     index = ChunkKeywordsIndex(; id = index_id, chunkdata = dtm, tags, tags_vocab,
         chunks, sources, extras)
+    return index
+end
+
+using Pinecone: Pinecone, init_v3, Index
+"""
+    build_index(
+        indexer::PTPineconeIndexer;
+        namespace::AbstractString,
+        schema::AbstractPromptSchema = OpenAISchema();
+        verbose::Integer = 1,
+        index_id = gensym("PTPineconeIndex"),
+        cost_tracker = Threads.Atomic{Float64}(0.0))
+
+Builds a `PTPineconeIndex` containing a Pinecone context (API key, index and namespace).
+"""
+function build_index(
+        indexer::PTPineconeIndexer,
+        namespace::AbstractString,
+        schema::PromptingTools.AbstractPromptSchema = PromptingTools.OpenAISchema();
+        verbose::Integer = 1,
+        index_id = gensym("PTPineconeIndex"),
+        cost_tracker = Threads.Atomic{Float64}(0.0))
+
+    pinecone_context = Pinecone.init_v3(ENV["PINECONE_API_KEY"])
+    pindex = ENV["PINECONE_INDEX"]
+    pinecone_index = pinecone_index = !isempty(pindex) ? Pinecone.Index(pinecone_context, pindex) : nothing
+
+    index = PTPineconeIndex(; id = index_id, pinecone_context, pinecone_index, namespace, schema)
+
+    (verbose > 0) && @info "Index built! (cost: \$$(round(cost_tracker[], digits=3)))"
+
     return index
 end
 

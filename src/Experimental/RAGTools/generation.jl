@@ -63,6 +63,30 @@ function build_context(contexter::ContextEnumerator,
     return context
 end
 
+using Pinecone: Pinecone, query
+using JSON3: JSON3, read
+"""
+    build_context(contexter::ContextEnumerator,
+        index::AbstractPTPineconeIndex;
+        verbose::Bool = true,
+        top_k::Int = 10,
+        kwargs...)
+
+Build context strings by querying Pinecone.
+```
+"""
+function build_context(contexter::ContextEnumerator,
+        index::AbstractPTPineconeIndex;
+        verbose::Bool = true,
+        top_k::Int = 10,
+        kwargs...)
+    pinecone_results = Pinecone.query(index.pinecone_context, index.pinecone_index, index.embedding, top_k, index.namespace, false, true)
+    results_json = JSON3.read(pinecone_results)
+    context = results_json.matches[1].metadata.content
+
+    return context
+end
+
 function build_context!(contexter::AbstractContextBuilder,
         index::AbstractDocumentIndex, result::AbstractRAGResult; kwargs...)
     throw(ArgumentError("Contexter $(typeof(contexter)) not implemented"))

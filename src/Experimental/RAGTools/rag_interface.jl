@@ -161,6 +161,13 @@ Main abstract type for storing document chunks and their embeddings. It also sto
 """
 abstract type AbstractChunkIndex <: AbstractDocumentIndex end
 
+"""
+    AbstractPTPineconeIndex <: AbstractDocumentIndex
+
+Abstract type for working with Pinecone. For now, just an empty index.
+"""
+abstract type AbstractPTPineconeIndex <: AbstractDocumentIndex end
+
 # ## Retrieval stage
 
 """
