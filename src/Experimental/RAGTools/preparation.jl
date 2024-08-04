@@ -288,19 +288,9 @@ function get_embeddings(embedder::BatchEmbedder, docs::AbstractVector{<:Abstract
         Threads.atomic_add!(cost_tracker, msg.cost) # track costs
         msg.content
     end
-    embeddings = hcat(embeddings...) .|> Float32 # flatten, columns are documents
-    # truncate_dimension=0 means that we skip it
-    if !isnothing(truncate_dimension) && truncate_dimension > 0
-        @assert truncate_dimension<=size(embeddings, 1) "Requested embeddings dimensionality is too high (Embeddings: $(size(embeddings)) vs dimensionality requested: $(truncate_dimension))"
-        ## reduce + normalize again
-        embeddings = embeddings[1:truncate_dimension, :]
-        for i in axes(embeddings, 2)
-            embeddings[:, i] = _normalize(embeddings[:, i])
-        end
-    elseif !isnothing(truncate_dimension) && truncate_dimension == 0
-        # do nothing
-        verbose && @info "Truncate_dimension set to 0. Skipping truncation"
-    end
+    ## Concat across documents and truncate if needed
+    embeddings = hcat_truncate(embeddings, truncate_dimension; verbose)
+    ## Normalize embeddings
     verbose && @info "Done embedding. Total cost: \$$(round(cost_tracker[],digits=3))"
     return embeddings
 end
