@@ -250,9 +250,9 @@ function wrap_string(str::AbstractString,
 end;
 
 """
-    length_longest_common_subsequence(itr1, itr2)
+    length_longest_common_subsequence(itr1::AbstractString, itr2::AbstractString)
 
-Compute the length of the longest common subsequence between two sequences (ie, the higher the number, the better the match).
+Compute the length of the longest common subsequence between two string sequences (ie, the higher the number, the better the match).
 
 Source: https://cn.julialang.org/LeetCode.jl/dev/democards/problems/problems/1143.longest-common-subsequence/
 
@@ -286,7 +286,7 @@ But it might be easier to use directly the convenience wrapper `distance_longest
 
 ```
 """
-function length_longest_common_subsequence(itr1, itr2)
+function length_longest_common_subsequence(itr1::AbstractString, itr2::AbstractString)
     m, n = length(itr1) + 1, length(itr2) + 1
     dp = fill(0, m, n)
 

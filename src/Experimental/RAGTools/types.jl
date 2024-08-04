@@ -911,10 +911,10 @@ function Base.getindex(ci::AbstractChunkIndex,
     getindex(ci, cc, field; sorted)
 end
 # Getindex on Multiindex, pool the individual hits
-# Sorted defaults to false --> similarly to Dict which doesn't guarantee ordering of values returned
+# Sorted defaults to true because we need to guarantee that potential `context` is sorted by score across different indices
 function Base.getindex(mi::MultiIndex,
         candidate::MultiCandidateChunks{TP, TD},
-        field::Symbol = :chunks; sorted::Bool = false) where {TP <: Integer, TD <: Real}
+        field::Symbol = :chunks; sorted::Bool = true) where {TP <: Integer, TD <: Real}
     @assert field in [:chunks, :sources, :scores] "Only `chunks`, `sources`, and `scores` fields are supported for now"
     if sorted
         # values can be either of chunks or sources
