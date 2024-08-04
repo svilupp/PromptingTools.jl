@@ -831,13 +831,13 @@ end
 
     # with MultiIndex
     mi = MultiIndex(; id = :multi, indexes = [ci1, ci2])
-    @test mi[cc] == ["chunk2", "chunk2x"]  # default is sorted=false
+    @test mi[cc] == ["chunk2", "chunk2x"]  # default is sorted=true
     @test Base.getindex(mi, cc, :chunks; sorted = true) == ["chunk2", "chunk2x"]
     @test Base.getindex(mi, cc, :chunks; sorted = false) == ["chunk2", "chunk2x"]
 
     # with MultiIndex -- flip the order of indices
     mi = MultiIndex(; id = :multi, indexes = [ci2, ci1])
-    @test mi[cc] == ["chunk2x", "chunk2"] # default is sorted=false
+    @test mi[cc] == ["chunk2", "chunk2x"] # default is sorted=true
     @test Base.getindex(mi, cc, :chunks; sorted = true) == ["chunk2", "chunk2x"]
     @test Base.getindex(mi, cc, :chunks; sorted = false) == ["chunk2x", "chunk2"]
 end
@@ -904,7 +904,7 @@ end
         scores = [0.5, 0.7])
     ## sorted=false by default (Dict-like where order isn't guaranteed)
     ## sorting follows index order
-    @test mi[mc1] == ["First chunk", "6"]
+    @test mi[mc1] == ["6", "First chunk"]
     @test Base.getindex(mi, mc1, :chunks; sorted = true) == ["6", "First chunk"]
     @test Base.getindex(mi, mc1, :sources; sorted = true) ==
           ["other_source3", "test_source1"]
