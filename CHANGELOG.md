@@ -10,10 +10,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-## [0.44.1]
+## [0.45.0]
+
+### Breaking Change
+- `getindex(::MultiIndex, ::MultiCandidateChunks)` now returns sorted chunks by default (`sorted=true`) to guarantee that potential `context` (=`chunks`) is sorted by descending similarity score across different sub-indices.
 
 ### Updated
 - Updated a `hcat` implementation in `RAGTools.get_embeddings` to reduce memory allocations for large embedding batches (c. 3x fewer allocations, see `hcat_truncate`).
+- Updated `length_longest_common_subsequence` signature to work only for pairs of `AbstractString` to not fail silently when wrong arguments are provided.
+
+### Fixed
+- Changed the default behavior of `getindex(::MultiIndex, ::MultiCandidateChunks)` to always return sorted chunks for consistency with other similar functions and correct `retrieve` behavior. This was accidentally changed in v0.40 and is now reverted to the original behavior.
 
 ## [0.44.0]
 
