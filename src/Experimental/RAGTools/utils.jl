@@ -45,6 +45,125 @@ function hcat_labeled_matrices(mat1::AbstractMatrix{T1},
     return hcat(aligned_mat1, aligned_mat2), combined_vocab
 end
 
+"""
+    hcat_truncate(matrices::AbstractVector{<:AbstractMatrix{T}},
+        truncate_dimension::Union{Nothing, Int} = nothing; verbose::Bool = false) where {T <:
+                                                                                         Real}
+
+Horizontal concatenation of matrices, with optional truncation of the rows of each matrix to the specified dimension (reducing embedding dimensionality).
+
+More efficient that a simple splatting, as the resulting matrix is pre-allocated in one go.
+
+Returns: a `Matrix{Float32}`
+
+# Arguments
+- `matrices::AbstractVector{<:AbstractMatrix{T}}`: Vector of matrices to concatenate
+- `truncate_dimension::Union{Nothing,Int}=nothing`: Dimension to truncate to, or `nothing` or `0` to skip truncation. If truncated, the columns will be normalized.
+- `verbose::Bool=false`: Whether to print verbose output.
+
+# Examples
+```julia
+a = rand(Float32, 1000, 10)
+b = rand(Float32, 1000, 20)
+
+c = hcat_truncate([a, b])
+size(c) # (1000, 30)
+
+d = hcat_truncate([a, b], 500)
+size(d) # (500, 30)
+```
+"""
+function hcat_truncate(matrices::AbstractVector{<:AbstractMatrix{T}},
+        truncate_dimension::Union{Nothing, Int} = nothing; verbose::Bool = false) where {T <:
+                                                                                         Real}
+    rows = -1
+    total_cols = 0
+    @inbounds for matrix in matrices
+        row, col = size(matrix)
+        if rows < 0
+            rows = row
+        else
+            @assert row==rows "All matrices must have the same number of rows (Found $row and $rows)"
+        end
+        total_cols += col
+    end
+
+    ## Check if we need to truncate
+    truncate, rows = if !isnothing(truncate_dimension) && truncate_dimension > 0
+        @assert truncate_dimension<=rows "Requested embeddings dimensionality is too high (Embeddings: $(rows) vs dimensionality requested: $(truncate_dimension))"
+        true, truncate_dimension
+    elseif !isnothing(truncate_dimension) && iszero(truncate_dimension)
+        verbose && @info "Truncate_dimension set to 0. Skipping truncation"
+        false, rows
+    else
+        false, rows
+    end
+
+    ## initialize result
+    result = Matrix{Float32}(undef, rows, total_cols)
+
+    col_offset = 1
+    @inbounds for matrix in matrices
+        cols = size(matrix, 2)
+        if truncate
+            for col in eachcol(matrix)
+                ## We must re-normalize the truncated vectors
+                ## LinearAlgebra.normalize but imported in RAGToolsExperimentalExt
+                result[:, col_offset] = _normalize(@view(col[1:rows]))
+                col_offset += 1
+            end
+        else
+            ## no truncation
+            result[:, col_offset:(col_offset + cols - 1)] = matrix
+            col_offset += cols
+        end
+    end
+
+    return result
+end
+function hcat_truncate(vectors::AbstractVector{<:AbstractVector{T}},
+        truncate_dimension::Union{Nothing, Int} = nothing; verbose::Bool = false) where {T <:
+                                                                                         Real}
+    rows = -1
+    total_cols = 0
+    @inbounds for vec in vectors
+        row = size(vec, 1)
+        if rows < 0
+            rows = row
+        else
+            @assert row==rows "All vectors must have the same number of rows (Found $row and $rows)"
+        end
+        total_cols += 1
+    end
+
+    # Check if we need to truncate
+    truncate, rows = if !isnothing(truncate_dimension) && truncate_dimension > 0
+        @assert truncate_dimension<=rows "Requested truncation dimension is too high (Vector length: $rows vs requested: $truncate_dimension)"
+        true, truncate_dimension
+    elseif !isnothing(truncate_dimension) && iszero(truncate_dimension)
+        verbose && @info "Truncate_dimension set to 0. Skipping truncation"
+        false, rows
+    else
+        false, rows
+    end
+
+    # Initialize result
+    result = Matrix{Float32}(undef, rows, total_cols)
+
+    # Fill the result matrix
+    @inbounds for i in eachindex(vectors)
+        vect = vectors[i]
+        if truncate
+            # We must re-normalize the truncated vectors
+            result[:, i] = _normalize(@view(vect[1:rows]))
+        else
+            result[:, i] = vect
+        end
+    end
+
+    return result
+end
+
 ### Text Utilities
 # STOPWORDS - used for annotation highlighting
 # Just a small list to get started
