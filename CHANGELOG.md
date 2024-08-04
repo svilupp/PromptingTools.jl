@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.44.1]
+
+### Updated
+- Updated a `hcat` implementation in `RAGTools.get_embeddings` to reduce memory allocations for large embedding batches (c. 3x fewer allocations, see `hcat_truncate`).
+
 ## [0.44.0]
 
 ### Added

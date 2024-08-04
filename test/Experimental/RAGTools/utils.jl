@@ -7,7 +7,8 @@ using PromptingTools.Experimental.RAGTools: split_into_code_and_sentences
 using PromptingTools.Experimental.RAGTools: getpropertynested, setpropertynested,
                                             merge_kwargs_nested
 using PromptingTools.Experimental.RAGTools: pack_bits, unpack_bits, preprocess_tokens,
-                                            reciprocal_rank_fusion, score_to_unit_scale
+                                            reciprocal_rank_fusion, score_to_unit_scale,
+                                            hcat_truncate, _normalize
 
 @testset "_check_aiextract_capability" begin
     @test _check_aiextract_capability("gpt-3.5-turbo") == nothing
@@ -90,6 +91,108 @@ end
     @test size(merged_mat) == (3, 4)
     @test combined_vocab == ["word1", "word2", "word3"]
     @test merged_mat ≈ [1.0 2.0 0.0 0.0; 3.0 4.0 5.0 6.0; 0.0 0.0 7.0 8.0]
+end
+
+@testset "hcat_truncate" begin
+    # Test basic functionality with no truncation
+    m1 = Float32[1 2; 3 4; 5 6]
+    m2 = Float32[7 8; 9 10; 11 12]
+    result = hcat_truncate([m1, m2])
+    @test size(result) == (3, 4)
+    @test result == Float32[1 2 7 8; 3 4 9 10; 5 6 11 12]
+
+    # Test with truncation
+    result_truncated = hcat_truncate([m1, m2], 2)
+    @test size(result_truncated) == (2, 4)
+
+    # Test normalization after truncation
+    expected_col1 = Float32[1, 3] / sqrt(1^2 + 3^2)
+    @test result_truncated[:, 1] ≈ expected_col1
+
+    # Test with single matrix input
+    single_result = hcat_truncate([m1])
+    @test single_result == m1
+
+    # Test with empty input
+    @test_throws Exception hcat_truncate([])
+
+    # Test with matrices of different row counts
+    m3 = Float32[1 2; 3 4]
+    @test_throws AssertionError hcat_truncate([m1, m3])
+
+    # Test with truncation dimension larger than input
+    @test_throws AssertionError hcat_truncate([m1, m2], 4)
+
+    # Test with truncate_dimension set to 0
+    zero_truncate = hcat_truncate([m1, m2], 0)
+    @test zero_truncate == Float32[1 2 7 8; 3 4 9 10; 5 6 11 12]
+
+    # Test with large matrices to ensure performance
+    large_m1 = rand(Float32, 1000, 1000)
+    large_m2 = rand(Float32, 1000, 1000)
+    @test size(hcat_truncate([large_m1, large_m2], 500)) == (500, 2000)
+
+    # Test with different types (should convert to Float32)
+    m4 = [1.0 2.0; 3.0 4.0; 5.0 6.0]
+    result_type_conversion = hcat_truncate([m4])
+    @test eltype(result_type_conversion) == Float32
+
+    # Test with truncate=nothing (should behave the same as no truncation)
+    result_nothing = hcat_truncate([m1, m2], nothing)
+    @test result_nothing == Float32[1 2 7 8; 3 4 9 10; 5 6 11 12]
+
+    # Test with truncate=-1 (should behave the same as no truncation)
+    result_negative = hcat_truncate([m1, m2], -1)
+    @test result_negative == Float32[1 2 7 8; 3 4 9 10; 5 6 11 12]
+
+    ## Test for Vectors
+    # Test basic functionality
+    v1 = [1.0, 2.0, 3.0]
+    v2 = [4.0, 5.0, 6.0]
+    result = hcat_truncate([v1, v2])
+    @test size(result) == (3, 2)
+    @test result == [1.0 4.0; 2.0 5.0; 3.0 6.0]
+
+    # Test with truncation
+    result_truncated = hcat_truncate([v1, v2], 2)
+    @test size(result_truncated) == (2, 2)
+    @test result_truncated ≈ mapreduce(_normalize, hcat, eachcol([1.0 4.0; 2.0 5.0]))
+
+    # Test with single vector input
+    single_result = hcat_truncate([v1])
+    @test single_result == reshape(v1, :, 1)
+
+    # Test with empty input
+    @test_throws Exception hcat_truncate(Vector{Float64}[])
+
+    # Test with vectors of different lengths
+    v3 = [1.0, 2.0]
+    @test_throws AssertionError hcat_truncate([v1, v3])
+
+    # Test with truncation dimension larger than input
+    @test_throws AssertionError hcat_truncate([v1, v2], 4)
+
+    # Test with truncate_dimension set to 0
+    zero_truncate = hcat_truncate([v1, v2], 0)
+    @test zero_truncate == [1.0 4.0; 2.0 5.0; 3.0 6.0]
+
+    # Test with large vectors to ensure performance
+    large_v1 = rand(1000)
+    large_v2 = rand(1000)
+    @test size(hcat_truncate([large_v1, large_v2], 500)) == (500, 2)
+
+    # Test with different types (should convert to Float32)
+    v4 = [1, 2, 3]
+    result_type_conversion = hcat_truncate([v4])
+    @test eltype(result_type_conversion) == Float32
+
+    # Test with truncate=nothing (should behave the same as no truncation)
+    result_nothing = hcat_truncate([v1, v2], nothing)
+    @test result_nothing == [1.0 4.0; 2.0 5.0; 3.0 6.0]
+
+    # Test with truncate=-1 (should behave the same as no truncation)
+    result_negative = hcat_truncate([v1, v2], -1)
+    @test result_negative == [1.0 4.0; 2.0 5.0; 3.0 6.0]
 end
 
 ### Text-manipulation utilities
