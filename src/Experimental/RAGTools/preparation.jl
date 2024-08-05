@@ -52,7 +52,7 @@ struct NoProcessor <: AbstractProcessor end
 """
     BinaryBatchEmbedder <: AbstractEmbedder
 
-Same as `BatchEmbedder` but reduces the embeddings matrix to a binary form (eg, `BitMatrix`).
+Same as `BatchEmbedder` but reduces the embeddings matrix to a binary form (eg, `BitMatrix`). Defines a method for `get_embeddings`.
 
 Reference: [HuggingFace: Embedding Quantization](https://huggingface.co/blog/embedding-quantization#binary-quantization-in-vector-databases).
 """
@@ -61,7 +61,7 @@ struct BinaryBatchEmbedder <: AbstractEmbedder end
 """
     BitPackedBatchEmbedder <: AbstractEmbedder
 
-Same as `BatchEmbedder` but reduces the embeddings matrix to a binary form packed in UInt64 (eg, `BitMatrix.chunks`).
+Same as `BatchEmbedder` but reduces the embeddings matrix to a binary form packed in UInt64 (eg, `BitMatrix.chunks`). Defines a method for `get_embeddings`.
 
 See also utilities `pack_bits` and `unpack_bits` to move between packed/non-packed binary forms.
 
@@ -146,7 +146,7 @@ function _normalize end
     load_text(chunker::AbstractChunker, input;
         kwargs...)
 
-Load text from `input` using the provided `chunker`
+Load text from `input` using the provided `chunker`. Called by `get_chunks`.
 
 Available chunkers:
 - `FileChunker`: The function opens each file in `input` and reads its contents.

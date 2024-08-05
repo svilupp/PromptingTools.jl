@@ -10,14 +10,14 @@ struct NoRephraser <: AbstractRephraser end
 """
     SimpleRephraser <: AbstractRephraser
 
-Rephraser implemented using the provided AI Template (eg, `...`) and standard chat model.
+Rephraser implemented using the provided AI Template (eg, `...`) and standard chat model. A method for `rephrase`.
 """
 struct SimpleRephraser <: AbstractRephraser end
 
 """
     HyDERephraser <: AbstractRephraser
 
-Rephraser implemented using the provided AI Template (eg, `...`) and standard chat model.
+Rephraser implemented using the provided AI Template (eg, `...`) and standard chat model. A method for `rephrase`.
 
 It uses a prompt-based rephrasing method called HyDE (Hypothetical Document Embedding), where instead of looking for an embedding of the question, 
 we look for the documents most similar to a synthetic passage that _would be_ a good answer to our question.
@@ -29,14 +29,14 @@ struct HyDERephraser <: AbstractRephraser end
 """
     CosineSimilarity <: AbstractSimilarityFinder
 
-Finds the closest chunks to a query embedding by measuring the cosine similarity between the query and the chunks' embeddings.
+Finds the closest chunks to a query embedding by measuring the cosine similarity between the query and the chunks' embeddings. A method for `find_closest` (see the docstring for more details and usage example).
 """
 struct CosineSimilarity <: AbstractSimilarityFinder end
 
 """
     BinaryCosineSimilarity <: AbstractSimilarityFinder
 
-Finds the closest chunks to a query embedding by measuring the Hamming distance AND cosine similarity between the query and the chunks' embeddings in binary form.
+Finds the closest chunks to a query embedding by measuring the Hamming distance AND cosine similarity between the query and the chunks' embeddings in binary form. A method for `find_closest`.
 
 It follows the two-pass approach:
 - First pass: Hamming distance in binary form to get the `top_k * rescore_multiplier` (ie, more than top_k) candidates.
@@ -49,7 +49,7 @@ struct BinaryCosineSimilarity <: AbstractSimilarityFinder end
 """
     BitPackedCosineSimilarity <: AbstractSimilarityFinder
 
-Finds the closest chunks to a query embedding by measuring the Hamming distance AND cosine similarity between the query and the chunks' embeddings in binary form.
+Finds the closest chunks to a query embedding by measuring the Hamming distance AND cosine similarity between the query and the chunks' embeddings in binary form. A method for `find_closest`.
 
 The difference to `BinaryCosineSimilarity` is that the binary values are packed into UInt64, which is more efficient.
 
@@ -61,7 +61,7 @@ struct BitPackedCosineSimilarity <: AbstractSimilarityFinder end
 """
     BM25Similarity <: AbstractSimilarityFinder
 
-Finds the closest chunks to a query embedding by measuring the BM25 similarity between the query and the chunks' embeddings in binary form.
+Finds the closest chunks to a query embedding by measuring the BM25 similarity between the query and the chunks' embeddings in binary form. A method for `find_closest`.
 
 Reference: [Wikipedia: BM25](https://en.wikipedia.org/wiki/Okapi_BM25).
 Implementation follows: [The Next Generation of Lucene Relevance](https://opensourceconnections.com/blog/2015/10/16/bm25-the-next-generation-of-lucene-relevation/).
@@ -71,7 +71,7 @@ struct BM25Similarity <: AbstractSimilarityFinder end
 """
     MultiFinder <: AbstractSimilarityFinder 
 
-Composite finder for `MultiIndex` where we want to set multiple finders for each index.
+Composite finder for `MultiIndex` where we want to set multiple finders for each index. A method for `find_closest`.
 Positions correspond to `indexes(::MultiIndex)`.
 """
 struct MultiFinder <: AbstractSimilarityFinder
@@ -91,14 +91,14 @@ struct NoTagFilter <: AbstractTagFilter end
 """
     AnyTagFilter <: AbstractTagFilter
 
-Finds the chunks that have ANY OF the specified tag(s).
+Finds the chunks that have ANY OF the specified tag(s). A method for `find_tags`.
 """
 struct AnyTagFilter <: AbstractTagFilter end
 
 """
     AllTagFilter <: AbstractTagFilter
 
-Finds the chunks that have ALL OF the specified tag(s).
+Finds the chunks that have ALL OF the specified tag(s). A method for `find_tags`.
 """
 struct AllTagFilter <: AbstractTagFilter end
 
@@ -622,14 +622,14 @@ struct NoReranker <: AbstractReranker end
 """
     CohereReranker <: AbstractReranker
 
-Rerank strategy using the Cohere Rerank API. Requires an API key.
+Rerank strategy using the Cohere Rerank API. Requires an API key. A method for `rerank`.
 """
 struct CohereReranker <: AbstractReranker end
 
 """
     FlashRanker <: AbstractReranker
 
-Rerank strategy using the package FlashRank.jl and local models.
+Rerank strategy using the package FlashRank.jl and local models. A method for `rerank`.
 
 You must first import the FlashRank.jl package.
 To automatically download any required models, set your 
@@ -659,7 +659,7 @@ end
 """
     RankGPTReranker <: AbstractReranker
 
-Rerank strategy using the RankGPT algorithm (calling LLMs). 
+Rerank strategy using the RankGPT algorithm (calling LLMs). A method for `rerank`.
 
 # Reference
 [1] [Is ChatGPT Good at Search? Investigating Large Language Models as Re-Ranking Agents by W. Sun et al.](https://arxiv.org/abs/2304.09542)
@@ -869,7 +869,7 @@ end
 """
     SimpleRetriever <: AbstractRetriever
 
-Default implementation for `retrieve`. It does a simple similarity search via `CosineSimilarity` and returns the results.
+Default implementation for `retrieve` function. It does a simple similarity search via `CosineSimilarity` and returns the results.
 
 Make sure to use consistent `embedder` and `tagger` with the Preparation Stage (`build_index`)!
 
