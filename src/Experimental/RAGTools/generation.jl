@@ -150,14 +150,14 @@ struct NoRefiner <: AbstractRefiner end
 """
     SimpleRefiner <: AbstractRefiner
 
-Refines the answer using the same context previously provided via the provided prompt template.
+Refines the answer using the same context previously provided via the provided prompt template. A method for `refine!`.
 """
 struct SimpleRefiner <: AbstractRefiner end
 
 """
     TavilySearchRefiner <: AbstractRefiner
 
-Refines the answer by executing a web search using the Tavily API. This method aims to enhance the answer's accuracy and relevance by incorporating information retrieved from the web.
+Refines the answer by executing a web search using the Tavily API. This method aims to enhance the answer's accuracy and relevance by incorporating information retrieved from the web. A method for `refine!`.
 """
 struct TavilySearchRefiner <: AbstractRefiner end
 
@@ -172,7 +172,7 @@ end
         refiner::NoRefiner, index::AbstractChunkIndex, result::AbstractRAGResult;
         kwargs...)
     
-Simple no-op function for `refine`. It simply copies the `result.answer` and `result.conversations[:answer]` without any changes.
+Simple no-op function for `refine!`. It simply copies the `result.answer` and `result.conversations[:answer]` without any changes.
 """
 function refine!(
         refiner::NoRefiner, index::AbstractDocumentIndex, result::AbstractRAGResult;
@@ -511,7 +511,7 @@ end
 """
     RAGConfig <: AbstractRAGConfig
 
-Default configuration for RAG. It uses `SimpleIndexer`, `SimpleRetriever`, and `SimpleGenerator` as default components.
+Default configuration for RAG. It uses `SimpleIndexer`, `SimpleRetriever`, and `SimpleGenerator` as default components. Provided as the first argument in `airag`.
 
 To customize the components, replace corresponding fields for each step of the RAG pipeline (eg, use `subtypes(AbstractIndexBuilder)` to find the available options).
 """
