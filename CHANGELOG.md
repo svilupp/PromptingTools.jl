@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.46.0]
+
+### Added
+- Added a new model `gpt-4o-2024-08-06` to the model registry (alias `gpt4ol` with `l` for latest). It's the latest version of GPT4o, which is faster and cheaper than the previous version.
+
 ## [0.45.0]
 
 ### Breaking Change
