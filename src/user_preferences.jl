@@ -325,6 +325,7 @@ aliases = merge(
     Dict("gpt3" => "gpt-3.5-turbo",
         "gpt4" => "gpt-4",
         "gpt4o" => "gpt-4o",
+        "gpt4ol" => "gpt-4o-2024-08-06", #GPT4o latest
         "gpt4om" => "gpt-4o-mini",
         "gpt4v" => "gpt-4-vision-preview", # 4v is for "4 vision"
         "gpt4t" => "gpt-4-turbo", # 4t is for "4 turbo"
@@ -446,6 +447,11 @@ registry = Dict{String, ModelSpec}(
         5e-6,
         1.5e-5,
         "GPT-4 Omni, the latest GPT4 model that is faster and cheaper than GPT-4 Turbo is an updated version of GPT4 that is much faster and the cheaper to use."),
+    "gpt-4o-2024-08-06" => ModelSpec("gpt-4o-2024-08-06",
+        OpenAISchema(),
+        2.5e-6,
+        1.0e-5,
+        "GPT-4 Omni, the latest GPT4 model series that is faster and faster. This is the latest version from Aug-24, which is cheaper than May-24 version."),
     "gpt-4o" => ModelSpec("gpt-4o",
         OpenAISchema(),
         5e-6,
