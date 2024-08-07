@@ -414,10 +414,10 @@ function aiclassify(prompt; model = MODEL_CHAT, kwargs...)
     schema = get(MODEL_REGISTRY, model, (; schema = PROMPT_SCHEMA)).schema
     aiclassify(schema, prompt; model, kwargs...)
 end
-function aiextract(prompt; model = MODEL_CHAT, kwargs...)
+function aiextract(prompt; model = MODEL_CHAT, strict::Union{Nothing, Bool}=nothing, kwargs...)
     global MODEL_REGISTRY
     schema = get(MODEL_REGISTRY, model, (; schema = PROMPT_SCHEMA)).schema
-    aiextract(schema, prompt; model, kwargs...)
+    aiextract(schema, prompt; model, strict, kwargs...)
 end
 function aiscan(prompt; model = MODEL_CHAT, kwargs...)
     schema = get(MODEL_REGISTRY, model, (; schema = PROMPT_SCHEMA)).schema
