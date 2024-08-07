@@ -345,8 +345,8 @@ end
 function aiclassify(schema::AbstractPromptSchema, template::AITemplate; kwargs...)
     aiclassify(schema, render(schema, template); kwargs...)
 end
-function aiextract(schema::AbstractPromptSchema, template::AITemplate; kwargs...)
-    aiextract(schema, render(schema, template); kwargs...)
+function aiextract(schema::AbstractPromptSchema, template::AITemplate; strict::Union{Nothing, Bool}=nothing, kwargs...)
+    aiextract(schema, render(schema, template); strict=strict, kwargs...)
 end
 function aiscan(schema::AbstractPromptSchema, template::AITemplate; kwargs...)
     aiscan(schema, render(schema, template); kwargs...)
