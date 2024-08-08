@@ -52,6 +52,71 @@ end
     @test size(merged_mat) == (4, 3)
     @test combined_vocab == ["word1", "word2", "word3"]
     @test merged_mat ≈ [1.0 2.0 0.0; 3.0 4.0 0.0; 0.0 5.0 6.0; 0.0 7.0 8.0]
+
+    ### Test cases with sparse matrices
+    # Test case 1: Basic functionality with non-overlapping vocabularies
+    mat1 = sparse([1 0; 0 2])
+    vocab1 = ["word1", "word2"]
+    mat2 = sparse([3 0; 0 4])
+    vocab2 = ["word3", "word4"]
+
+    result_mat, result_vocab = RT.vcat_labeled_matrices(mat1, vocab1, mat2, vocab2)
+    @test result_mat isa SparseMatrixCSC
+    @test size(result_mat) == (4, 4)
+    @test result_vocab == ["word1", "word2", "word3", "word4"]
+    @test Array(result_mat) == [1 0 0 0; 0 2 0 0; 0 0 3 0; 0 0 0 4]
+
+    # Test case 2: Overlapping vocabularies
+    mat1 = sparse([1 2; 3 0])
+    vocab1 = ["word1", "word2"]
+    mat2 = sparse([0 4; 5 6])
+    vocab2 = ["word2", "word3"]
+
+    result_mat, result_vocab = RT.vcat_labeled_matrices(mat1, vocab1, mat2, vocab2)
+    @test result_mat isa SparseMatrixCSC
+    @test size(result_mat) == (4, 3)
+    @test result_vocab == ["word1", "word2", "word3"]
+    @test Array(result_mat) == [1 2 0; 3 0 0; 0 0 4; 0 5 6]
+
+    # Test case 3: Different data types
+    mat1 = sparse([1.0 0.0; 0.0 2.0])
+    vocab1 = ["word1", "word2"]
+    mat2 = sparse(Float32[3 0; 0 4])
+    vocab2 = ["word3", "word4"]
+
+    result_mat, result_vocab = RT.vcat_labeled_matrices(mat1, vocab1, mat2, vocab2)
+    @test result_mat isa SparseMatrixCSC{Float64}
+    @test size(result_mat) == (4, 4)
+    @test result_vocab == ["word1", "word2", "word3", "word4"]
+    @test Array(result_mat) ==
+          [1.0 0.0 0.0 0.0; 0.0 2.0 0.0 0.0; 0.0 0.0 3.0 0.0; 0.0 0.0 0.0 4.0]
+
+    # Test case 4: Empty matrices
+    mat1 = sparse(Int[], Int[], Int[], 0, 0)
+    vocab1 = String[]
+    mat2 = sparse(Int[], Int[], Int[], 0, 0)
+    vocab2 = String[]
+
+    result_mat, result_vocab = RT.vcat_labeled_matrices(mat1, vocab1, mat2, vocab2)
+
+    @test result_mat isa SparseMatrixCSC
+    @test size(result_mat) == (0, 0)
+    @test result_vocab == String[]
+
+    # Test case 5: Large sparse matrices
+    n = 1000
+    m = 500
+    mat1 = sprand(Float32, n, m, 0.01)
+    vocab1 = ["word$i" for i in 1:m]
+    mat2 = sprand(Float32, n, m, 0.01)
+    vocab2 = ["word$(i+m÷2)" for i in 1:m]
+
+    result_mat, result_vocab = RT.vcat_labeled_matrices(mat1, vocab1, mat2, vocab2)
+
+    @test result_mat isa SparseMatrixCSC
+    @test size(result_mat) == (2n, length(unique([vocab1; vocab2])))
+    @test length(result_vocab) == length(unique([vocab1; vocab2]))
+    @test nnz(result_mat)≈nnz(mat1) + nnz(mat2) atol=10  # Allow for some numerical imprecision
 end
 
 @testset "hcat_labeled_matrices" begin
@@ -755,4 +820,7 @@ end
     v = [-1.0, 0.0, 1.0]
     scaled_v = score_to_unit_scale(v)
     @test extrema(scaled_v) == (0.0, 1.0)
+
+    # Test with empty vector
+    @test score_to_unit_scale(Float32[]) |> isempty
 end

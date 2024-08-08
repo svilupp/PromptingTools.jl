@@ -46,6 +46,69 @@ function RT.build_tags(
     return tags_, tags_vocab_
 end
 
+function RT.vcat_labeled_matrices(mat1::AbstractSparseMatrix{T1},
+        vocab1::AbstractVector{<:AbstractString},
+        mat2::AbstractSparseMatrix{T2},
+        vocab2::AbstractVector{<:AbstractString}) where {T1 <: Number, T2 <: Number}
+    T = promote_type(T1, T2)
+    new_words = setdiff(vocab2, vocab1)
+    combined_vocab = [vocab1; new_words]
+    vocab2_indices = Dict(word => i for (i, word) in enumerate(vocab2))
+
+    ## more efficient composition
+    I, J, V = findnz(mat1)
+    aligned_mat1 = sparse(
+        I, J, convert(Vector{T}, V), size(mat1, 1), length(combined_vocab))
+
+    ## collect the mat2 more efficiently since it's sparse
+    I, J, V = Int[], Int[], T[]
+    nz_rows = rowvals(mat2)
+    nz_vals = nonzeros(mat2)
+    for (j, word) in enumerate(combined_vocab)
+        if haskey(vocab2_indices, word)
+            @inbounds @simd for k in nzrange(mat2, vocab2_indices[word])
+                i = nz_rows[k]
+                val = nz_vals[k]
+                if !iszero(val)
+                    push!(I, i)
+                    push!(J, j)
+                    push!(V, val)
+                end
+            end
+        end
+    end
+    aligned_mat2 = sparse(I, J, V, size(mat2, 1), length(combined_vocab))
+
+    return vcat(aligned_mat1, aligned_mat2), combined_vocab
+end
+
+function Base.hcat(d1::RT.DocumentTermMatrix{<:AbstractSparseMatrix},
+        d2::RT.DocumentTermMatrix{<:AbstractSparseMatrix})
+    tf_, vocab_ = RT.vcat_labeled_matrices(tf(d1), vocab(d1), tf(d2), vocab(d2))
+    vocab_lookup_ = Dict(t => i for (i, t) in enumerate(vocab_))
+
+    ## decompose tf for efficient ops
+    N, M = size(tf_)
+    I, J, V = findnz(tf_)
+    doc_freq = zeros(Int, M)
+    @inbounds for j in eachindex(J, V)
+        if V[j] > 0
+            doc_freq[J[j]] += 1
+        end
+    end
+    idf = @. log(1.0f0 + (N - doc_freq + 0.5f0) / (doc_freq + 0.5f0))
+    doc_lengths = zeros(Float32, N)
+    @inbounds for i in eachindex(I, V)
+        if V[i] > 0
+            doc_lengths[I[i]] += V[i]
+        end
+    end
+    sumdl = sum(doc_lengths)
+    doc_rel_length_ = sumdl == 0 ? zeros(Float32, N) :
+                      convert(Vector{Float32}, (doc_lengths ./ (sumdl / N)))
+    return RT.DocumentTermMatrix(tf_, vocab_, vocab_lookup_, idf, doc_rel_length_)
+end
+
 """
     document_term_matrix(documents::AbstractVector{<:AbstractVector{<:AbstractString}})
 
