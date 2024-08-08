@@ -10,6 +10,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.47.0]
+
+### Added
+- Added a new specialized method for `hcat(::DocumentTermMatrix, ::DocumentTermMatrix)` to allow for combining large DocumentTermMatrices (eg, 1M x 100K).
+
+### Updated
+- Increased the compat bound for HTTP.jl to 1.10.8 to fix a bug with Julia 1.11.
+
+### Fixed
+- Fixed a bug in `vcat_labeled_matrices` where extremely large DocumentTermMatrix could run out of memory.
+- Fixed a bug in `score_to_unit_scale` where empty score vectors would error (now returns the empty array back).
+
 ## [0.46.0]
 
 ### Added
