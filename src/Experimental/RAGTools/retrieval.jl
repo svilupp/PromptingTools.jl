@@ -610,6 +610,13 @@ function find_tags(method::NoTagFilter, index::AbstractMultiIndex,
     return nothing
 end
 
+function find_tags(method::NoTagFilter, index::AbstractPTPineconeIndex,
+        tags::Union{T, AbstractVector{<:T}}; kwargs...) where {T <:
+                                                               Union{
+        AbstractString, Regex, Nothing}}
+    return nothing
+end
+
 ### Reranking
 
 """
@@ -944,6 +951,21 @@ Compared to SimpleRetriever, it adds rephrasing the query and reranking the resu
 end
 
 """
+    PTPineconeRetriever <: AbstractRetriever
+
+Dispatch for `retrieve` for Pinecone.
+"""
+@kwdef mutable struct PTPineconeRetriever <: AbstractRetriever
+    rephraser::AbstractRephraser = NoRephraser()
+    embedder::AbstractEmbedder = NoEmbedder()
+    processor::AbstractProcessor = NoProcessor()
+    finder::AbstractSimilarityFinder = CosineSimilarity()
+    tagger::AbstractTagger = NoTagger()
+    filter::AbstractTagFilter = NoTagFilter()
+    reranker::AbstractReranker = NoReranker()
+end
+
+"""
     retrieve(retriever::AbstractRetriever,
         index::AbstractChunkIndex,
         question::AbstractString;
@@ -1153,6 +1175,58 @@ function retrieve(retriever::AbstractRetriever,
         tag_candidates,
         filtered_candidates,
         reranked_candidates)
+
+    return result
+end
+
+function retrieve(retriever::PTPineconeRetriever,
+        index::AbstractPTPineconeIndex,
+        question::AbstractString;
+        verbose::Integer = 1,
+        top_k::Integer = 100,
+        top_n::Integer = 10,
+        api_kwargs::NamedTuple = NamedTuple(),
+        rephraser::AbstractRephraser = retriever.rephraser,
+        rephraser_kwargs::NamedTuple = NamedTuple(),
+        embedder::AbstractEmbedder = retriever.embedder,
+        embedder_kwargs::NamedTuple = NamedTuple(),
+        processor::AbstractProcessor = retriever.processor,
+        processor_kwargs::NamedTuple = NamedTuple(),
+        finder::AbstractSimilarityFinder = retriever.finder,
+        finder_kwargs::NamedTuple = NamedTuple(),
+        tagger::AbstractTagger = retriever.tagger,
+        tagger_kwargs::NamedTuple = NamedTuple(),
+        filter::AbstractTagFilter = retriever.filter,
+        filter_kwargs::NamedTuple = NamedTuple(),
+        reranker::AbstractReranker = retriever.reranker,
+        reranker_kwargs::NamedTuple = NamedTuple(),
+        cost_tracker = Threads.Atomic{Float64}(0.0),
+        kwargs...)
+    ## Rephrase into one or more questions
+    rephraser_kwargs_ = isempty(api_kwargs) ? rephraser_kwargs :
+                        merge(rephraser_kwargs, (; api_kwargs))
+    rephrased_questions = rephrase(
+        rephraser, question; verbose = (verbose > 1), cost_tracker, rephraser_kwargs_...)
+
+    ## Embed the question
+    index.embedding = Vector{Float64}(aiembed(index.schema, question).content)
+    embeddings = hcat([Vector{Float64}(aiembed(index.schema, x).content) for x in rephrased_questions]...)
+
+    ## Get the context from Pinecone
+    pinecone_results = Pinecone.query(index.pinecone_context, index.pinecone_index, index.embedding, top_n, index.namespace, false, true)
+    pinecone_results_json = JSON3.read(pinecone_results)
+    context = map(x -> x.metadata.content, pinecone_results_json.matches)
+
+    verbose > 0 &&
+        @info "Retrieval done. Total cost: \$$(round(cost_tracker[], digits=2))."
+
+    ## Return
+    result = RAGResult(;
+        question,
+        answer = nothing,
+        rephrased_questions,
+        final_answer = nothing,
+        context)
 
     return result
 end

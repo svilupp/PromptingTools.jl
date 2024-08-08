@@ -134,6 +134,24 @@ chunkdata(index::ChunkEmbeddingsIndex) = embeddings(index)
 
 # For backward compatibility
 const ChunkIndex = ChunkEmbeddingsIndex
+
+using Pinecone: Pinecone, PineconeContextv3, PineconeIndexv3
+"""
+    PTPineconeIndex
+
+Struct for storing index for working with Pinecone.
+"""
+@kwdef mutable struct PTPineconeIndex <: AbstractPTPineconeIndex
+    id::Symbol = gensym("PTPineconeIndex")
+    pinecone_context::Pinecone.PineconeContextv3
+    pinecone_index::Pinecone.PineconeIndexv3
+    namespace::AbstractString
+    schema::PromptingTools.AbstractPromptSchema
+    embedding::Vector{Float64} = Float64[]
+end
+HasKeywords(::PTPineconeIndex) = false
+HasEmbeddings(::PTPineconeIndex) = false
+
 abstract type AbstractDocumentTermMatrix end
 
 """
