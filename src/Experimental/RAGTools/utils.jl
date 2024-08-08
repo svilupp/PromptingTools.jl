@@ -761,6 +761,8 @@ scaled_x = score_to_unit_scale(x)
 ```
 """
 function score_to_unit_scale(x::AbstractVector{T}) where {T <: Real}
+    isempty(x) && return x
+    ##
     ex = extrema(x)
     if ex[2] - ex[1] < eps(T)
         ones(T, length(x))
