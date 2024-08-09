@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.48.0]
+
+### Added
+- Implements the new OpenAI structured output mode for `aiextract` (just provide kwarg `strict=true`). Reference [blog post](https://openai.com/index/introducing-structured-outputs-in-the-api/).
+
 ## [0.47.0]
 
 ### Added
