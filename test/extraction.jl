@@ -1,6 +1,6 @@
 using PromptingTools: MaybeExtract, extract_docstring, ItemsExtract
 using PromptingTools: has_null_type, is_required_field, remove_null_types, to_json_schema
-using PromptingTools: function_call_signature
+using PromptingTools: function_call_signature, set_properties_strict!
 
 # TODO: check more edge cases like empty structs
 
@@ -216,6 +216,100 @@ end
     @test schema_measurement["description"] ==
           "Represents person's age, height, and weight\n"
 end
+@testset "set_properties_strict!" begin
+    # Test 1: Basic functionality
+    params = Dict(
+        "properties" => Dict{String, Any}(
+            "name" => Dict{String, Any}("type" => "string"),
+            "age" => Dict{String, Any}("type" => "integer")
+        ),
+        "required" => ["name"]
+    )
+    set_properties_strict!(params)
+    @test params["additionalProperties"] == false
+    @test Set(params["required"]) == Set(["name", "age"])
+    @test params["properties"]["age"]["type"] == ["integer", "null"]
+
+    # Test 2: Nested properties
+    params = Dict{String, Any}(
+        "properties" => Dict{String, Any}(
+        "person" => Dict{String, Any}(
+        "type" => "object",
+        "properties" => Dict{String, Any}(
+            "name" => Dict{String, Any}("type" => "string"),
+            "age" => Dict{String, Any}("type" => "integer")
+        )
+    )
+    )
+    )
+    set_properties_strict!(params)
+    @test params["properties"]["person"]["additionalProperties"] == false
+    @test Set(params["properties"]["person"]["required"]) ==
+          Set(["name", "age"])
+
+    # Test 3: Array of objects
+    params = Dict{String, Any}(
+        "properties" => Dict{String, Any}(
+        "people" => Dict{String, Any}(
+        "type" => "array",
+        "items" => Dict{String, Any}(
+            "type" => "object",
+            "properties" => Dict{String, Any}(
+                "name" => Dict{String, Any}("type" => "string"),
+                "age" => Dict{String, Any}("type" => "integer")
+            )
+        )
+    )
+    )
+    )
+    set_properties_strict!(params)
+    @test params["properties"]["people"]["items"]["additionalProperties"] == false
+    @test Set(params["properties"]["people"]["items"]["required"]) == Set(["name", "age"])
+
+    # Test 4: Multiple levels of nesting
+    params = Dict{String, Any}(
+        "properties" => Dict{String, Any}(
+        "company" => Dict{String, Any}(
+        "type" => "object",
+        "properties" => Dict{String, Any}(
+            "name" => Dict{String, Any}("type" => "string"),
+            "employees" => Dict{String, Any}(
+                "type" => "array",
+                "items" => Dict{String, Any}(
+                    "type" => "object",
+                    "properties" => Dict{String, Any}(
+                        "name" => Dict{String, Any}("type" => "string"),
+                        "position" => Dict{String, Any}("type" => "string")
+                    )
+                )
+            )
+        )
+    )
+    )
+    )
+    set_properties_strict!(params)
+    @test params["properties"]["company"]["additionalProperties"] == false
+    @test params["properties"]["company"]["properties"]["employees"]["items"]["additionalProperties"] ==
+          false
+    @test Set(params["properties"]["company"]["properties"]["employees"]["items"]["required"]) ==
+          Set(["name", "position"])
+
+    # Test 5: Handling of existing required fields
+    params = Dict{String, Any}(
+        "properties" => Dict{String, Any}(
+            "name" => Dict{String, Any}("type" => "string"),
+            "age" => Dict{String, Any}("type" => "integer"),
+            "email" => Dict{String, Any}("type" => "string")
+        ),
+        "required" => ["name", "email"]
+    )
+    set_properties_strict!(params)
+    @test Set(params["required"]) == Set(["name", "email", "age"])
+    @test params["properties"]["age"]["type"] == ["integer", "null"]
+    @test !haskey(params["properties"]["name"], "null")
+    @test !haskey(params["properties"]["email"], "null")
+end
+
 @testset "function_call_signature" begin
     "Some docstring"
     struct MyMeasurement2
@@ -241,4 +335,49 @@ end
     ## MaybeWraper name cleanup
     schema = function_call_signature(MaybeExtract{MyMeasurement2})
     @test schema["name"] == "MaybeExtractMyMeasurement2_extractor"
+
+    ## Test with strict = true
+
+    "Person's age, height, and weight."
+    struct MyMeasurement3
+        age::Int
+        height::Union{Int, Nothing}
+        weight::Union{Nothing, Float64}
+    end
+
+    # Test with strict = nothing (default behavior)
+    output_default = function_call_signature(MyMeasurement3)
+    @test !haskey(output_default, "strict")
+    @test output_default["name"] == "MyMeasurement3_extractor"
+    @test output_default["parameters"]["type"] == "object"
+    @test output_default["parameters"]["required"] == ["age"]
+    @test !haskey(output_default["parameters"], "additionalProperties")
+
+    # Test with strict =false
+    output_not_strict = function_call_signature(MyMeasurement3; strict = false)
+    @test haskey(output_not_strict, "strict")
+    @test output_not_strict["strict"] == false
+    @test output_not_strict["name"] == "MyMeasurement3_extractor"
+    @test output_not_strict["parameters"]["type"] == "object"
+    @test output_not_strict["parameters"]["required"] == ["age"]
+    @test !haskey(output_default["parameters"], "additionalProperties")
+
+    # Test with strict = true
+    output_strict = function_call_signature(MyMeasurement3; strict = true)
+    @test output_strict["strict"] == true
+    @test output_strict["name"] == "MyMeasurement3_extractor"
+    @test output_strict["parameters"]["type"] == "object"
+    @test Set(output_strict["parameters"]["required"]) == Set(["age", "height", "weight"])
+    @test output_strict["parameters"]["additionalProperties"] == false
+    @test output_strict["parameters"]["properties"]["height"]["type"] == ["integer", "null"]
+    @test output_strict["parameters"]["properties"]["weight"]["type"] == ["number", "null"]
+    @test output_strict["parameters"]["properties"]["age"]["type"] == "integer"
+
+    # Test with MaybeExtract wrapper
+    output_maybe = function_call_signature(MaybeExtract{MyMeasurement3}; strict = true)
+    @test output_maybe["name"] == "MaybeExtractMyMeasurement3_extractor"
+    @test output_maybe["parameters"]["properties"]["result"]["type"] == ["object", "null"]
+    @test output_maybe["parameters"]["properties"]["error"]["type"] == "boolean"
+    @test output_maybe["parameters"]["properties"]["message"]["type"] == ["string", "null"]
+    @test Set(output_maybe["parameters"]["required"]) == Set(["result", "error", "message"])
 end

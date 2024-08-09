@@ -969,6 +969,7 @@ end
             retries = 5,
             readtimeout = 120), api_kwargs::NamedTuple = (;
             tool_choice = "exact"),
+        strict::Union{Nothing, Bool} = nothing,
         kwargs...)
 
 Extract required information (defined by a struct **`return_type`**) from the provided prompt by leveraging OpenAI function calling mode.
@@ -994,6 +995,7 @@ It's effectively a light wrapper around `aigenerate` call, which requires additi
   - `tool_choice`: A string representing the tool choice to use for the API call. Usually, one of "auto","any","exact". 
     Defaults to `"exact"`, which is a made-up value to enforce the OpenAI requirements if we want one exact function.
     Providers like Mistral, Together, etc. use `"any"` instead.
+- `strict::Union{Nothing, Bool} = nothing`: A boolean indicating whether to enforce strict generation of the response (supported only for OpenAI models). It has additional latency for the first request. If `nothing`, standard function calling is used.
 - `kwargs`: Prompt variables to be used to fill the prompt/template
 
 # Returns
@@ -1100,11 +1102,13 @@ function aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_T
             retries = 5,
             readtimeout = 120), api_kwargs::NamedTuple = (;
             tool_choice = "exact"),
+        strict::Union{Nothing, Bool} = nothing,
         kwargs...)
     ##
     global MODEL_ALIASES
     ## Function calling specifics
-    tools = [Dict(:type => "function", :function => function_call_signature(return_type))]
+    tools = [Dict(
+        :type => "function", :function => function_call_signature(return_type; strict))]
     ## force our function to be used
     tool_choice_ = get(api_kwargs, :tool_choice, "exact")
     tool_choice = if tool_choice_ == "exact"
