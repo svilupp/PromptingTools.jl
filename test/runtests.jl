@@ -47,6 +47,30 @@ let cb = AICode(; code = """
     @test isnothing(cb.output) # because it failed
 end
 
+@testset "aiextract with strict parameter" begin
+    # Test with strict=true
+    result_strict_true = aiextract("Extract the name and age: John is 30 years old",
+                                   Dict("name" => String, "age" => Int);
+                                   strict=true)
+    @test result_strict_true == Dict("name" => "John", "age" => 30)
+
+    # Test with strict=false
+    result_strict_false = aiextract("Extract the name and age: John is 30 years old",
+                                    Dict("name" => String, "age" => Int);
+                                    strict=false)
+    @test haskey(result_strict_false, "strict")
+    @test result_strict_false["strict"] == false
+    @test result_strict_false["name"] == "John"
+    @test result_strict_false["age"] == 30
+
+    # Test with strict=nothing (default behavior)
+    result_strict_nothing = aiextract("Extract the name and age: John is 30 years old",
+                                      Dict("name" => String, "age" => Int))
+    @test !haskey(result_strict_nothing, "strict")
+    @test result_strict_nothing["name"] == "John"
+    @test result_strict_nothing["age"] == 30
+end
+
 ## Run experimental
 @testset "Experimental" begin
     include("Experimental/RAGTools/runtests.jl")
