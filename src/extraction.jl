@@ -75,18 +75,18 @@ function to_json_schema(orig_type; max_description_length::Int = 100)
     return schema
 end
 function to_json_schema(type::Type{<:AbstractString}; max_description_length::Int = 100)
-    Dict("type" => to_json_type(type))
+    Dict{String, Any}("type" => to_json_type(type))
 end
 function to_json_schema(type::Type{T};
         max_description_length::Int = 100) where {T <:
                                                   Union{AbstractSet, Tuple, AbstractArray}}
     element_type = eltype(type)
-    return Dict("type" => "array",
+    return Dict{String, Any}("type" => "array",
         "items" => to_json_schema(remove_null_types(element_type)))
 end
 function to_json_schema(type::Type{<:Enum}; max_description_length::Int = 100)
     enum_options = Base.Enums.namemap(type) |> values .|> string
-    return Dict("type" => "string",
+    return Dict{String, Any}("type" => "string",
         "enum" => enum_options)
 end
 function to_json_schema(type::Type{<:AbstractDict}; max_description_length::Int = 100)
@@ -94,7 +94,9 @@ function to_json_schema(type::Type{<:AbstractDict}; max_description_length::Int 
 end
 
 """
-    function_call_signature(datastructtype::Struct; max_description_length::Int = 100)
+    function_call_signature(
+        datastructtype::Type; strict::Union{Nothing, Bool} = nothing,
+        max_description_length::Int = 100)
 
 Extract the argument names, types and docstrings from a struct to create the function call signature in JSON schema.
 
@@ -123,7 +125,8 @@ signature = function_call_signature(MyMeasurement)
 # Dict{String, Any} with 3 entries:
 #   "name"        => "MyMeasurement_extractor"
 #   "parameters"  => Dict{String, Any}("properties"=>Dict{String, Any}("height"=>Dict{String, Any}("type"=>"integer"), "weight"=>Dic…
-#   "description" => "Represents person's age, height, and weight\n"
+#   "description" => "Represents person's age, height, and weight
+"
 ```
 
 You can see that only the field `age` does not allow null values, hence, it's "required".
@@ -161,7 +164,9 @@ msg = aiextract("Extract measurements from the text: I am giraffe", type)
 ```
 That way, you can handle the error gracefully and get a reason why extraction failed.
 """
-function function_call_signature(datastructtype::Type; max_description_length::Int = 100)
+function function_call_signature(
+        datastructtype::Type; strict::Union{Nothing, Bool} = nothing,
+        max_description_length::Int = 100)
     !isstructtype(datastructtype) &&
         error("Only Structs are supported (provided type: $datastructtype")
     ## Standardize the name
@@ -177,7 +182,54 @@ function function_call_signature(datastructtype::Type; max_description_length::I
        schema["parameters"]["description"] == docs
         delete!(schema["parameters"], "description")
     end
+    ## strict mode // see https://platform.openai.com/docs/guides/structured-outputs/supported-schemas
+    if strict == false
+        schema["strict"] = false
+    elseif strict == true
+        schema["strict"] = true
+        if haskey(schema["parameters"], "properties")
+            set_properties_strict!(schema["parameters"])
+        end
+    end
     return schema
+end
+
+"""
+    set_properties_strict!(properties::AbstractDict)
+
+Sets strict mode for the properties of a JSON schema.
+
+Changes:
+- Sets `additionalProperties` to `false`.
+- All keys must be included in `required`.
+- All optional keys will have `null` added to their type.
+
+Reference: https://platform.openai.com/docs/guides/structured-outputs/supported-schemas
+"""
+function set_properties_strict!(parameters::AbstractDict)
+    parameters["additionalProperties"] = false
+    required_fields = get(parameters, "required", String[])
+    optional_fields = String[]
+
+    for (key, value) in parameters["properties"]
+        if key ∉ required_fields
+            push!(optional_fields, key)
+            if haskey(value, "type")
+                value["type"] = [value["type"], "null"]
+            end
+        end
+
+        # Recursively apply to nested properties
+        if haskey(value, "properties")
+            set_properties_strict!(value)
+        elseif haskey(value, "items") && haskey(value["items"], "properties")
+            ## if it's an array, we need to skip inside "items"
+            set_properties_strict!(value["items"])
+        end
+    end
+
+    parameters["required"] = vcat(required_fields, optional_fields)
+    return parameters
 end
 
 ######################
