@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.49.0]
+
+### Added
+- Added new OpenAI's model "chatgpt-4o-latest" to the model registry with alias "chatgpt". This model represents the latest version of ChatGPT-4o tuned specifically for ChatGPT.
+
 ## [0.48.0]
 
 ### Added
