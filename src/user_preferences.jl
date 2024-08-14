@@ -330,6 +330,7 @@ aliases = merge(
         "gpt4v" => "gpt-4-vision-preview", # 4v is for "4 vision"
         "gpt4t" => "gpt-4-turbo", # 4t is for "4 turbo"
         "gpt3t" => "gpt-3.5-turbo-0125", # 3t is for "3 turbo"
+        "chatgpt" => "chatgpt-4o-latest",
         "ada" => "text-embedding-ada-002",
         "emb3small" => "text-embedding-3-small",
         "emb3large" => "text-embedding-3-large",
@@ -467,6 +468,11 @@ registry = Dict{String, ModelSpec}(
         1.5e-7,
         6e-7,
         "GPT-4 Omni Mini, the smallest and fastest model based on GPT4 (and cheaper than GPT3.5Turbo). Context of 128K, knowledge until October 2023. Currently points to version gpt-4o-2024-07-18."),
+    "chatgpt-4o-latest" => ModelSpec("chatgpt-4o-latest",
+        OpenAISchema(),
+        5e-6,
+        1.5e-5,
+        "ChatGPT-4o-latest is the latest version of ChatGPT-4o tuned for ChatGPT. It is the NOT same as gpt-4o-latest."),
     "gpt-4-vision-preview" => ModelSpec(
         "gpt-4-vision-preview",
         OpenAISchema(),
