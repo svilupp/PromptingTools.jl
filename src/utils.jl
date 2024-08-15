@@ -468,7 +468,12 @@ function _report_stats(msg,
         model::String)
     cost = call_cost(msg, model)
     cost_str = iszero(cost) ? "" : " @ Cost: \$$(round(cost; digits=4))"
-    return "Tokens: $(sum(msg.tokens))$(cost_str) in $(round(msg.elapsed;digits=1)) seconds"
+    metadata_str = if !isnothing(msg.meta) && !isempty(msg.meta)
+        " (Metadata: $(join([string(k, " => ", v) for (k, v) in msg.meta if v isa Number && !iszero(v)], ", ")))"
+    else
+        ""
+    end
+    return "Tokens: $(sum(msg.tokens))$(cost_str) in $(round(msg.elapsed;digits=1)) seconds$(metadata_str)"
 end
 ## dispatch for array -> take last message
 function _report_stats(msg::AbstractVector,
