@@ -89,6 +89,7 @@ Base.@kwdef struct AIMessage{T <: Union{AbstractString, Nothing}} <: AbstractCha
     elapsed::Float64 = -1.0
     cost::Union{Nothing, Float64} = nothing
     log_prob::Union{Nothing, Float64} = nothing
+    meta::Union{Nothing, Dict{Symbol, Any}} = nothing
     finish_reason::Union{Nothing, String} = nothing
     run_id::Union{Nothing, Int} = Int(rand(Int16))
     sample_id::Union{Nothing, Int} = nothing

@@ -9,6 +9,7 @@
         messages::Vector{<:AbstractMessage};
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         tools::Vector{<:Dict{String, <:Any}} = Dict{String, Any}[],
+        cache::Union{Nothing, Symbol} = nothing,
         kwargs...)
 
 Builds a history of the conversation to provide the prompt to the API. All unspecified kwargs are passed as replacements such that `{{key}}=>value` in the template.
@@ -16,14 +17,17 @@ Builds a history of the conversation to provide the prompt to the API. All unspe
 # Keyword Arguments
 - `conversation`: Past conversation to be included in the beginning of the prompt (for continued conversations).
 - `tools`: A list of tools to be used in the conversation. Added to the end of the system prompt to enforce its use.
+- `cache`: A symbol representing the caching strategy to be used. Currently only `:last` is supported.
 """
 function render(schema::AbstractAnthropicSchema,
         messages::Vector{<:AbstractMessage};
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         tools::Vector{<:Dict{String, <:Any}} = Dict{String, Any}[],
+        cache::Union{Nothing, Symbol} = nothing,
         kwargs...)
     ## 
     @assert count(issystemmessage, messages)<=1 "AbstractAnthropicSchema only supports at most 1 System message"
+    @assert (isnothing(cache)||cache in [:system, :tools, :last]) "Currently only `:system`, `:tools`, `:last` are supported for Anthropic Prompt Caching"
 
     system = nothing
 
@@ -58,25 +62,48 @@ function render(schema::AbstractAnthropicSchema,
         end
     end
 
+    ## Apply cache for last message
+    if cache == :last
+        conversation[end]["cache_control"] = Dict("type" => "ephemeral")
+    elseif cache == :system && !isnothing(system)
+        ## Apply cache for system message
+        system = Dict("type" => "text", "text" => system,
+            "cache_control" => Dict("type" => "ephemeral"))
+    end
+
     ## Sense check
     @assert !isempty(conversation) "AbstractAnthropicSchema requires at least 1 User message, ie, no `prompt` provided!"
 
     return (; system, conversation)
 end
 
+function anthropic_extra_headers(; has_tools = false, has_cache = false)
+    extra_headers = ["anthropic-version" => "2023-06-01"]
+    if has_tools
+        push!(extra_headers, "anthropic-beta" => "tools-2024-04-04")
+    end
+    if has_cache
+        push!(extra_headers, "anthropic-beta" => "prompt-caching-2024-07-31")
+    end
+    return extra_headers
+end
+
 ## Model-calling
 """
-    anthropic_api(prompt_schema::AbstractAnthropicSchema,
-        messages::Vector{<:AbstractMessage} = AbstractMessage[];
-        prompt::Union{AbstractString, Nothing} = nothing;
-        system::Union{Nothing, AbstractString} = nothing,
-        endpoint::String = "generate",
-        model::String = "llama2", http_kwargs::NamedTuple = NamedTuple(),
+    anthropic_api(
+        prompt_schema::AbstractAnthropicSchema,
+        messages::Vector{<:AbstractDict{String, <:Any}} = Vector{Dict{String, Any}}();
+        api_key::AbstractString = ANTHROPIC_API_KEY,
+        system::Union{Nothing, AbstractString, AbstractDict} = nothing,
+        endpoint::String = "messages",
+        max_tokens::Int = 2048,
+        model::String = "claude-3-haiku-20240307", http_kwargs::NamedTuple = NamedTuple(),
         stream::Bool = false,
-        url::String = "localhost", port::Int = 11434,
+        url::String = "https://api.anthropic.com/v1",
+        cache::Union{Nothing, Symbol} = nothing,
         kwargs...)
 
-Simple wrapper for a call to Ollama API.
+Simple wrapper for a call to Anthropic API.
 
 # Keyword Arguments
 - `prompt_schema`: Defines which prompt template should be applied.
@@ -94,26 +121,37 @@ function anthropic_api(
         prompt_schema::AbstractAnthropicSchema,
         messages::Vector{<:AbstractDict{String, <:Any}} = Vector{Dict{String, Any}}();
         api_key::AbstractString = ANTHROPIC_API_KEY,
-        system::Union{Nothing, AbstractString} = nothing,
+        system::Union{Nothing, AbstractString, AbstractDict} = nothing,
         endpoint::String = "messages",
         max_tokens::Int = 2048,
         model::String = "claude-3-haiku-20240307", http_kwargs::NamedTuple = NamedTuple(),
         stream::Bool = false,
         url::String = "https://api.anthropic.com/v1",
+        cache::Union{Nothing, Symbol} = nothing,
         kwargs...)
     @assert endpoint in ["messages"] "Only 'messages' endpoint is supported."
     ## 
+    ## update tools to use caching
+    if cache == :tools
+        ## Add cache control, we only ever provide 1 tool with our API
+        tools = kwargs[:tools]
+        if length(tools) > 0
+            tools[end]["cache_control"] = Dict("type" => "ephemeral")
+        end
+    end
+    ##
     body = Dict("model" => model, "max_tokens" => max_tokens,
         "stream" => stream, "messages" => messages, kwargs...)
     ## provide system message
     if !isnothing(system)
         body["system"] = system
     end
-    ## 
+    ## Build the headers
+    extra_headers = anthropic_extra_headers(;
+        has_tools = haskey(kwargs, :tools), has_cache = !isnothing(cache))
     headers = auth_header(
         api_key; bearer = false, x_api_key = true,
-        extra_headers = ["anthropic-version" => "2023-06-01",
-            "anthropic-beta" => "tools-2024-04-04"])
+        extra_headers)
     api_url = string(url, "/", endpoint)
     resp = HTTP.post(api_url, headers, JSON3.write(body); http_kwargs...)
     body = JSON3.read(resp.body)
@@ -125,6 +163,7 @@ function anthropic_api(prompt_schema::TestEchoAnthropicSchema,
         api_key::AbstractString = ANTHROPIC_API_KEY,
         system::Union{Nothing, AbstractString} = nothing,
         endpoint::String = "messages",
+        cache::Union{Nothing, Symbol} = nothing,
         model::String = "claude-3-haiku-20240307", kwargs...)
     prompt_schema.model_id = model
     prompt_schema.inputs = (; system, messages)
@@ -138,6 +177,7 @@ end
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         http_kwargs::NamedTuple = NamedTuple(), api_kwargs::NamedTuple = NamedTuple(),
+        cache::Union{Nothing, Symbol} = nothing,
         kwargs...)
 
 Generate an AI response based on a given prompt using the Anthropic API.
@@ -154,6 +194,7 @@ Generate an AI response based on a given prompt using the Anthropic API.
 - `http_kwargs::NamedTuple`: Additional keyword arguments for the HTTP request. Defaults to empty `NamedTuple`.
 - `api_kwargs::NamedTuple`: Additional keyword arguments for the Ollama API. Defaults to an empty `NamedTuple`.
     - `max_tokens::Int`: The maximum number of tokens to generate. Defaults to 2048, because it's a required parameter for the API.
+- `cache::Union{Nothing, Symbol}`: A symbol representing the caching strategy to be used. Currently only `:last` is supported.
 - `kwargs`: Prompt variables to be used to fill the prompt/template
 
 # Returns
@@ -218,26 +259,36 @@ function aigenerate(
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         http_kwargs::NamedTuple = NamedTuple(), api_kwargs::NamedTuple = NamedTuple(),
+        cache::Union{Nothing, Symbol} = nothing,
         kwargs...)
     ##
     global MODEL_ALIASES
+    @assert (isnothing(cache)||cache in [:system, :tools, :last]) "Currently only `:system`, `:tools`, `:last` are supported for Anthropic Prompt Caching"
     ## Find the unique ID for the model alias provided
     model_id = get(MODEL_ALIASES, model, model)
-    conv_rendered = render(prompt_schema, prompt; conversation, kwargs...)
+    conv_rendered = render(prompt_schema, prompt; conversation, cache, kwargs...)
 
     if !dry_run
         time = @elapsed resp = anthropic_api(
             prompt_schema, conv_rendered.conversation; api_key,
-            conv_rendered.system, endpoint = "messages", model = model_id, http_kwargs,
+            conv_rendered.system, endpoint = "messages", model = model_id, http_kwargs, cache,
             api_kwargs...)
         tokens_prompt = get(resp.response[:usage], :input_tokens, 0)
         tokens_completion = get(resp.response[:usage], :output_tokens, 0)
         content = mapreduce(x -> get(x, :text, ""), *, resp.response[:content]) |> strip
+        ## Build metadata
+        meta = Dict{Symbol, Any}()
+        haskey(resp.response, :cache_creation_input_tokens) &&
+            (meta[:cache_creation_input_tokens] = resp.response[:cache_creation_input_tokens])
+        haskey(resp.response, :cache_read_input_tokens) &&
+            (meta[:cache_read_input_tokens] = resp.response[:cache_read_input_tokens])
+        ## Build the message
         msg = AIMessage(; content,
             status = Int(resp.status),
             cost = call_cost(tokens_prompt, tokens_completion, model_id),
             finish_reason = get(resp.response, :stop_reason, nothing),
             tokens = (tokens_prompt, tokens_completion),
+            meta,
             elapsed = time)
         ## Reporting
         verbose && @info _report_stats(msg, model_id)
@@ -396,6 +447,7 @@ function aiextract(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMP
         kwargs...)
     ##
     global MODEL_ALIASES
+    # TODO: implement cache for aiextract
 
     ## Find the unique ID for the model alias provided
     model_id = get(MODEL_ALIASES, model, model)
