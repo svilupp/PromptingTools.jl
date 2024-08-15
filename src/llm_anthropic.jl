@@ -138,6 +138,7 @@ end
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         http_kwargs::NamedTuple = NamedTuple(), api_kwargs::NamedTuple = NamedTuple(),
+        cache::Union{Nothing, Symbol} = nothing,
         kwargs...)
 
 Generate an AI response based on a given prompt using the Anthropic API.
@@ -154,6 +155,7 @@ Generate an AI response based on a given prompt using the Anthropic API.
 - `http_kwargs::NamedTuple`: Additional keyword arguments for the HTTP request. Defaults to empty `NamedTuple`.
 - `api_kwargs::NamedTuple`: Additional keyword arguments for the Ollama API. Defaults to an empty `NamedTuple`.
     - `max_tokens::Int`: The maximum number of tokens to generate. Defaults to 2048, because it's a required parameter for the API.
+- `cache::Union{Nothing, Symbol}`: Caching option. Can be `nothing` (no caching), `:system`, `:tools`, or `:last`.
 - `kwargs`: Prompt variables to be used to fill the prompt/template
 
 # Returns
@@ -218,6 +220,7 @@ function aigenerate(
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         http_kwargs::NamedTuple = NamedTuple(), api_kwargs::NamedTuple = NamedTuple(),
+        cache::Union{Nothing, Symbol} = nothing,
         kwargs...)
     ##
     global MODEL_ALIASES
@@ -226,19 +229,49 @@ function aigenerate(
     conv_rendered = render(prompt_schema, prompt; conversation, kwargs...)
 
     if !dry_run
-        time = @elapsed resp = anthropic_api(
-            prompt_schema, conv_rendered.conversation; api_key,
-            conv_rendered.system, endpoint = "messages", model = model_id, http_kwargs,
-            api_kwargs...)
-        tokens_prompt = get(resp.response[:usage], :input_tokens, 0)
-        tokens_completion = get(resp.response[:usage], :output_tokens, 0)
-        content = mapreduce(x -> get(x, :text, ""), *, resp.response[:content]) |> strip
+        # Initialize cache performance tracking
+        cache_hit = false
+        cache_type = nothing
+
+        # Check cache based on the cache option
+        cached_response = nothing
+        if !isnothing(cache)
+            cache_key = _generate_cache_key(conv_rendered, model_id)
+            cached_response = _get_from_cache(cache_key, cache)
+            if !isnothing(cached_response)
+                cache_hit = true
+                cache_type = cache
+            end
+        end
+
+        if isnothing(cached_response)
+            time = @elapsed resp = anthropic_api(
+                prompt_schema, conv_rendered.conversation; api_key,
+                conv_rendered.system, endpoint = "messages", model = model_id, http_kwargs,
+                api_kwargs...)
+            tokens_prompt = get(resp.response[:usage], :input_tokens, 0)
+            tokens_completion = get(resp.response[:usage], :output_tokens, 0)
+            content = mapreduce(x -> get(x, :text, ""), *, resp.response[:content]) |> strip
+
+            # Cache the response if caching is enabled
+            if !isnothing(cache)
+                _add_to_cache(cache_key, content, cache)
+            end
+        else
+            time = 0.0
+            tokens_prompt = 0
+            tokens_completion = 0
+            content = cached_response
+        end
+
         msg = AIMessage(; content,
-            status = Int(resp.status),
-            cost = call_cost(tokens_prompt, tokens_completion, model_id),
-            finish_reason = get(resp.response, :stop_reason, nothing),
+            status = cache_hit ? 200 : Int(resp.status),
+            cost = cache_hit ? 0.0 : call_cost(tokens_prompt, tokens_completion, model_id),
+            finish_reason = cache_hit ? "cache_hit" : get(resp.response, :stop_reason, nothing),
             tokens = (tokens_prompt, tokens_completion),
-            elapsed = time)
+            elapsed = time,
+            meta = Dict{Symbol, Any}(:cache_hit => cache_hit, :cache_type => cache_type))
+
         ## Reporting
         verbose && @info _report_stats(msg, model_id)
     else
@@ -255,6 +288,41 @@ function aigenerate(
         kwargs...)
     return output
 end
+
+# Helper functions for caching
+function _generate_cache_key(conv_rendered, model_id)
+    # Generate a unique key based on the conversation and model
+    return hash((conv_rendered, model_id))
+end
+
+function _get_from_cache(cache_key, cache_type)
+    # Retrieve cached content based on cache type
+    if cache_type == :system
+        return get(SYSTEM_CACHE, cache_key, nothing)
+    elseif cache_type == :tools
+        return get(TOOLS_CACHE, cache_key, nothing)
+    elseif cache_type == :last
+        return get(LAST_CACHE, cache_key, nothing)
+    else
+        return nothing
+    end
+end
+
+function _add_to_cache(cache_key, content, cache_type)
+    # Add content to the appropriate cache
+    if cache_type == :system
+        SYSTEM_CACHE[cache_key] = content
+    elseif cache_type == :tools
+        TOOLS_CACHE[cache_key] = content
+    elseif cache_type == :last
+        LAST_CACHE[cache_key] = content
+    end
+end
+
+# Initialize global caches
+const SYSTEM_CACHE = Dict{UInt, Any}()
+const TOOLS_CACHE = Dict{UInt, Any}()
+const LAST_CACHE = Dict{UInt, Any}()
 
 """
     aiextract(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMPT_TYPE;
