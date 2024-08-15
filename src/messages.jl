@@ -81,7 +81,6 @@ Returned by `aigenerate`, `aiclassify`, and `aiscan` functions.
 - `finish_reason::Union{Nothing, String}`: The reason the response was finished.
 - `run_id::Union{Nothing, Int}`: The unique ID of the run.
 - `sample_id::Union{Nothing, Int}`: The unique ID of the sample (if multiple samples are generated, they will all have the same `run_id`).
-- `meta::Dict{Symbol, Any}`: Additional metadata, including cache performance statistics.
 """
 Base.@kwdef struct AIMessage{T <: Union{AbstractString, Nothing}} <: AbstractChatMessage
     content::T = nothing
@@ -93,7 +92,6 @@ Base.@kwdef struct AIMessage{T <: Union{AbstractString, Nothing}} <: AbstractCha
     finish_reason::Union{Nothing, String} = nothing
     run_id::Union{Nothing, Int} = Int(rand(Int16))
     sample_id::Union{Nothing, Int} = nothing
-    meta::Dict{Symbol, Any} = Dict{Symbol, Any}()
     _type::Symbol = :aimessage
 end
 
