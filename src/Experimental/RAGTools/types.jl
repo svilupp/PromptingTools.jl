@@ -3,6 +3,7 @@ using Base: parent
 
 ### Shared methods
 Base.parent(index::AbstractDocumentIndex) = index
+Base.parent(index::AbstractManagedIndex) = index
 indexid(index::AbstractDocumentIndex) = index.id
 chunkdata(index::AbstractChunkIndex) = index.chunkdata
 "Access chunkdata for a subset of chunks, `chunk_idx` is a vector of chunk indices in the index"
@@ -135,22 +136,18 @@ chunkdata(index::ChunkEmbeddingsIndex) = embeddings(index)
 # For backward compatibility
 const ChunkIndex = ChunkEmbeddingsIndex
 
-using Pinecone: Pinecone, PineconeContextv3, PineconeIndexv3
-"""
-    PTPineconeIndex
+abstract type AbstractManagedIndex end
+indexid(index::AbstractManagedIndex) = index.id
 
-Struct for storing index for working with Pinecone.
-"""
-@kwdef mutable struct PTPineconeIndex <: AbstractPTPineconeIndex
-    id::Symbol = gensym("PTPineconeIndex")
-    pinecone_context::Pinecone.PineconeContextv3
-    pinecone_index::Pinecone.PineconeIndexv3
-    namespace::AbstractString
-    schema::PromptingTools.AbstractPromptSchema
-    embedding::Vector{Float64} = Float64[]
+using Pinecone: Pinecone, PineconeContextv3, PineconeIndexv3
+@kwdef struct PineconeIndex <: AbstractManagedIndex
+    id::Symbol  # namespace
+    context::Pinecone.PineconeContextv3
+    index::Pinecone.PineconeIndexv3
+    namespace::String
 end
-HasKeywords(::PTPineconeIndex) = false
-HasEmbeddings(::PTPineconeIndex) = false
+HasKeywords(::PineconeIndex) = false
+HasEmbeddings(::PineconeIndex) = true
 
 abstract type AbstractDocumentTermMatrix end
 
@@ -578,6 +575,28 @@ function CandidateChunks(index::AbstractChunkIndex, positions::AbstractVector{<:
         indexid(index), convert(Vector{Int}, positions), convert(Vector{Float32}, scores))
 end
 
+@kwdef struct CandidateWithChunks{TP <: Integer, TD <: Real} <:
+              AbstractCandidateWithChunks
+    index_id::Symbol
+    positions::Vector{TP} = Int[]
+    scores::Vector{TD} = Float32[]
+    ## fields that we don't have in Index anymore -- so we get them "per question"
+    chunks::Vector{String} = String[]
+    metadata::AbstractVector = Dict{String, Any}[]
+    sources::Vector{String} = String[]
+end
+indexid(cc::CandidateWithChunks) = cc.index_id
+positions(cc::CandidateWithChunks) = cc.positions
+scores(cc::CandidateWithChunks) = cc.scores
+chunks(cc::CandidateWithChunks) = cc.chunks
+metadata(cc::CandidateWithChunks) = cc.metadata
+sources(cc::CandidateWithChunks) = cc.sources
+Base.length(cc::CandidateWithChunks) = length(cc.positions)
+function Base.first(cc::CandidateWithChunks, k::Integer)
+    sorted_idxs = sortperm(scores(cc), rev = true) |> x -> first(x, k)
+    CandidateWithChunks(indexid(cc), positions(cc)[sorted_idxs], scores(cc)[sorted_idxs], chunks(cc), metadata(cc), sources(cc))
+end
+
 """
     MultiCandidateChunks
 
@@ -827,6 +846,10 @@ end
 Base.@propagate_inbounds function Base.view(index::SubChunkIndex, cc::MultiCandidateChunks)
     SubChunkIndex(index, cc)
 end
+# TODO: proper `view` -- `SubManagedIndex`?
+Base.@propagate_inbounds function Base.view(index::AbstractManagedIndex, cc::CandidateWithChunks)
+    return cc
+end
 Base.@propagate_inbounds function SubChunkIndex(index::SubChunkIndex, cc::CandidateChunks)
     pos = indexid(index) == indexid(cc) ? positions(cc) : Int[]
     intersect_pos = intersect(pos, positions(index))
@@ -900,6 +923,45 @@ function Base.getindex(ci::AbstractChunkIndex,
         end
     end
 end
+function Base.getindex(pidx::AbstractManagedIndex,
+        candidate::CandidateWithChunks{TP, TD},
+        field::Symbol = :chunks; sorted::Bool = false) where {TP <: Integer, TD <: Real}
+    @assert field in [:chunks, :embeddings, :chunkdata, :sources, :scores] "Only `chunks`, `embeddings`, `chunkdata`, `sources`, `scores` fields are supported for now"
+    ## embeddings is a compatibility alias, use chunkdata
+    field = field == :embeddings ? :chunkdata : field
+
+    if indexid(pidx) == indexid(candidate)
+        # Sort if requested
+        sorted_idx = sorted ? sortperm(scores(candidate), rev = true) :
+                     eachindex(scores(candidate))
+        sub_index = view(pidx, candidate)
+        if field == :chunks
+            chunks(sub_index)[sorted_idx]
+        elseif field == :chunkdata
+            ## If embeddings, chunks are columns
+            ## If keywords (DTM), chunks are rows
+            chkdata = chunkdata(sub_index, sorted_idx)
+        elseif field == :sources
+            sources(sub_index)[sorted_idx]
+        elseif field == :scores
+            scores(candidate)[sorted_idx]
+        end
+    else
+        if field == :chunks
+            eltype(chunks(pidx))[]
+        elseif field == :chunkdata
+            chkdata = chunkdata(pidx)
+            isnothing(chkdata) && return nothing
+            TypeItem = typeof(chkdata)
+            init_dim = ntuple(i -> 0, ndims(chkdata))
+            TypeItem(undef, init_dim)
+        elseif field == :sources
+            eltype(sources(pidx))[]
+        elseif field == :scores
+            TD[]
+        end
+    end
+end
 function Base.getindex(mi::MultiIndex,
         candidate::CandidateChunks{TP, TD},
         field::Symbol = :chunks; sorted::Bool = false) where {TP <: Integer, TD <: Real}
@@ -954,6 +1016,9 @@ end
 function Base.getindex(index::AbstractChunkIndex, id::Symbol)
     id == indexid(index) ? index : nothing
 end
+function Base.getindex(index::AbstractManagedIndex, id::Symbol)
+    id == indexid(index) ? index : nothing
+end
 function Base.getindex(index::AbstractMultiIndex, id::Symbol)
     id == indexid(index) && return index
     idx = findfirst(x -> indexid(x) == id, indexes(index))
@@ -989,13 +1054,13 @@ See also: `pprint` (pretty printing), `annotate_support` (for annotating the ans
     final_answer::Union{Nothing, AbstractString} = nothing
     context::Vector{<:AbstractString} = String[]
     sources::Vector{<:AbstractString} = String[]
-    emb_candidates::Union{CandidateChunks, MultiCandidateChunks} = CandidateChunks(
+    emb_candidates::Union{CandidateChunks, CandidateWithChunks, MultiCandidateChunks} = CandidateChunks(
         index_id = :NOTINDEX, positions = Int[], scores = Float32[])
-    tag_candidates::Union{Nothing, CandidateChunks, MultiCandidateChunks} = CandidateChunks(
+    tag_candidates::Union{Nothing, CandidateChunks, CandidateWithChunks, MultiCandidateChunks} = CandidateChunks(
         index_id = :NOTINDEX, positions = Int[], scores = Float32[])
-    filtered_candidates::Union{CandidateChunks, MultiCandidateChunks} = CandidateChunks(
+    filtered_candidates::Union{CandidateChunks, CandidateWithChunks, MultiCandidateChunks} = CandidateChunks(
         index_id = :NOTINDEX, positions = Int[], scores = Float32[])
-    reranked_candidates::Union{CandidateChunks, MultiCandidateChunks} = CandidateChunks(
+    reranked_candidates::Union{CandidateChunks, CandidateWithChunks, MultiCandidateChunks} = CandidateChunks(
         index_id = :NOTINDEX, positions = Int[], scores = Float32[])
     conversations::Dict{Symbol, Vector{<:AbstractMessage}} = Dict{
         Symbol, Vector{<:AbstractMessage}}()

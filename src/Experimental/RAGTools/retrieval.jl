@@ -241,6 +241,57 @@ function find_closest(
     return CandidateChunks(indexid(index), positions, Float32.(scores))
 end
 
+function find_closest(
+        finder::AbstractSimilarityFinder, index::PineconeIndex,
+        query_emb::AbstractVector{<:Real}, query_tokens::AbstractVector{<:AbstractString} = String[];
+        top_n::Int = 10, kwargs...)
+    # get Pinecone info
+    pinecone_context = index.context
+    pinecone_index = index.index
+    pinecone_namespace = index.namespace
+
+    # query candidates
+    pinecone_results = Pinecone.query(pinecone_context, pinecone_index,
+        Vector{Float32}(query_emb), top_n, pinecone_namespace, false, true)
+    pinecone_results_json = JSON3.read(pinecone_results)
+    matches = pinecone_results_json.matches
+
+    # println(matches[1])
+
+    # get the chunks / metadata / sources / scores
+    positions = [1 for _ in matches]  # TODO: change this
+    scores = [m.score for m in matches]
+    chunks = [m.metadata.content for m in matches]
+    metadata = [JSON3.read(JSON3.write(m.metadata), Dict{String, Any}) for m in matches]
+    sources = [m.metadata.source for m in matches]
+
+    return CandidateWithChunks(
+        index_id = index.id,
+        positions = positions,
+        scores = Vector{Float32}(scores),
+        chunks = Vector{String}(chunks),
+        metadata = metadata,
+        sources = Vector{String}(sources))
+end
+
+function find_closest(
+        finder::AbstractSimilarityFinder, index::PineconeIndex,
+        query_emb::AbstractMatrix{<:Real}, query_tokens::AbstractVector{<:AbstractVector{<:AbstractString}} = Vector{Vector{String}}();
+        top_k::Int = 100, top_n::Int = 10,
+        kwargs...)
+    ## reduce top_k since we have more than one query
+    top_k_ = top_k ÷ size(query_emb, 2)
+    ## simply vcat together (gets sorted from the highest similarity to the lowest)
+    if isempty(query_tokens)
+        mapreduce(
+            c -> find_closest(finder, index, c; top_k = top_k_, top_n = top_n, kwargs...), vcat, eachcol(query_emb))
+    else
+        @assert length(query_tokens)==size(query_emb, 2) "Length of `query_tokens` must be equal to the number of columns in `query_emb`."
+        mapreduce(
+            (emb, tok) -> find_closest(finder, index, emb, tok; top_k = top_k_, top_n = top_n, kwargs...), vcat, eachcol(query_emb), query_tokens)
+    end
+end
+
 # Dispatch to find scores for multiple embeddings
 function find_closest(
         finder::AbstractSimilarityFinder, index::AbstractChunkIndex,
@@ -571,12 +622,22 @@ end
 
 Returns all chunks in the index, ie, no filtering, so we simply return `nothing` (easier for dispatch).
 """
-function find_tags(method::NoTagFilter, index::AbstractChunkIndex,
-        tags::Union{T, AbstractVector{<:T}}; kwargs...) where {T <:
-                                                               Union{
+# function find_tags(method::NoTagFilter, index::AbstractChunkIndex,
+#         tags::Union{T, AbstractVector{<:T}}; kwargs...) where {T <:
+#                                                                Union{
+#         AbstractString, Regex, Nothing}}
+#     return nothing
+# end
+function find_tags(
+        method::NoTagFilter, index::Union{AbstractChunkIndex,
+            AbstractManagedIndex},
+        tags::Union{T, AbstractVector{<:T}};
+        kwargs...) where {T <:
+                          Union{
         AbstractString, Regex, Nothing}}
     return nothing
 end
+
 ## Multi-index implementation -- logic differs within each index and then we simply vcat them together
 function find_tags(method::Union{AnyTagFilter, AllTagFilter}, index::AbstractMultiIndex,
         tag::Union{T, AbstractVector{<:T}}; kwargs...) where {T <:
@@ -604,13 +665,6 @@ function find_tags(method::Union{AnyTagFilter, AllTagFilter}, index::AbstractMul
 end
 
 function find_tags(method::NoTagFilter, index::AbstractMultiIndex,
-        tags::Union{T, AbstractVector{<:T}}; kwargs...) where {T <:
-                                                               Union{
-        AbstractString, Regex, Nothing}}
-    return nothing
-end
-
-function find_tags(method::NoTagFilter, index::AbstractPTPineconeIndex,
         tags::Union{T, AbstractVector{<:T}}; kwargs...) where {T <:
                                                                Union{
         AbstractString, Regex, Nothing}}
@@ -680,9 +734,9 @@ function rerank(reranker::AbstractReranker,
 end
 
 function rerank(reranker::NoReranker,
-        index::AbstractDocumentIndex,
+        index::Union{AbstractDocumentIndex, AbstractManagedIndex},
         question::AbstractString,
-        candidates::AbstractCandidateChunks;
+        candidates::Union{AbstractCandidateChunks, AbstractCandidateWithChunks};
         top_n::Integer = length(candidates),
         kwargs...)
     # Since this is almost a passthrough strategy, it returns the candidate_chunks unchanged
@@ -951,13 +1005,13 @@ Compared to SimpleRetriever, it adds rephrasing the query and reranking the resu
 end
 
 """
-    PTPineconeRetriever <: AbstractRetriever
+    PineconeRetriever <: AbstractRetriever
 
 Dispatch for `retrieve` for Pinecone.
 """
-@kwdef mutable struct PTPineconeRetriever <: AbstractRetriever
+@kwdef mutable struct PineconeRetriever <: AbstractRetriever
     rephraser::AbstractRephraser = NoRephraser()
-    embedder::AbstractEmbedder = NoEmbedder()
+    embedder::AbstractEmbedder = SimpleEmbedder()
     processor::AbstractProcessor = NoProcessor()
     finder::AbstractSimilarityFinder = CosineSimilarity()
     tagger::AbstractTagger = NoTagger()
@@ -1179,8 +1233,8 @@ function retrieve(retriever::AbstractRetriever,
     return result
 end
 
-function retrieve(retriever::PTPineconeRetriever,
-        index::AbstractPTPineconeIndex,
+function retrieve(retriever::PineconeRetriever,
+        index::PineconeIndex,
         question::AbstractString;
         verbose::Integer = 1,
         top_k::Integer = 100,
@@ -1208,25 +1262,74 @@ function retrieve(retriever::PTPineconeRetriever,
     rephrased_questions = rephrase(
         rephraser, question; verbose = (verbose > 1), cost_tracker, rephraser_kwargs_...)
 
-    ## Embed the question
-    index.embedding = Vector{Float64}(aiembed(index.schema, question).content)
-    embeddings = hcat([Vector{Float64}(aiembed(index.schema, x).content) for x in rephrased_questions]...)
+    ## Embed one or more rephrased questions
+    embeddings = if HasEmbeddings(index)
+        embedder_kwargs_ = isempty(api_kwargs) ? embedder_kwargs :
+                           merge(embedder_kwargs, (; api_kwargs))
+        embeddings = get_embeddings(embedder, rephrased_questions;
+            verbose = (verbose > 1), cost_tracker, embedder_kwargs_...)
+    else
+        embeddings = hcat([Float32[] for _ in rephrased_questions]...)
+    end
 
-    ## Get the context from Pinecone
-    pinecone_results = Pinecone.query(index.pinecone_context, index.pinecone_index, index.embedding, top_n, index.namespace, false, true)
-    pinecone_results_json = JSON3.read(pinecone_results)
-    context = map(x -> x.metadata.content, pinecone_results_json.matches)
+    ## Preprocess into keyword tokens if we're running BM25 
+    keywords = if HasKeywords(index)
+        ## Return only keywords, not DTM
+        keywords = get_keywords(processor, rephrased_questions;
+            verbose = (verbose > 1), processor_kwargs..., return_keywords = true)
+        ## Send warning for common error
+        verbose >= 1 && (keywords isa AbstractVector{<:AbstractVector{<:AbstractString}} ||
+         @warn "Processed Keywords is not a vector of tokenized queries. Have you used the correct processor? (provided: $(typeof(processor))).")
+        keywords
+    else
+        [String[] for _ in rephrased_questions]
+    end
+
+    finder_kwargs_ = isempty(api_kwargs) ? finder_kwargs :
+                     merge(finder_kwargs, (; api_kwargs))
+    emb_candidates = find_closest(finder, index, embeddings, keywords;
+        verbose = (verbose > 1), top_k, top_n, finder_kwargs_...)
+
+    ## Tagging - if you provide them explicitly, use tagger `PassthroughTagger` and `tagger_kwargs = (;tags = ...)`
+    tagger_kwargs_ = isempty(api_kwargs) ? tagger_kwargs :
+                     merge(tagger_kwargs, (; api_kwargs))
+    tags = get_tags(tagger, rephrased_questions; verbose = (verbose > 1),
+        cost_tracker, tagger_kwargs_...)
+
+    filter_kwargs_ = isempty(api_kwargs) ? filter_kwargs :
+                     merge(filter_kwargs, (; api_kwargs))
+    tag_candidates = find_tags(
+        filter, index, tags; verbose = (verbose > 1), filter_kwargs_...)
+
+    ## Combine the two sets of candidates, looks for intersection (hard filter)!
+    # With tagger=NoTagger() get_tags returns `nothing` find_tags simply passes it through to skip the intersection
+    filtered_candidates = isnothing(tag_candidates) ? emb_candidates :
+                          (emb_candidates & tag_candidates)
+    ## TODO: Future implementation should be to apply tag filtering BEFORE the find_closest,
+    ## but that requires implementing `view(::Index,...)` to provide only a subset of the embeddings to the subsequent functionality.
+    ## Also, find_closest is so fast & cheap that it doesn't matter at current scale/maturity of the use cases
+
+    ## Reranking
+    reranker_kwargs_ = isempty(api_kwargs) ? reranker_kwargs :
+                       merge(reranker_kwargs, (; api_kwargs))
+    reranked_candidates = rerank(reranker, index, question, filtered_candidates;
+        top_n, verbose = (verbose > 1), cost_tracker, reranker_kwargs_...)
 
     verbose > 0 &&
         @info "Retrieval done. Total cost: \$$(round(cost_tracker[], digits=2))."
 
-    ## Return
     result = RAGResult(;
         question,
         answer = nothing,
         rephrased_questions,
         final_answer = nothing,
-        context)
+        ## Ensure chunks and sources are sorted
+        context = collect(index[reranked_candidates, :chunks, sorted = true]),
+        sources = collect(index[reranked_candidates, :sources, sorted = true]),
+        emb_candidates,
+        tag_candidates,
+        filtered_candidates,
+        reranked_candidates)
 
     return result
 end

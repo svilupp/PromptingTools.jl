@@ -20,13 +20,6 @@ Chunker when you provide text to `get_chunks` functions. Inputs are directly chu
 """
 struct TextChunker <: AbstractChunker end
 
-"""
-    NoChunker <: AbstractChunker
-
-
-"""
-struct NoChunker <: AbstractChunker end
-
 ### Embedding Types
 """
     NoEmbedder <: AbstractEmbedder
@@ -34,6 +27,13 @@ struct NoChunker <: AbstractChunker end
 No-op embedder for `get_embeddings` functions. It returns `nothing`.
 """
 struct NoEmbedder <: AbstractEmbedder end
+
+"""
+    SimpleEmbedder <: AbstractEmbedder
+
+Simply passes the input to `aiembed`.
+"""
+struct SimpleEmbedder <: AbstractEmbedder end
 
 """
     BatchEmbedder <: AbstractEmbedder
@@ -142,15 +142,13 @@ It uses `TextChunker`, `KeywordsProcessor`, and `NoTagger` as default chunker, p
 end
 
 """
-    PTPineconeIndexer <: AbstractIndexBuilder
+    PineconeIndexer <: AbstractIndexBuilder
 
 Pinecone index to be returned by `build_index`.
-
-It uses `NoChunker`, `NoEmbedder`, and `NoTagger` as default chunker, embedder, and tagger.
 """
-@kwdef mutable struct PTPineconeIndexer <: AbstractIndexBuilder
-    chunker::AbstractChunker = NoChunker()
-    embedder::AbstractEmbedder = NoEmbedder()
+@kwdef mutable struct PineconeIndexer <: AbstractIndexBuilder
+    chunker::AbstractChunker = TextChunker()
+    embedder::AbstractEmbedder = SimpleEmbedder()
     tagger::AbstractTagger = NoTagger()
 end
 
@@ -185,10 +183,6 @@ function load_text(chunker::TextChunker, input::AbstractString;
         source::AbstractString = input, kwargs...)
     @assert length(source)<=512 "Each `source` should be less than 512 characters long. Detected: $(length(source)) characters. You must provide sources for each text when using `TextChunker`"
     return input, source
-end
-function load_text(chunker::NoChunker, input::AbstractString = "";
-    source::AbstractString = input, kwargs...)
-return input, source
 end
 
 """
@@ -249,6 +243,13 @@ end
 function get_embeddings(
         embedder::NoEmbedder, docs::AbstractVector{<:AbstractString}; kwargs...)
     return nothing
+end
+
+function get_embeddings(
+        embedder::SimpleEmbedder, docs::AbstractVector{<:AbstractString};
+        model::AbstractString = PT.MODEL_EMBEDDING,
+        kwargs...)
+    return hcat([Vector{Float32}(aiembed(doc; model).content) for doc in docs]...)
 end
 
 """
@@ -725,31 +726,31 @@ function build_index(
     return index
 end
 
-using Pinecone: Pinecone, init_v3, Index
+using Pinecone: Pinecone, PineconeContextv3, PineconeIndexv3, init_v3, Index
+# TODO: change docs
 """
     build_index(
-        indexer::PTPineconeIndexer;
+        indexer::PineconeIndexer;
         namespace::AbstractString,
-        schema::AbstractPromptSchema = OpenAISchema();
         verbose::Integer = 1,
         index_id = gensym("PTPineconeIndex"),
         cost_tracker = Threads.Atomic{Float64}(0.0))
 
-Builds a `PTPineconeIndex` containing a Pinecone context (API key, index and namespace).
+Builds a `PineconeIndex` containing a Pinecone context (API key, index and namespace).
 """
 function build_index(
-        indexer::PTPineconeIndexer,
+        indexer::PineconeIndexer,
+        context::Pinecone.PineconeContextv3 = Pinecone.init_v3(""),
+        index::Pinecone.PineconeIndexv3 = "",
         namespace::AbstractString,
-        schema::PromptingTools.AbstractPromptSchema = PromptingTools.OpenAISchema();
         verbose::Integer = 1,
-        index_id = gensym("PTPineconeIndex"),
+        index_id = gensym(namespace),
         cost_tracker = Threads.Atomic{Float64}(0.0))
+    @assert !isempty(context.api_key) && !isempty(index) "Pinecone context and index not set"
 
-    pinecone_context = Pinecone.init_v3(ENV["PINECONE_API_KEY"])
-    pindex = ENV["PINECONE_INDEX"]
-    pinecone_index = pinecone_index = !isempty(pindex) ? Pinecone.Index(pinecone_context, pindex) : nothing
+    # TODO: add chunking, embedding, tags?
 
-    index = PTPineconeIndex(; id = index_id, pinecone_context, pinecone_index, namespace, schema)
+    index = PineconeIndex(; id = index_id, context, index, namespace)
 
     (verbose > 0) && @info "Index built! (cost: \$$(round(cost_tracker[], digits=3)))"
 

@@ -161,13 +161,6 @@ Main abstract type for storing document chunks and their embeddings. It also sto
 """
 abstract type AbstractChunkIndex <: AbstractDocumentIndex end
 
-"""
-    AbstractPTPineconeIndex <: AbstractDocumentIndex
-
-Abstract type for working with Pinecone. For now, just an empty index.
-"""
-abstract type AbstractPTPineconeIndex <: AbstractDocumentIndex end
-
 # ## Retrieval stage
 
 """
@@ -183,6 +176,8 @@ Return type from `find_closest` and `find_tags` functions.
 - `scores::Vector{Float32}`: the similarity scores of the candidates from the query (higher is better)
 """
 abstract type AbstractCandidateChunks end
+
+abstract type AbstractCandidateWithChunks end
 
 # Main supertype for retrieval customizations
 abstract type AbstractRetrievalMethod end

@@ -37,7 +37,8 @@ context = build_context(ContextEnumerator(), index, candidates; chunks_window_ma
 ```
 """
 function build_context(contexter::ContextEnumerator,
-        index::AbstractDocumentIndex, candidates::AbstractCandidateChunks;
+        index::AbstractManagedIndex,
+        candidates::AbstractCandidateWithChunks;
         verbose::Bool = true,
         chunks_window_margin::Tuple{Int, Int} = (1, 1), kwargs...)
     ## Checks
@@ -63,27 +64,31 @@ function build_context(contexter::ContextEnumerator,
     return context
 end
 
-using Pinecone: Pinecone, query
-using JSON3: JSON3, read
-"""
-    build_context(contexter::ContextEnumerator,
-        index::AbstractPTPineconeIndex;
-        verbose::Bool = true,
-        top_k::Int = 10,
-        kwargs...)
-
-Build context strings by querying Pinecone.
-```
-"""
 function build_context(contexter::ContextEnumerator,
-        index::AbstractPTPineconeIndex;
+        index::AbstractManagedIndex,
+        candidates::AbstractCandidateWithChunks;
         verbose::Bool = true,
-        top_k::Int = 10,
-        kwargs...)
-    pinecone_results = Pinecone.query(index.pinecone_context, index.pinecone_index, index.embedding, top_k, index.namespace, false, true)
-    results_json = JSON3.read(pinecone_results)
-    context = results_json.matches[1].metadata.content
+        chunks_window_margin::Tuple{Int, Int} = (1, 1), kwargs...)
+    ## Checks
+    @assert chunks_window_margin[1] >= 0&&chunks_window_margin[2] >= 0 "Both `chunks_window_margin` values must be non-negative"
 
+    context = String[]
+    for (i, position) in enumerate(positions(candidates))
+        ## select the right index
+        id = candidates isa MultiCandidateChunks ? candidates.index_ids[i] :
+             candidates.index_id
+        index_ = index isa AbstractChunkIndex ? index : index[id]
+        isnothing(index_) && continue
+
+        chunks_ = chunks(candidates)[
+            max(1, position - chunks_window_margin[1]):min(end,
+            position + chunks_window_margin[2])]
+        ## Check if surrounding chunks are from the same source
+        is_same_source = sources(candidates)[
+            max(1, position - chunks_window_margin[1]):min(end,
+            position + chunks_window_margin[2])] .== sources(candidates)[position]
+        push!(context, "$(i). $(join(chunks_[is_same_source], "\n"))")
+    end
     return context
 end
 
@@ -94,7 +99,7 @@ end
 
 # Mutating version that dispatches on the result to the underlying implementation
 function build_context!(contexter::ContextEnumerator,
-        index::AbstractDocumentIndex, result::AbstractRAGResult; kwargs...)
+        index::Union{AbstractDocumentIndex, AbstractManagedIndex}, result::AbstractRAGResult; kwargs...)
     result.context = build_context(contexter, index, result.reranked_candidates; kwargs...)
     return result
 end
@@ -114,6 +119,7 @@ function answer!(
     throw(ArgumentError("Answerer $(typeof(answerer)) not implemented"))
 end
 
+# TODO: update docs signature
 """
     answer!(
         answerer::SimpleAnswerer, index::AbstractDocumentIndex, result::AbstractRAGResult;
@@ -138,7 +144,7 @@ Generates an answer using the `aigenerate` function with the provided `result.co
 
 """
 function answer!(
-        answerer::SimpleAnswerer, index::AbstractDocumentIndex, result::AbstractRAGResult;
+        answerer::SimpleAnswerer, index::Union{AbstractDocumentIndex, AbstractManagedIndex}, result::AbstractRAGResult;
         model::AbstractString = PT.MODEL_CHAT, verbose::Bool = true,
         template::Symbol = :RAGAnswerFromContext,
         cost_tracker = Threads.Atomic{Float64}(0.0),
@@ -186,11 +192,13 @@ Refines the answer by executing a web search using the Tavily API. This method a
 struct TavilySearchRefiner <: AbstractRefiner end
 
 function refine!(
-        refiner::AbstractRefiner, index::AbstractDocumentIndex, result::AbstractRAGResult;
+        refiner::AbstractRefiner, index::Union{AbstractDocumentIndex, AbstractManagedIndex}, result::AbstractRAGResult;
         kwargs...)
     throw(ArgumentError("Refiner $(typeof(refiner)) not implemented"))
 end
 
+
+# TODO: update docs signature
 """
     refine!(
         refiner::NoRefiner, index::AbstractChunkIndex, result::AbstractRAGResult;
@@ -199,7 +207,7 @@ end
 Simple no-op function for `refine!`. It simply copies the `result.answer` and `result.conversations[:answer]` without any changes.
 """
 function refine!(
-        refiner::NoRefiner, index::AbstractDocumentIndex, result::AbstractRAGResult;
+        refiner::NoRefiner, index::Union{AbstractDocumentIndex, AbstractManagedIndex}, result::AbstractRAGResult;
         kwargs...)
     result.final_answer = result.answer
     if haskey(result.conversations, :answer)
@@ -208,6 +216,8 @@ function refine!(
     return result
 end
 
+
+# TODO: update docs signature
 """
     refine!(
         refiner::SimpleRefiner, index::AbstractDocumentIndex, result::AbstractRAGResult;
@@ -234,7 +244,7 @@ This method uses the same context as the original answer, however, it can be mod
 - `cost_tracker`: An atomic counter to track the cost of the operation.
 """
 function refine!(
-        refiner::SimpleRefiner, index::AbstractDocumentIndex, result::AbstractRAGResult;
+        refiner::SimpleRefiner, index::Union{AbstractDocumentIndex, AbstractManagedIndex}, result::AbstractRAGResult;
         verbose::Bool = true,
         model::AbstractString = PT.MODEL_CHAT,
         template::Symbol = :RAGAnswerRefiner,
@@ -262,6 +272,8 @@ function refine!(
     return result
 end
 
+
+# TODO: update docs signature
 """
     refine!(
         refiner::TavilySearchRefiner, index::AbstractDocumentIndex, result::AbstractRAGResult;
@@ -312,7 +324,7 @@ pprint(result)
 ```
 """
 function refine!(
-        refiner::TavilySearchRefiner, index::AbstractDocumentIndex, result::AbstractRAGResult;
+        refiner::TavilySearchRefiner, index::Union{AbstractDocumentIndex, AbstractManagedIndex}, result::AbstractRAGResult;
         verbose::Bool = true,
         model::AbstractString = PT.MODEL_CHAT,
         include_answer::Bool = true,
@@ -377,13 +389,13 @@ Overload this method to add custom postprocessing steps, eg, logging, saving con
 """
 struct NoPostprocessor <: AbstractPostprocessor end
 
-function postprocess!(postprocessor::AbstractPostprocessor, index::AbstractDocumentIndex,
+function postprocess!(postprocessor::AbstractPostprocessor, index::Union{AbstractDocumentIndex, AbstractManagedIndex},
         result::AbstractRAGResult; kwargs...)
     throw(ArgumentError("Postprocessor $(typeof(postprocessor)) not implemented"))
 end
 
 function postprocess!(
-        ::NoPostprocessor, index::AbstractDocumentIndex, result::AbstractRAGResult; kwargs...)
+        ::NoPostprocessor, index::Union{AbstractDocumentIndex, AbstractManagedIndex}, result::AbstractRAGResult; kwargs...)
     return result
 end
 
@@ -416,6 +428,7 @@ It uses `ContextEnumerator`, `SimpleAnswerer`, `SimpleRefiner`, and `NoPostproce
     postprocessor::AbstractPostprocessor = NoPostprocessor()
 end
 
+# TODO: update docs signature
 """
     generate!(
         generator::AbstractGenerator, index::AbstractDocumentIndex, result::AbstractRAGResult;
@@ -483,7 +496,7 @@ result = generate!(index, result)
 ```
 """
 function generate!(
-        generator::AbstractGenerator, index::AbstractDocumentIndex, result::AbstractRAGResult;
+        generator::AbstractGenerator, index::Union{AbstractDocumentIndex, AbstractManagedIndex}, result::AbstractRAGResult;
         verbose::Integer = 1,
         api_kwargs::NamedTuple = NamedTuple(),
         contexter::AbstractContextBuilder = generator.contexter,
@@ -672,7 +685,7 @@ PT.pprint(result)
 
 For easier manipulation of nested kwargs, see utilities `getpropertynested`, `setpropertynested`, `merge_kwargs_nested`.
 """
-function airag(cfg::AbstractRAGConfig, index::AbstractDocumentIndex;
+function airag(cfg::AbstractRAGConfig, index::Union{AbstractDocumentIndex, AbstractManagedIndex};
         question::AbstractString,
         verbose::Integer = 1, return_all::Bool = false,
         api_kwargs::NamedTuple = NamedTuple(),
