@@ -210,6 +210,44 @@ AIMessage("I sense. But unhealthy it may be. Your iPhone, a tool it is, not a li
 ```
 
 """
+    aigenerate(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMPT_TYPE;
+        verbose::Bool = true,
+        api_key::String = ANTHROPIC_API_KEY,
+        model::String = MODEL_CHAT,
+        return_all::Bool = false, dry_run::Bool = false,
+        conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
+        http_kwargs::NamedTuple = NamedTuple(), api_kwargs::NamedTuple = NamedTuple(),
+        cache::Union{Nothing, Symbol} = nothing,
+        kwargs...)
+
+Generate an AI response based on a given prompt using the Anthropic API.
+
+# Arguments
+- `prompt_schema`: An object specifying which prompt template should be applied.
+- `prompt`: Can be a string representing the prompt for the AI conversation, a `UserMessage`, a vector of `AbstractMessage` or an `AITemplate`.
+- `verbose`: A boolean indicating whether to print additional information.
+- `api_key`: API key for the Anthropic API. Defaults to `ANTHROPIC_API_KEY`.
+- `model`: A string representing the model to use for generating the response. Can be an alias corresponding to a model ID defined in `MODEL_ALIASES`.
+- `return_all::Bool=false`: If `true`, returns the entire conversation history, otherwise returns only the last message (the `AIMessage`).
+- `dry_run::Bool=false`: If `true`, skips sending the messages to the model (for debugging, often used with `return_all=true`).
+- `conversation::AbstractVector{<:AbstractMessage}=[]`: Additional conversation history to be included.
+- `http_kwargs::NamedTuple`: Additional keyword arguments for the HTTP request.
+- `api_kwargs::NamedTuple`: Additional keyword arguments for the Anthropic API.
+- `cache::Union{Nothing, Symbol}=nothing`: Specifies the caching behavior for the API request. If not `nothing`, it adds a `cache_control` object to `api_kwargs`.
+- `kwargs`: Prompt variables to be used to fill the prompt/template.
+
+# Returns
+- `msg`: An `AIMessage` object representing the generated AI message, including the content, status, tokens, and elapsed time.
+ Use `msg.content` to access the extracted string.
+
+# Example
+```julia
+schema = AnthropicSchema()
+msg = aigenerate(schema, "Say hi!"; model="claudeh")
+```
+
+Note: The `cache` argument, when provided, enables caching for the request. The caching mechanism uses `SYSTEM_CACHE`, `TOOLS_CACHE`, and `LAST_CACHE` for different types of caching.
+"""
 function aigenerate(
         prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMPT_TYPE;
         verbose::Bool = true,
@@ -218,29 +256,47 @@ function aigenerate(
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         http_kwargs::NamedTuple = NamedTuple(), api_kwargs::NamedTuple = NamedTuple(),
+        cache::Union{Nothing, Symbol} = nothing,
         kwargs...)
     ##
-    global MODEL_ALIASES
+    global MODEL_ALIASES, SYSTEM_CACHE, TOOLS_CACHE, LAST_CACHE
     ## Find the unique ID for the model alias provided
     model_id = get(MODEL_ALIASES, model, model)
     conv_rendered = render(prompt_schema, prompt; conversation, kwargs...)
 
     if !dry_run
-        time = @elapsed resp = anthropic_api(
-            prompt_schema, conv_rendered.conversation; api_key,
-            conv_rendered.system, endpoint = "messages", model = model_id, http_kwargs,
-            api_kwargs...)
-        tokens_prompt = get(resp.response[:usage], :input_tokens, 0)
-        tokens_completion = get(resp.response[:usage], :output_tokens, 0)
-        content = mapreduce(x -> get(x, :text, ""), *, resp.response[:content]) |> strip
-        msg = AIMessage(; content,
-            status = Int(resp.status),
-            cost = call_cost(tokens_prompt, tokens_completion, model_id),
-            finish_reason = get(resp.response, :stop_reason, nothing),
-            tokens = (tokens_prompt, tokens_completion),
-            elapsed = time)
-        ## Reporting
-        verbose && @info _report_stats(msg, model_id)
+        # Generate cache key if caching is enabled
+        cache_key = isnothing(cache) ? nothing : _generate_cache_key(conv_rendered, model_id, api_kwargs)
+
+        # Try to retrieve from cache
+        cached_response = isnothing(cache_key) ? nothing : _get_from_cache(cache_key, cache)
+
+        if !isnothing(cached_response)
+            msg = cached_response
+            verbose && @info "Retrieved response from cache."
+        else
+            time = @elapsed resp = anthropic_api(
+                prompt_schema, conv_rendered.conversation; api_key,
+                conv_rendered.system, endpoint = "messages", model = model_id, http_kwargs,
+                api_kwargs...)
+            tokens_prompt = get(resp.response[:usage], :input_tokens, 0)
+            tokens_completion = get(resp.response[:usage], :output_tokens, 0)
+            content = mapreduce(x -> get(x, :text, ""), *, resp.response[:content]) |> strip
+            msg = AIMessage(; content,
+                status = Int(resp.status),
+                cost = call_cost(tokens_prompt, tokens_completion, model_id),
+                finish_reason = get(resp.response, :stop_reason, nothing),
+                tokens = (tokens_prompt, tokens_completion),
+                elapsed = time)
+
+            # Add to cache if caching is enabled
+            if !isnothing(cache_key)
+                _add_to_cache(cache_key, msg, cache)
+            end
+
+            ## Reporting
+            verbose && @info _report_stats(msg, model_id)
+        end
     else
         msg = nothing
     end
@@ -254,6 +310,38 @@ function aigenerate(
         dry_run,
         kwargs...)
     return output
+end
+
+# Helper functions for caching
+function _generate_cache_key(conv_rendered, model_id, api_kwargs)
+    # Implement a suitable hashing mechanism for the conversation and model
+    return hash((conv_rendered, model_id, api_kwargs))
+end
+
+function _get_from_cache(key, cache_type::Symbol)
+    cache = if cache_type == :system
+        SYSTEM_CACHE
+    elseif cache_type == :tools
+        TOOLS_CACHE
+    elseif cache_type == :last
+        LAST_CACHE
+    else
+        error("Invalid cache type: $cache_type")
+    end
+    return get(cache, key, nothing)
+end
+
+function _add_to_cache(key, value, cache_type::Symbol)
+    cache = if cache_type == :system
+        SYSTEM_CACHE
+    elseif cache_type == :tools
+        TOOLS_CACHE
+    elseif cache_type == :last
+        LAST_CACHE
+    else
+        error("Invalid cache type: $cache_type")
+    end
+    cache[key] = value
 end
 
 """
