@@ -1,7 +1,8 @@
 using PromptingTools: TestEchoAnthropicSchema, render, AnthropicSchema
 using PromptingTools: AIMessage, SystemMessage, AbstractMessage
 using PromptingTools: UserMessage, UserMessageWithImages, DataMessage
-using PromptingTools: call_cost, anthropic_api, function_call_signature
+using PromptingTools: call_cost, anthropic_api, function_call_signature,
+                      anthropic_extra_headers
 
 @testset "render-Anthropic" begin
     schema = AnthropicSchema()
@@ -11,7 +12,8 @@ using PromptingTools: call_cost, anthropic_api, function_call_signature
         UserMessage("Hello, my name is {{name}}")
     ]
     expected_output = (; system = "Act as a helpful AI assistant",
-        conversation = [Dict("role" => "user", "content" => "Hello, my name is John")])
+        conversation = [Dict("role" => "user",
+            "content" => [Dict("type" => "text", "text" => "Hello, my name is John")])])
     conversation = render(schema, messages; name = "John")
     @test conversation == expected_output
     # Test with dry_run=true on ai* functions
@@ -26,7 +28,8 @@ using PromptingTools: call_cost, anthropic_api, function_call_signature
     ]
     expected_output = (; system = "Act as a helpful AI assistant",
         conversation = [Dict(
-            "role" => "assistant", "content" => "Hello, my name is {{name}}")])
+            "role" => "assistant",
+            "content" => [Dict("type" => "text", "text" => "Hello, my name is {{name}}")])])
     conversation = render(schema, messages; name = "John")
     # AIMessage does not replace handlebar variables
     @test conversation == expected_output
@@ -37,7 +40,8 @@ using PromptingTools: call_cost, anthropic_api, function_call_signature
     ]
     conversation = render(schema, messages)
     expected_output = (; system = "Act as a helpful AI assistant",
-        conversation = [Dict("role" => "user", "content" => "User message")])
+        conversation = [Dict("role" => "user",
+            "content" => [Dict("type" => "text", "text" => "User message")])])
     @test conversation == expected_output
 
     # Given a schema and a vector of messages, it should return a conversation dictionary with the correct roles and contents for each message.
@@ -49,10 +53,15 @@ using PromptingTools: call_cost, anthropic_api, function_call_signature
     ]
     expected_output = (; system = "Act as a helpful AI assistant",
         conversation = [
-            Dict("role" => "user", "content" => "Hello"),
-            Dict("role" => "assistant", "content" => "Hi there"),
-            Dict("role" => "user", "content" => "How are you?"),
-            Dict("role" => "assistant", "content" => "I'm doing well, thank you!")
+            Dict(
+                "role" => "user", "content" => [Dict("type" => "text", "text" => "Hello")]),
+            Dict("role" => "assistant",
+                "content" => [Dict("type" => "text", "text" => "Hi there")]),
+            Dict("role" => "user",
+                "content" => [Dict("type" => "text", "text" => "How are you?")]),
+            Dict("role" => "assistant",
+                "content" => [Dict(
+                    "type" => "text", "text" => "I'm doing well, thank you!")])
         ])
     conversation = render(schema, messages)
     @test conversation == expected_output
@@ -65,8 +74,10 @@ using PromptingTools: call_cost, anthropic_api, function_call_signature
     ]
     expected_output = (; system = "This is a system message",
         conversation = [
-            Dict("role" => "user", "content" => "Hello"),
-            Dict("role" => "assistant", "content" => "Hi there")
+            Dict(
+                "role" => "user", "content" => [Dict("type" => "text", "text" => "Hello")]),
+            Dict("role" => "assistant",
+                "content" => [Dict("type" => "text", "text" => "Hi there")])
         ])
     conversation = render(schema, messages)
     @test conversation == expected_output
@@ -83,8 +94,10 @@ using PromptingTools: call_cost, anthropic_api, function_call_signature
     ]
     expected_output = (; system = "Act as a helpful AI assistant",
         conversation = [
-            Dict("role" => "user", "content" => "Hello"),
-            Dict("role" => "assistant", "content" => "Hi there")
+            Dict(
+                "role" => "user", "content" => [Dict("type" => "text", "text" => "Hello")]),
+            Dict("role" => "assistant",
+                "content" => [Dict("type" => "text", "text" => "Hi there")])
         ])
     conversation = render(schema, messages)
     @test conversation == expected_output
@@ -117,6 +130,56 @@ using PromptingTools: call_cost, anthropic_api, function_call_signature
             "input_schema" => "")]
     @test_logs (:warn, r"Multiple tools provided") match_mode=:any render(
         schema, messages; tools)
+
+    ## Cache variables
+    messages = [
+        SystemMessage("Act as a helpful AI assistant"),
+        UserMessage("Hello, my name is {{name}}")
+    ]
+    conversation = render(schema, messages; name = "John", cache = :system)
+    expected_output = (;
+        system = Dict{String, Any}[Dict("cache_control" => Dict("type" => "ephemeral"),
+            "text" => "Act as a helpful AI assistant", "type" => "text")],
+        conversation = [Dict("role" => "user",
+            "content" => [Dict("type" => "text", "text" => "Hello, my name is John")])])
+    @test conversation == expected_output
+
+    conversation = render(schema, messages; name = "John", cache = :last)
+    expected_output = (;
+        system = "Act as a helpful AI assistant",
+        conversation = [Dict("role" => "user",
+            "content" => [Dict("type" => "text", "text" => "Hello, my name is John",
+                "cache_control" => Dict("type" => "ephemeral"))])])
+    @test conversation == expected_output
+
+    conversation = render(schema, messages; name = "John", cache = :all)
+    expected_output = (;
+        system = Dict{String, Any}[Dict("cache_control" => Dict("type" => "ephemeral"),
+            "text" => "Act as a helpful AI assistant", "type" => "text")],
+        conversation = [Dict("role" => "user",
+            "content" => [Dict("type" => "text", "text" => "Hello, my name is John",
+                "cache_control" => Dict("type" => "ephemeral"))])])
+    @test conversation == expected_output
+end
+
+@testset "anthropic_extra_headers" begin
+    @test anthropic_extra_headers() == ["anthropic-version" => "2023-06-01"]
+
+    @test anthropic_extra_headers(has_tools = true) == [
+        "anthropic-version" => "2023-06-01",
+        "anthropic-beta" => "tools-2024-04-04"
+    ]
+
+    @test anthropic_extra_headers(has_cache = true) == [
+        "anthropic-version" => "2023-06-01",
+        "anthropic-beta" => "prompt-caching-2024-07-31"
+    ]
+
+    @test anthropic_extra_headers(has_tools = true, has_cache = true) == [
+        "anthropic-version" => "2023-06-01",
+        "anthropic-beta" => "tools-2024-04-04",
+        "anthropic-beta" => "prompt-caching-2024-07-31"
+    ]
 end
 
 @testset "anthropic_api" begin

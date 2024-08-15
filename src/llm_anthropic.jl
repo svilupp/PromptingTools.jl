@@ -17,7 +17,7 @@ Builds a history of the conversation to provide the prompt to the API. All unspe
 # Keyword Arguments
 - `conversation`: Past conversation to be included in the beginning of the prompt (for continued conversations).
 - `tools`: A list of tools to be used in the conversation. Added to the end of the system prompt to enforce its use.
-- `cache`: A symbol representing the caching strategy to be used. Currently only `nothing` (no caching), `:system`, `:tools`, and `:last` are supported.
+- `cache`: A symbol representing the caching strategy to be used. Currently only `nothing` (no caching), `:system`, `:tools`,`:last` and `:all` are supported.
 """
 function render(schema::AbstractAnthropicSchema,
         messages::Vector{<:AbstractMessage};
@@ -27,7 +27,7 @@ function render(schema::AbstractAnthropicSchema,
         kwargs...)
     ## 
     @assert count(issystemmessage, messages)<=1 "AbstractAnthropicSchema only supports at most 1 System message"
-    @assert (isnothing(cache)||cache in [:system, :tools, :last]) "Currently only `:system`, `:tools`, `:last` are supported for Anthropic Prompt Caching"
+    @assert (isnothing(cache)||cache in [:system, :tools, :last, :all]) "Currently only `:system`, `:tools`, `:last`, `:all` are supported for Anthropic Prompt Caching"
 
     system = nothing
 
@@ -67,9 +67,10 @@ function render(schema::AbstractAnthropicSchema,
     is_valid_conversation = length(conversation) > 0 &&
                             haskey(conversation[end], "content") &&
                             length(conversation[end]["content"]) > 0
-    if cache == :last && is_valid_conversation
+    if is_valid_conversation && (cache == :last || cache == :all)
         conversation[end]["content"][end]["cache_control"] = Dict("type" => "ephemeral")
-    elseif cache == :system && !isnothing(system)
+    end
+    if !isnothing(system) && (cache == :system || cache == :all)
         ## Apply cache for system message
         system = [Dict("type" => "text", "text" => system,
             "cache_control" => Dict("type" => "ephemeral"))]
@@ -119,6 +120,7 @@ Simple wrapper for a call to Anthropic API.
 - `http_kwargs::NamedTuple`: Additional keyword arguments for the HTTP request. Defaults to empty `NamedTuple`.
 - `stream`: A boolean indicating whether to stream the response. Defaults to `false`.
 - `url`: The URL of the Ollama API. Defaults to "localhost".
+- `cache`: A symbol representing the caching strategy to be used. Currently only `nothing` (no caching), `:system`, `:tools`,`:last` and `:all` are supported.
 - `kwargs`: Prompt variables to be used to fill the prompt/template
 """
 function anthropic_api(
@@ -189,8 +191,14 @@ Generate an AI response based on a given prompt using the Anthropic API.
 - `http_kwargs::NamedTuple`: Additional keyword arguments for the HTTP request. Defaults to empty `NamedTuple`.
 - `api_kwargs::NamedTuple`: Additional keyword arguments for the Ollama API. Defaults to an empty `NamedTuple`.
     - `max_tokens::Int`: The maximum number of tokens to generate. Defaults to 2048, because it's a required parameter for the API.
-- `cache`: A symbol indicating whether to use caching for the prompt. Supported values are `nothing` (no caching), `:system`, `:tools`, and `:last`. Note that COST estimate will be wrong (ignores the caching).
+- `cache`: A symbol indicating whether to use caching for the prompt. Supported values are `nothing` (no caching), `:system`, `:tools`, `:last` and `:all`. Note that COST estimate will be wrong (ignores the caching).
+    - `:system`: Caches the system message
+    - `:tools`: Caches the tool definitions (and everything before them)
+    - `:last`: Caches the last message in the conversation (and everything before it)
+    - `:all`: Cache trigger points are inserted in all of the above places (ie, higher likelyhood of cache hit, but also slightly higher cost)
 - `kwargs`: Prompt variables to be used to fill the prompt/template
+
+Note: At the moment, the cache is only allowed for prompt segments over 1024 tokens (in some cases, over 2048 tokens). You'll get an error if you try to cache short prompts.
 
 # Returns
 - `msg`: An `AIMessage` object representing the generated AI message, including the content, status, tokens, and elapsed time.
@@ -258,7 +266,7 @@ function aigenerate(
         kwargs...)
     ##
     global MODEL_ALIASES
-    @assert (isnothing(cache)||cache in [:system, :tools, :last]) "Currently only `:system`, `:tools`, `:last` are supported for Anthropic Prompt Caching"
+    @assert (isnothing(cache)||cache in [:system, :tools, :last, :all]) "Currently only `:system`, `:tools`, `:last` and `:all` are supported for Anthropic Prompt Caching"
     ## Find the unique ID for the model alias provided
     model_id = get(MODEL_ALIASES, model, model)
     conv_rendered = render(prompt_schema, prompt; conversation, cache, kwargs...)
@@ -338,8 +346,14 @@ It's effectively a light wrapper around `aigenerate` call, which requires additi
 - `conversation`: An optional vector of `AbstractMessage` objects representing the conversation history. If not provided, it is initialized as an empty vector.
 - `http_kwargs`: A named tuple of HTTP keyword arguments.
 - `api_kwargs`: A named tuple of API keyword arguments. 
-- `cache`: A symbol indicating whether to use caching for the prompt. Supported values are `nothing` (no caching), `:system`, `:tools`, and `:last`. Note that COST estimate will be wrong (ignores the caching).
+- `cache`: A symbol indicating whether to use caching for the prompt. Supported values are `nothing` (no caching), `:system`, `:tools`, `:last` and `:all`. Note that COST estimate will be wrong (ignores the caching).
+    - `:system`: Caches the system message
+    - `:tools`: Caches the tool definitions (and everything before them)
+    - `:last`: Caches the last message in the conversation (and everything before it)
+    - `:all`: Cache trigger points are inserted in all of the above places (ie, higher likelyhood of cache hit, but also slightly higher cost)
 - `kwargs`: Prompt variables to be used to fill the prompt/template
+
+Note: At the moment, the cache is only allowed for prompt segments over 1024 tokens (in some cases, over 2048 tokens). You'll get an error if you try to cache short prompts.
 
 # Returns
 If `return_all=false` (default):
@@ -445,7 +459,7 @@ function aiextract(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMP
         kwargs...)
     ##
     global MODEL_ALIASES
-    @assert (isnothing(cache)||cache in [:system, :tools, :last]) "Currently only `:system`, `:tools`, `:last` are supported for Anthropic Prompt Caching"
+    @assert (isnothing(cache)||cache in [:system, :tools, :last, :all]) "Currently only `:system`, `:tools`, `:last` and `:all` are supported for Anthropic Prompt Caching"
 
     ## Find the unique ID for the model alias provided
     model_id = get(MODEL_ALIASES, model, model)
@@ -455,7 +469,8 @@ function aiextract(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMP
     tools = [Dict("name" => sig["name"], "description" => get(sig, "description", ""),
         "input_schema" => sig["parameters"])]
     ## update tools to use caching
-    cache == :tools && (tools[end]["cache_control"] = Dict("type" => "ephemeral"))
+    (cache == :tools || cache == :all) &&
+        (tools[end]["cache_control"] = Dict("type" => "ephemeral"))
 
     ## Add the function call stopping sequence to the api_kwargs
     api_kwargs = merge(api_kwargs, (; tools))
