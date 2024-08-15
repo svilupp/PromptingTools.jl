@@ -19,7 +19,7 @@ const _hoisted_40 = /* @__PURE__ */ createBaseVNode("a", {
 }, "here", -1);
 const _hoisted_41 = /* @__PURE__ */ createBaseVNode("p", null, [
   /* @__PURE__ */ createBaseVNode("a", {
-    href: "https://github.com/svilupp/PromptingTools.jl/blob/e3331d13c2ceac370e1c1a293e45c8d9e06ff38c/src/llm_interface.jl#L286-L300",
+    href: "https://github.com/svilupp/PromptingTools.jl/blob/5c66241f2a648d835e4fc09224109e7d396a325c/src/llm_interface.jl#L286-L300",
     target: "_blank",
     rel: "noreferrer"
   }, "source")
@@ -27,8 +27,8 @@ const _hoisted_41 = /* @__PURE__ */ createBaseVNode("p", null, [
 const _hoisted_42 = /* @__PURE__ */ createStaticVNode("", 69);
 const _hoisted_111 = { style: { "border-width": "1px", "border-style": "solid", "border-color": "black", "padding": "1em", "border-radius": "25px" } };
 const _hoisted_112 = /* @__PURE__ */ createBaseVNode("a", {
-  id: 'PromptingTools.aiclassify-Union{Tuple{T}, Tuple{PromptingTools.AbstractOpenAISchema, Union{AbstractString, PromptingTools.AbstractMessage, Vector{<:PromptingTools.AbstractMessage}}}} where T<:Union{AbstractString, Tuple{var"#s90", var"#s89"} where {var"#s90"<:AbstractString, var"#s89"<:AbstractString}}',
-  href: '#PromptingTools.aiclassify-Union{Tuple{T}, Tuple{PromptingTools.AbstractOpenAISchema, Union{AbstractString, PromptingTools.AbstractMessage, Vector{<:PromptingTools.AbstractMessage}}}} where T<:Union{AbstractString, Tuple{var"#s90", var"#s89"} where {var"#s90"<:AbstractString, var"#s89"<:AbstractString}}'
+  id: 'PromptingTools.aiclassify-Union{Tuple{T}, Tuple{PromptingTools.AbstractOpenAISchema, Union{AbstractString, PromptingTools.AbstractMessage, Vector{<:PromptingTools.AbstractMessage}}}} where T<:Union{AbstractString, Tuple{var"#s89", var"#s88"} where {var"#s89"<:AbstractString, var"#s88"<:AbstractString}}',
+  href: '#PromptingTools.aiclassify-Union{Tuple{T}, Tuple{PromptingTools.AbstractOpenAISchema, Union{AbstractString, PromptingTools.AbstractMessage, Vector{<:PromptingTools.AbstractMessage}}}} where T<:Union{AbstractString, Tuple{var"#s89", var"#s88"} where {var"#s89"<:AbstractString, var"#s88"<:AbstractString}}'
 }, "#", -1);
 const _hoisted_113 = /* @__PURE__ */ createBaseVNode("b", null, [
   /* @__PURE__ */ createBaseVNode("u", null, "PromptingTools.aiclassify")
@@ -314,7 +314,7 @@ const _hoisted_254 = /* @__PURE__ */ createBaseVNode("div", { style: { "border-w
         ]),
         /* @__PURE__ */ createTextVNode("\n"),
         /* @__PURE__ */ createBaseVNode("span", { class: "line" }, [
-          /* @__PURE__ */ createBaseVNode("span", null, "[source](https://github.com/svilupp/PromptingTools.jl/blob/e3331d13c2ceac370e1c1a293e45c8d9e06ff38c/src/extraction.jl#L96-L166)")
+          /* @__PURE__ */ createBaseVNode("span", null, "[source](https://github.com/svilupp/PromptingTools.jl/blob/5c66241f2a648d835e4fc09224109e7d396a325c/src/extraction.jl#L96-L166)")
         ]),
         /* @__PURE__ */ createTextVNode("\n"),
         /* @__PURE__ */ createBaseVNode("span", { class: "line" }, [
@@ -396,7 +396,7 @@ const _hoisted_254 = /* @__PURE__ */ createBaseVNode("div", { style: { "border-w
   ]),
   /* @__PURE__ */ createBaseVNode("p", null, [
     /* @__PURE__ */ createBaseVNode("a", {
-      href: "https://github.com/svilupp/PromptingTools.jl/blob/e3331d13c2ceac370e1c1a293e45c8d9e06ff38c/src/user_preferences.jl#L108-L119",
+      href: "https://github.com/svilupp/PromptingTools.jl/blob/5c66241f2a648d835e4fc09224109e7d396a325c/src/user_preferences.jl#L108-L119",
       target: "_blank",
       rel: "noreferrer"
     }, "source")
@@ -438,7 +438,7 @@ const _hoisted_315 = /* @__PURE__ */ createBaseVNode("ul", null, [
 ], -1);
 const _hoisted_316 = /* @__PURE__ */ createBaseVNode("p", null, [
   /* @__PURE__ */ createBaseVNode("a", {
-    href: "https://github.com/svilupp/PromptingTools.jl/blob/e3331d13c2ceac370e1c1a293e45c8d9e06ff38c/src/llm_google.jl#L9-L20",
+    href: "https://github.com/svilupp/PromptingTools.jl/blob/5c66241f2a648d835e4fc09224109e7d396a325c/src/llm_google.jl#L9-L20",
     target: "_blank",
     rel: "noreferrer"
   }, "source")
@@ -472,7 +472,7 @@ const _hoisted_325 = /* @__PURE__ */ createBaseVNode("ul", null, [
 ], -1);
 const _hoisted_326 = /* @__PURE__ */ createBaseVNode("p", null, [
   /* @__PURE__ */ createBaseVNode("a", {
-    href: "https://github.com/svilupp/PromptingTools.jl/blob/e3331d13c2ceac370e1c1a293e45c8d9e06ff38c/src/llm_ollama_managed.jl#L9-L21",
+    href: "https://github.com/svilupp/PromptingTools.jl/blob/5c66241f2a648d835e4fc09224109e7d396a325c/src/llm_ollama_managed.jl#L9-L21",
     target: "_blank",
     rel: "noreferrer"
   }, "source")
@@ -501,7 +501,7 @@ const _hoisted_334 = /* @__PURE__ */ createBaseVNode("ul", null, [
 ], -1);
 const _hoisted_335 = /* @__PURE__ */ createBaseVNode("p", null, [
   /* @__PURE__ */ createBaseVNode("a", {
-    href: "https://github.com/svilupp/PromptingTools.jl/blob/e3331d13c2ceac370e1c1a293e45c8d9e06ff38c/src/llm_ollama.jl#L11-L22",
+    href: "https://github.com/svilupp/PromptingTools.jl/blob/5c66241f2a648d835e4fc09224109e7d396a325c/src/llm_ollama.jl#L11-L22",
     target: "_blank",
     rel: "noreferrer"
   }, "source")
@@ -537,7 +537,7 @@ const _hoisted_359 = /* @__PURE__ */ createBaseVNode("li", null, [
 ], -1);
 const _hoisted_360 = /* @__PURE__ */ createBaseVNode("p", null, [
   /* @__PURE__ */ createBaseVNode("a", {
-    href: "https://github.com/svilupp/PromptingTools.jl/blob/e3331d13c2ceac370e1c1a293e45c8d9e06ff38c/src/llm_shared.jl#L10-L28",
+    href: "https://github.com/svilupp/PromptingTools.jl/blob/5c66241f2a648d835e4fc09224109e7d396a325c/src/llm_shared.jl#L10-L28",
     target: "_blank",
     rel: "noreferrer"
   }, "source")
