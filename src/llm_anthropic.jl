@@ -17,7 +17,7 @@ Builds a history of the conversation to provide the prompt to the API. All unspe
 # Keyword Arguments
 - `conversation`: Past conversation to be included in the beginning of the prompt (for continued conversations).
 - `tools`: A list of tools to be used in the conversation. Added to the end of the system prompt to enforce its use.
-- `cache`: A symbol representing the caching strategy to be used. Currently only `:last` is supported.
+- `cache`: A symbol representing the caching strategy to be used. Currently only `nothing` (no caching), `:system`, `:tools`, and `:last` are supported.
 """
 function render(schema::AbstractAnthropicSchema,
         messages::Vector{<:AbstractMessage};
@@ -43,7 +43,8 @@ function render(schema::AbstractAnthropicSchema,
         elseif msg isa UserMessage || msg isa AIMessage
             content = msg.content
             push!(conversation,
-                Dict("role" => role4render(schema, msg), "content" => content))
+                Dict("role" => role4render(schema, msg),
+                    "content" => [Dict{String, Any}("type" => "text", "text" => content)]))
         elseif msg isa UserMessageWithImages
             error("AbstractAnthropicSchema does not yet support UserMessageWithImages. Please use OpenAISchema instead.")
         end
@@ -63,12 +64,15 @@ function render(schema::AbstractAnthropicSchema,
     end
 
     ## Apply cache for last message
-    if cache == :last
-        conversation[end]["cache_control"] = Dict("type" => "ephemeral")
+    is_valid_conversation = length(conversation) > 0 &&
+                            haskey(conversation[end], "content") &&
+                            length(conversation[end]["content"]) > 0
+    if cache == :last && is_valid_conversation
+        conversation[end]["content"][end]["cache_control"] = Dict("type" => "ephemeral")
     elseif cache == :system && !isnothing(system)
         ## Apply cache for system message
-        system = Dict("type" => "text", "text" => system,
-            "cache_control" => Dict("type" => "ephemeral"))
+        system = [Dict("type" => "text", "text" => system,
+            "cache_control" => Dict("type" => "ephemeral"))]
     end
 
     ## Sense check
@@ -94,7 +98,7 @@ end
         prompt_schema::AbstractAnthropicSchema,
         messages::Vector{<:AbstractDict{String, <:Any}} = Vector{Dict{String, Any}}();
         api_key::AbstractString = ANTHROPIC_API_KEY,
-        system::Union{Nothing, AbstractString, AbstractDict} = nothing,
+        system::Union{Nothing, AbstractString, AbstractVector{<:AbstractDict}} = nothing,
         endpoint::String = "messages",
         max_tokens::Int = 2048,
         model::String = "claude-3-haiku-20240307", http_kwargs::NamedTuple = NamedTuple(),
@@ -121,7 +125,7 @@ function anthropic_api(
         prompt_schema::AbstractAnthropicSchema,
         messages::Vector{<:AbstractDict{String, <:Any}} = Vector{Dict{String, Any}}();
         api_key::AbstractString = ANTHROPIC_API_KEY,
-        system::Union{Nothing, AbstractString, AbstractDict} = nothing,
+        system::Union{Nothing, AbstractString, AbstractVector{<:AbstractDict}} = nothing,
         endpoint::String = "messages",
         max_tokens::Int = 2048,
         model::String = "claude-3-haiku-20240307", http_kwargs::NamedTuple = NamedTuple(),
@@ -130,15 +134,6 @@ function anthropic_api(
         cache::Union{Nothing, Symbol} = nothing,
         kwargs...)
     @assert endpoint in ["messages"] "Only 'messages' endpoint is supported."
-    ## 
-    ## update tools to use caching
-    if cache == :tools
-        ## Add cache control, we only ever provide 1 tool with our API
-        tools = kwargs[:tools]
-        if length(tools) > 0
-            tools[end]["cache_control"] = Dict("type" => "ephemeral")
-        end
-    end
     ##
     body = Dict("model" => model, "max_tokens" => max_tokens,
         "stream" => stream, "messages" => messages, kwargs...)
@@ -194,7 +189,7 @@ Generate an AI response based on a given prompt using the Anthropic API.
 - `http_kwargs::NamedTuple`: Additional keyword arguments for the HTTP request. Defaults to empty `NamedTuple`.
 - `api_kwargs::NamedTuple`: Additional keyword arguments for the Ollama API. Defaults to an empty `NamedTuple`.
     - `max_tokens::Int`: The maximum number of tokens to generate. Defaults to 2048, because it's a required parameter for the API.
-- `cache::Union{Nothing, Symbol}`: A symbol representing the caching strategy to be used. Currently only `:last` is supported.
+- `cache`: A symbol indicating whether to use caching for the prompt. Supported values are `nothing` (no caching), `:system`, `:tools`, and `:last`. Note that COST estimate will be wrong (ignores the caching).
 - `kwargs`: Prompt variables to be used to fill the prompt/template
 
 # Returns
@@ -278,10 +273,10 @@ function aigenerate(
         content = mapreduce(x -> get(x, :text, ""), *, resp.response[:content]) |> strip
         ## Build metadata
         meta = Dict{Symbol, Any}()
-        haskey(resp.response, :cache_creation_input_tokens) &&
-            (meta[:cache_creation_input_tokens] = resp.response[:cache_creation_input_tokens])
-        haskey(resp.response, :cache_read_input_tokens) &&
-            (meta[:cache_read_input_tokens] = resp.response[:cache_read_input_tokens])
+        haskey(resp.response[:usage], :cache_creation_input_tokens) &&
+            (meta[:cache_creation_input_tokens] = resp.response[:usage][:cache_creation_input_tokens])
+        haskey(resp.response[:usage], :cache_read_input_tokens) &&
+            (meta[:cache_read_input_tokens] = resp.response[:usage][:cache_read_input_tokens])
         ## Build the message
         msg = AIMessage(; content,
             status = Int(resp.status),
@@ -318,6 +313,7 @@ end
         http_kwargs::NamedTuple = (retry_non_idempotent = true,
             retries = 5,
             readtimeout = 120), api_kwargs::NamedTuple = NamedTuple(),
+        cache::Union{Nothing, Symbol} = nothing,
         kwargs...)
 
 Extract required information (defined by a struct **`return_type`**) from the provided prompt by leveraging Anthropic's function calling mode.
@@ -342,6 +338,7 @@ It's effectively a light wrapper around `aigenerate` call, which requires additi
 - `conversation`: An optional vector of `AbstractMessage` objects representing the conversation history. If not provided, it is initialized as an empty vector.
 - `http_kwargs`: A named tuple of HTTP keyword arguments.
 - `api_kwargs`: A named tuple of API keyword arguments. 
+- `cache`: A symbol indicating whether to use caching for the prompt. Supported values are `nothing` (no caching), `:system`, `:tools`, and `:last`. Note that COST estimate will be wrong (ignores the caching).
 - `kwargs`: Prompt variables to be used to fill the prompt/template
 
 # Returns
@@ -418,7 +415,7 @@ return_type = MaybeExtract{MyMeasurement}
 # If LLM extraction fails, it will return a Dict with `error` and `message` fields instead of the result!
 msg = aiextract("Extract measurements from the text: I am giraffe"; model="claudeo", return_type)
 msg.content
-# Output: MaybeExtract{MyMeasurement}(nothing, true, "I'm sorry, but your input of \"I am giraffe\" does not contain any information about a person's age, height or weight measurements that I can extract. To use this tool, please provide a statement that includes at least the person's age, and optionally their height in inches and weight in pounds. Without that information, I am unable to extract the requested measurements.")
+# Output: MaybeExtract{MyMeasurement}(nothing, true, "I'm sorry, but your input of "I am giraffe" does not contain any information about a person's age, height or weight measurements that I can extract. To use this tool, please provide a statement that includes at least the person's age, and optionally their height in inches and weight in pounds. Without that information, I am unable to extract the requested measurements.")
 ```
 That way, you can handle the error gracefully and get a reason why extraction failed (in `msg.content.message`).
 
@@ -444,10 +441,11 @@ function aiextract(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMP
         http_kwargs::NamedTuple = (retry_non_idempotent = true,
             retries = 5,
             readtimeout = 120), api_kwargs::NamedTuple = NamedTuple(),
+        cache::Union{Nothing, Symbol} = nothing,
         kwargs...)
     ##
     global MODEL_ALIASES
-    # TODO: implement cache for aiextract
+    @assert (isnothing(cache)||cache in [:system, :tools, :last]) "Currently only `:system`, `:tools`, `:last` are supported for Anthropic Prompt Caching"
 
     ## Find the unique ID for the model alias provided
     model_id = get(MODEL_ALIASES, model, model)
@@ -456,17 +454,19 @@ function aiextract(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMP
     sig = function_call_signature(return_type; max_description_length = 100)
     tools = [Dict("name" => sig["name"], "description" => get(sig, "description", ""),
         "input_schema" => sig["parameters"])]
+    ## update tools to use caching
+    cache == :tools && (tools[end]["cache_control"] = Dict("type" => "ephemeral"))
 
     ## Add the function call stopping sequence to the api_kwargs
     api_kwargs = merge(api_kwargs, (; tools))
 
     ## We provide the tool description to the rendering engine
-    conv_rendered = render(prompt_schema, prompt; tools, conversation, kwargs...)
+    conv_rendered = render(prompt_schema, prompt; tools, conversation, cache, kwargs...)
 
     if !dry_run
         time = @elapsed resp = anthropic_api(
             prompt_schema, conv_rendered.conversation; api_key,
-            conv_rendered.system, endpoint = "messages", model = model_id, http_kwargs,
+            conv_rendered.system, endpoint = "messages", model = model_id, cache, http_kwargs,
             api_kwargs...)
         tokens_prompt = get(resp.response[:usage], :input_tokens, 0)
         tokens_completion = get(resp.response[:usage], :output_tokens, 0)
@@ -488,13 +488,20 @@ function aiextract(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMP
             @warn "No tool_use found in the response. Returning the raw text instead."
             mapreduce(x -> get(x, :text, ""), *, resp.response[:content]) |> strip
         end
+        ## Build metadata
+        meta = Dict{Symbol, Any}()
+        haskey(resp.response, :cache_creation_input_tokens) &&
+            (meta[:cache_creation_input_tokens] = resp.response[:cache_creation_input_tokens])
+        haskey(resp.response, :cache_read_input_tokens) &&
+            (meta[:cache_read_input_tokens] = resp.response[:cache_read_input_tokens])
         ## Build data message
         msg = DataMessage(; content,
             status = Int(resp.status),
             cost = call_cost(tokens_prompt, tokens_completion, model_id),
             finish_reason,
             tokens = (tokens_prompt, tokens_completion),
-            elapsed = time)
+            elapsed = time,
+            meta)
 
         ## Reporting
         verbose && @info _report_stats(msg, model_id)
