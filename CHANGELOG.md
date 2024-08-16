@@ -13,11 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.50.0]
 
 ### Breaking Changes
-- `AIMessage` and `DataMessage` now have a new field `meta` to hold any API-specific metadata in a simple dictionary. Change is backward-compatible (defaults to `nothing`).
+- `AIMessage` and `DataMessage` now have a new field `extras` to hold any API-specific metadata in a simple dictionary. Change is backward-compatible (defaults to `nothing`).
 
 ### Added
 - Added EXPERIMENTAL support for Anthropic's new prompt cache (see ?`aigenerate` and look for `cache` kwarg). Note that COST estimate will be wrong (ignores the caching discount for now).
-- Added a new `meta` field to `AIMessage` and `DataMessage` to hold any API-specific metadata in a simple dictionary (eg, used for reporting on the cache hit/miss).
+- Added a new `extras` field to `AIMessage` and `DataMessage` to hold any API-specific metadata in a simple dictionary (eg, used for reporting on the cache hit/miss).
 
 ## [0.49.0]
 

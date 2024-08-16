@@ -216,7 +216,7 @@ end
         tokens = (2, 1),
         finish_reason = "stop",
         cost = msg.cost,
-        meta = Dict{Symbol, Any}(),
+        extras = Dict{Symbol, Any}(),
         elapsed = msg.elapsed)
     @test msg == expected_output
     @test schema1.inputs.system == "Act as a helpful AI assistant"
@@ -235,7 +235,7 @@ end
         tokens = (2, 1),
         finish_reason = "stop",
         cost = msg.cost,
-        meta = Dict{Symbol, Any}(),
+        extras = Dict{Symbol, Any}(),
         elapsed = msg.elapsed)
     @test msg == expected_output
     @test schema2.inputs.system == "Act as a helpful AI assistant"
@@ -262,7 +262,7 @@ end
         tokens = (2, 1),
         finish_reason = "stop",
         cost = msg.cost,
-        meta = Dict{Symbol, Any}(
+        extras = Dict{Symbol, Any}(
             :cache_read_input_tokens => 0, :cache_creation_input_tokens => 1),
         elapsed = msg.elapsed)
     @test msg == expected_output
@@ -298,7 +298,7 @@ end
         tokens = (2, 1),
         finish_reason = "tool_use",
         cost = msg.cost,
-        meta = Dict{Symbol, Any}(),
+        extras = Dict{Symbol, Any}(),
         elapsed = msg.elapsed)
     @test msg == expected_output
     @test schema1.inputs.system ==
@@ -346,7 +346,7 @@ end
         tokens = (2, 1),
         finish_reason = "tool_use",
         cost = msg.cost,
-        meta = Dict{Symbol, Any}(
+        extras = Dict{Symbol, Any}(
             :cache_read_input_tokens => 0, :cache_creation_input_tokens => 1),
         elapsed = msg.elapsed)
     @test msg == expected_output

@@ -78,7 +78,7 @@ Returned by `aigenerate`, `aiclassify`, and `aiscan` functions.
 - `elapsed::Float64`: The time taken to generate the response in seconds.
 - `cost::Union{Nothing, Float64}`: The cost of the API call (calculated with information from `MODEL_REGISTRY`).
 - `log_prob::Union{Nothing, Float64}`: The log probability of the response.
-- `meta::Union{Nothing, Dict{Symbol, Any}}`: A dictionary for additional metadata that is not part of the key message fields. Try to limit to a small number of items and singletons to be serializable.
+- `extras::Union{Nothing, Dict{Symbol, Any}}`: A dictionary for additional metadata that is not part of the key message fields. Try to limit to a small number of items and singletons to be serializable.
 - `finish_reason::Union{Nothing, String}`: The reason the response was finished.
 - `run_id::Union{Nothing, Int}`: The unique ID of the run.
 - `sample_id::Union{Nothing, Int}`: The unique ID of the sample (if multiple samples are generated, they will all have the same `run_id`).
@@ -90,7 +90,7 @@ Base.@kwdef struct AIMessage{T <: Union{AbstractString, Nothing}} <: AbstractCha
     elapsed::Float64 = -1.0
     cost::Union{Nothing, Float64} = nothing
     log_prob::Union{Nothing, Float64} = nothing
-    meta::Union{Nothing, Dict{Symbol, Any}} = nothing
+    extras::Union{Nothing, Dict{Symbol, Any}} = nothing
     finish_reason::Union{Nothing, String} = nothing
     run_id::Union{Nothing, Int} = Int(rand(Int16))
     sample_id::Union{Nothing, Int} = nothing
@@ -110,7 +110,7 @@ Returned by `aiextract`, and `aiextract` functions.
 - `elapsed::Float64`: The time taken to generate the response in seconds.
 - `cost::Union{Nothing, Float64}`: The cost of the API call (calculated with information from `MODEL_REGISTRY`).
 - `log_prob::Union{Nothing, Float64}`: The log probability of the response.
-- `meta::Union{Nothing, Dict{Symbol, Any}}`: A dictionary for additional metadata that is not part of the key message fields. Try to limit to a small number of items and singletons to be serializable.
+- `extras::Union{Nothing, Dict{Symbol, Any}}`: A dictionary for additional metadata that is not part of the key message fields. Try to limit to a small number of items and singletons to be serializable.
 - `finish_reason::Union{Nothing, String}`: The reason the response was finished.
 - `run_id::Union{Nothing, Int}`: The unique ID of the run.
 - `sample_id::Union{Nothing, Int}`: The unique ID of the sample (if multiple samples are generated, they will all have the same `run_id`).
@@ -122,7 +122,7 @@ Base.@kwdef struct DataMessage{T <: Any} <: AbstractDataMessage
     elapsed::Float64 = -1.0
     cost::Union{Nothing, Float64} = nothing
     log_prob::Union{Nothing, Float64} = nothing
-    meta::Union{Nothing, Dict{Symbol, Any}} = nothing
+    extras::Union{Nothing, Dict{Symbol, Any}} = nothing
     finish_reason::Union{Nothing, String} = nothing
     run_id::Union{Nothing, Int} = Int(rand(Int16))
     sample_id::Union{Nothing, Int} = nothing
@@ -141,7 +141,7 @@ function (MSG::Type{<:AbstractChatMessage})(msg::AbstractTracerMessage{<:Abstrac
     MSG(; msg.content)
 end
 
-## It checks types so it should be defined for all inputs
+## It checks types so it should be defined for all inputs
 isusermessage(m::Any) = m isa UserMessage
 issystemmessage(m::Any) = m isa SystemMessage
 isdatamessage(m::Any) = m isa DataMessage

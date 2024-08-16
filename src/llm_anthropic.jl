@@ -280,18 +280,18 @@ function aigenerate(
         tokens_completion = get(resp.response[:usage], :output_tokens, 0)
         content = mapreduce(x -> get(x, :text, ""), *, resp.response[:content]) |> strip
         ## Build metadata
-        meta = Dict{Symbol, Any}()
+        extras = Dict{Symbol, Any}()
         haskey(resp.response[:usage], :cache_creation_input_tokens) &&
-            (meta[:cache_creation_input_tokens] = resp.response[:usage][:cache_creation_input_tokens])
+            (extras[:cache_creation_input_tokens] = resp.response[:usage][:cache_creation_input_tokens])
         haskey(resp.response[:usage], :cache_read_input_tokens) &&
-            (meta[:cache_read_input_tokens] = resp.response[:usage][:cache_read_input_tokens])
+            (extras[:cache_read_input_tokens] = resp.response[:usage][:cache_read_input_tokens])
         ## Build the message
         msg = AIMessage(; content,
             status = Int(resp.status),
             cost = call_cost(tokens_prompt, tokens_completion, model_id),
             finish_reason = get(resp.response, :stop_reason, nothing),
             tokens = (tokens_prompt, tokens_completion),
-            meta,
+            extras,
             elapsed = time)
         ## Reporting
         verbose && @info _report_stats(msg, model_id)
@@ -504,11 +504,11 @@ function aiextract(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMP
             mapreduce(x -> get(x, :text, ""), *, resp.response[:content]) |> strip
         end
         ## Build metadata
-        meta = Dict{Symbol, Any}()
+        extras = Dict{Symbol, Any}()
         haskey(resp.response[:usage], :cache_creation_input_tokens) &&
-            (meta[:cache_creation_input_tokens] = resp.response[:usage][:cache_creation_input_tokens])
+            (extras[:cache_creation_input_tokens] = resp.response[:usage][:cache_creation_input_tokens])
         haskey(resp.response[:usage], :cache_read_input_tokens) &&
-            (meta[:cache_read_input_tokens] = resp.response[:usage][:cache_read_input_tokens])
+            (extras[:cache_read_input_tokens] = resp.response[:usage][:cache_read_input_tokens])
         ## Build data message
         msg = DataMessage(; content,
             status = Int(resp.status),
@@ -516,7 +516,7 @@ function aiextract(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMP
             finish_reason,
             tokens = (tokens_prompt, tokens_completion),
             elapsed = time,
-            meta)
+            extras)
 
         ## Reporting
         verbose && @info _report_stats(msg, model_id)
