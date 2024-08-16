@@ -216,10 +216,12 @@ end
         tokens = (2, 1),
         finish_reason = "stop",
         cost = msg.cost,
+        meta = Dict{Symbol, Any}(),
         elapsed = msg.elapsed)
     @test msg == expected_output
     @test schema1.inputs.system == "Act as a helpful AI assistant"
-    @test schema1.inputs.messages == [Dict("role" => "user", "content" => "Hello World")]
+    @test schema1.inputs.messages == [Dict(
+        "role" => "user", "content" => [Dict("type" => "text", "text" => "Hello World")])]
     @test schema1.model_id == "claude-3-opus-20240229"
 
     # Test different input combinations and different prompts
@@ -233,11 +235,47 @@ end
         tokens = (2, 1),
         finish_reason = "stop",
         cost = msg.cost,
+        meta = Dict{Symbol, Any}(),
         elapsed = msg.elapsed)
     @test msg == expected_output
     @test schema2.inputs.system == "Act as a helpful AI assistant"
-    @test schema2.inputs.messages == [Dict("role" => "user", "content" => "Hello World")]
+    @test schema2.inputs.messages == [Dict(
+        "role" => "user", "content" => [Dict("type" => "text", "text" => "Hello World")])]
     @test schema2.model_id == "claude-3-5-sonnet-20240620"
+
+    # With caching
+    response3 = Dict(
+        :content => [
+            Dict(:text => "Hello!")],
+        :stop_reason => "stop",
+        :usage => Dict(:input_tokens => 2, :output_tokens => 1,
+            :cache_creation_input_tokens => 1, :cache_read_input_tokens => 0))
+
+    schema3 = TestEchoAnthropicSchema(; response = response3, status = 200)
+    msg = aigenerate(schema3, UserMessage("Hello {{name}}"),
+        model = "claudes", http_kwargs = (; verbose = 3), api_kwargs = (; temperature = 0),
+        cache = :all,
+        name = "World")
+    expected_output = AIMessage(;
+        content = "Hello!" |> strip,
+        status = 200,
+        tokens = (2, 1),
+        finish_reason = "stop",
+        cost = msg.cost,
+        meta = Dict{Symbol, Any}(
+            :cache_read_input_tokens => 0, :cache_creation_input_tokens => 1),
+        elapsed = msg.elapsed)
+    @test msg == expected_output
+    @test schema3.inputs.system == [Dict("cache_control" => Dict("type" => "ephemeral"),
+        "text" => "Act as a helpful AI assistant", "type" => "text")]
+    @test schema3.inputs.messages == [Dict("role" => "user",
+        "content" => Dict{String, Any}[Dict("cache_control" => Dict("type" => "ephemeral"),
+            "text" => "Hello World", "type" => "text")])]
+    @test schema3.model_id == "claude-3-5-sonnet-20240620"
+
+    ## Bad cache
+    @test_throws AssertionError aigenerate(
+        schema3, UserMessage("Hello {{name}}"); model = "claudeo", cache = :bad)
 end
 
 @testset "aiextract-Anthropic" begin
@@ -260,12 +298,15 @@ end
         tokens = (2, 1),
         finish_reason = "tool_use",
         cost = msg.cost,
+        meta = Dict{Symbol, Any}(),
         elapsed = msg.elapsed)
     @test msg == expected_output
     @test schema1.inputs.system ==
           "Act as a helpful AI assistant\n\nUse the Fruit_extractor tool in your response."
     @test schema1.inputs.messages ==
-          [Dict("role" => "user", "content" => "Hello World! Banana")]
+          [Dict("role" => "user",
+        "content" => Dict{String, Any}[Dict(
+            "text" => "Hello World! Banana", "type" => "text")])]
     @test schema1.model_id == "claude-3-opus-20240229"
 
     # Test badly formatted response
@@ -288,6 +329,32 @@ end
     schema3 = TestEchoAnthropicSchema(; response, status = 200)
     msg = aiextract(schema3, "Hello World! Banana"; model = "claudeo", return_type = Fruit)
     @test msg.content == "No tools for you!"
+
+    # With Cache
+    response4 = Dict(
+        :content => [
+            Dict(:type => "tool_use", :input => Dict("name" => "banana"))],
+        :stop_reason => "tool_use",
+        :usage => Dict(:input_tokens => 2, :output_tokens => 1,
+            :cache_creation_input_tokens => 1, :cache_read_input_tokens => 0))
+    schema4 = TestEchoAnthropicSchema(; response = response4, status = 200)
+    msg = aiextract(
+        schema4, "Hello World! Banana"; model = "claudeo", return_type = Fruit, cache = :all)
+    expected_output = DataMessage(;
+        content = Fruit("banana"),
+        status = 200,
+        tokens = (2, 1),
+        finish_reason = "tool_use",
+        cost = msg.cost,
+        meta = Dict{Symbol, Any}(
+            :cache_read_input_tokens => 0, :cache_creation_input_tokens => 1),
+        elapsed = msg.elapsed)
+    @test msg == expected_output
+
+    # Bad cache
+    @test_throws AssertionError aiextract(
+        schema4, "Hello World! Banana"; model = "claudeo",
+        return_type = Fruit, cache = :bad)
 end
 
 @testset "not implemented ai* functions" begin
