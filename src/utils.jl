@@ -468,8 +468,8 @@ function _report_stats(msg,
         model::String)
     cost = call_cost(msg, model)
     cost_str = iszero(cost) ? "" : " @ Cost: \$$(round(cost; digits=4))"
-    metadata_str = if !isnothing(msg.meta) && !isempty(msg.meta)
-        " (Metadata: $(join([string(k, " => ", v) for (k, v) in msg.meta if v isa Number && !iszero(v)], ", ")))"
+    metadata_str = if !isnothing(msg.extras) && !isempty(msg.extras)
+        " (Metadata: $(join([string(k, " => ", v) for (k, v) in msg.extras if v isa Number && !iszero(v)], ", ")))"
     else
         ""
     end
