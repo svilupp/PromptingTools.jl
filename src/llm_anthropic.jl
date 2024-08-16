@@ -158,7 +158,7 @@ end
 function anthropic_api(prompt_schema::TestEchoAnthropicSchema,
         messages::Vector{<:AbstractDict{String, <:Any}} = Vector{Dict{String, Any}}();
         api_key::AbstractString = ANTHROPIC_API_KEY,
-        system::Union{Nothing, AbstractString} = nothing,
+        system::Union{Nothing, AbstractString, AbstractVector{<:AbstractDict}} = nothing,
         endpoint::String = "messages",
         cache::Union{Nothing, Symbol} = nothing,
         model::String = "claude-3-haiku-20240307", kwargs...)
@@ -505,10 +505,10 @@ function aiextract(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMP
         end
         ## Build metadata
         meta = Dict{Symbol, Any}()
-        haskey(resp.response, :cache_creation_input_tokens) &&
-            (meta[:cache_creation_input_tokens] = resp.response[:cache_creation_input_tokens])
-        haskey(resp.response, :cache_read_input_tokens) &&
-            (meta[:cache_read_input_tokens] = resp.response[:cache_read_input_tokens])
+        haskey(resp.response[:usage], :cache_creation_input_tokens) &&
+            (meta[:cache_creation_input_tokens] = resp.response[:usage][:cache_creation_input_tokens])
+        haskey(resp.response[:usage], :cache_read_input_tokens) &&
+            (meta[:cache_read_input_tokens] = resp.response[:usage][:cache_read_input_tokens])
         ## Build data message
         msg = DataMessage(; content,
             status = Int(resp.status),
