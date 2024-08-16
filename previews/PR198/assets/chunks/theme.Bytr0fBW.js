@@ -2220,7 +2220,7 @@ const _hoisted_3$6 = {
 const _sfc_main$k = /* @__PURE__ */ defineComponent({
   __name: "VPNavBarSearch",
   setup(__props) {
-    const VPLocalSearchBox = defineAsyncComponent(() => __vitePreload(() => import("./VPLocalSearchBox.DsSCGdA0.js"), true ? __vite__mapDeps([0,1]) : void 0));
+    const VPLocalSearchBox = defineAsyncComponent(() => __vitePreload(() => import("./VPLocalSearchBox.Ce22TN3g.js"), true ? __vite__mapDeps([0,1]) : void 0));
     const VPAlgoliaSearchBox = () => null;
     const { theme: theme2 } = useData();
     const loaded = ref(false);
@@ -3405,7 +3405,7 @@ export {
 };
 function __vite__mapDeps(indexes) {
   if (!__vite__mapDeps.viteFileDeps) {
-    __vite__mapDeps.viteFileDeps = ["assets/chunks/VPLocalSearchBox.DsSCGdA0.js","assets/chunks/framework.YP6oD09s.js"]
+    __vite__mapDeps.viteFileDeps = ["assets/chunks/VPLocalSearchBox.Ce22TN3g.js","assets/chunks/framework.YP6oD09s.js"]
   }
   return indexes.map((i) => __vite__mapDeps.viteFileDeps[i])
 }
