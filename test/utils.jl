@@ -236,6 +236,13 @@ end
     msg = AIMessage(; content = "", tokens = (1000, 5000), elapsed = 5.0)
     expected_output = "Tokens: 6000 @ Cost: \$0.008 in 5.0 seconds"
     @test _report_stats(msg, "gpt-3.5-turbo") == expected_output
+
+    # Add extra metadata
+    msg = AIMessage(; content = "", tokens = (1000, 5000), elapsed = 5.0,
+        extras = Dict{Symbol, Any}(
+            :cache_read_input_tokens => 100, :cache_creation_input_tokens => 200))
+    expected_output = "Tokens: 6000 @ Cost: \$0.008 in 5.0 seconds (Metadata: cache_read_input_tokens => 100, cache_creation_input_tokens => 200)"
+    @test _report_stats(msg, "gpt-3.5-turbo") == expected_output
 end
 
 @testset "_string_to_vector" begin
