@@ -55,21 +55,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Setup Node # This is still useful because it caches the node_modules so we don't constantly re-install.  You don't technically need this, though.
-        uses: actions/setup-node@v3
-        with:
-            node-version: 20
-            cache: npm # or pnpm / yarn
-            cache-dependency-path: 'docs/package-lock.json' # this should be a package-lock.json file
       - name: Setup Julia
         uses: julia-actions/setup-julia@v1
       - name: Pull Julia cache
         uses: julia-actions/cache@v1
       - name: Install documentation dependencies
         run: julia --project=docs -e 'using Pkg; pkg"dev ."; Pkg.instantiate(); Pkg.precompile(); Pkg.status()'
-      - name: Instantiate NPM
-        run: cd docs/; npm i; cd ..
-      #- name: Creating new mds from src
       - name: Build and deploy docs
         uses: julia-actions/julia-docdeploy@v1
         env:
