@@ -19,14 +19,14 @@ https://github.com/vuejs/vitepress/blob/main/src/client/theme-default/styles/var
 
 /* Fonts */
 
- :root {
+:root {
   /* Typography */
   --vp-font-family-base: "Barlow", "Inter var experimental", "Inter var",
     -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
     Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
 
   /* Code Snippet font */
-  --vp-font-family-mono: "Space Mono", Menlo, Monaco, Consolas, "Courier New",
+  --vp-font-family-mono: "Fira Code", Menlo, Monaco, Consolas, "Courier New",
     monospace;
 }
 
@@ -38,8 +38,8 @@ https://github.com/vuejs/vitepress/blob/main/src/client/theme-default/styles/var
   --julia-red: #CB3C33;
   --julia-green: #389826;
 
-  --vp-c-brand: #389826;
-  --vp-c-brand-light: #3dd027;
+  --vp-c-brand: rgb(209, 110, 142);
+  --vp-c-brand-light: rgb(136,109,156);
   --vp-c-brand-lighter: #9499ff;
   --vp-c-brand-lightest: #bcc0ff;
   --vp-c-brand-dark: #535bf2;
@@ -67,15 +67,15 @@ https://github.com/vuejs/vitepress/blob/main/src/client/theme-default/styles/var
   --vp-home-hero-name-color: transparent;
   --vp-home-hero-name-background: -webkit-linear-gradient(
     120deg,
-    #9558B2 30%,
-    #CB3C33
+    rgb(136,109,156) 30%,
+    rgb(209, 110, 142)
   );
 
   --vp-home-hero-image-background-image: linear-gradient(
-    -45deg,
-    #9558B2 30%,
-    #389826 30%,
-    #CB3C33 
+    -120deg,
+    rgba(136,109,156, 0.75) 10%,
+    rgba(47, 47, 47,0.1) 50%,
+    rgba(209, 110, 142,0.75)
   );
   --vp-home-hero-image-filter: blur(40px);
 }
@@ -154,17 +154,17 @@ mjx-container > svg {
  * -------------------------------------------------------------------------- */
 
  :root {
-  --vp-c-brand-1: #CB3C33;
-  --vp-c-brand-2: #CB3C33;
-  --vp-c-brand-3: #CB3C33;
+  --vp-c-brand-1: rgb(136,109,156);
+  --vp-c-brand-2: rgb(136,109,156);
+  --vp-c-brand-3: rgb(136,109,156);
   --vp-c-sponsor: #ca2971;
   --vitest-c-sponsor-hover: #c13071;
 }
 
 .dark {
-  --vp-c-brand-1: #91dd33;
-  --vp-c-brand-2: #91dd33;
-  --vp-c-brand-3: #91dd33;
-  --vp-c-sponsor: #91dd33;
+  --vp-c-brand-1: rgb(209, 110, 142);
+  --vp-c-brand-2: rgb(209, 110, 142);
+  --vp-c-brand-3: rgb(209, 110, 142);
+  --vp-c-sponsor: rgb(209, 110, 142);
   --vitest-c-sponsor-hover: #e51370;
 }
