@@ -58,6 +58,11 @@ end
 end
 
 @testset "get_embeddings" begin
+    # docs should not be empty
+    @test_throws AssertionError get_embeddings(BatchEmbedder(), String[])
+    @test_throws AssertionError get_embeddings(BinaryBatchEmbedder(), String[])
+    @test_throws AssertionError get_embeddings(BitPackedBatchEmbedder(), String[])
+
     # corresponds to OpenAI API v1
     response1 = Dict(:data => [Dict(:embedding => ones(128, 2))],
         :usage => Dict(:total_tokens => 2, :prompt_tokens => 2, :completion_tokens => 0))

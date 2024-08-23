@@ -266,6 +266,8 @@ function get_embeddings(embedder::BatchEmbedder, docs::AbstractVector{<:Abstract
         target_batch_size_length::Int = 80_000,
         ntasks::Int = 4 * Threads.nthreads(),
         kwargs...)
+    @assert !isempty(docs) "The list of docs to get embeddings from should not be empty."
+
     ## check if extension is available
     ext = Base.get_extension(PromptingTools, :RAGToolsExperimentalExt)
     if isnothing(ext)
@@ -338,6 +340,8 @@ function get_embeddings(
         target_batch_size_length::Int = 80_000,
         ntasks::Int = 4 * Threads.nthreads(),
         kwargs...)
+    @assert !isempty(docs) "The list of docs to get embeddings from should not be empty."
+
     emb = get_embeddings(BatchEmbedder(), docs; verbose, model, truncate_dimension,
         cost_tracker, target_batch_size_length, ntasks, kwargs...)
     # This will return Matrix{Bool}, eg, map(>(0),emb)
@@ -387,6 +391,8 @@ function get_embeddings(
         target_batch_size_length::Int = 80_000,
         ntasks::Int = 4 * Threads.nthreads(),
         kwargs...)
+    @assert !isempty(docs) "The list of docs to get embeddings from should not be empty."
+
     emb = get_embeddings(BatchEmbedder(), docs; verbose, model, truncate_dimension,
         cost_tracker, target_batch_size_length, ntasks, kwargs...)
     # This will return Matrix{UInt64} to save space
