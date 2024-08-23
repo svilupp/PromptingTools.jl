@@ -37,8 +37,8 @@ context = build_context(ContextEnumerator(), index, candidates; chunks_window_ma
 ```
 """
 function build_context(contexter::ContextEnumerator,
-        index::AbstractManagedIndex,
-        candidates::AbstractCandidateWithChunks;
+        index::AbstractDocumentIndex,
+        candidates::AbstractCandidateChunks;
         verbose::Bool = true,
         chunks_window_margin::Tuple{Int, Int} = (1, 1), kwargs...)
     ## Checks
@@ -99,7 +99,12 @@ end
 
 # Mutating version that dispatches on the result to the underlying implementation
 function build_context!(contexter::ContextEnumerator,
-        index::Union{AbstractDocumentIndex, AbstractManagedIndex}, result::AbstractRAGResult; kwargs...)
+        index::AbstractDocumentIndex, result::AbstractRAGResult; kwargs...)
+    result.context = build_context(contexter, index, result.reranked_candidates; kwargs...)
+    return result
+end
+function build_context!(contexter::ContextEnumerator,
+        index::AbstractManagedIndex, result::AbstractRAGResult; kwargs...)
     result.context = build_context(contexter, index, result.reranked_candidates; kwargs...)
     return result
 end
@@ -144,7 +149,32 @@ Generates an answer using the `aigenerate` function with the provided `result.co
 
 """
 function answer!(
-        answerer::SimpleAnswerer, index::Union{AbstractDocumentIndex, AbstractManagedIndex}, result::AbstractRAGResult;
+        answerer::SimpleAnswerer, index::AbstractDocumentIndex, result::AbstractRAGResult;
+        model::AbstractString = PT.MODEL_CHAT, verbose::Bool = true,
+        template::Symbol = :RAGAnswerFromContext,
+        cost_tracker = Threads.Atomic{Float64}(0.0),
+        kwargs...)
+    ## Checks
+    placeholders = only(aitemplates(template)).variables # only one template should be found
+    @assert (:question in placeholders)&&(:context in placeholders) "Provided RAG Template $(template) is not suitable. It must have placeholders: `question` and `context`."
+    ##
+    (; context, question) = result
+    conv = aigenerate(template; question,
+        context = join(context, "\n\n"), model, verbose = false,
+        return_all = true,
+        kwargs...)
+    msg = conv[end]
+    result.answer = strip(msg.content)
+    result.conversations[:answer] = conv
+    ## Increment the cost tracker
+    Threads.atomic_add!(cost_tracker, msg.cost)
+    verbose &&
+        @info "Done generating the answer. Cost: \$$(round(msg.cost,digits=3))"
+
+    return result
+end
+function answer!(
+        answerer::SimpleAnswerer, index::AbstractManagedIndex, result::AbstractRAGResult;
         model::AbstractString = PT.MODEL_CHAT, verbose::Bool = true,
         template::Symbol = :RAGAnswerFromContext,
         cost_tracker = Threads.Atomic{Float64}(0.0),

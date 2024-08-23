@@ -741,12 +741,12 @@ Builds a `PineconeIndex` containing a Pinecone context (API key, index and names
 function build_index(
         indexer::PineconeIndexer,
         context::Pinecone.PineconeContextv3 = Pinecone.init_v3(""),
-        index::Pinecone.PineconeIndexv3 = "",
-        namespace::AbstractString,
+        index::Pinecone.PineconeIndexv3 = nothing,
+        namespace::AbstractString = "",
         verbose::Integer = 1,
         index_id = gensym(namespace),
         cost_tracker = Threads.Atomic{Float64}(0.0))
-    @assert !isempty(context.api_key) && !isempty(index) "Pinecone context and index not set"
+    @assert !isempty(context.apikey) && !isnothing(index) "Pinecone context and index not set"
 
     # TODO: add chunking, embedding, tags?
 

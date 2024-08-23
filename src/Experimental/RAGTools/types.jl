@@ -136,7 +136,6 @@ chunkdata(index::ChunkEmbeddingsIndex) = embeddings(index)
 # For backward compatibility
 const ChunkIndex = ChunkEmbeddingsIndex
 
-abstract type AbstractManagedIndex end
 indexid(index::AbstractManagedIndex) = index.id
 
 using Pinecone: Pinecone, PineconeContextv3, PineconeIndexv3

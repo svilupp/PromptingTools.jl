@@ -734,9 +734,20 @@ function rerank(reranker::AbstractReranker,
 end
 
 function rerank(reranker::NoReranker,
-        index::Union{AbstractDocumentIndex, AbstractManagedIndex},
+        index::AbstractDocumentIndex,
         question::AbstractString,
-        candidates::Union{AbstractCandidateChunks, AbstractCandidateWithChunks};
+        candidates::AbstractCandidateChunks;
+        top_n::Integer = length(candidates),
+        kwargs...)
+    # Since this is almost a passthrough strategy, it returns the candidate_chunks unchanged
+    # but it truncates to `top_n` if necessary
+    return first(candidates, top_n)
+end
+
+function rerank(reranker::NoReranker,
+        index::AbstractManagedIndex,
+        question::AbstractString,
+        candidates::AbstractCandidateWithChunks;
         top_n::Integer = length(candidates),
         kwargs...)
     # Since this is almost a passthrough strategy, it returns the candidate_chunks unchanged

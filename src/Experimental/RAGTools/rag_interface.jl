@@ -138,6 +138,8 @@ abstract type AbstractTagger <: AbstractIndexingMethod end
 ### Index itself - return type of `build_index`
 abstract type AbstractDocumentIndex end
 
+abstract type AbstractManagedIndex end
+
 """
     AbstractMultiIndex <: AbstractDocumentIndex
 
