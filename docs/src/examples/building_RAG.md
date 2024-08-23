@@ -175,17 +175,16 @@ Let's run each question & answer through our eval loop in async (we do it only f
 ````julia
 results = asyncmap(evals[1:10]) do qa_item
     # Generate an answer -- often you want the model_judge to be the highest quality possible, eg, "GPT-4 Turbo" (alias "gpt4t)
-    msg, ctx = airag(index; qa_item.question, return_all = true,
-        top_k = 3, verbose = false, model_judge = "gpt4t")
+    ctx = airag(index; qa_item.question, return_all = true, verbose = false)
     # Evaluate the response
     # Note: you can log key parameters for easier analysis later
-    run_qa_evals(qa_item, ctx; parameters_dict = Dict(:top_k => 3), verbose = false)
+    run_qa_evals(qa_item, ctx; parameters_dict = Dict(:top_k => 3), verbose = false, model_judge = "gpt4t")
 end
 ## Note that the "failed" evals can show as "nothing" (failed as in there was some API error or parsing error), so make sure to handle them.
 results = filter(x->!isnothing(x.answer_score), results);
 ````
 
-Note: You could also use the vectorized version `results = run_qa_evals(evals)` to evaluate all items at once.
+Note: You could also use the vectorized version `results = run_qa_evals(index, evals)` to evaluate all items at once.
 
 ````julia
 
