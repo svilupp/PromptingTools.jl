@@ -139,14 +139,31 @@ const ChunkIndex = ChunkEmbeddingsIndex
 indexid(index::AbstractManagedIndex) = index.id
 
 using Pinecone: Pinecone, PineconeContextv3, PineconeIndexv3
-@kwdef struct PineconeIndex <: AbstractManagedIndex
+@kwdef struct PineconeIndex{
+    T1 <: Union{Nothing, AbstractString},
+    T2 <: Union{Nothing, Matrix{<:Real}},
+    T3 <: Union{Nothing, AbstractMatrix{<:Bool}}
+} <: AbstractManagedIndex
     id::Symbol  # namespace
     context::Pinecone.PineconeContextv3
     index::Pinecone.PineconeIndexv3
     namespace::String
+    # underlying document chunks / snippets
+    chunks::Vector{T1} = nothing
+    # for semantic search
+    embeddings::T2 = nothing
+    # for exact search, filtering, etc.
+    # expected to be some sparse structure, eg, sparse matrix or nothing
+    # column oriented, ie, each column is one item in `tags_vocab` and rows are the chunks
+    tags::T3 = nothing
+    tags_vocab::Union{Nothing, Vector{<:AbstractString}} = nothing
+    # metadata for each chunk
+    metadata::Vector{Dict{String, Any}} = Vector{Dict{String, Any}}()
+    sources::Union{Nothing, Vector{<:AbstractString}} = nothing
 end
 HasKeywords(::PineconeIndex) = false
 HasEmbeddings(::PineconeIndex) = true
+embeddings(index::PineconeIndex) = index.embeddings
 
 abstract type AbstractDocumentTermMatrix end
 

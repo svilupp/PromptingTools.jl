@@ -256,8 +256,6 @@ function find_closest(
     pinecone_results_json = JSON3.read(pinecone_results)
     matches = pinecone_results_json.matches
 
-    # println(matches[1])
-
     # get the chunks / metadata / sources / scores
     positions = [1 for _ in matches]  # TODO: change this
     scores = [m.score for m in matches]

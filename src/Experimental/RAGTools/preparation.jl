@@ -147,7 +147,7 @@ end
 Pinecone index to be returned by `build_index`.
 """
 @kwdef mutable struct PineconeIndexer <: AbstractIndexBuilder
-    chunker::AbstractChunker = TextChunker()
+    chunker::AbstractChunker = FileChunker()
     embedder::AbstractEmbedder = SimpleEmbedder()
     tagger::AbstractTagger = NoTagger()
 end
@@ -726,7 +726,8 @@ function build_index(
     return index
 end
 
-using Pinecone: Pinecone, PineconeContextv3, PineconeIndexv3, init_v3, Index
+using Pinecone: Pinecone, PineconeContextv3, PineconeIndexv3, init_v3, Index, PineconeVector, upsert
+using UUIDs: UUIDs, uuid4
 # TODO: change docs
 """
     build_index(
@@ -739,18 +740,60 @@ using Pinecone: Pinecone, PineconeContextv3, PineconeIndexv3, init_v3, Index
 Builds a `PineconeIndex` containing a Pinecone context (API key, index and namespace).
 """
 function build_index(
-        indexer::PineconeIndexer,
+        indexer::PineconeIndexer, files_or_docs::Vector{<:AbstractString};
+        metadata::Vector{Dict{String, Any}} = Vector{Dict{String, Any}}(),
         context::Pinecone.PineconeContextv3 = Pinecone.init_v3(""),
         index::Pinecone.PineconeIndexv3 = nothing,
         namespace::AbstractString = "",
+        upsert::Bool = false,
         verbose::Integer = 1,
         index_id = gensym(namespace),
+        chunker::AbstractChunker = indexer.chunker,
+        chunker_kwargs::NamedTuple = NamedTuple(),
+        embedder::AbstractEmbedder = indexer.embedder,
+        embedder_kwargs::NamedTuple = NamedTuple(),
+        tagger::AbstractTagger = indexer.tagger,
+        tagger_kwargs::NamedTuple = NamedTuple(),
+        api_kwargs::NamedTuple = NamedTuple(),
         cost_tracker = Threads.Atomic{Float64}(0.0))
     @assert !isempty(context.apikey) && !isnothing(index) "Pinecone context and index not set"
 
-    # TODO: add chunking, embedding, tags?
+    ## Split into chunks
+    chunks, sources = get_chunks(chunker, files_or_docs;
+        chunker_kwargs...)
+    ## Get metadata for each chunk
+    if isempty(metadata)
+        metadata = [Dict{String, Any}() for _ in sources]
+    else
+        metadata = [metadata[findfirst(f -> f == source, files_or_docs)] for source in sources]
+        [metadata[idx]["content"] = chunk for (idx, chunk) in enumerate(chunks)]
+    end
 
-    index = PineconeIndex(; id = index_id, context, index, namespace)
+    ## Embed chunks
+    embeddings = get_embeddings(embedder, chunks;
+        verbose = (verbose > 1),
+        cost_tracker,
+        api_kwargs, embedder_kwargs...)
+
+    ## Extract tags
+    tags_extracted = get_tags(tagger, chunks;
+        verbose = (verbose > 1),
+        cost_tracker,
+        api_kwargs, tagger_kwargs...)
+    # Build the sparse matrix and the vocabulary
+    tags, tags_vocab = build_tags(tagger, tags_extracted)
+
+    # Upsert to Pinecone
+    if upsert
+        embeddings_arr = [embeddings[:,i] for i in axes(embeddings,2)]
+        for (idx, emb) in enumerate(embeddings_arr)
+            pinevector = Pinecone.PineconeVector(string(UUIDs.uuid4()), emb, metadata[idx])
+            Pinecone.upsert(context, index, [pinevector], namespace)
+            @info "Upsert #$idx complete"
+        end
+    end
+
+    index = PineconeIndex(; id = index_id, context, index, namespace, chunks, embeddings, tags, tags_vocab, metadata, sources)
 
     (verbose > 0) && @info "Index built! (cost: \$$(round(cost_tracker[], digits=3)))"
 

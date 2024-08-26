@@ -760,6 +760,10 @@ const DEFAULT_RAG_CONFIG = RAGConfig()
 function airag(index::AbstractDocumentIndex; question::AbstractString, kwargs...)
     return airag(DEFAULT_RAG_CONFIG, index; question, kwargs...)
 end
+const DEFAULT_RAG_CONFIG_PINECONE = RAGConfig(PineconeIndexer(), PineconeRetriever(), AdvancedGenerator())
+function airag(index::AbstractManagedIndex; question::AbstractString, kwargs...)
+    return airag(DEFAULT_RAG_CONFIG_PINECONE, index; question, kwargs...)
+end
 
 # Special method to pretty-print the airag results
 function PT.pprint(io::IO, airag_result::Tuple{PT.AIMessage, AbstractRAGResult},
