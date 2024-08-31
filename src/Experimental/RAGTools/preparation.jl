@@ -742,12 +742,12 @@ Builds a `PineconeIndex` containing a Pinecone context (API key, index and names
 function build_index(
         indexer::PineconeIndexer, files_or_docs::Vector{<:AbstractString};
         metadata::Vector{Dict{String, Any}} = Vector{Dict{String, Any}}(),
-        context::Pinecone.PineconeContextv3 = Pinecone.init_v3(""),
-        index::Pinecone.PineconeIndexv3 = nothing,
-        namespace::AbstractString = "",
+        pinecone_context::Pinecone.PineconeContextv3 = Pinecone.init_v3(""),
+        pinecone_index::Pinecone.PineconeIndexv3 = nothing,
+        pinecone_namespace::AbstractString = "",
         upsert::Bool = false,
         verbose::Integer = 1,
-        index_id = gensym(namespace),
+        index_id = gensym(pinecone_namespace),
         chunker::AbstractChunker = indexer.chunker,
         chunker_kwargs::NamedTuple = NamedTuple(),
         embedder::AbstractEmbedder = indexer.embedder,
@@ -756,7 +756,7 @@ function build_index(
         tagger_kwargs::NamedTuple = NamedTuple(),
         api_kwargs::NamedTuple = NamedTuple(),
         cost_tracker = Threads.Atomic{Float64}(0.0))
-    @assert !isempty(context.apikey) && !isnothing(index) "Pinecone context and index not set"
+    @assert !isempty(pinecone_context.apikey) && !isnothing(pinecone_index) "Pinecone context and index not set"
 
     ## Split into chunks
     chunks, sources = get_chunks(chunker, files_or_docs;
@@ -788,12 +788,12 @@ function build_index(
         embeddings_arr = [embeddings[:,i] for i in axes(embeddings,2)]
         for (idx, emb) in enumerate(embeddings_arr)
             pinevector = Pinecone.PineconeVector(string(UUIDs.uuid4()), emb, metadata[idx])
-            Pinecone.upsert(context, index, [pinevector], namespace)
+            Pinecone.upsert(pinecone_context, pinecone_index, [pinevector], pinecone_namespace)
             @info "Upsert #$idx complete"
         end
     end
 
-    index = PineconeIndex(; id = index_id, context, index, namespace, chunks, embeddings, tags, tags_vocab, metadata, sources)
+    index = PineconeIndex(; id = index_id, pinecone_context, pinecone_index, pinecone_namespace, chunks, embeddings, tags, tags_vocab, metadata, sources)
 
     (verbose > 0) && @info "Index built! (cost: \$$(round(cost_tracker[], digits=3)))"
 

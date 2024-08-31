@@ -246,9 +246,9 @@ function find_closest(
         query_emb::AbstractVector{<:Real}, query_tokens::AbstractVector{<:AbstractString} = String[];
         top_n::Int = 10, kwargs...)
     # get Pinecone info
-    pinecone_context = index.context
-    pinecone_index = index.index
-    pinecone_namespace = index.namespace
+    pinecone_context = index.pinecone_context
+    pinecone_index = index.pinecone_index
+    pinecone_namespace = index.pinecone_namespace
 
     # query candidates
     pinecone_results = Pinecone.query(pinecone_context, pinecone_index,
