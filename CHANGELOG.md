@@ -13,8 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.51.0]
 
 ### Added
-- Added more flexible structured extraction with `aiextract` -> now you can simply provide the field names and types without specifying the struct (in `aiextract`, provide the fields like `return_type = [:field_name => field_type]`). 
-- Added a way to attach field-level descriptions to the generated JSON schemas to better structured extraction (see `?update_schema_descriptions!`), which was not possible with structs.
+- Added more flexible structured extraction with `aiextract` -> now you can simply provide the field names and, optionally, their types without specifying the struct itself (in `aiextract`, provide the fields like `return_type = [:field_name => field_type]`). 
+- Added a way to attach field-level descriptions to the generated JSON schemas to better structured extraction (see `?update_schema_descriptions!` to see the syntax), which was not possible with struct-only extraction.
 
 ## [0.50.0]
 

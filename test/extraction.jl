@@ -311,78 +311,6 @@ end
     @test !haskey(params["properties"]["email"], "null")
 end
 
-@testset "function_call_signature" begin
-    "Some docstring"
-    struct MyMeasurement2
-        age::Int
-        height::Union{Int, Nothing}
-        weight::Union{Nothing, Float64}
-    end
-    output, t = function_call_signature(MyMeasurement2)#|> JSON3.pretty
-    expected_output = Dict{String, Any}("name" => "MyMeasurement2_extractor",
-        "parameters" => Dict{String, Any}(
-            "properties" => Dict{String, Any}(
-                "height" => Dict{
-                    String,
-                    Any
-                }("type" => "integer"),
-                "weight" => Dict{String, Any}("type" => "number"),
-                "age" => Dict{String, Any}("type" => "integer")),
-            "required" => ["age"],
-            "type" => "object"),
-        "description" => "Some docstring\n")
-    @test output == expected_output
-
-    ## MaybeWraper name cleanup
-    schema, t = function_call_signature(MaybeExtract{MyMeasurement2})
-    @test schema["name"] == "MaybeExtractMyMeasurement2_extractor"
-
-    ## Test with strict = true
-
-    "Person's age, height, and weight."
-    struct MyMeasurement3
-        age::Int
-        height::Union{Int, Nothing}
-        weight::Union{Nothing, Float64}
-    end
-
-    # Test with strict = nothing (default behavior)
-    output_default, t = function_call_signature(MyMeasurement3)
-    @test !haskey(output_default, "strict")
-    @test output_default["name"] == "MyMeasurement3_extractor"
-    @test output_default["parameters"]["type"] == "object"
-    @test output_default["parameters"]["required"] == ["age"]
-    @test !haskey(output_default["parameters"], "additionalProperties")
-
-    # Test with strict =false
-    output_not_strict, t = function_call_signature(MyMeasurement3; strict = false)
-    @test haskey(output_not_strict, "strict")
-    @test output_not_strict["strict"] == false
-    @test output_not_strict["name"] == "MyMeasurement3_extractor"
-    @test output_not_strict["parameters"]["type"] == "object"
-    @test output_not_strict["parameters"]["required"] == ["age"]
-    @test !haskey(output_default["parameters"], "additionalProperties")
-
-    # Test with strict = true
-    output_strict, t = function_call_signature(MyMeasurement3; strict = true)
-    @test output_strict["strict"] == true
-    @test output_strict["name"] == "MyMeasurement3_extractor"
-    @test output_strict["parameters"]["type"] == "object"
-    @test Set(output_strict["parameters"]["required"]) == Set(["age", "height", "weight"])
-    @test output_strict["parameters"]["additionalProperties"] == false
-    @test output_strict["parameters"]["properties"]["height"]["type"] == ["integer", "null"]
-    @test output_strict["parameters"]["properties"]["weight"]["type"] == ["number", "null"]
-    @test output_strict["parameters"]["properties"]["age"]["type"] == "integer"
-
-    # Test with MaybeExtract wrapper
-    output_maybe, t = function_call_signature(MaybeExtract{MyMeasurement3}; strict = true)
-    @test output_maybe["name"] == "MaybeExtractMyMeasurement3_extractor"
-    @test output_maybe["parameters"]["properties"]["result"]["type"] == ["object", "null"]
-    @test output_maybe["parameters"]["properties"]["error"]["type"] == "boolean"
-    @test output_maybe["parameters"]["properties"]["message"]["type"] == ["string", "null"]
-    @test Set(output_maybe["parameters"]["required"]) == Set(["result", "error", "message"])
-end
-
 @testset "generate_struct" begin
     # Test with only field names
     fields = [:field1, :field2, :field3]
@@ -455,6 +383,77 @@ end
 end
 
 @testset "function_call_signature" begin
+    "Some docstring"
+    struct MyMeasurement2
+        age::Int
+        height::Union{Int, Nothing}
+        weight::Union{Nothing, Float64}
+    end
+    output, t = function_call_signature(MyMeasurement2)#|> JSON3.pretty
+    expected_output = Dict{String, Any}("name" => "MyMeasurement2_extractor",
+        "parameters" => Dict{String, Any}(
+            "properties" => Dict{String, Any}(
+                "height" => Dict{
+                    String,
+                    Any
+                }("type" => "integer"),
+                "weight" => Dict{String, Any}("type" => "number"),
+                "age" => Dict{String, Any}("type" => "integer")),
+            "required" => ["age"],
+            "type" => "object"),
+        "description" => "Some docstring\n")
+    @test output == expected_output
+
+    ## MaybeWraper name cleanup
+    schema, t = function_call_signature(MaybeExtract{MyMeasurement2})
+    @test schema["name"] == "MaybeExtractMyMeasurement2_extractor"
+
+    ## Test with strict = true
+
+    "Person's age, height, and weight."
+    struct MyMeasurement3
+        age::Int
+        height::Union{Int, Nothing}
+        weight::Union{Nothing, Float64}
+    end
+
+    # Test with strict = nothing (default behavior)
+    output_default, t = function_call_signature(MyMeasurement3)
+    @test !haskey(output_default, "strict")
+    @test output_default["name"] == "MyMeasurement3_extractor"
+    @test output_default["parameters"]["type"] == "object"
+    @test output_default["parameters"]["required"] == ["age"]
+    @test !haskey(output_default["parameters"], "additionalProperties")
+
+    # Test with strict =false
+    output_not_strict, t = function_call_signature(MyMeasurement3; strict = false)
+    @test haskey(output_not_strict, "strict")
+    @test output_not_strict["strict"] == false
+    @test output_not_strict["name"] == "MyMeasurement3_extractor"
+    @test output_not_strict["parameters"]["type"] == "object"
+    @test output_not_strict["parameters"]["required"] == ["age"]
+    @test !haskey(output_default["parameters"], "additionalProperties")
+
+    # Test with strict = true
+    output_strict, t = function_call_signature(MyMeasurement3; strict = true)
+    @test output_strict["strict"] == true
+    @test output_strict["name"] == "MyMeasurement3_extractor"
+    @test output_strict["parameters"]["type"] == "object"
+    @test Set(output_strict["parameters"]["required"]) == Set(["age", "height", "weight"])
+    @test output_strict["parameters"]["additionalProperties"] == false
+    @test output_strict["parameters"]["properties"]["height"]["type"] == ["integer", "null"]
+    @test output_strict["parameters"]["properties"]["weight"]["type"] == ["number", "null"]
+    @test output_strict["parameters"]["properties"]["age"]["type"] == "integer"
+
+    # Test with MaybeExtract wrapper
+    output_maybe, t = function_call_signature(MaybeExtract{MyMeasurement3}; strict = true)
+    @test output_maybe["name"] == "MaybeExtractMyMeasurement3_extractor"
+    @test output_maybe["parameters"]["properties"]["result"]["type"] == ["object", "null"]
+    @test output_maybe["parameters"]["properties"]["error"]["type"] == "boolean"
+    @test output_maybe["parameters"]["properties"]["message"]["type"] == ["string", "null"]
+    @test Set(output_maybe["parameters"]["required"]) == Set(["result", "error", "message"])
+
+    #### Test with generated structs and with descriptions
     # Test with simple fields
     fields = [:field1 => Int, :field2 => String]
     schema, datastructtype = function_call_signature(fields)

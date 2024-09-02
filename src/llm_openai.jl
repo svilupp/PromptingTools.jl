@@ -1136,13 +1136,18 @@ aiextract("I ate an apple",return_type=Fruit,api_kwargs=(;tool_choice="any"),mod
 # Notice two differences: 1) struct MUST have a docstring, 2) tool_choice is set explicitly set to "any"
 ```
 
-# Example of using a vector of field names with `aiextract`
+Example of using a vector of field names with `aiextract`
+```julia
 fields = [:location, :temperature => Float64, :condition => String]
 msg = aiextract("Extract the following information from the text: location, temperature, condition. Text: The weather in New York is sunny and 72.5 degrees Fahrenheit."; return_type = fields)
+```
 
-# It will be returned it a new generated type, which you can check with `PT.isextracted(msg.content) == true` to confirm the data has been extracted correctly.
+Or simply call `aiextract("some text"; return_type = [:reasoning,:answer])` to get a Chain of Thought reasoning for extraction task.
 
-# This new syntax also allows you to provide field-level descriptions, which will be passed to the model.
+It will be returned it a new generated type, which you can check with `PromptingTools.isextracted(msg.content) == true` to confirm the data has been extracted correctly.
+
+This new syntax also allows you to provide field-level descriptions, which will be passed to the model.
+```julia
 fields_with_descriptions = [
     :location,
     :temperature => Float64,
@@ -1151,6 +1156,7 @@ fields_with_descriptions = [
     :condition__description => "Current weather condition (e.g., sunny, rainy, cloudy)"
 ]
 msg = aiextract("The weather in New York is sunny and 72.5 degrees Fahrenheit."; return_type = fields_with_descriptions)
+```
 """
 function aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE;
         return_type::Union{Type, Vector},
