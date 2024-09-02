@@ -318,7 +318,7 @@ end
         height::Union{Int, Nothing}
         weight::Union{Nothing, Float64}
     end
-    output = function_call_signature(MyMeasurement2)#|> JSON3.pretty
+    output, t = function_call_signature(MyMeasurement2)#|> JSON3.pretty
     expected_output = Dict{String, Any}("name" => "MyMeasurement2_extractor",
         "parameters" => Dict{String, Any}(
             "properties" => Dict{String, Any}(
@@ -334,7 +334,7 @@ end
     @test output == expected_output
 
     ## MaybeWraper name cleanup
-    schema = function_call_signature(MaybeExtract{MyMeasurement2})
+    schema, t = function_call_signature(MaybeExtract{MyMeasurement2})
     @test schema["name"] == "MaybeExtractMyMeasurement2_extractor"
 
     ## Test with strict = true
@@ -347,7 +347,7 @@ end
     end
 
     # Test with strict = nothing (default behavior)
-    output_default = function_call_signature(MyMeasurement3)
+    output_default, t = function_call_signature(MyMeasurement3)
     @test !haskey(output_default, "strict")
     @test output_default["name"] == "MyMeasurement3_extractor"
     @test output_default["parameters"]["type"] == "object"
@@ -355,7 +355,7 @@ end
     @test !haskey(output_default["parameters"], "additionalProperties")
 
     # Test with strict =false
-    output_not_strict = function_call_signature(MyMeasurement3; strict = false)
+    output_not_strict, t = function_call_signature(MyMeasurement3; strict = false)
     @test haskey(output_not_strict, "strict")
     @test output_not_strict["strict"] == false
     @test output_not_strict["name"] == "MyMeasurement3_extractor"
@@ -364,7 +364,7 @@ end
     @test !haskey(output_default["parameters"], "additionalProperties")
 
     # Test with strict = true
-    output_strict = function_call_signature(MyMeasurement3; strict = true)
+    output_strict, t = function_call_signature(MyMeasurement3; strict = true)
     @test output_strict["strict"] == true
     @test output_strict["name"] == "MyMeasurement3_extractor"
     @test output_strict["parameters"]["type"] == "object"
@@ -375,7 +375,7 @@ end
     @test output_strict["parameters"]["properties"]["age"]["type"] == "integer"
 
     # Test with MaybeExtract wrapper
-    output_maybe = function_call_signature(MaybeExtract{MyMeasurement3}; strict = true)
+    output_maybe, t = function_call_signature(MaybeExtract{MyMeasurement3}; strict = true)
     @test output_maybe["name"] == "MaybeExtractMyMeasurement3_extractor"
     @test output_maybe["parameters"]["properties"]["result"]["type"] == ["object", "null"]
     @test output_maybe["parameters"]["properties"]["error"]["type"] == "boolean"
@@ -471,9 +471,11 @@ end
     schema, datastructtype = function_call_signature(fields; strict = true)
     @test schema["strict"] == true
 
-    # Test with max_description_length
-    fields = [:field1 => Int, :field2 => String]
-    schema, datastructtype = function_call_signature(fields; max_description_length = 10)
+    # Test with descriptions and max_description_length
+    fields = [
+        :field1 => Int, :field2 => String, :field1__description => "Field 1 description",
+        :field2__description => "Field 2 description"]
+    schema, datastructtype = function_call_signature(fields; max_description_length = 7)
     @test haskey(schema, "name")
     @test haskey(schema, "parameters")
     @test haskey(schema["parameters"], "properties")
@@ -481,15 +483,22 @@ end
     @test haskey(schema["parameters"]["properties"], "field2")
     @test schema["parameters"]["properties"]["field1"]["type"] == "integer"
     @test schema["parameters"]["properties"]["field2"]["type"] == "string"
+    @test schema["parameters"]["properties"]["field1"]["description"] == "Field 1"
+    @test schema["parameters"]["properties"]["field2"]["description"] == "Field 2"
 
     # Test with empty fields
     fields = []
     schema, datastructtype = function_call_signature(fields)
     @test haskey(schema, "name")
     @test haskey(schema, "parameters")
-    @test !haskey(schema["parameters"], "properties")
+    @test haskey(schema["parameters"], "properties")
+    @test isempty(schema["parameters"]["properties"])
 
     # Test with invalid field specification
-    fields = [:field1 => Int, :field2 => "InvalidType"]
+    fields = [:field1 => Int, :field2 => :InvalidType]
     @test_throws ErrorException function_call_signature(fields)
+    fields = ["field1" => Int]
+    @test_throws ErrorException function_call_signature(fields)
+    fields = ["field1", "field2"] # caught earlier as an error so assertion error
+    @test_throws AssertionError function_call_signature(fields)
 end
