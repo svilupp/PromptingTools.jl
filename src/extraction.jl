@@ -349,13 +349,30 @@ end
 Generate a function call signature schema for a dynamically generated struct based on the provided fields.
 
 # Arguments
-- `fields::Vector{Union{Symbol, Pair{Symbol, Type}}}`: A vector of field names or pairs of field name and type, eg, `[:field1, :field2, :field3]` or `[:field1 => String, :field2 => Int, :field3 => Float64]`.
+- `fields::Vector{Union{Symbol, Pair{Symbol, Type}, Pair{Symbol, String}}}`: A vector of field names or pairs of field name and type or string description, eg, `[:field1, :field2, :field3]` or `[:field1 => String, :field2 => Int, :field3 => Float64]` or `[:field1 => String, :field1__description => "Field 1 has the name"]`.
 - `strict::Union{Nothing, Bool}`: Whether to enforce strict mode for the schema. Defaults to `nothing`.
 - `max_description_length::Int`: Maximum length for descriptions. Defaults to 200.
 
 # Returns a tuple of (schema, struct type)
 - `Dict{String, Any}`: A dictionary representing the function call signature schema.
 - `Type`: The struct type to create instance of the result.
+
+See also `generate_struct`, `aiextract`, `update_schema_descriptions!`.
+
+# Examples
+```julia
+schema, return_type = function_call_signature([:field1, :field2, :field3])
+```
+
+With the field types:
+```julia
+schema, return_type = function_call_signature([:field1 => String, :field2 => Int, :field3 => Float64])
+```
+
+And with the field descriptions:
+```julia
+schema, return_type = function_call_signature([:field1 => String, :field1__description => "Field 1 has the name"])
+```
 """
 function function_call_signature(fields::Vector;
         strict::Union{Nothing, Bool} = nothing, max_description_length::Int = 200)
