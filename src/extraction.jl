@@ -93,10 +93,159 @@ function to_json_schema(type::Type{<:AbstractDict}; max_description_length::Int 
     throw(ArgumentError("Dicts are not supported yet as we cannot analyze their keys/values on a type-level. Use a nested Struct instead!"))
 end
 
+### Type conversion / Schema generation
+"""
+    generate_struct(fields::Vector)
+
+Generate a struct with the given name and fields. Fields can be specified simply as symbols (with default type `String`) or pairs of symbol and type.
+Field descriptions can be provided by adding a pair with the field name suffixed with "__description" (eg, `:myfield__description => "My field description"`).
+
+Returns: A tuple of (struct type, descriptions)
+
+# Examples
+```julia
+Weather, descriptions = generate_struct(
+    [:location,
+     :temperature=>Float64,
+     :temperature__description=>"Temperature in degrees Fahrenheit",
+     :condition=>String,
+     :condition__description=>"Current weather condition (e.g., sunny, rainy, cloudy)"
+    ])
+```
+"""
+function generate_struct(fields::Vector)
+    name = gensym("ExtractedData")
+    struct_fields = []
+    descriptions = Dict{Symbol, String}()
+
+    for field in fields
+        if field isa Symbol
+            push!(struct_fields, :($field::String))
+        elseif field isa Pair
+            field_name, field_value = field
+            if endswith(string(field_name), "__description")
+                base_field = Symbol(replace(string(field_name), "__description" => ""))
+                descriptions[base_field] = field_value
+            elseif field_name isa Symbol &&
+                   (field_value isa Type || field_value isa AbstractString)
+                push!(struct_fields, :($field_name::$field_value))
+            else
+                error("Invalid field specification: $(field). It must be a Symbol or a Pair{Symbol, Type} or Pair{Symbol, Pair{Type, String}}.")
+            end
+        else
+            error("Invalid field specification: $(field). It must be a Symbol or a Pair{Symbol, Type} or Pair{Symbol, Pair{Type, String}}.")
+        end
+    end
+
+    struct_def = quote
+        @kwdef struct $name <: AbstractExtractedData
+            $(struct_fields...)
+        end
+    end
+
+    # Evaluate the struct definition
+    eval(struct_def)
+
+    return eval(name), descriptions
+end
+
+"""
+    update_schema_descriptions!(
+        schema::Dict{String, <:Any}, descriptions::Dict{Symbol, <:AbstractString};
+        max_description_length::Int = 200)
+
+Update the given JSON schema with descriptions from the `descriptions` dictionary.
+This function modifies the schema in-place, adding a "description" field to each property
+that has a corresponding entry in the `descriptions` dictionary.
+
+Note: It modifies the schema in place. Only the top-level "properties" are updated!
+
+Returns: The modified schema dictionary.
+
+# Arguments
+- `schema`: A dictionary representing the JSON schema to be updated.
+- `descriptions`: A dictionary mapping field names (as symbols) to their descriptions.
+- `max_description_length::Int`: Maximum length for descriptions. Defaults to 200.
+
+# Examples
+```julia
+    schema = Dict{String, Any}(
+        "name" => "varExtractedData235_extractor",
+        "parameters" => Dict{String, Any}(
+            "properties" => Dict{String, Any}(
+                "location" => Dict{String, Any}("type" => "string"),
+                "condition" => Dict{String, Any}("type" => "string"),
+                "temperature" => Dict{String, Any}("type" => "number")
+            ),
+            "required" => ["location", "temperature", "condition"],
+            "type" => "object"
+        )
+    )
+    descriptions = Dict{Symbol, String}(
+        :temperature => "Temperature in degrees Fahrenheit",
+        :condition => "Current weather condition (e.g., sunny, rainy, cloudy)"
+    )
+    update_schema_descriptions!(schema, descriptions)
+```
+"""
+function update_schema_descriptions!(
+        schema::Dict{String, <:Any}, descriptions::Dict{Symbol, <:AbstractString};
+        max_description_length::Int = 200)
+    properties = get(get(schema, "parameters", Dict()), "properties", Dict())
+
+    for (field, field_schema) in properties
+        field_sym = Symbol(field)
+        if haskey(descriptions, field_sym)
+            field_schema["description"] = first(
+                descriptions[field_sym], max_description_length)
+        end
+    end
+
+    return schema
+end
+
+"""
+    set_properties_strict!(properties::AbstractDict)
+
+Sets strict mode for the properties of a JSON schema.
+
+Changes:
+- Sets `additionalProperties` to `false`.
+- All keys must be included in `required`.
+- All optional keys will have `null` added to their type.
+
+Reference: https://platform.openai.com/docs/guides/structured-outputs/supported-schemas
+"""
+function set_properties_strict!(parameters::AbstractDict)
+    parameters["additionalProperties"] = false
+    required_fields = get(parameters, "required", String[])
+    optional_fields = String[]
+
+    for (key, value) in parameters["properties"]
+        if key ∉ required_fields
+            push!(optional_fields, key)
+            if haskey(value, "type")
+                value["type"] = [value["type"], "null"]
+            end
+        end
+
+        # Recursively apply to nested properties
+        if haskey(value, "properties")
+            set_properties_strict!(value)
+        elseif haskey(value, "items") && haskey(value["items"], "properties")
+            ## if it's an array, we need to skip inside "items"
+            set_properties_strict!(value["items"])
+        end
+    end
+
+    parameters["required"] = vcat(required_fields, optional_fields)
+    return parameters
+end
+
 """
     function_call_signature(
         datastructtype::Type; strict::Union{Nothing, Bool} = nothing,
-        max_description_length::Int = 100)
+        max_description_length::Int = 200)
 
 Extract the argument names, types and docstrings from a struct to create the function call signature in JSON schema.
 
@@ -120,7 +269,7 @@ struct MyMeasurement
     height::Union{Int,Nothing}
     weight::Union{Nothing,Float64}
 end
-signature = function_call_signature(MyMeasurement)
+signature, t = function_call_signature(MyMeasurement)
 #
 # Dict{String, Any} with 3 entries:
 #   "name"        => "MyMeasurement_extractor"
@@ -166,7 +315,7 @@ That way, you can handle the error gracefully and get a reason why extraction fa
 """
 function function_call_signature(
         datastructtype::Type; strict::Union{Nothing, Bool} = nothing,
-        max_description_length::Int = 100)
+        max_description_length::Int = 200)
     !isstructtype(datastructtype) &&
         error("Only Structs are supported (provided type: $datastructtype")
     ## Standardize the name
@@ -191,45 +340,37 @@ function function_call_signature(
             set_properties_strict!(schema["parameters"])
         end
     end
-    return schema
+    return schema, datastructtype
 end
 
 """
-    set_properties_strict!(properties::AbstractDict)
+    function_call_signature(fields::Vector; strict::Union{Nothing, Bool} = nothing, max_description_length::Int = 200)
 
-Sets strict mode for the properties of a JSON schema.
+Generate a function call signature schema for a dynamically generated struct based on the provided fields.
 
-Changes:
-- Sets `additionalProperties` to `false`.
-- All keys must be included in `required`.
-- All optional keys will have `null` added to their type.
+# Arguments
+- `fields::Vector{Union{Symbol, Pair{Symbol, Type}}}`: A vector of field names or pairs of field name and type, eg, `[:field1, :field2, :field3]` or `[:field1 => String, :field2 => Int, :field3 => Float64]`.
+- `strict::Union{Nothing, Bool}`: Whether to enforce strict mode for the schema. Defaults to `nothing`.
+- `max_description_length::Int`: Maximum length for descriptions. Defaults to 200.
 
-Reference: https://platform.openai.com/docs/guides/structured-outputs/supported-schemas
+# Returns a tuple of (schema, struct type)
+- `Dict{String, Any}`: A dictionary representing the function call signature schema.
+- `Type`: The struct type to create instance of the result.
 """
-function set_properties_strict!(parameters::AbstractDict)
-    parameters["additionalProperties"] = false
-    required_fields = get(parameters, "required", String[])
-    optional_fields = String[]
+function function_call_signature(fields::Vector;
+        strict::Union{Nothing, Bool} = nothing, max_description_length::Int = 200)
+    @assert all(x -> x isa Symbol || x isa Pair, fields) "Invalid return types provided. All fields must be either Symbols or Pairs of Symbol and Type or String"
+    # Generate the struct and descriptions
+    datastructtype, descriptions = generate_struct(fields)
 
-    for (key, value) in parameters["properties"]
-        if key ∉ required_fields
-            push!(optional_fields, key)
-            if haskey(value, "type")
-                value["type"] = [value["type"], "null"]
-            end
-        end
+    # Create the schema
+    schema, _ = function_call_signature(
+        datastructtype; strict, max_description_length)
 
-        # Recursively apply to nested properties
-        if haskey(value, "properties")
-            set_properties_strict!(value)
-        elseif haskey(value, "items") && haskey(value["items"], "properties")
-            ## if it's an array, we need to skip inside "items"
-            set_properties_strict!(value["items"])
-        end
-    end
+    # Update the schema with descriptions
+    update_schema_descriptions!(schema, descriptions; max_description_length)
 
-    parameters["required"] = vcat(required_fields, optional_fields)
-    return parameters
+    return schema, datastructtype
 end
 
 ######################

@@ -439,3 +439,10 @@ function response_to_message(schema::AbstractPromptSchema,
         sample_id::Union{Nothing, Integer} = nothing) where {T}
     throw(ArgumentError("Response unwrapping not implemented for $(typeof(schema)) and $MSG"))
 end
+
+### For structured extraction
+# We can generate fields, they will all share this parent type
+abstract type AbstractExtractedData end
+Base.show(io::IO, x::AbstractExtractedData) = dump(io, x; maxdepth = 1)
+"Check if the object is an instance of `AbstractExtractedData`"
+isextracted(x) = x isa AbstractExtractedData

@@ -980,13 +980,13 @@ function response_to_message(schema::AbstractOpenAISchema,
     tokens_completion = get(resp.response, :usage, Dict(:completion_tokens => 0))[:completion_tokens]
     cost = call_cost(tokens_prompt, tokens_completion, model_id)
     # "Safe" parsing of the response - it still fails if JSON is invalid
+    args = choice[:message][:tool_calls][1][:function][:arguments]
     content = try
-        choice[:message][:tool_calls][1][:function][:arguments] |>
-        x -> JSON3.read(x, return_type)
+        ## Must invoke latest because we might have generated the struct
+        Base.invokelatest(JSON3.read, args, return_type)::return_type
     catch e
         @warn "There was an error parsing the response: $e. Using the raw response instead."
-        choice[:message][:tool_calls][1][:function][:arguments] |>
-        JSON3.read |> copy
+        JSON3.read(args) |> copy
     end
     ## build DataMessage object
     msg = MSG(;
@@ -1004,7 +1004,7 @@ end
 
 """
     aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE;
-        return_type::Type,
+        return_type::Union{Type, Vector},
         verbose::Bool = true,
         api_key::String = OPENAI_API_KEY,
         model::String = MODEL_CHAT,
@@ -1027,7 +1027,7 @@ It's effectively a light wrapper around `aigenerate` call, which requires additi
 # Arguments
 - `prompt_schema`: An optional object to specify which prompt template should be applied (Default to `PROMPT_SCHEMA = OpenAISchema`)
 - `prompt`: Can be a string representing the prompt for the AI conversation, a `UserMessage`, a vector of `AbstractMessage` or an `AITemplate`
-- `return_type`: A **struct** TYPE representing the the information we want to extract. Do not provide a struct instance, only the type.
+- `return_type`: A **struct** TYPE representing the the information we want to extract. Do not provide a struct instance, only the type. Alternatively, you can provide a vector of field names and their types (see `?generate_struct` function for the syntax).
   If the struct has a docstring, it will be provided to the model as well. It's used to enforce structured model outputs or provide more information.
 - `verbose`: A boolean indicating whether to print additional information.
 - `api_key`: A string representing the API key for accessing the OpenAI API.
@@ -1052,7 +1052,7 @@ If `return_all=true`:
 - `conversation`: A vector of `AbstractMessage` objects representing the full conversation history, including the response from the AI model (`DataMessage`).
 
 
-See also: `function_call_signature`, `MaybeExtract`, `ItemsExtract`, `aigenerate`
+See also: `function_call_signature`, `MaybeExtract`, `ItemsExtract`, `aigenerate`, `generate_struct`
 
 # Example
 
@@ -1135,9 +1135,25 @@ end
 aiextract("I ate an apple",return_type=Fruit,api_kwargs=(;tool_choice="any"),model="mistrall")
 # Notice two differences: 1) struct MUST have a docstring, 2) tool_choice is set explicitly set to "any"
 ```
+
+# Example of using a vector of field names with `aiextract`
+fields = [:location, :temperature => Float64, :condition => String]
+msg = aiextract("Extract the following information from the text: location, temperature, condition. Text: The weather in New York is sunny and 72.5 degrees Fahrenheit."; return_type = fields)
+
+# It will be returned it a new generated type, which you can check with `PT.isextracted(msg.content) == true` to confirm the data has been extracted correctly.
+
+# This new syntax also allows you to provide field-level descriptions, which will be passed to the model.
+fields_with_descriptions = [
+    :location,
+    :temperature => Float64,
+    :temperature__description => "Temperature in degrees Fahrenheit",
+    :condition => String,
+    :condition__description => "Current weather condition (e.g., sunny, rainy, cloudy)"
+]
+msg = aiextract("The weather in New York is sunny and 72.5 degrees Fahrenheit."; return_type = fields_with_descriptions)
 """
 function aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE;
-        return_type::Type,
+        return_type::Union{Type, Vector},
         verbose::Bool = true,
         api_key::String = OPENAI_API_KEY,
         model::String = MODEL_CHAT,
@@ -1152,8 +1168,9 @@ function aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_T
     ##
     global MODEL_ALIASES
     ## Function calling specifics
+    schema, datastructtype = function_call_signature(return_type; strict)
     tools = [Dict(
-        :type => "function", :function => function_call_signature(return_type; strict))]
+        :type => "function", :function => schema)]
     ## force our function to be used
     tool_choice_ = get(api_kwargs, :tool_choice, "exact")
     tool_choice = if tool_choice_ == "exact"
@@ -1182,7 +1199,7 @@ function aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_T
             run_id = Int(rand(Int32)) # remember one run ID
             ## extract all message
             msgs = [response_to_message(prompt_schema, DataMessage, choice, r;
-                        return_type, time, model_id, run_id, sample_id = i)
+                        return_type = datastructtype, time, model_id, run_id, sample_id = i)
                     for (i, choice) in enumerate(r.response[:choices])]
             ## Order by log probability if available
             ## bigger is better, keep it last
@@ -1195,7 +1212,7 @@ function aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_T
             ## only 1 sample / 1 completion
             choice = r.response[:choices][begin]
             response_to_message(prompt_schema, DataMessage, choice, r;
-                return_type, time, model_id)
+                return_type = datastructtype, time, model_id)
         end
         ## Reporting
         verbose && @info _report_stats(msg, model_id)
