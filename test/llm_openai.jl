@@ -4,7 +4,8 @@ using PromptingTools: UserMessage, UserMessageWithImages, DataMessage
 using PromptingTools: CustomProvider,
                       CustomOpenAISchema, MistralOpenAISchema, MODEL_EMBEDDING,
                       MODEL_IMAGE_GENERATION
-using PromptingTools: encode_choices, decode_choices, response_to_message, call_cost
+using PromptingTools: encode_choices, decode_choices, response_to_message, call_cost,
+                      isextracted
 
 @testset "render-OpenAI" begin
     schema = OpenAISchema()
@@ -628,6 +629,14 @@ end
         api_kwargs = (; temperature = 0, n = 2))
     @test msg.content == RandomType1235(1)
     @test msg.log_prob ≈ -0.9
+
+    ## Test with field descriptions
+    fields = [:x => Int, :x__description => "Field 1 description"]
+    msg = aiextract(schema1, "Extract number 1"; return_type = fields,
+        model = "gpt4",
+        api_kwargs = (; temperature = 0, n = 2))
+    @test isextracted(msg.content)
+    @test msg.content.x == 1
 
     ## Test multiple samples -- mock_choice is less probable
     mock_choice2 = Dict(

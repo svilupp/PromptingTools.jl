@@ -312,7 +312,7 @@ end
 
 """
     aiextract(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMPT_TYPE;
-        return_type::Type,
+        return_type::Union{Type, Vector},
         verbose::Bool = true,
         api_key::String = ANTHROPIC_API_KEY,
         model::String = MODEL_CHAT,
@@ -338,6 +338,7 @@ It's effectively a light wrapper around `aigenerate` call, which requires additi
 - `prompt`: Can be a string representing the prompt for the AI conversation, a `UserMessage`, a vector of `AbstractMessage` or an `AITemplate`
 - `return_type`: A **struct** TYPE representing the the information we want to extract. Do not provide a struct instance, only the type.
   If the struct has a docstring, it will be provided to the model as well. It's used to enforce structured model outputs or provide more information.
+  Alternatively, you can provide a vector of field names and their types (see `?generate_struct` function for the syntax).
 - `verbose`: A boolean indicating whether to print additional information.
 - `api_key`: A string representing the API key for accessing the OpenAI API.
 - `model`: A string representing the model to use for generating the response. Can be an alias corresponding to a model ID defined in `MODEL_ALIASES`.
@@ -443,10 +444,32 @@ Note that when using a prompt template, we provide `data` for the extraction as 
 
 Note that the error message refers to a giraffe not being a human, 
  because in our `MyMeasurement` docstring, we said that it's for people!
+
+Example of using a vector of field names with `aiextract`
+```julia
+fields = [:location, :temperature => Float64, :condition => String]
+msg = aiextract("Extract the following information from the text: location, temperature, condition. Text: The weather in New York is sunny and 72.5 degrees Fahrenheit."; 
+return_type = fields, model="claudeh")
+```
+
+Or simply call `aiextract("some text"; return_type = [:reasoning,:answer], model="claudeh")` to get a Chain of Thought reasoning for extraction task.
+
+It will be returned it a new generated type, which you can check with `PromptingTools.isextracted(msg.content) == true` to confirm the data has been extracted correctly.
+
+This new syntax also allows you to provide field-level descriptions, which will be passed to the model.
+```julia
+fields_with_descriptions = [
+    :location,
+    :temperature => Float64,
+    :temperature__description => "Temperature in degrees Fahrenheit",
+    :condition => String,
+    :condition__description => "Current weather condition (e.g., sunny, rainy, cloudy)"
+]
+msg = aiextract("The weather in New York is sunny and 72.5 degrees Fahrenheit."; return_type = fields_with_descriptions, model="claudeh")
 ```
 """
 function aiextract(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMPT_TYPE;
-        return_type::Type,
+        return_type::Union{Type, Vector},
         verbose::Bool = true,
         api_key::String = ANTHROPIC_API_KEY,
         model::String = MODEL_CHAT,
@@ -465,7 +488,7 @@ function aiextract(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMP
     model_id = get(MODEL_ALIASES, model, model)
 
     ## Tools definition
-    sig = function_call_signature(return_type; max_description_length = 100)
+    sig, datastructtype = function_call_signature(return_type; max_description_length = 100)
     tools = [Dict("name" => sig["name"], "description" => get(sig, "description", ""),
         "input_schema" => sig["parameters"])]
     ## update tools to use caching
@@ -493,7 +516,7 @@ function aiextract(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMP
             ## parse it into object
             arguments = JSON3.write(contents[1][:input])
             try
-                JSON3.read(arguments, return_type)
+                Base.invokelatest(JSON3.read, arguments, datastructtype)
             catch e
                 @warn "There was an error parsing the response: $e. Using the raw response instead."
                 JSON3.read(arguments) |> copy

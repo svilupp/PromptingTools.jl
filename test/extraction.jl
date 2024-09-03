@@ -1,6 +1,7 @@
 using PromptingTools: MaybeExtract, extract_docstring, ItemsExtract
 using PromptingTools: has_null_type, is_required_field, remove_null_types, to_json_schema
-using PromptingTools: function_call_signature, set_properties_strict!
+using PromptingTools: function_call_signature, set_properties_strict!,
+                      update_schema_descriptions!, generate_struct
 
 # TODO: check more edge cases like empty structs
 
@@ -310,6 +311,77 @@ end
     @test !haskey(params["properties"]["email"], "null")
 end
 
+@testset "generate_struct" begin
+    # Test with only field names
+    fields = [:field1, :field2, :field3]
+    struct_type, descriptions = generate_struct(fields)
+    @test fieldnames(struct_type) == (:field1, :field2, :field3)
+    @test descriptions == Dict{Symbol, String}()
+
+    # Test with field names and types
+    fields = [:field1 => Int, :field2 => String, :field3 => Float64]
+    struct_type, descriptions = generate_struct(fields)
+    @test fieldnames(struct_type) == (:field1, :field2, :field3)
+    @test fieldtypes(struct_type) == (Int, String, Float64)
+    @test descriptions == Dict{Symbol, String}()
+
+    # Test with field names, types, and descriptions
+    fields = [:field1 => Int, :field2 => String, :field3 => Float64,
+        :field1__description => "Field 1 description",
+        :field2__description => "Field 2 description"]
+    struct_type, descriptions = generate_struct(fields)
+    @test fieldnames(struct_type) == (:field1, :field2, :field3)
+    @test fieldtypes(struct_type) == (Int, String, Float64)
+    @test descriptions ==
+          Dict(:field1 => "Field 1 description", :field2 => "Field 2 description")
+
+    # Test with invalid field specification
+    fields = [:field1 => Int, :field2 => :InvalidType]
+    @test_throws ErrorException generate_struct(fields)
+end
+
+@testset "update_schema_descriptions!" begin
+    # Test with empty descriptions
+    schema = Dict("parameters" => Dict("properties" => Dict("field1" => Dict("type" => "string"))))
+    descriptions = Dict{Symbol, String}()
+    updated_schema = update_schema_descriptions!(schema, descriptions)
+    @test !haskey(updated_schema["parameters"]["properties"]["field1"], "description")
+
+    # Test with descriptions provided
+    schema = Dict("parameters" => Dict("properties" => Dict("field1" => Dict("type" => "string"))))
+    descriptions = Dict(:field1 => "Field 1 description")
+    updated_schema = update_schema_descriptions!(schema, descriptions)
+    @test updated_schema["parameters"]["properties"]["field1"]["description"] ==
+          "Field 1 description"
+
+    # Test with max_description_length
+    schema = Dict("parameters" => Dict("properties" => Dict("field1" => Dict("type" => "string"))))
+    descriptions = Dict(:field1 => "Field 1 description is very long and should be truncated")
+    updated_schema = update_schema_descriptions!(
+        schema, descriptions; max_description_length = 10)
+    @test updated_schema["parameters"]["properties"]["field1"]["description"] ==
+          "Field 1 de"
+
+    # Test with multiple fields
+    schema = Dict("parameters" => Dict("properties" => Dict(
+        "field1" => Dict("type" => "string"), "field2" => Dict("type" => "integer"))))
+    descriptions = Dict(:field1 => "Field 1 description", :field2 => "Field 2 description")
+    updated_schema = update_schema_descriptions!(schema, descriptions)
+    @test updated_schema["parameters"]["properties"]["field1"]["description"] ==
+          "Field 1 description"
+    @test updated_schema["parameters"]["properties"]["field2"]["description"] ==
+          "Field 2 description"
+
+    # Test with missing field in descriptions
+    schema = Dict("parameters" => Dict("properties" => Dict(
+        "field1" => Dict("type" => "string"), "field2" => Dict("type" => "integer"))))
+    descriptions = Dict(:field1 => "Field 1 description")
+    updated_schema = update_schema_descriptions!(schema, descriptions)
+    @test updated_schema["parameters"]["properties"]["field1"]["description"] ==
+          "Field 1 description"
+    @test !haskey(updated_schema["parameters"]["properties"]["field2"], "description")
+end
+
 @testset "function_call_signature" begin
     "Some docstring"
     struct MyMeasurement2
@@ -317,7 +389,7 @@ end
         height::Union{Int, Nothing}
         weight::Union{Nothing, Float64}
     end
-    output = function_call_signature(MyMeasurement2)#|> JSON3.pretty
+    output, t = function_call_signature(MyMeasurement2)#|> JSON3.pretty
     expected_output = Dict{String, Any}("name" => "MyMeasurement2_extractor",
         "parameters" => Dict{String, Any}(
             "properties" => Dict{String, Any}(
@@ -333,7 +405,7 @@ end
     @test output == expected_output
 
     ## MaybeWraper name cleanup
-    schema = function_call_signature(MaybeExtract{MyMeasurement2})
+    schema, t = function_call_signature(MaybeExtract{MyMeasurement2})
     @test schema["name"] == "MaybeExtractMyMeasurement2_extractor"
 
     ## Test with strict = true
@@ -346,7 +418,7 @@ end
     end
 
     # Test with strict = nothing (default behavior)
-    output_default = function_call_signature(MyMeasurement3)
+    output_default, t = function_call_signature(MyMeasurement3)
     @test !haskey(output_default, "strict")
     @test output_default["name"] == "MyMeasurement3_extractor"
     @test output_default["parameters"]["type"] == "object"
@@ -354,7 +426,7 @@ end
     @test !haskey(output_default["parameters"], "additionalProperties")
 
     # Test with strict =false
-    output_not_strict = function_call_signature(MyMeasurement3; strict = false)
+    output_not_strict, t = function_call_signature(MyMeasurement3; strict = false)
     @test haskey(output_not_strict, "strict")
     @test output_not_strict["strict"] == false
     @test output_not_strict["name"] == "MyMeasurement3_extractor"
@@ -363,7 +435,7 @@ end
     @test !haskey(output_default["parameters"], "additionalProperties")
 
     # Test with strict = true
-    output_strict = function_call_signature(MyMeasurement3; strict = true)
+    output_strict, t = function_call_signature(MyMeasurement3; strict = true)
     @test output_strict["strict"] == true
     @test output_strict["name"] == "MyMeasurement3_extractor"
     @test output_strict["parameters"]["type"] == "object"
@@ -374,10 +446,58 @@ end
     @test output_strict["parameters"]["properties"]["age"]["type"] == "integer"
 
     # Test with MaybeExtract wrapper
-    output_maybe = function_call_signature(MaybeExtract{MyMeasurement3}; strict = true)
+    output_maybe, t = function_call_signature(MaybeExtract{MyMeasurement3}; strict = true)
     @test output_maybe["name"] == "MaybeExtractMyMeasurement3_extractor"
     @test output_maybe["parameters"]["properties"]["result"]["type"] == ["object", "null"]
     @test output_maybe["parameters"]["properties"]["error"]["type"] == "boolean"
     @test output_maybe["parameters"]["properties"]["message"]["type"] == ["string", "null"]
     @test Set(output_maybe["parameters"]["required"]) == Set(["result", "error", "message"])
+
+    #### Test with generated structs and with descriptions
+    # Test with simple fields
+    fields = [:field1 => Int, :field2 => String]
+    schema, datastructtype = function_call_signature(fields)
+    @test haskey(schema, "name")
+    @test haskey(schema, "parameters")
+    @test haskey(schema["parameters"], "properties")
+    @test haskey(schema["parameters"]["properties"], "field1")
+    @test haskey(schema["parameters"]["properties"], "field2")
+    @test schema["parameters"]["properties"]["field1"]["type"] == "integer"
+    @test schema["parameters"]["properties"]["field2"]["type"] == "string"
+
+    # Test with strict mode
+    fields = [:field1 => Int, :field2 => String]
+    schema, datastructtype = function_call_signature(fields; strict = true)
+    @test schema["strict"] == true
+
+    # Test with descriptions and max_description_length
+    fields = [
+        :field1 => Int, :field2 => String, :field1__description => "Field 1 description",
+        :field2__description => "Field 2 description"]
+    schema, datastructtype = function_call_signature(fields; max_description_length = 7)
+    @test haskey(schema, "name")
+    @test haskey(schema, "parameters")
+    @test haskey(schema["parameters"], "properties")
+    @test haskey(schema["parameters"]["properties"], "field1")
+    @test haskey(schema["parameters"]["properties"], "field2")
+    @test schema["parameters"]["properties"]["field1"]["type"] == "integer"
+    @test schema["parameters"]["properties"]["field2"]["type"] == "string"
+    @test schema["parameters"]["properties"]["field1"]["description"] == "Field 1"
+    @test schema["parameters"]["properties"]["field2"]["description"] == "Field 2"
+
+    # Test with empty fields
+    fields = []
+    schema, datastructtype = function_call_signature(fields)
+    @test haskey(schema, "name")
+    @test haskey(schema, "parameters")
+    @test haskey(schema["parameters"], "properties")
+    @test isempty(schema["parameters"]["properties"])
+
+    # Test with invalid field specification
+    fields = [:field1 => Int, :field2 => :InvalidType]
+    @test_throws ErrorException function_call_signature(fields)
+    fields = ["field1" => Int]
+    @test_throws ErrorException function_call_signature(fields)
+    fields = ["field1", "field2"] # caught earlier as an error so assertion error
+    @test_throws AssertionError function_call_signature(fields)
 end
