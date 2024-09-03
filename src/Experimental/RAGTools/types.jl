@@ -136,17 +136,39 @@ chunkdata(index::ChunkEmbeddingsIndex) = embeddings(index)
 # For backward compatibility
 const ChunkIndex = ChunkEmbeddingsIndex
 
+# TODO: where to put these?
 indexid(index::AbstractManagedIndex) = index.id
 chunks(index::AbstractManagedIndex) = index.chunks
 sources(index::AbstractManagedIndex) = index.sources
 
+# TODO: what about this?
 using Pinecone: Pinecone, PineconeContextv3, PineconeIndexv3
+
+"""
+    PineconeIndex
+
+Main struct for storing document chunks and their embeddings along with the necessary Pinecone context for connecting to Pinecone.
+
+# Fields
+- `id::Symbol`: unique identifier of each index (a symbol of the Pinecone index namespace)
+- `pinecone_context::Pinecone.PineconeContextv3`: Pinecone API key
+- `pinecone_index::Pinecone.PineconeIndexv3`: Pinecone index
+- `pinecone_namespace::String`: name of the namespace inside the Pinecone index
+- `chunks::Vector{<:AbstractString}`: underlying document chunks / snippets
+- `embeddings::Union{Nothing, Matrix{<:Real}}`: for semantic search
+- `tags::Union{Nothing, AbstractMatrix{<:Bool}}`: for exact search, filtering, etc. This is often a sparse matrix indicating which chunks have the given `tag` (see `tag_vocab` for the position lookup)
+- `tags_vocab::Union{Nothing, Vector{<:AbstractString}}`: vocabulary for the `tags` matrix (each column in `tags` is one item in `tags_vocab` and rows are the chunks)
+- `sources::Vector{<:AbstractString}`: sources of the chunks
+- `metadata::Vector{Dict{String, Any}}`: metadata for each chunk/embedding stored in Pinecone
+"""
 @kwdef struct PineconeIndex{
     T1 <: Union{Nothing, AbstractString},
     T2 <: Union{Nothing, Matrix{<:Real}},
     T3 <: Union{Nothing, AbstractMatrix{<:Bool}}
 } <: AbstractManagedIndex
+    # TODO: id should be a combination of index + namespace?
     id::Symbol  # namespace
+    # TODO: these should not be v3, maybe?
     pinecone_context::Pinecone.PineconeContextv3
     pinecone_index::Pinecone.PineconeIndexv3
     pinecone_namespace::String
@@ -159,9 +181,10 @@ using Pinecone: Pinecone, PineconeContextv3, PineconeIndexv3
     # column oriented, ie, each column is one item in `tags_vocab` and rows are the chunks
     tags::T3 = nothing
     tags_vocab::Union{Nothing, Vector{<:AbstractString}} = nothing
-    # metadata for each chunk
-    metadata::Vector{Dict{String, Any}} = Vector{Dict{String, Any}}()
     sources::Union{Nothing, Vector{<:AbstractString}} = nothing
+    # metadata for each chunk
+    # TODO: should be changed to `extras`? but different type -- this needs to be vector of dicts
+    metadata::Vector{Dict{String, Any}} = Vector{Dict{String, Any}}()
 end
 HasKeywords(::PineconeIndex) = false
 HasEmbeddings(::PineconeIndex) = true
@@ -549,6 +572,11 @@ Base.@propagate_inbounds function translate_positions_to_parent(
 end
 
 
+"""
+    SubManagedIndex
+
+Provides the same functionality for `AbstractManagedIndex` as `SubChunkIndex` does for `AbstractChunkIndex`.
+"""
 @kwdef struct SubManagedIndex{T <: AbstractManagedIndex} <: AbstractManagedIndex
     parent::T
     positions::Vector{Int}
@@ -560,6 +588,7 @@ Base.parent(index::SubManagedIndex) = index.parent
 HasEmbeddings(index::SubManagedIndex) = HasEmbeddings(parent(index))
 HasKeywords(index::SubManagedIndex) = HasKeywords(parent(index))
 
+# TODO: see which of these are needed
 Base.@propagate_inbounds function chunks(index::SubManagedIndex)
     view(chunks(parent(index)), positions(index))
 end
@@ -569,7 +598,6 @@ end
 Base.@propagate_inbounds function chunkdata(index::SubManagedIndex)
     chunkdata(parent(index), positions(index))
 end
-"Access chunkdata for a subset of chunks, `chunk_idx` is a vector of chunk indices in the index"
 Base.@propagate_inbounds function chunkdata(
         index::SubManagedIndex, chunk_idx::AbstractVector{<:Integer})
     ## We need this accessor because different chunk indices can have chunks in different dimensions!!
@@ -671,16 +699,31 @@ function CandidateChunks(index::AbstractChunkIndex, positions::AbstractVector{<:
         indexid(index), convert(Vector{Int}, positions), convert(Vector{Float32}, scores))
 end
 
+
+"""
+    CandidateWithChunks
+
+Similar to `CandidateChunks`, but for `AbstractManagedIndex`. It's the result of the retrieval stage of RAG.
+
+# Fields
+- `index_id::Symbol`: the id of the index from which the candidates are drawn
+- `positions::Vector{Int}`: the positions of the candidates in the index (ie, `5` refers to the 5th chunk in the index - `chunks(index)[5]`)
+- `scores::Vector{Float32}`: the similarity scores of the candidates from the query (higher is better)
+- `chunks::Vector{String}`: the chunks retrieved for a given question
+- `metadata::AbstractVector`: metadata corresponding to `chunks`
+- `sources::Vector{String}`: sources corresponding to `chunks`
+"""
 @kwdef struct CandidateWithChunks{TP <: Integer, TD <: Real} <:
               AbstractCandidateWithChunks
     index_id::Symbol
     positions::Vector{TP} = Int[]
     scores::Vector{TD} = Float32[]
-    ## fields that we don't have in Index anymore -- so we get them "per question"
+    ## fields obtained "per question"
     chunks::Vector{String} = String[]
     metadata::AbstractVector = Dict{String, Any}[]
     sources::Vector{String} = String[]
 end
+# TODO: see which can be removed
 indexid(cc::CandidateWithChunks) = cc.index_id
 positions(cc::CandidateWithChunks) = cc.positions
 scores(cc::CandidateWithChunks) = cc.scores
@@ -942,7 +985,6 @@ end
 Base.@propagate_inbounds function Base.view(index::SubChunkIndex, cc::MultiCandidateChunks)
     SubChunkIndex(index, cc)
 end
-# TODO: proper `view` -- `SubManagedIndex`?
 Base.@propagate_inbounds function Base.view(index::AbstractManagedIndex, cc::CandidateWithChunks)
     @boundscheck let chk_vector = chunks(parent(index))
         if !checkbounds(Bool, axes(chk_vector, 1), positions(cc))

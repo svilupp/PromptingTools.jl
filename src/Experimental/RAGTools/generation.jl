@@ -64,6 +64,17 @@ function build_context(contexter::ContextEnumerator,
     return context
 end
 
+"""
+    build_context(contexter::ContextEnumerator,
+        index::AbstractManagedIndex, candidates::AbstractCandidateWithChunks;
+        verbose::Bool = true,
+        chunks_window_margin::Tuple{Int, Int} = (1, 1), kwargs...)
+
+        build_context!(contexter::ContextEnumerator,
+        index::AbstractManagedIndex, result::AbstractRAGResult; kwargs...)
+
+Dispatch for `AbstractManagedIndex` with `AbstractCandidateWithChunks`.
+"""
 function build_context(contexter::ContextEnumerator,
         index::AbstractManagedIndex,
         candidates::AbstractCandidateWithChunks;
@@ -124,7 +135,6 @@ function answer!(
     throw(ArgumentError("Answerer $(typeof(answerer)) not implemented"))
 end
 
-# TODO: update docs signature
 """
     answer!(
         answerer::SimpleAnswerer, index::AbstractDocumentIndex, result::AbstractRAGResult;
@@ -173,6 +183,17 @@ function answer!(
 
     return result
 end
+
+"""
+    answer!(
+        answerer::SimpleAnswerer, index::AbstractManagedIndex, result::AbstractRAGResult;
+        model::AbstractString = PT.MODEL_CHAT, verbose::Bool = true,
+        template::Symbol = :RAGAnswerFromContext,
+        cost_tracker = Threads.Atomic{Float64}(0.0),
+        kwargs...)
+
+Dispatch for `AbstractManagedIndex`.
+"""
 function answer!(
         answerer::SimpleAnswerer, index::AbstractManagedIndex, result::AbstractRAGResult;
         model::AbstractString = PT.MODEL_CHAT, verbose::Bool = true,
@@ -228,7 +249,6 @@ function refine!(
 end
 
 
-# TODO: update docs signature
 """
     refine!(
         refiner::NoRefiner, index::AbstractChunkIndex, result::AbstractRAGResult;
@@ -247,10 +267,9 @@ function refine!(
 end
 
 
-# TODO: update docs signature
 """
     refine!(
-        refiner::SimpleRefiner, index::AbstractDocumentIndex, result::AbstractRAGResult;
+        refiner::SimpleRefiner, index::Union{AbstractDocumentIndex, AbstractManagedIndex}, result::AbstractRAGResult;
         verbose::Bool = true,
         model::AbstractString = PT.MODEL_CHAT,
         template::Symbol = :RAGAnswerRefiner,
@@ -303,10 +322,9 @@ function refine!(
 end
 
 
-# TODO: update docs signature
 """
     refine!(
-        refiner::TavilySearchRefiner, index::AbstractDocumentIndex, result::AbstractRAGResult;
+        refiner::TavilySearchRefiner, index::Union{AbstractDocumentIndex, AbstractManagedIndex}, result::AbstractRAGResult;
         verbose::Bool = true,
         model::AbstractString = PT.MODEL_CHAT,
         include_answer::Bool = true,
@@ -458,10 +476,9 @@ It uses `ContextEnumerator`, `SimpleAnswerer`, `SimpleRefiner`, and `NoPostproce
     postprocessor::AbstractPostprocessor = NoPostprocessor()
 end
 
-# TODO: update docs signature
 """
     generate!(
-        generator::AbstractGenerator, index::AbstractDocumentIndex, result::AbstractRAGResult;
+        generator::AbstractGenerator, index::Union{AbstractDocumentIndex, AbstractManagedIndex}, result::AbstractRAGResult;
         verbose::Integer = 1,
         api_kwargs::NamedTuple = NamedTuple(),
         contexter::AbstractContextBuilder = generator.contexter,
@@ -591,8 +608,9 @@ function Base.show(io::IO, cfg::AbstractRAGConfig)
     dump(io, cfg; maxdepth = 2)
 end
 
+# TODO: add example for Pinecone
 """
-    airag(cfg::AbstractRAGConfig, index::AbstractDocumentIndex;
+    airag(cfg::AbstractRAGConfig, index::Union{AbstractDocumentIndex, AbstractManagedIndex};
         question::AbstractString,
         verbose::Integer = 1, return_all::Bool = false,
         api_kwargs::NamedTuple = NamedTuple(),

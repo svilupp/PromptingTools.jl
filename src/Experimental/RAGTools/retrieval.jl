@@ -241,6 +241,37 @@ function find_closest(
     return CandidateChunks(indexid(index), positions, Float32.(scores))
 end
 
+# Dispatch to find scores for multiple embeddings
+function find_closest(
+        finder::AbstractSimilarityFinder, index::AbstractChunkIndex,
+        query_emb::AbstractMatrix{<:Real}, query_tokens::AbstractVector{<:AbstractVector{<:AbstractString}} = Vector{Vector{String}}();
+        top_k::Int = 100, kwargs...)
+    if isnothing(chunkdata(parent(index)))
+        return CandidateChunks(; index_id = indexid(index))
+    end
+    ## reduce top_k since we have more than one query
+    top_k_ = top_k ÷ size(query_emb, 2)
+    ## simply vcat together (gets sorted from the highest similarity to the lowest)
+    if isempty(query_tokens)
+        mapreduce(
+            c -> find_closest(finder, index, c; top_k = top_k_, kwargs...), vcat, eachcol(query_emb))
+    else
+        @assert length(query_tokens)==size(query_emb, 2) "Length of `query_tokens` must be equal to the number of columns in `query_emb`."
+        mapreduce(
+            (emb, tok) -> find_closest(finder, index, emb, tok; top_k = top_k_, kwargs...), vcat, eachcol(query_emb), query_tokens)
+    end
+end
+
+"""
+    find_closest(
+        finder::AbstractSimilarityFinder, index::PineconeIndex,
+        query_emb::AbstractVector{<:Real}, query_tokens::AbstractVector{<:AbstractString} = String[];
+        top_k::Int = 10, kwargs...)
+
+Finds the indices of chunks that are closest to query embedding (`query_emb`) by querying Pinecone.
+
+Returns only `top_k` closest indices.
+"""
 function find_closest(
         finder::AbstractSimilarityFinder, index::PineconeIndex,
         query_emb::AbstractVector{<:Real}, query_tokens::AbstractVector{<:AbstractString} = String[];
@@ -261,6 +292,7 @@ function find_closest(
     scores = [m.score for m in matches]
     chunks = [m.metadata.content for m in matches]
     metadata = [JSON3.read(JSON3.write(m.metadata), Dict{String, Any}) for m in matches]
+    # TODO: metadata might not have `source`, change this
     sources = [m.metadata.source for m in matches]
 
     return CandidateWithChunks(
@@ -272,6 +304,7 @@ function find_closest(
         sources = Vector{String}(sources))
 end
 
+# Dispatch to find scores for multiple embeddings
 function find_closest(
         finder::AbstractSimilarityFinder, index::PineconeIndex,
         query_emb::AbstractMatrix{<:Real}, query_tokens::AbstractVector{<:AbstractVector{<:AbstractString}} = Vector{Vector{String}}();
@@ -287,27 +320,6 @@ function find_closest(
         @assert length(query_tokens)==size(query_emb, 2) "Length of `query_tokens` must be equal to the number of columns in `query_emb`."
         mapreduce(
             (emb, tok) -> find_closest(finder, index, emb, tok; top_k = top_k_, top_n = top_n, kwargs...), vcat, eachcol(query_emb), query_tokens)
-    end
-end
-
-# Dispatch to find scores for multiple embeddings
-function find_closest(
-        finder::AbstractSimilarityFinder, index::AbstractChunkIndex,
-        query_emb::AbstractMatrix{<:Real}, query_tokens::AbstractVector{<:AbstractVector{<:AbstractString}} = Vector{Vector{String}}();
-        top_k::Int = 100, kwargs...)
-    if isnothing(chunkdata(parent(index)))
-        return CandidateChunks(; index_id = indexid(index))
-    end
-    ## reduce top_k since we have more than one query
-    top_k_ = top_k ÷ size(query_emb, 2)
-    ## simply vcat together (gets sorted from the highest similarity to the lowest)
-    if isempty(query_tokens)
-        mapreduce(
-            c -> find_closest(finder, index, c; top_k = top_k_, kwargs...), vcat, eachcol(query_emb))
-    else
-        @assert length(query_tokens)==size(query_emb, 2) "Length of `query_tokens` must be equal to the number of columns in `query_emb`."
-        mapreduce(
-            (emb, tok) -> find_closest(finder, index, emb, tok; top_k = top_k_, kwargs...), vcat, eachcol(query_emb), query_tokens)
     end
 end
 
@@ -612,7 +624,7 @@ function find_tags(method::AllTagFilter, index::AbstractChunkIndex,
 end
 
 """
-    find_tags(method::NoTagFilter, index::AbstractChunkIndex,
+    find_tags(method::NoTagFilter, index::Union{AbstractChunkIndex, AbstractManagedIndex},
         tags::Union{T, AbstractVector{<:T}}; kwargs...) where {T <:
                                                                Union{
         AbstractString, Regex, Nothing}}
@@ -620,12 +632,6 @@ end
 
 Returns all chunks in the index, ie, no filtering, so we simply return `nothing` (easier for dispatch).
 """
-# function find_tags(method::NoTagFilter, index::AbstractChunkIndex,
-#         tags::Union{T, AbstractVector{<:T}}; kwargs...) where {T <:
-#                                                                Union{
-#         AbstractString, Regex, Nothing}}
-#     return nothing
-# end
 function find_tags(
         method::NoTagFilter, index::Union{AbstractChunkIndex,
             AbstractManagedIndex},
@@ -748,8 +754,6 @@ function rerank(reranker::NoReranker,
         candidates::AbstractCandidateWithChunks;
         top_n::Integer = length(candidates),
         kwargs...)
-    # Since this is almost a passthrough strategy, it returns the candidate_chunks unchanged
-    # but it truncates to `top_n` if necessary
     return first(candidates, top_n)
 end
 
@@ -1017,11 +1021,22 @@ end
     PineconeRetriever <: AbstractRetriever
 
 Dispatch for `retrieve` for Pinecone.
+
+# Fields
+- `rephraser::AbstractRephraser`: the rephrasing method, dispatching `rephrase` - uses `NoRephraser`
+- `embedder::AbstractEmbedder`: the embedding method, dispatching `get_embeddings` (see Preparation Stage for more details) - uses `SimpleEmbedder`
+- `processor::AbstractProcessor`: the processor method, dispatching `get_keywords` (see Preparation Stage for more details) - uses `NoProcessor`
+- `finder::AbstractSimilarityFinder`: the similarity search method, dispatching `find_closest` - uses `CosineSimilarity`
+- `tagger::AbstractTagger`: the tag generating method, dispatching `get_tags` (see Preparation Stage for more details) - uses `NoTagger`
+- `filter::AbstractTagFilter`: the tag matching method, dispatching `find_tags` - uses `NoTagFilter`
+- `reranker::AbstractReranker`: the reranking method, dispatching `rerank` - uses `NoReranker`
 """
 @kwdef mutable struct PineconeRetriever <: AbstractRetriever
     rephraser::AbstractRephraser = NoRephraser()
+    # TODO: BatchEmbedder?
     embedder::AbstractEmbedder = SimpleEmbedder()
     processor::AbstractProcessor = NoProcessor()
+    # TODO: actually do something with this; Pinecone allows choosing finder
     finder::AbstractSimilarityFinder = CosineSimilarity()
     tagger::AbstractTagger = NoTagger()
     filter::AbstractTagFilter = NoTagFilter()
@@ -1242,6 +1257,33 @@ function retrieve(retriever::AbstractRetriever,
     return result
 end
 
+"""
+    retrieve(retriever::PineconeRetriever,
+        index::PineconeIndex,
+        question::AbstractString;
+        verbose::Integer = 1,
+        top_k::Integer = 100,
+        top_n::Integer = 10,
+        api_kwargs::NamedTuple = NamedTuple(),
+        rephraser::AbstractRephraser = retriever.rephraser,
+        rephraser_kwargs::NamedTuple = NamedTuple(),
+        embedder::AbstractEmbedder = retriever.embedder,
+        embedder_kwargs::NamedTuple = NamedTuple(),
+        processor::AbstractProcessor = retriever.processor,
+        processor_kwargs::NamedTuple = NamedTuple(),
+        finder::AbstractSimilarityFinder = retriever.finder,
+        finder_kwargs::NamedTuple = NamedTuple(),
+        tagger::AbstractTagger = retriever.tagger,
+        tagger_kwargs::NamedTuple = NamedTuple(),
+        filter::AbstractTagFilter = retriever.filter,
+        filter_kwargs::NamedTuple = NamedTuple(),
+        reranker::AbstractReranker = retriever.reranker,
+        reranker_kwargs::NamedTuple = NamedTuple(),
+        cost_tracker = Threads.Atomic{Float64}(0.0),
+        kwargs...)
+
+Dispatch method for `PineconeIndex`.
+"""
 function retrieve(retriever::PineconeRetriever,
         index::PineconeIndex,
         question::AbstractString;
