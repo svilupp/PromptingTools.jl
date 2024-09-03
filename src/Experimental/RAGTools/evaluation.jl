@@ -17,9 +17,9 @@ end
     context::AbstractString
     question::AbstractString
     answer::AbstractString
-    retrieval_score::Union{Number, Nothing} = nothing
+    retrieval_score::Union{Float64, Nothing} = nothing
     retrieval_rank::Union{Int, Nothing} = nothing
-    answer_score::Union{Number, Nothing} = nothing
+    answer_score::Union{Float64, Nothing} = nothing
     parameters::Dict{Symbol, Any} = Dict{Symbol, Any}()
 end
 
