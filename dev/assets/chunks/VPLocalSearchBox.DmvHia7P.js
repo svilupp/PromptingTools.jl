@@ -2,8 +2,8 @@ var __defProp = Object.defineProperty;
 var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 import { X as __vitePreload, s as ref, h as computed, al as toValue, am as unrefElement, an as notNullish, v as watch, ao as tryOnScopeDispose, d as defineComponent, G as shallowRef, ap as computedAsync, aq as useSessionStorage, ar as useLocalStorage, x as watchEffect, as as watchDebounced, y as onMounted, R as nextTick, Q as onKeyStroke, at as useRouter, au as useEventListener, Y as useScrollLock, U as inBrowser, a1 as onBeforeUnmount, o as openBlock, b as createBlock, j as createBaseVNode, a2 as withModifiers, k as unref, av as withDirectives, aw as vModelText, ax as isRef, c as createElementBlock, n as normalizeClass, e as createCommentVNode, E as renderList, F as Fragment, a as createTextVNode, t as toDisplayString, ay as Teleport, p as pushScopeId, l as popScopeId, az as markRaw, aA as createApp, ab as dataSymbol, ah as pathToFile, aB as escapeRegExp, _ as _export_sfc } from "./framework.BuWqaE3y.js";
-import { u as useData, c as createSearchTranslate } from "./theme.CJXqKad2.js";
-const localSearchIndex = { "root": () => __vitePreload(() => import("./@localSearchIndexroot.D_aNU165.js"), true ? [] : void 0) };
+import { u as useData, c as createSearchTranslate } from "./theme.Cqx9uVi7.js";
+const localSearchIndex = { "root": () => __vitePreload(() => import("./@localSearchIndexroot.BZMFw0Cf.js"), true ? [] : void 0) };
 /*!
 * tabbable 6.2.0
 * @license MIT, https://github.com/focus-trap/tabbable/blob/master/LICENSE
