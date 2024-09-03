@@ -1,7 +1,8 @@
 using PromptingTools.Experimental.RAGTools: QAItem, QAEvalItem, QAEvalResult
 using PromptingTools.Experimental.RAGTools: score_retrieval_hit, score_retrieval_rank
 using PromptingTools.Experimental.RAGTools: build_qa_evals, run_qa_evals, chunks, sources
-using PromptingTools.Experimental.RAGTools: JudgeAllScores, Tag, MaybeTags
+using PromptingTools.Experimental.RAGTools: JudgeAllScores, Tag, MaybeTags, ChunkIndex,
+                                            RAGConfig, airag
 
 @testset "QAEvalItem" begin
     empty_qa = QAEvalItem()
@@ -75,7 +76,7 @@ end
 
 @testset "build_qa_evals" begin
     # test with a mock server
-    PORT = rand(10005:40001)
+    PORT = rand(10005:40010)
     PT.register_model!(; name = "mock-emb", schema = PT.CustomOpenAISchema())
     PT.register_model!(; name = "mock-meta", schema = PT.CustomOpenAISchema())
     PT.register_model!(; name = "mock-gen", schema = PT.CustomOpenAISchema())
