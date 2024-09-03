@@ -11,6 +11,7 @@ HTTP = "cd3eb016-35fb-5094-929b-558a96fad6f3"
 JSON3 = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
 Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
 OpenAI = "e9f21f70-7185-4079-aca2-91159181367c"
+Pinecone = "ee90fdae-f7f0-4648-8b00-9c0307cf46d9"
 Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 PrecompileTools = "aea7be01-6a6a-4083-8856-8a6e6704d82a"
 Preferences = "21216c6a-2e73-6563-6e65-726566657250"
@@ -31,7 +32,7 @@ Unicode = "4ec0a83e-493e-50e2-b9ac-8f72acf5a8f5"
 FlashRankPromptingToolsExt = ["FlashRank"]
 GoogleGenAIPromptingToolsExt = ["GoogleGenAI"]
 MarkdownPromptingToolsExt = ["Markdown"]
-RAGToolsExperimentalExt = ["SparseArrays", "LinearAlgebra", "Unicode"]
+RAGToolsExperimentalExt = ["SparseArrays", "LinearAlgebra", "Unicode", "Pinecone"]
 SnowballPromptingToolsExt = ["Snowball"]
 
 [compat]

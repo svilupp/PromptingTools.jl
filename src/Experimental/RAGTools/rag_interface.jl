@@ -138,6 +138,8 @@ abstract type AbstractTagger <: AbstractIndexingMethod end
 ### Index itself - return type of `build_index`
 abstract type AbstractDocumentIndex end
 
+abstract type AbstractManagedIndex end
+
 """
     AbstractMultiIndex <: AbstractDocumentIndex
 
@@ -176,6 +178,8 @@ Return type from `find_closest` and `find_tags` functions.
 - `scores::Vector{Float32}`: the similarity scores of the candidates from the query (higher is better)
 """
 abstract type AbstractCandidateChunks end
+
+abstract type AbstractCandidateWithChunks end
 
 # Main supertype for retrieval customizations
 abstract type AbstractRetrievalMethod end

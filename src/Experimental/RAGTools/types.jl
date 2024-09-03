@@ -3,6 +3,7 @@ using Base: parent
 
 ### Shared methods
 Base.parent(index::AbstractDocumentIndex) = index
+Base.parent(index::AbstractManagedIndex) = index
 indexid(index::AbstractDocumentIndex) = index.id
 chunkdata(index::AbstractChunkIndex) = index.chunkdata
 "Access chunkdata for a subset of chunks, `chunk_idx` is a vector of chunk indices in the index"
@@ -134,6 +135,61 @@ chunkdata(index::ChunkEmbeddingsIndex) = embeddings(index)
 
 # For backward compatibility
 const ChunkIndex = ChunkEmbeddingsIndex
+
+# TODO: where to put these?
+indexid(index::AbstractManagedIndex) = index.id
+chunks(index::AbstractManagedIndex) = index.chunks
+sources(index::AbstractManagedIndex) = index.sources
+
+# TODO: what about this?
+using Pinecone: Pinecone, PineconeContextv3, PineconeIndexv3
+
+"""
+    PineconeIndex
+
+Main struct for storing document chunks and their embeddings along with the necessary Pinecone context for connecting to Pinecone.
+
+# Fields
+- `id::Symbol`: unique identifier of each index (a symbol of the Pinecone index namespace)
+- `pinecone_context::Pinecone.PineconeContextv3`: Pinecone API key
+- `pinecone_index::Pinecone.PineconeIndexv3`: Pinecone index
+- `pinecone_namespace::String`: name of the namespace inside the Pinecone index
+- `chunks::Vector{<:AbstractString}`: underlying document chunks / snippets
+- `embeddings::Union{Nothing, Matrix{<:Real}}`: for semantic search
+- `tags::Union{Nothing, AbstractMatrix{<:Bool}}`: for exact search, filtering, etc. This is often a sparse matrix indicating which chunks have the given `tag` (see `tag_vocab` for the position lookup)
+- `tags_vocab::Union{Nothing, Vector{<:AbstractString}}`: vocabulary for the `tags` matrix (each column in `tags` is one item in `tags_vocab` and rows are the chunks)
+- `sources::Vector{<:AbstractString}`: sources of the chunks
+- `metadata::Vector{Dict{String, Any}}`: metadata for each chunk/embedding stored in Pinecone
+"""
+@kwdef struct PineconeIndex{
+    T1 <: Union{Nothing, AbstractString},
+    T2 <: Union{Nothing, Matrix{<:Real}},
+    T3 <: Union{Nothing, AbstractMatrix{<:Bool}}
+} <: AbstractManagedIndex
+    # TODO: id should be a combination of index + namespace?
+    id::Symbol  # namespace
+    # TODO: these should not be v3, maybe?
+    pinecone_context::Pinecone.PineconeContextv3
+    pinecone_index::Pinecone.PineconeIndexv3
+    pinecone_namespace::String
+    # underlying document chunks / snippets
+    chunks::Vector{T1} = nothing
+    # for semantic search
+    embeddings::T2 = nothing
+    # for exact search, filtering, etc.
+    # expected to be some sparse structure, eg, sparse matrix or nothing
+    # column oriented, ie, each column is one item in `tags_vocab` and rows are the chunks
+    tags::T3 = nothing
+    tags_vocab::Union{Nothing, Vector{<:AbstractString}} = nothing
+    sources::Union{Nothing, Vector{<:AbstractString}} = nothing
+    # metadata for each chunk
+    # TODO: should be changed to `extras`? but different type -- this needs to be vector of dicts
+    metadata::Vector{Dict{String, Any}} = Vector{Dict{String, Any}}()
+end
+HasKeywords(::PineconeIndex) = false
+HasEmbeddings(::PineconeIndex) = true
+embeddings(index::PineconeIndex) = index.embeddings
+
 abstract type AbstractDocumentTermMatrix end
 
 """
@@ -515,6 +571,89 @@ Base.@propagate_inbounds function translate_positions_to_parent(
     return sub_positions[pos]
 end
 
+
+"""
+    SubManagedIndex
+
+Provides the same functionality for `AbstractManagedIndex` as `SubChunkIndex` does for `AbstractChunkIndex`.
+"""
+@kwdef struct SubManagedIndex{T <: AbstractManagedIndex} <: AbstractManagedIndex
+    parent::T
+    positions::Vector{Int}
+end
+
+indexid(index::SubManagedIndex) = parent(index) |> indexid
+positions(index::SubManagedIndex) = index.positions
+Base.parent(index::SubManagedIndex) = index.parent
+HasEmbeddings(index::SubManagedIndex) = HasEmbeddings(parent(index))
+HasKeywords(index::SubManagedIndex) = HasKeywords(parent(index))
+
+# TODO: see which of these are needed
+Base.@propagate_inbounds function chunks(index::SubManagedIndex)
+    view(chunks(parent(index)), positions(index))
+end
+Base.@propagate_inbounds function sources(index::SubManagedIndex)
+    view(sources(parent(index)), positions(index))
+end
+Base.@propagate_inbounds function chunkdata(index::SubManagedIndex)
+    chunkdata(parent(index), positions(index))
+end
+Base.@propagate_inbounds function chunkdata(
+        index::SubManagedIndex, chunk_idx::AbstractVector{<:Integer})
+    ## We need this accessor because different chunk indices can have chunks in different dimensions!!
+    index_chunk_idx = translate_positions_to_parent(index, chunk_idx)
+    pos = intersect(positions(index), index_chunk_idx)
+    chkdata = chunkdata(parent(index), pos)
+end
+function embeddings(index::SubManagedIndex)
+    if HasEmbeddings(index)
+        view(embeddings(parent(index)), :, positions(index))
+    else
+        throw(ArgumentError("`embeddings` not implemented for $(typeof(index))"))
+    end
+end
+function tags(index::SubManagedIndex)
+    tagsdata = tags(parent(index))
+    isnothing(tagsdata) && return nothing
+    view(tagsdata, positions(index), :)
+end
+function tags_vocab(index::SubManagedIndex)
+    tags_vocab(parent(index))
+end
+function extras(index::SubManagedIndex)
+    extrasdata = extras(parent(index))
+    isnothing(extrasdata) && return nothing
+    view(extrasdata, positions(index))
+end
+function Base.vcat(i1::SubManagedIndex, i2::SubManagedIndex)
+    throw(ArgumentError("vcat not implemented for type $(typeof(i1)) and $(typeof(i2))"))
+end
+function Base.vcat(i1::T, i2::T) where {T <: SubManagedIndex}
+    ## Check if can be merged
+    if indexid(parent(i1)) != indexid(parent(i2))
+        throw(ArgumentError("Parent indices must be the same (provided: $(indexid(parent(i1))) and $(indexid(parent(i2))))"))
+    end
+    return SubChunkIndex(parent(i1), vcat(positions(i1), positions(i2)))
+end
+function Base.unique(index::SubManagedIndex)
+    return SubChunkIndex(parent(index), unique(positions(index)))
+end
+function Base.length(index::SubManagedIndex)
+    return length(positions(index))
+end
+function Base.isempty(index::SubManagedIndex)
+    return isempty(positions(index))
+end
+function Base.show(io::IO, index::SubManagedIndex)
+    print(io,
+        "A view of $(typeof(parent(index))|>nameof) (id: $(indexid(parent(index)))) with $(length(index)) chunks")
+end
+Base.@propagate_inbounds function translate_positions_to_parent(
+        index::SubManagedIndex, pos::AbstractVector{<:Integer})
+    sub_positions = positions(index)
+    return sub_positions[pos]
+end
+
 # # CandidateChunks for Retrieval
 
 """
@@ -558,6 +697,43 @@ function CandidateChunks(index::AbstractChunkIndex, positions::AbstractVector{<:
         scores::AbstractVector{<:Real} = fill(0.0f0, length(positions)))
     CandidateChunks(
         indexid(index), convert(Vector{Int}, positions), convert(Vector{Float32}, scores))
+end
+
+
+"""
+    CandidateWithChunks
+
+Similar to `CandidateChunks`, but for `AbstractManagedIndex`. It's the result of the retrieval stage of RAG.
+
+# Fields
+- `index_id::Symbol`: the id of the index from which the candidates are drawn
+- `positions::Vector{Int}`: the positions of the candidates in the index (ie, `5` refers to the 5th chunk in the index - `chunks(index)[5]`)
+- `scores::Vector{Float32}`: the similarity scores of the candidates from the query (higher is better)
+- `chunks::Vector{String}`: the chunks retrieved for a given question
+- `metadata::AbstractVector`: metadata corresponding to `chunks`
+- `sources::Vector{String}`: sources corresponding to `chunks`
+"""
+@kwdef struct CandidateWithChunks{TP <: Integer, TD <: Real} <:
+              AbstractCandidateWithChunks
+    index_id::Symbol
+    positions::Vector{TP} = Int[]
+    scores::Vector{TD} = Float32[]
+    ## fields obtained "per question"
+    chunks::Vector{String} = String[]
+    metadata::AbstractVector = Dict{String, Any}[]
+    sources::Vector{String} = String[]
+end
+# TODO: see which can be removed
+indexid(cc::CandidateWithChunks) = cc.index_id
+positions(cc::CandidateWithChunks) = cc.positions
+scores(cc::CandidateWithChunks) = cc.scores
+chunks(cc::CandidateWithChunks) = cc.chunks
+metadata(cc::CandidateWithChunks) = cc.metadata
+sources(cc::CandidateWithChunks) = cc.sources
+Base.length(cc::CandidateWithChunks) = length(cc.positions)
+function Base.first(cc::CandidateWithChunks, k::Integer)
+    sorted_idxs = sortperm(scores(cc), rev = true) |> x -> first(x, k)
+    CandidateWithChunks(indexid(cc), positions(cc)[sorted_idxs], scores(cc)[sorted_idxs], chunks(cc), metadata(cc), sources(cc))
 end
 
 """
@@ -809,6 +985,20 @@ end
 Base.@propagate_inbounds function Base.view(index::SubChunkIndex, cc::MultiCandidateChunks)
     SubChunkIndex(index, cc)
 end
+Base.@propagate_inbounds function Base.view(index::AbstractManagedIndex, cc::CandidateWithChunks)
+    @boundscheck let chk_vector = chunks(parent(index))
+        if !checkbounds(Bool, axes(chk_vector, 1), positions(cc))
+            ## Avoid printing huge position arrays, show the extremas of the attempted range
+            max_pos = extrema(positions(cc))
+            throw(BoundsError(chk_vector, max_pos))
+        end
+    end
+    pos = indexid(index) == indexid(cc) ? positions(cc) : Int[]
+    return SubManagedIndex(parent(index), pos)
+end
+Base.@propagate_inbounds function Base.view(index::SubManagedIndex, cc::CandidateWithChunks)
+    SubManagedIndex(index, cc)
+end
 Base.@propagate_inbounds function SubChunkIndex(index::SubChunkIndex, cc::CandidateChunks)
     pos = indexid(index) == indexid(cc) ? positions(cc) : Int[]
     intersect_pos = intersect(pos, positions(index))
@@ -834,6 +1024,18 @@ Base.@propagate_inbounds function SubChunkIndex(
         end
     end
     return SubChunkIndex(parent(index), intersect_pos)
+end
+Base.@propagate_inbounds function SubManagedIndex(index::SubManagedIndex, cc::CandidateWithChunks)
+    pos = indexid(index) == indexid(cc) ? positions(cc) : Int[]
+    intersect_pos = intersect(pos, positions(index))
+    @boundscheck let chk_vector = chunks(parent(index))
+        if !checkbounds(Bool, axes(chk_vector, 1), intersect_pos)
+            ## Avoid printing huge position arrays, show the extremas of the attempted range
+            max_pos = extrema(intersect_pos)
+            throw(BoundsError(chk_vector, max_pos))
+        end
+    end
+    return SubManagedIndex(parent(index), intersect_pos)
 end
 
 ## Getindex
@@ -877,6 +1079,45 @@ function Base.getindex(ci::AbstractChunkIndex,
             TypeItem(undef, init_dim)
         elseif field == :sources
             eltype(sources(ci))[]
+        elseif field == :scores
+            TD[]
+        end
+    end
+end
+function Base.getindex(pidx::AbstractManagedIndex,
+        candidate::CandidateWithChunks{TP, TD},
+        field::Symbol = :chunks; sorted::Bool = false) where {TP <: Integer, TD <: Real}
+    @assert field in [:chunks, :embeddings, :chunkdata, :sources, :scores] "Only `chunks`, `embeddings`, `chunkdata`, `sources`, `scores` fields are supported for now"
+    ## embeddings is a compatibility alias, use chunkdata
+    field = field == :embeddings ? :chunkdata : field
+
+    if indexid(pidx) == indexid(candidate)
+        # Sort if requested
+        sorted_idx = sorted ? sortperm(scores(candidate), rev = true) :
+                     eachindex(scores(candidate))
+        sub_index = view(pidx, candidate)
+        if field == :chunks
+            chunks(sub_index)[sorted_idx]
+        elseif field == :chunkdata
+            ## If embeddings, chunks are columns
+            ## If keywords (DTM), chunks are rows
+            chkdata = chunkdata(sub_index, sorted_idx)
+        elseif field == :sources
+            sources(sub_index)[sorted_idx]
+        elseif field == :scores
+            scores(candidate)[sorted_idx]
+        end
+    else
+        if field == :chunks
+            eltype(chunks(pidx))[]
+        elseif field == :chunkdata
+            chkdata = chunkdata(pidx)
+            isnothing(chkdata) && return nothing
+            TypeItem = typeof(chkdata)
+            init_dim = ntuple(i -> 0, ndims(chkdata))
+            TypeItem(undef, init_dim)
+        elseif field == :sources
+            eltype(sources(pidx))[]
         elseif field == :scores
             TD[]
         end
@@ -936,6 +1177,9 @@ end
 function Base.getindex(index::AbstractChunkIndex, id::Symbol)
     id == indexid(index) ? index : nothing
 end
+function Base.getindex(index::AbstractManagedIndex, id::Symbol)
+    id == indexid(index) ? index : nothing
+end
 function Base.getindex(index::AbstractMultiIndex, id::Symbol)
     id == indexid(index) && return index
     idx = findfirst(x -> indexid(x) == id, indexes(index))
@@ -971,13 +1215,13 @@ See also: `pprint` (pretty printing), `annotate_support` (for annotating the ans
     final_answer::Union{Nothing, AbstractString} = nothing
     context::Vector{<:AbstractString} = String[]
     sources::Vector{<:AbstractString} = String[]
-    emb_candidates::Union{CandidateChunks, MultiCandidateChunks} = CandidateChunks(
+    emb_candidates::Union{CandidateChunks, CandidateWithChunks, MultiCandidateChunks} = CandidateChunks(
         index_id = :NOTINDEX, positions = Int[], scores = Float32[])
-    tag_candidates::Union{Nothing, CandidateChunks, MultiCandidateChunks} = CandidateChunks(
+    tag_candidates::Union{Nothing, CandidateChunks, CandidateWithChunks, MultiCandidateChunks} = CandidateChunks(
         index_id = :NOTINDEX, positions = Int[], scores = Float32[])
-    filtered_candidates::Union{CandidateChunks, MultiCandidateChunks} = CandidateChunks(
+    filtered_candidates::Union{CandidateChunks, CandidateWithChunks, MultiCandidateChunks} = CandidateChunks(
         index_id = :NOTINDEX, positions = Int[], scores = Float32[])
-    reranked_candidates::Union{CandidateChunks, MultiCandidateChunks} = CandidateChunks(
+    reranked_candidates::Union{CandidateChunks, CandidateWithChunks, MultiCandidateChunks} = CandidateChunks(
         index_id = :NOTINDEX, positions = Int[], scores = Float32[])
     conversations::Dict{Symbol, Vector{<:AbstractMessage}} = Dict{
         Symbol, Vector{<:AbstractMessage}}()

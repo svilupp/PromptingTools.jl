@@ -29,6 +29,13 @@ No-op embedder for `get_embeddings` functions. It returns `nothing`.
 struct NoEmbedder <: AbstractEmbedder end
 
 """
+    SimpleEmbedder <: AbstractEmbedder
+
+Simply passes the input to `aiembed`.
+"""
+struct SimpleEmbedder <: AbstractEmbedder end
+
+"""
     BatchEmbedder <: AbstractEmbedder
 
 Default embedder for `get_embeddings` functions. It passes individual documents to be embedded in chunks to `aiembed`.
@@ -134,6 +141,20 @@ It uses `TextChunker`, `KeywordsProcessor`, and `NoTagger` as default chunker, p
     tagger::AbstractTagger = NoTagger()
 end
 
+"""
+    PineconeIndexer <: AbstractIndexBuilder
+
+Pinecone index to be returned by `build_index`.
+
+It uses `FileChunker`, `SimpleEmbedder` and `NoTagger` as default chunker, embedder and tagger.
+"""
+@kwdef mutable struct PineconeIndexer <: AbstractIndexBuilder
+    chunker::AbstractChunker = FileChunker()
+    # TODO: BatchEmbedder?
+    embedder::AbstractEmbedder = SimpleEmbedder()
+    tagger::AbstractTagger = NoTagger()
+end
+
 ### Functions
 
 ## "Build an index for RAG (Retriever-Augmented Generation) applications. REQUIRES SparseArrays and LinearAlgebra packages to be loaded!!"
@@ -225,6 +246,13 @@ end
 function get_embeddings(
         embedder::NoEmbedder, docs::AbstractVector{<:AbstractString}; kwargs...)
     return nothing
+end
+
+function get_embeddings(
+        embedder::SimpleEmbedder, docs::AbstractVector{<:AbstractString};
+        model::AbstractString = PT.MODEL_EMBEDDING,
+        kwargs...)
+    return hcat([Vector{Float32}(aiembed(doc; model).content) for doc in docs]...)
 end
 
 """
@@ -698,6 +726,156 @@ function build_index(
 
     index = ChunkKeywordsIndex(; id = index_id, chunkdata = dtm, tags, tags_vocab,
         chunks, sources, extras)
+    return index
+end
+
+# TODO: where to put these?
+using Pinecone: Pinecone, PineconeContextv3, PineconeIndexv3, init_v3, Index, PineconeVector, upsert
+using UUIDs: UUIDs, uuid4
+"""
+    build_index(
+        indexer::PineconeIndexer, files_or_docs::Vector{<:AbstractString};
+        metadata::Vector{Dict{String, Any}} = Vector{Dict{String, Any}}(),
+        pinecone_context::Pinecone.PineconeContextv3 = Pinecone.init_v3(""),
+        pinecone_index::Pinecone.PineconeIndexv3 = nothing,
+        pinecone_namespace::AbstractString = "",
+        upsert::Bool = true,
+        verbose::Integer = 1,
+        index_id = gensym(pinecone_namespace),
+        chunker::AbstractChunker = indexer.chunker,
+        chunker_kwargs::NamedTuple = NamedTuple(),
+        embedder::AbstractEmbedder = indexer.embedder,
+        embedder_kwargs::NamedTuple = NamedTuple(),
+        tagger::AbstractTagger = indexer.tagger,
+        tagger_kwargs::NamedTuple = NamedTuple(),
+        api_kwargs::NamedTuple = NamedTuple(),
+        cost_tracker = Threads.Atomic{Float64}(0.0))
+
+Builds a `PineconeIndex` containing a Pinecone context (API key, index and namespace).
+The index stores the document chunks and their embeddings (and potentially other information).
+
+The function processes each file or document (depending on `chunker`), splits its content into chunks, embeds these chunks
+and then combines this information into a retrievable index. The chunks and embeddings are upsert to Pinecone using
+the provided Pinecone context (unless the `upsert` flag is set to `false`).
+
+# Arguments
+- `indexer::PineconeIndexer`: The indexing logic for Pinecone operations.
+- `files_or_docs`: A vector of valid file paths to be indexed (chunked and embedded).
+- `metadata::Vector{Dict{String, Any}}`: A vector of metadata attributed to each docs file, given as dictionaries with `String` keys. Default is empty vector.
+- `pinecone_context::Pinecone.PineconeContextv3`: The Pinecone API key generated using Pinecone.jl. Must be specified.
+- `pinecone_index::Pinecone.PineconeIndexv3`: The Pinecone index generated using Pinecone.jl. Must be specified.
+- `pinecone_namespace::AbstractString`: The Pinecone namespace associated to `pinecone_index`.
+- `upsert::Bool = true`: A flag specifying whether to upsert the chunks and embeddings to Pinecone. Defaults to `true`.
+- `verbose`: An Integer specifying the verbosity of the logs. Default is `1` (high-level logging). `0` is disabled.
+- `index_id`: A unique identifier for the index. Default is a generated symbol.
+- `chunker`: The chunker logic to use for splitting the documents. Default is `TextChunker()`.
+- `chunker_kwargs`: Parameters to be provided to the `get_chunks` function. Useful to change the `separators` or `max_length`.
+  - `sources`: A vector of strings indicating the source of each chunk. Default is equal to `files_or_docs`.
+- `embedder`: The embedder logic to use for embedding the chunks. Default is `BatchEmbedder()`.
+- `embedder_kwargs`: Parameters to be provided to the `get_embeddings` function. Useful to change the `target_batch_size_length` or reduce asyncmap tasks `ntasks`.
+  - `model`: The model to use for embedding. Default is `PT.MODEL_EMBEDDING`.
+- `tagger`: The tagger logic to use for extracting tags from the chunks. Default is `NoTagger()`, ie, skip tag extraction. There are also `PassthroughTagger` and `OpenTagger`.
+- `tagger_kwargs`: Parameters to be provided to the `get_tags` function.
+  - `model`: The model to use for tags extraction. Default is `PT.MODEL_CHAT`.
+  - `template`: A template to be used for tags extraction. Default is `:RAGExtractMetadataShort`.
+  - `tags`: A vector of vectors of strings directly providing the tags for each chunk. Applicable for `tagger::PasstroughTagger`.
+- `api_kwargs`: Parameters to be provided to the API endpoint. Shared across all API calls if provided.
+- `cost_tracker`: A `Threads.Atomic{Float64}` object to track the total cost of the API calls. Useful to pass the total cost to the parent call.
+
+# Returns
+- `PineconeIndex`: An object containing the compiled index of chunks, embeddings, tags, vocabulary, sources and metadata, together with the Pinecone connection data.
+
+See also: `PineconeIndex`, `get_chunks`, `get_embeddings`, `get_tags`, `CandidateWithChunks`, `find_closest`, `find_tags`, `rerank`, `retrieve`, `generate!`, `airag`
+
+# Examples
+```julia
+using Pinecone
+
+# Prepare the Pinecone connection data
+pinecone_context = Pinecone.init_v3(ENV["PINECONE_API_KEY"])
+pindex = ENV["PINECONE_INDEX"]
+pinecone_index = !isempty(pindex) ? Pinecone.Index(pinecone_context, pindex) : nothing
+namespace = "my-namespace"
+
+# Add metadata about the sources in Pinecone
+metadata = [Dict{String, Any}("source" => doc_file) for doc_file in docs_files]
+
+# Build the index. By default, the chunks and embeddings get upserted to Pinecone.
+const RT = PromptingTools.Experimental.RAGTools
+index_pinecone = RT.build_index(
+    RT.PineconeIndexer(),
+    docs_files;
+    pinecone_context = pinecone_context,
+    pinecone_index = pinecone_index,
+    pinecone_namespace = namespace,
+    metadata = metadata
+)
+
+# Notes
+- If you get errors about exceeding embedding input sizes, first check the `max_length` in your chunks. 
+  If that does NOT resolve the issue, try changing the `embedding_kwargs`. 
+  In particular, reducing the `target_batch_size_length` parameter (eg, 10_000) and number of tasks `ntasks=1`. 
+  Some providers cannot handle large batch sizes (eg, Databricks).
+
+"""
+function build_index(
+        indexer::PineconeIndexer, files_or_docs::Vector{<:AbstractString};
+        metadata::Vector{Dict{String, Any}} = Vector{Dict{String, Any}}(),
+        pinecone_context::Pinecone.PineconeContextv3 = Pinecone.init_v3(""),
+        pinecone_index::Pinecone.PineconeIndexv3 = nothing,
+        pinecone_namespace::AbstractString = "",
+        upsert::Bool = true,
+        verbose::Integer = 1,
+        index_id = gensym(pinecone_namespace),
+        chunker::AbstractChunker = indexer.chunker,
+        chunker_kwargs::NamedTuple = NamedTuple(),
+        embedder::AbstractEmbedder = indexer.embedder,
+        embedder_kwargs::NamedTuple = NamedTuple(),
+        tagger::AbstractTagger = indexer.tagger,
+        tagger_kwargs::NamedTuple = NamedTuple(),
+        api_kwargs::NamedTuple = NamedTuple(),
+        cost_tracker = Threads.Atomic{Float64}(0.0))
+    @assert !isempty(pinecone_context.apikey) && !isnothing(pinecone_index) "Pinecone context and index not set"
+
+    ## Split into chunks
+    chunks, sources = get_chunks(chunker, files_or_docs;
+        chunker_kwargs...)
+    ## Get metadata for each chunk
+    if isempty(metadata)
+        metadata = [Dict{String, Any}() for _ in sources]
+    else
+        metadata = [metadata[findfirst(f -> f == source, files_or_docs)] for source in sources]
+        [metadata[idx]["content"] = chunk for (idx, chunk) in enumerate(chunks)]
+    end
+
+    ## Embed chunks
+    embeddings = get_embeddings(embedder, chunks;
+        verbose = (verbose > 1),
+        cost_tracker,
+        api_kwargs, embedder_kwargs...)
+
+    ## Extract tags
+    tags_extracted = get_tags(tagger, chunks;
+        verbose = (verbose > 1),
+        cost_tracker,
+        api_kwargs, tagger_kwargs...)
+    # Build the sparse matrix and the vocabulary
+    tags, tags_vocab = build_tags(tagger, tags_extracted)
+
+    # Upsert to Pinecone
+    if upsert
+        embeddings_arr = [embeddings[:,i] for i in axes(embeddings,2)]
+        for (idx, emb) in enumerate(embeddings_arr)
+            pinevector = Pinecone.PineconeVector(string(UUIDs.uuid4()), emb, metadata[idx])
+            Pinecone.upsert(pinecone_context, pinecone_index, [pinevector], pinecone_namespace)
+            @info "Upsert #$idx complete"
+        end
+    end
+
+    index = PineconeIndex(; id = index_id, pinecone_context, pinecone_index, pinecone_namespace, chunks, embeddings, tags, tags_vocab, metadata, sources)
+
+    (verbose > 0) && @info "Index built! (cost: \$$(round(cost_tracker[], digits=3)))"
+
     return index
 end
 

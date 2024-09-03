@@ -37,7 +37,8 @@ context = build_context(ContextEnumerator(), index, candidates; chunks_window_ma
 ```
 """
 function build_context(contexter::ContextEnumerator,
-        index::AbstractDocumentIndex, candidates::AbstractCandidateChunks;
+        index::AbstractDocumentIndex,
+        candidates::AbstractCandidateChunks;
         verbose::Bool = true,
         chunks_window_margin::Tuple{Int, Int} = (1, 1), kwargs...)
     ## Checks
@@ -63,6 +64,45 @@ function build_context(contexter::ContextEnumerator,
     return context
 end
 
+"""
+    build_context(contexter::ContextEnumerator,
+        index::AbstractManagedIndex, candidates::AbstractCandidateWithChunks;
+        verbose::Bool = true,
+        chunks_window_margin::Tuple{Int, Int} = (1, 1), kwargs...)
+
+        build_context!(contexter::ContextEnumerator,
+        index::AbstractManagedIndex, result::AbstractRAGResult; kwargs...)
+
+Dispatch for `AbstractManagedIndex` with `AbstractCandidateWithChunks`.
+"""
+function build_context(contexter::ContextEnumerator,
+        index::AbstractManagedIndex,
+        candidates::AbstractCandidateWithChunks;
+        verbose::Bool = true,
+        chunks_window_margin::Tuple{Int, Int} = (1, 1), kwargs...)
+    ## Checks
+    @assert chunks_window_margin[1] >= 0&&chunks_window_margin[2] >= 0 "Both `chunks_window_margin` values must be non-negative"
+
+    context = String[]
+    for (i, position) in enumerate(positions(candidates))
+        ## select the right index
+        id = candidates isa MultiCandidateChunks ? candidates.index_ids[i] :
+             candidates.index_id
+        index_ = index isa AbstractChunkIndex ? index : index[id]
+        isnothing(index_) && continue
+
+        chunks_ = chunks(candidates)[
+            max(1, position - chunks_window_margin[1]):min(end,
+            position + chunks_window_margin[2])]
+        ## Check if surrounding chunks are from the same source
+        is_same_source = sources(candidates)[
+            max(1, position - chunks_window_margin[1]):min(end,
+            position + chunks_window_margin[2])] .== sources(candidates)[position]
+        push!(context, "$(i). $(join(chunks_[is_same_source], "\n"))")
+    end
+    return context
+end
+
 function build_context!(contexter::AbstractContextBuilder,
         index::AbstractDocumentIndex, result::AbstractRAGResult; kwargs...)
     throw(ArgumentError("Contexter $(typeof(contexter)) not implemented"))
@@ -71,6 +111,11 @@ end
 # Mutating version that dispatches on the result to the underlying implementation
 function build_context!(contexter::ContextEnumerator,
         index::AbstractDocumentIndex, result::AbstractRAGResult; kwargs...)
+    result.context = build_context(contexter, index, result.reranked_candidates; kwargs...)
+    return result
+end
+function build_context!(contexter::ContextEnumerator,
+        index::AbstractManagedIndex, result::AbstractRAGResult; kwargs...)
     result.context = build_context(contexter, index, result.reranked_candidates; kwargs...)
     return result
 end
@@ -139,6 +184,42 @@ function answer!(
     return result
 end
 
+"""
+    answer!(
+        answerer::SimpleAnswerer, index::AbstractManagedIndex, result::AbstractRAGResult;
+        model::AbstractString = PT.MODEL_CHAT, verbose::Bool = true,
+        template::Symbol = :RAGAnswerFromContext,
+        cost_tracker = Threads.Atomic{Float64}(0.0),
+        kwargs...)
+
+Dispatch for `AbstractManagedIndex`.
+"""
+function answer!(
+        answerer::SimpleAnswerer, index::AbstractManagedIndex, result::AbstractRAGResult;
+        model::AbstractString = PT.MODEL_CHAT, verbose::Bool = true,
+        template::Symbol = :RAGAnswerFromContext,
+        cost_tracker = Threads.Atomic{Float64}(0.0),
+        kwargs...)
+    ## Checks
+    placeholders = only(aitemplates(template)).variables # only one template should be found
+    @assert (:question in placeholders)&&(:context in placeholders) "Provided RAG Template $(template) is not suitable. It must have placeholders: `question` and `context`."
+    ##
+    (; context, question) = result
+    conv = aigenerate(template; question,
+        context = join(context, "\n\n"), model, verbose = false,
+        return_all = true,
+        kwargs...)
+    msg = conv[end]
+    result.answer = strip(msg.content)
+    result.conversations[:answer] = conv
+    ## Increment the cost tracker
+    Threads.atomic_add!(cost_tracker, msg.cost)
+    verbose &&
+        @info "Done generating the answer. Cost: \$$(round(msg.cost,digits=3))"
+
+    return result
+end
+
 ## Refine
 """
     NoRefiner <: AbstractRefiner
@@ -162,10 +243,11 @@ Refines the answer by executing a web search using the Tavily API. This method a
 struct TavilySearchRefiner <: AbstractRefiner end
 
 function refine!(
-        refiner::AbstractRefiner, index::AbstractDocumentIndex, result::AbstractRAGResult;
+        refiner::AbstractRefiner, index::Union{AbstractDocumentIndex, AbstractManagedIndex}, result::AbstractRAGResult;
         kwargs...)
     throw(ArgumentError("Refiner $(typeof(refiner)) not implemented"))
 end
+
 
 """
     refine!(
@@ -175,7 +257,7 @@ end
 Simple no-op function for `refine!`. It simply copies the `result.answer` and `result.conversations[:answer]` without any changes.
 """
 function refine!(
-        refiner::NoRefiner, index::AbstractDocumentIndex, result::AbstractRAGResult;
+        refiner::NoRefiner, index::Union{AbstractDocumentIndex, AbstractManagedIndex}, result::AbstractRAGResult;
         kwargs...)
     result.final_answer = result.answer
     if haskey(result.conversations, :answer)
@@ -184,9 +266,10 @@ function refine!(
     return result
 end
 
+
 """
     refine!(
-        refiner::SimpleRefiner, index::AbstractDocumentIndex, result::AbstractRAGResult;
+        refiner::SimpleRefiner, index::Union{AbstractDocumentIndex, AbstractManagedIndex}, result::AbstractRAGResult;
         verbose::Bool = true,
         model::AbstractString = PT.MODEL_CHAT,
         template::Symbol = :RAGAnswerRefiner,
@@ -210,7 +293,7 @@ This method uses the same context as the original answer, however, it can be mod
 - `cost_tracker`: An atomic counter to track the cost of the operation.
 """
 function refine!(
-        refiner::SimpleRefiner, index::AbstractDocumentIndex, result::AbstractRAGResult;
+        refiner::SimpleRefiner, index::Union{AbstractDocumentIndex, AbstractManagedIndex}, result::AbstractRAGResult;
         verbose::Bool = true,
         model::AbstractString = PT.MODEL_CHAT,
         template::Symbol = :RAGAnswerRefiner,
@@ -238,9 +321,10 @@ function refine!(
     return result
 end
 
+
 """
     refine!(
-        refiner::TavilySearchRefiner, index::AbstractDocumentIndex, result::AbstractRAGResult;
+        refiner::TavilySearchRefiner, index::Union{AbstractDocumentIndex, AbstractManagedIndex}, result::AbstractRAGResult;
         verbose::Bool = true,
         model::AbstractString = PT.MODEL_CHAT,
         include_answer::Bool = true,
@@ -288,7 +372,7 @@ pprint(result)
 ```
 """
 function refine!(
-        refiner::TavilySearchRefiner, index::AbstractDocumentIndex, result::AbstractRAGResult;
+        refiner::TavilySearchRefiner, index::Union{AbstractDocumentIndex, AbstractManagedIndex}, result::AbstractRAGResult;
         verbose::Bool = true,
         model::AbstractString = PT.MODEL_CHAT,
         include_answer::Bool = true,
@@ -353,13 +437,13 @@ Overload this method to add custom postprocessing steps, eg, logging, saving con
 """
 struct NoPostprocessor <: AbstractPostprocessor end
 
-function postprocess!(postprocessor::AbstractPostprocessor, index::AbstractDocumentIndex,
+function postprocess!(postprocessor::AbstractPostprocessor, index::Union{AbstractDocumentIndex, AbstractManagedIndex},
         result::AbstractRAGResult; kwargs...)
     throw(ArgumentError("Postprocessor $(typeof(postprocessor)) not implemented"))
 end
 
 function postprocess!(
-        ::NoPostprocessor, index::AbstractDocumentIndex, result::AbstractRAGResult; kwargs...)
+        ::NoPostprocessor, index::Union{AbstractDocumentIndex, AbstractManagedIndex}, result::AbstractRAGResult; kwargs...)
     return result
 end
 
@@ -394,7 +478,7 @@ end
 
 """
     generate!(
-        generator::AbstractGenerator, index::AbstractDocumentIndex, result::AbstractRAGResult;
+        generator::AbstractGenerator, index::Union{AbstractDocumentIndex, AbstractManagedIndex}, result::AbstractRAGResult;
         verbose::Integer = 1,
         api_kwargs::NamedTuple = NamedTuple(),
         contexter::AbstractContextBuilder = generator.contexter,
@@ -459,7 +543,7 @@ result = generate!(index, result)
 ```
 """
 function generate!(
-        generator::AbstractGenerator, index::AbstractDocumentIndex, result::AbstractRAGResult;
+        generator::AbstractGenerator, index::Union{AbstractDocumentIndex, AbstractManagedIndex}, result::AbstractRAGResult;
         verbose::Integer = 1,
         api_kwargs::NamedTuple = NamedTuple(),
         contexter::AbstractContextBuilder = generator.contexter,
@@ -524,8 +608,9 @@ function Base.show(io::IO, cfg::AbstractRAGConfig)
     dump(io, cfg; maxdepth = 2)
 end
 
+# TODO: add example for Pinecone
 """
-    airag(cfg::AbstractRAGConfig, index::AbstractDocumentIndex;
+    airag(cfg::AbstractRAGConfig, index::Union{AbstractDocumentIndex, AbstractManagedIndex};
         question::AbstractString,
         verbose::Integer = 1, return_all::Bool = false,
         api_kwargs::NamedTuple = NamedTuple(),
@@ -648,7 +733,7 @@ PT.pprint(result)
 
 For easier manipulation of nested kwargs, see utilities `getpropertynested`, `setpropertynested`, `merge_kwargs_nested`.
 """
-function airag(cfg::AbstractRAGConfig, index::AbstractDocumentIndex;
+function airag(cfg::AbstractRAGConfig, index::Union{AbstractDocumentIndex, AbstractManagedIndex};
         question::AbstractString,
         verbose::Integer = 1, return_all::Bool = false,
         api_kwargs::NamedTuple = NamedTuple(),
@@ -692,6 +777,10 @@ end
 const DEFAULT_RAG_CONFIG = RAGConfig()
 function airag(index::AbstractDocumentIndex; question::AbstractString, kwargs...)
     return airag(DEFAULT_RAG_CONFIG, index; question, kwargs...)
+end
+const DEFAULT_RAG_CONFIG_PINECONE = RAGConfig(PineconeIndexer(), PineconeRetriever(), AdvancedGenerator())
+function airag(index::AbstractManagedIndex; question::AbstractString, kwargs...)
+    return airag(DEFAULT_RAG_CONFIG_PINECONE, index; question, kwargs...)
 end
 
 # Special method to pretty-print the airag results

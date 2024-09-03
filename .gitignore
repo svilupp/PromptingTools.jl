@@ -11,3 +11,5 @@
 # exclude scratch files
 **/_*
 docs/package-lock.json
+
+.env
