@@ -75,8 +75,23 @@ function OpenAI.create_chat(schema::AbstractOpenAISchema,
         api_key::AbstractString,
         model::AbstractString,
         conversation;
+        http_kwargs::NamedTuple = NamedTuple(),
+        streamcallback::Any = nothing,
         kwargs...)
-    OpenAI.create_chat(api_key, model, conversation; kwargs...)
+    if !isnothing(streamcallback)
+        ## Take over from OpenAI.jl
+        url = OpenAI.build_url(OpenAI.DEFAULT_PROVIDER, "chat/completions")
+        headers = OpenAI.auth_header(OpenAI.DEFAULT_PROVIDER, api_key)
+        streamcallback, new_kwargs = configure_callback!(
+            streamcallback, schema; kwargs...)
+        input = OpenAI.build_params((; messages = conversation, model, new_kwargs...))
+        ## Use the streaming callback
+        resp = streamed_request!(streamcallback, url, headers, input; http_kwargs...)
+        OpenAI.OpenAIResponse(resp.status, JSON3.read(resp.body))
+    else
+        ## Use OpenAI.jl default
+        OpenAI.create_chat(api_key, model, conversation; http_kwargs, kwargs...)
+    end
 end
 
 # Overload for testing/debugging
@@ -500,6 +515,7 @@ function aigenerate(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_
         api_key::String = OPENAI_API_KEY,
         model::String = MODEL_CHAT, return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
+        streamcallback::Any = nothing,
         http_kwargs::NamedTuple = (retry_non_idempotent = true,
             retries = 5,
             readtimeout = 120), api_kwargs::NamedTuple = NamedTuple(),
@@ -514,6 +530,7 @@ function aigenerate(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_
         time = @elapsed r = create_chat(prompt_schema, api_key,
             model_id,
             conv_rendered;
+            streamcallback,
             http_kwargs,
             api_kwargs...)
         ## Process one of more samples returned

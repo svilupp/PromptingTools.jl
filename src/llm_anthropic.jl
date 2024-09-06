@@ -132,6 +132,7 @@ function anthropic_api(
         max_tokens::Int = 2048,
         model::String = "claude-3-haiku-20240307", http_kwargs::NamedTuple = NamedTuple(),
         stream::Bool = false,
+        streamcallback::Any = nothing,
         url::String = "https://api.anthropic.com/v1",
         cache::Union{Nothing, Symbol} = nothing,
         kwargs...)
@@ -150,7 +151,15 @@ function anthropic_api(
         api_key; bearer = false, x_api_key = true,
         extra_headers)
     api_url = string(url, "/", endpoint)
-    resp = HTTP.post(api_url, headers, JSON3.write(body); http_kwargs...)
+    if !isnothing(streamcallback)
+        streamcallback, _ = configure_callback!(
+            streamcallback, prompt_schema; kwargs...)
+        body["stream"] = true
+        resp = streamed_request!(
+            streamcallback, api_url, headers, JSON3.write(body); http_kwargs...)
+    else
+        resp = HTTP.post(api_url, headers, JSON3.write(body); http_kwargs...)
+    end
     body = JSON3.read(resp.body)
     return (; response = body, resp.status)
 end
@@ -261,6 +270,7 @@ function aigenerate(
         model::String = MODEL_CHAT,
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
+        streamcallback::Any = nothing,
         http_kwargs::NamedTuple = NamedTuple(), api_kwargs::NamedTuple = NamedTuple(),
         cache::Union{Nothing, Symbol} = nothing,
         kwargs...)
@@ -274,7 +284,7 @@ function aigenerate(
     if !dry_run
         time = @elapsed resp = anthropic_api(
             prompt_schema, conv_rendered.conversation; api_key,
-            conv_rendered.system, endpoint = "messages", model = model_id, http_kwargs, cache,
+            conv_rendered.system, endpoint = "messages", model = model_id, streamcallback, http_kwargs, cache,
             api_kwargs...)
         tokens_prompt = get(resp.response[:usage], :input_tokens, 0)
         tokens_completion = get(resp.response[:usage], :output_tokens, 0)
