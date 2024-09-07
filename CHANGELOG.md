@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.52.0]
 
 ### Added
-- Added a new `streamcallback` kwarg for `aigenerate` with the OpenAI and Anthropic schema to enable custom streaming implementations. Simplest usage is simply with `streamcallback=stdout`, which will print each text chunk into the console. System is modular enabling custom callbacks and allowing you to inspect received chunks. See `?StreamCallback` for more information.
+- Added a new EXPERIMENTAL `streamcallback` kwarg for `aigenerate` with the OpenAI and Anthropic prompt schema to enable custom streaming implementations. Simplest usage is simply with `streamcallback=stdout`, which will print each text chunk into the console. System is modular enabling custom callbacks and allowing you to inspect received chunks. See `?StreamCallback` for more information. It does not support tools yet.
 
 ## [0.51.0]
 

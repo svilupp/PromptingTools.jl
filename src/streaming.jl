@@ -41,16 +41,24 @@ end
     StreamCallback
 
 Simplest callback for streaming message, which just prints the content to the output stream defined by `out`.
+When streaming is over, it builds the response body from the chunks and returns it as if it was a normal response from the API.
 
 For more complex use cases, you can define your own `callback`. See the interface description below for more information.
 
 # Fields
 - `out`: The output stream, eg, `stdout` or a pipe.
 - `flavor`: The stream flavor which might or might not differ between different providers, eg, `OpenAIStream` or `AnthropicStream`.
-- `chunks`: The list of `StreamChunk` chunks.
-- `kwargs`: The keyword arguments, eg, `verbose=true` to see more details.
+- `chunks`: The list of received `StreamChunk` chunks.
+- `verbose`: Whether to print verbose information.
+- `throw_on_error`: Whether to throw an error if an error message is detected in the streaming response.
+- `kwargs`: Any custom keyword arguments required for your use case.
 
 # Interface
+
+- `StreamCallback(; kwargs...)`: Constructor for the `StreamCallback` object.
+- `streamed_request!(cb, url, headers, input)`: End-to-end wrapper for POST streaming requests.
+
+`streamed_request!` composes of:
 - `extract_chunks(flavor, blob)`: Extract the chunks from the received SSE blob. Returns a list of `StreamChunk` and the next spillover (if message was incomplete).
 - `callback(cb, chunk)`: Process the chunk to be printed
     - `extract_content(flavor, chunk)`: Extract the content from the chunk.
@@ -59,32 +67,55 @@ For more complex use cases, you can define your own `callback`. See the interfac
 - `build_response_body(flavor, cb)`: Build the response body from the chunks to mimic receiving a standard response from the API.
 
 If you want to implement your own callback, you can create your own methods for the interface functions.
-Eg, if you want to print the streamed chunks into a Channel, you could define a simple method just for `print_content`.
+Eg, if you want to print the streamed chunks into some specialized sink or Channel, you could define a simple method just for `print_content`.
 
+# Example
+```julia
+using PromptingTools
+const PT = PromptingTools
+
+# Simplest usage, just provide where to steam the text (we build the callback for you)
+msg = aigenerate("Count from 1 to 100."; streamcallback = stdout)
+
+streamcallback = PT.StreamCallback() # record all chunks
+msg = aigenerate("Count from 1 to 100."; streamcallback)
+# this allows you to inspect each chunk with `streamcallback.chunks`
+
+# Get verbose output with details of each chunk for debugging
+streamcallback = PT.StreamCallback(; verbose=true, throw_on_error=true)
+msg = aigenerate("Count from 1 to 10."; streamcallback)
+```
 """
 @kwdef mutable struct StreamCallback{
     T1 <: Any, T2 <: Union{AbstractStreamFlavor, Nothing}} <:
                       AbstractStreamCallback
     out::T1 = stdout
     flavor::T2 = nothing
-    chunks::Vector{StreamChunk} = StreamChunk[]
+    chunks::Vector{<:StreamChunk} = StreamChunk[]
+    verbose::Bool = false
+    throw_on_error::Bool = false
     kwargs::NamedTuple = NamedTuple()
 end
 function Base.show(io::IO, cb::StreamCallback)
     print(io,
-        "StreamCallback(out=$(cb.out), flavor=$(cb.flavor), chunks=$(length(cb.chunks)) items)")
+        "StreamCallback(out=$(cb.out), flavor=$(cb.flavor), chunks=$(length(cb.chunks)) items, $(cb.verbose ? "verbose" : "silent"), $(cb.throw_on_error ? "throw_on_error" : "no_throw"))")
 end
+Base.empty!(cb::AbstractStreamCallback) = empty!(cb.chunks)
+Base.push!(cb::AbstractStreamCallback, chunk::StreamChunk) = push!(cb.chunks, chunk)
+Base.isempty(cb::AbstractStreamCallback) = isempty(cb.chunks)
+Base.length(cb::AbstractStreamCallback) = length(cb.chunks)
 
 ### Convenience utilities
 """
-    configure_callback!(cb::AbstractStreamCallback, schema::AbstractPromptSchema;
-        api_kwargs::NamedTuple = NamedTuple(), kwargs...)
+    configure_callback!(cb::StreamCallback, schema::AbstractPromptSchema;
+        api_kwargs...)
 
 Configures the callback `cb` for streaming with a given prompt schema.
 If no `cb.flavor` is provided, adjusts the `flavor` and the provided `api_kwargs` as necessary.
+
 """
 function configure_callback!(cb::T, schema::AbstractPromptSchema;
-        api_kwargs...) where {T <: AbstractStreamCallback}
+        api_kwargs...) where {T <: StreamCallback}
     ## Check if we are in passthrough mode or if we should configure the callback
     if isnothing(cb.flavor)
         if schema isa OpenAISchema
@@ -103,7 +134,8 @@ function configure_callback!(cb::T, schema::AbstractPromptSchema;
     return cb, api_kwargs
 end
 # method to build a callback for a given output stream
-function configure_callback!(output_stream::IO, schema::AbstractPromptSchema)
+function configure_callback!(
+        output_stream::Union{IO, Channel}, schema::AbstractPromptSchema)
     cb = StreamCallback(out = output_stream)
     return configure_callback!(cb, schema)
 end
@@ -132,15 +164,19 @@ end
 @inline function is_done(flavor::AnthropicStream, chunk::StreamChunk; kwargs...)
     chunk.event == :error || chunk.event == :message_stop
 end
+function is_done(flavor::AbstractStreamFlavor, chunk::StreamChunk; kwargs...)
+    throw(ArgumentError("is_done is not implemented for flavor $(flavor)"))
+end
 
 """
-    extract_chunks(flavor, blob)
+    extract_chunks(flavor::AbstractStreamFlavor, blob::AbstractString;
+        spillover::AbstractString = "", verbose::Bool = false, kwargs...)
 
 Extract the chunks from the received SSE blob. Shared by all streaming flavors currently.
 
 Returns a list of `StreamChunk` and the next spillover (if message was incomplete).
 """
-@inline function extract_chunks(flavor::Any, blob::AbstractString;
+@inline function extract_chunks(flavor::AbstractStreamFlavor, blob::AbstractString;
         spillover::AbstractString = "", verbose::Bool = false, kwargs...)
     chunks = StreamChunk[]
     next_spillover = ""
@@ -172,12 +208,7 @@ Returns a list of `StreamChunk` and the next spillover (if message was incomplet
                     write(data_buf, data_chunk)
                 end
             end
-            ## On the last iteration of the blob, check if we spilled over
-            if bi == length(blob_split) && length(data_splits) > 1 &&
-               !isempty(strip(data_splits[end]))
-                verbose && @info "Incomplete message detected: $(data_splits[end])"
-                next_spillover = data_splits[end]
-            end
+
             ## Parse the spillover
             if bi == 1 && !isempty(spillover)
                 data = spillover
@@ -196,28 +227,37 @@ Returns a list of `StreamChunk` and the next spillover (if message was incomplet
                 # reset the spillover
                 spillover = ""
             end
-            ## Try to parse the data as JSON
-            data = String(take!(data_buf))
-            ## try to build a JSON object if it's a well-formed JSON string
-            json = if startswith(data, '{') && endswith(data, '}')
-                try
-                    JSON3.read(data)
-                catch e
-                    verbose && @warn "Cannot parse JSON: $raw_chunk"
+            ## On the last iteration of the blob, check if we spilled over
+            if bi == length(blob_split) && length(data_splits) > 1 &&
+               !isempty(strip(data_splits[end]))
+                verbose && @info "Incomplete message detected: $(data_splits[end])"
+                next_spillover = String(take!(data_buf))
+                ## Do not save this chunk
+            else
+                ## Try to parse the data as JSON
+                data = String(take!(data_buf))
+                isempty(data) && continue
+                ## try to build a JSON object if it's a well-formed JSON string
+                json = if startswith(data, '{') && endswith(data, '}')
+                    try
+                        JSON3.read(data)
+                    catch e
+                        verbose && @warn "Cannot parse JSON: $raw_chunk"
+                        nothing
+                    end
+                else
                     nothing
                 end
-            else
-                nothing
+                ## Create a new chunk
+                push!(chunks, StreamChunk(event_name, data, json))
             end
-            ## Create a new chunk
-            push!(chunks, StreamChunk(event_name, data, json))
         end
     end
     return chunks, next_spillover
 end
 
 """
-    extract_content(flavor::OpenAIStream, chunk)
+    extract_content(flavor::OpenAIStream, chunk::StreamChunk; kwargs...)
 
 Extract the content from the chunk.
 """
@@ -232,6 +272,9 @@ Extract the content from the chunk.
     else
         nothing
     end
+end
+function extract_content(flavor::AbstractStreamFlavor, chunk::StreamChunk; kwargs...)
+    throw(ArgumentError("extract_content is not implemented for flavor $(flavor)"))
 end
 
 """
@@ -262,7 +305,7 @@ Do nothing if the output stream is `nothing`.
 end
 
 """
-    callback(cb::StreamCallback, chunk::StreamChunk; kwargs...)
+    callback(cb::AbstractStreamCallback, chunk::StreamChunk; kwargs...)
 
 Process the chunk to be printed and print it. It's a wrapper for two operations:
 - extract the content from the chunk using `extract_content`
@@ -274,7 +317,14 @@ Process the chunk to be printed and print it. It's a wrapper for two operations:
     print_content(cb.out, processed_text; kwargs...)
     return nothing
 end
-@inline function handle_error_message(chunk::StreamChunk; kwargs...)
+
+"""
+    handle_error_message(chunk::StreamChunk; throw_on_error::Bool = false, kwargs...)
+
+Handles error messages from the streaming response.
+"""
+@inline function handle_error_message(
+        chunk::StreamChunk; throw_on_error::Bool = false, kwargs...)
     if chunk.event == :error ||
        (isnothing(chunk.event) && !isnothing(chunk.json) &&
         haskey(chunk.json, :error))
@@ -289,13 +339,19 @@ end
         else
             string(chunk.data)
         end
-        @warn "Error detected in the streaming response: $(error_str)"
+        ## Define whether to throw an error
+        error_msg = "Error detected in the streaming response: $(error_str)"
+        if throw_on_error
+            throw(Exception(error_msg))
+        else
+            @warn error_msg
+        end
     end
     return nothing
 end
 
 """
-    build_response_body(flavor::OpenAIStream, cb::StreamCallback; kwargs...)
+    build_response_body(flavor::OpenAIStream, cb::StreamCallback; verbose::Bool = false, kwargs...)
 
 Build the response body from the chunks to mimic receiving a standard response from the API.
 
@@ -371,14 +427,21 @@ end
 """
     streamed_request!(cb::AbstractStreamCallback, url, headers, input; kwargs...)
 
-End-to-end wrapper for streaming requests. 
+End-to-end wrapper for POST streaming requests. 
 In-place modification of the callback object (`cb.chunks`) with the results of the request being returned.
 We build the `body` of the response object in the end and write it into the `resp.body`.
 
 Returns the response object.
+
+# Arguments
+- `cb`: The callback object.
+- `url`: The URL to send the request to.
+- `headers`: The headers to send with the request.
+- `input`: A buffer with the request body.
+- `kwargs`: Additional keyword arguments.
 """
 function streamed_request!(cb::AbstractStreamCallback, url, headers, input; kwargs...)
-    verbose = get(kwargs, :verbose, false) || get(cb.kwargs, :verbose, false)
+    verbose = get(kwargs, :verbose, false) || cb.verbose
     resp = HTTP.open("POST", url, headers; kwargs...) do stream
         write(stream, String(take!(input)))
         HTTP.closewrite(stream)
@@ -389,24 +452,24 @@ function streamed_request!(cb::AbstractStreamCallback, url, headers, input; kwar
         while !eof(stream) || !isdone
             masterchunk = String(readavailable(stream))
             chunks, spillover = extract_chunks(
-                cb.flavor, masterchunk; spillover, cb.kwargs...)
+                cb.flavor, masterchunk; verbose, spillover, cb.kwargs...)
 
             for chunk in chunks
                 verbose && @info "Chunk Data: $(chunk.data)"
                 ## look for errors
-                handle_error_message(chunk; cb.kwargs...)
+                handle_error_message(chunk; cb.throw_on_error, verbose, cb.kwargs...)
                 ## look for termination signal, but process all remaining chunks first
-                is_done(cb.flavor, chunk; cb.kwargs...) && (isdone = true)
+                is_done(cb.flavor, chunk; verbose, cb.kwargs...) && (isdone = true)
                 ## trigger callback
-                callback(cb, chunk; cb.kwargs...)
+                callback(cb, chunk; verbose, cb.kwargs...)
                 ## Write into our CB chunks (for later processing)
-                push!(cb.chunks, chunk)
+                push!(cb, chunk)
             end
         end
         HTTP.closeread(stream)
     end
 
-    body = build_response_body(cb.flavor, cb; cb.kwargs...)
+    body = build_response_body(cb.flavor, cb; verbose, cb.kwargs...)
     resp.body = JSON3.write(body)
 
     return resp
@@ -414,9 +477,12 @@ end
 
 ### Additional methods required for AnthropicStream
 """
-    build_response_body(flavor::AnthropicStream, cb::StreamCallback; kwargs...)
+    build_response_body(
+        flavor::AnthropicStream, cb::StreamCallback; verbose::Bool = false, kwargs...)
 
 Build the response body from the chunks to mimic receiving a standard response from the API.
+
+Note: Limited functionality for now. Does NOT support tool use. Use standard responses for these.
 """
 function build_response_body(
         flavor::AnthropicStream, cb::StreamCallback; verbose::Bool = false, kwargs...)
@@ -461,7 +527,6 @@ function build_response_body(
         response[:content] = [Dict(:type => "text", :text => String(take!(content_buf)))]
         isnothing(usage) && (response[:usage] = usage)
     end
-    @info "Response: $(response)"
     return response
 end
 """
@@ -472,7 +537,7 @@ Extract the content from the chunk.
 function extract_content(flavor::AnthropicStream, chunk::StreamChunk; kwargs...)
     if !isnothing(chunk.json)
         ## Can contain more than one choice for multi-sampling, but ignore for callback
-        ## Get only the first choice, index=0
+        ## Get only the first choice, index=0 // index=1 is for tools etc
         index = get(chunk.json, :index, nothing)
         isnothing(index) || !iszero(index) && return nothing
 

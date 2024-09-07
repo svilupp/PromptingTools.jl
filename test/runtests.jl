@@ -18,6 +18,7 @@ end
     include("extraction.jl")
     include("user_preferences.jl")
     include("llm_interface.jl")
+    include("streaming.jl")
     include("llm_shared.jl")
     include("llm_openai.jl")
     include("llm_ollama_managed.jl")
