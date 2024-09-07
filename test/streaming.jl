@@ -1,7 +1,7 @@
 using PromptingTools: StreamCallback, StreamChunk, OpenAIStream, AnthropicStream,
                       configure_callback!
 using PromptingTools: is_done, extract_chunks, extract_content, print_content, callback,
-                      build_response_body, streamed_request
+                      build_response_body, streamed_request!
 using PromptingTools: OpenAISchema, AnthropicSchema, GoogleSchema
 
 @testset "StreamCallback" begin
@@ -738,3 +738,67 @@ end
     @test response[:stop_reason] == "max_tokens"
     @test isnothing(response[:stop_sequence])
 end
+
+@testset "handle_error_message" begin
+    # Test case 1: No error
+    chunk = PT.StreamChunk(:content, "Normal content", nothing)
+    @test isnothing(PT.handle_error_message(chunk))
+
+    # Test case 2: Error event
+    error_chunk = PT.StreamChunk(:error, "Error occurred", nothing)
+    @test_logs (:warn, "Error detected in the streaming response: Error occurred") PT.handle_error_message(error_chunk)
+
+    # Test case 4: Detailed error in JSON
+    obj = Dict(:error => Dict(:message => "Invalid input", :type => "user_error"))
+    detailed_error_chunk = PT.StreamChunk(
+        nothing, JSON3.write(obj), JSON3.read(JSON3.write(obj)))
+    @test_logs (:warn,
+        r"Message: Invalid input") PT.handle_error_message(detailed_error_chunk)
+    @test_logs (:warn,
+        r"Type: user_error") PT.handle_error_message(detailed_error_chunk)
+
+    # Test case 5: Throw on error
+    @test_throws Exception PT.handle_error_message(error_chunk, throw_on_error = true)
+end
+
+## Not working yet!!
+# @testset "streamed_request!" begin
+#     # Setup mock server
+#     PORT = rand(10000:20000)
+#     server = HTTP.serve!(PORT; verbose = false) do request
+#         if request.method == "POST" && request.target == "/v1/chat/completions"
+#             # Simulate streaming response
+#             return HTTP.Response() do io
+#                 write(io, "data: {\"choices\":[{\"delta\":{\"content\":\"Hello\"}}]}\n\n")
+#                 write(io, "data: {\"choices\":[{\"delta\":{\"content\":\" world\"}}]}\n\n")
+#                 write(io, "data: [DONE]\n\n")
+#             end
+#         else
+#             return HTTP.Response(404, "Not found")
+#         end
+#     end
+
+#     # Test streamed_request!
+#     url = "http://localhost:$PORT/v1/chat/completions"
+#     headers = ["Content-Type" => "application/json"]
+#     input = IOBuffer(JSON3.write(Dict(
+#         "model" => "gpt-3.5-turbo",
+#         "messages" => [Dict("role" => "user", "content" => "Say hello")]
+#     )))
+
+#     cb = PT.StreamCallback(flavor = PT.OpenAIStream())
+#     response = PT.streamed_request!(cb, url, headers, input)
+
+#     # Assertions
+#     @test response.status == 200
+#     @test length(cb.chunks) == 3
+#     @test cb.chunks[1].json.choices[1].delta.content == "Hello"
+#     @test cb.chunks[2].json.choices[1].delta.content == " world"
+#     @test cb.chunks[3].data == "[DONE]"
+
+#     # Test build_response_body
+#     body = PT.build_response_body(PT.OpenAIStream(), cb)
+#     @test body[:choices][1][:message][:content] == "Hello world"
+#     # Cleanup
+#     close(server)
+# end

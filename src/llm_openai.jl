@@ -441,6 +441,8 @@ end
         verbose::Bool = true,
         api_key::String = OPENAI_API_KEY,
         model::String = MODEL_CHAT, return_all::Bool = false, dry_run::Bool = false,
+        conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
+        streamcallback::Any = nothing,
         http_kwargs::NamedTuple = (retry_non_idempotent = true,
             retries = 5,
             readtimeout = 120), api_kwargs::NamedTuple = NamedTuple(),
@@ -457,6 +459,7 @@ Generate an AI response based on a given prompt using the OpenAI API.
 - `return_all::Bool=false`: If `true`, returns the entire conversation history, otherwise returns only the last message (the `AIMessage`).
 - `dry_run::Bool=false`: If `true`, skips sending the messages to the model (for debugging, often used with `return_all=true`).
 - `conversation`: An optional vector of `AbstractMessage` objects representing the conversation history. If not provided, it is initialized as an empty vector.
+- `streamcallback`: A callback function to handle streaming responses. Can be simply `stdout` or a `StreamCallback` object. See `?StreamCallback` for details.
 - `http_kwargs`: A named tuple of HTTP keyword arguments.
 - `api_kwargs`: A named tuple of API keyword arguments. Useful parameters include:
     - `temperature`: A float representing the temperature for sampling (ie, the amount of "creativity"). Often defaults to `0.7`.
@@ -509,6 +512,24 @@ conversation = [
 msg=aigenerate(conversation)
 # AIMessage("Ah, strong feelings you have for your iPhone. A Jedi's path, this is not... <continues>")
 ```
+
+Example of streaming:
+
+```julia
+# Simplest usage, just provide where to steam the text
+msg = aigenerate("Count from 1 to 100."; streamcallback = stdout)
+
+streamcallback = PT.StreamCallback()
+msg = aigenerate("Count from 1 to 100."; streamcallback)
+# this allows you to inspect each chunk with `streamcallback.chunks`. You can them empty it with `empty!(streamcallback)` in between repeated calls.
+
+# Get verbose output with details of each chunk
+streamcallback = PT.StreamCallback(; verbose=true, throw_on_error=true)
+msg = aigenerate("Count from 1 to 10."; streamcallback)
+```
+
+Learn more in `?StreamCallback`.
+Note: Streaming support is only for OpenAI models and it doesn't yet support tool calling and a few other features (logprobs, refusals, etc.)
 """
 function aigenerate(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE;
         verbose::Bool = true,

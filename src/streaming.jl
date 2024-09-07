@@ -147,7 +147,7 @@ function extract_content end
 function print_content end
 function callback end
 function build_response_body end
-function streamed_request end
+function streamed_request! end
 
 ### Define the necessary methods -- start with OpenAIStream
 

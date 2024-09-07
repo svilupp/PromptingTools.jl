@@ -184,6 +184,7 @@ end
         api_key::String = ANTHROPIC_API_KEY, model::String = MODEL_CHAT,
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
+        streamcallback::Any = nothing,
         http_kwargs::NamedTuple = NamedTuple(), api_kwargs::NamedTuple = NamedTuple(),
         cache::Union{Nothing, Symbol} = nothing,
         kwargs...)
@@ -199,6 +200,7 @@ Generate an AI response based on a given prompt using the Anthropic API.
 - `return_all::Bool=false`: If `true`, returns the entire conversation history, otherwise returns only the last message (the `AIMessage`).
 - `dry_run::Bool=false`: If `true`, skips sending the messages to the model (for debugging, often used with `return_all=true`).
 - `conversation::AbstractVector{<:AbstractMessage}=[]`: Not allowed for this schema. Provided only for compatibility.
+- `streamcallback::Any`: A callback function to handle streaming responses. Can be simply `stdout` or `StreamCallback` object. See `?StreamCallback` for details.
 - `http_kwargs::NamedTuple`: Additional keyword arguments for the HTTP request. Defaults to empty `NamedTuple`.
 - `api_kwargs::NamedTuple`: Additional keyword arguments for the Ollama API. Defaults to an empty `NamedTuple`.
     - `max_tokens::Int`: The maximum number of tokens to generate. Defaults to 2048, because it's a required parameter for the API.
@@ -264,6 +266,21 @@ msg = aigenerate(conversation; model="claudeh")
 AIMessage("I sense. But unhealthy it may be. Your iPhone, a tool it is, not a living being. Feelings of affection, understandable they are, <continues>")
 ```
 
+Example of streaming:
+```julia
+# Simplest usage, just provide where to steam the text
+msg = aigenerate("Count from 1 to 100."; streamcallback = stdout, model="claudeh")
+
+streamcallback = PT.StreamCallback()
+msg = aigenerate("Count from 1 to 100."; streamcallback, model="claudeh")
+# this allows you to inspect each chunk with `streamcallback.chunks`. You can them empty it with `empty!(streamcallback)` in between repeated calls.
+
+# Get verbose output with details of each chunk
+streamcallback = PT.StreamCallback(; verbose=true, throw_on_error=true)
+msg = aigenerate("Count from 1 to 10."; streamcallback, model="claudeh")
+```
+
+Note: Streaming support is only for Anthropic models and it doesn't yet support tool calling and a few other features (logprobs, refusals, etc.)
 """
 function aigenerate(
         prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMPT_TYPE;
