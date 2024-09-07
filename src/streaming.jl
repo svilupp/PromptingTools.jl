@@ -47,11 +47,11 @@ For more complex use cases, you can define your own `callback`. See the interfac
 # Fields
 - `out`: The output stream, eg, `stdout` or a pipe.
 - `flavor`: The stream flavor which might or might not differ between different providers, eg, `OpenAIStream` or `AnthropicStream`.
-- `chunks`: The list of chunks.
+- `chunks`: The list of `StreamChunk` chunks.
 - `kwargs`: The keyword arguments, eg, `verbose=true` to see more details.
 
 # Interface
-- `extract_chunks(flavor, blob)`: Extract the chunks from the received SSE blob. Returns a list of `StreamingChunk` and the next spillover (if message was incomplete).
+- `extract_chunks(flavor, blob)`: Extract the chunks from the received SSE blob. Returns a list of `StreamChunk` and the next spillover (if message was incomplete).
 - `callback(cb, chunk)`: Process the chunk to be printed
     - `extract_content(flavor, chunk)`: Extract the content from the chunk.
     - `print_content(out, text)`: Print the content to the output stream.
@@ -117,7 +117,7 @@ function callback end
 function build_response_body end
 function streamed_request end
 
-### Define the necessary methods -- start with OpenAIStreaming
+### Define the necessary methods -- start with OpenAIStream
 
 # Define the interface functions
 """
@@ -125,8 +125,12 @@ function streamed_request end
 
 Check if the streaming is done. Shared by all streaming flavors currently.
 """
-@inline function is_done(flavor::Any, chunk::StreamChunk)
+@inline function is_done(flavor::OpenAIStream, chunk::StreamChunk; kwargs...)
     chunk.data == "[DONE]"
+end
+
+@inline function is_done(flavor::AnthropicStream, chunk::StreamChunk; kwargs...)
+    chunk.event == :error || chunk.event == :message_stop
 end
 
 """
@@ -134,7 +138,7 @@ end
 
 Extract the chunks from the received SSE blob. Shared by all streaming flavors currently.
 
-Returns a list of `StreamingChunk` and the next spillover (if message was incomplete).
+Returns a list of `StreamChunk` and the next spillover (if message was incomplete).
 """
 @inline function extract_chunks(flavor::Any, blob::AbstractString;
         spillover::AbstractString = "", verbose::Bool = false, kwargs...)
@@ -213,11 +217,11 @@ Returns a list of `StreamingChunk` and the next spillover (if message was incomp
 end
 
 """
-    extract_content(flavor::OpenAIStreaming, chunk)
+    extract_content(flavor::OpenAIStream, chunk)
 
 Extract the content from the chunk.
 """
-@inline function extract_content(flavor::OpenAIStreaming, chunk::StreamChunk; kwargs...)
+@inline function extract_content(flavor::OpenAIStream, chunk::StreamChunk; kwargs...)
     if !isnothing(chunk.json)
         ## Can contain more than one choice for multi-sampling, but ignore for callback
         ## Get only the first choice
@@ -283,22 +287,22 @@ end
                  for (k, v) in pairs(chunk.json.error)],
                 ", ")
         else
-            "Error detected in the streaming response: $(chunk.data)"
+            string(chunk.data)
         end
-        @warn error_str
+        @warn "Error detected in the streaming response: $(error_str)"
     end
     return nothing
 end
 
 """
-    build_response_body(flavor::OpenAIStreaming, cb::StreamCallback; kwargs...)
+    build_response_body(flavor::OpenAIStream, cb::StreamCallback; kwargs...)
 
 Build the response body from the chunks to mimic receiving a standard response from the API.
 
 Note: Limited functionality for now. Does NOT support tool use, refusals, logprobs. Use standard responses for these.
 """
 function build_response_body(
-        flavor::OpenAIStreaming, cb::StreamCallback; verbose::Bool = false, kwargs...)
+        flavor::OpenAIStream, cb::StreamCallback; verbose::Bool = false, kwargs...)
     isempty(cb.chunks) && return nothing
     response = nothing
     usage = nothing
@@ -365,7 +369,7 @@ function build_response_body(
 end
 
 """
-    streamed_request!(cb::AbstractStreamingCallback, url, headers, input; kwargs...)
+    streamed_request!(cb::AbstractStreamCallback, url, headers, input; kwargs...)
 
 End-to-end wrapper for streaming requests. 
 In-place modification of the callback object (`cb.chunks`) with the results of the request being returned.
@@ -373,7 +377,8 @@ We build the `body` of the response object in the end and write it into the `res
 
 Returns the response object.
 """
-function streamed_request!(cb::AbstractStreamingCallback, url, headers, input; kwargs...)
+function streamed_request!(cb::AbstractStreamCallback, url, headers, input; kwargs...)
+    verbose = get(kwargs, :verbose, false) || get(cb.kwargs, :verbose, false)
     resp = HTTP.open("POST", url, headers; kwargs...) do stream
         write(stream, String(take!(input)))
         HTTP.closewrite(stream)
@@ -387,6 +392,7 @@ function streamed_request!(cb::AbstractStreamingCallback, url, headers, input; k
                 cb.flavor, masterchunk; spillover, cb.kwargs...)
 
             for chunk in chunks
+                verbose && @info "Chunk Data: $(chunk.data)"
                 ## look for errors
                 handle_error_message(chunk; cb.kwargs...)
                 ## look for termination signal, but process all remaining chunks first
@@ -406,91 +412,76 @@ function streamed_request!(cb::AbstractStreamingCallback, url, headers, input; k
     return resp
 end
 
-### Additional methods required for AnthropicStreaming
+### Additional methods required for AnthropicStream
 """
-    build_response_body(flavor::AnthropicStreaming, cb::StreamingCallback; kwargs...)
+    build_response_body(flavor::AnthropicStream, cb::StreamCallback; kwargs...)
 
 Build the response body from the chunks to mimic receiving a standard response from the API.
 """
 function build_response_body(
-        flavor::AnthropicStreaming, cb::StreamingCallback; verbose::Bool = false, kwargs...)
+        flavor::AnthropicStream, cb::StreamCallback; verbose::Bool = false, kwargs...)
     isempty(cb.chunks) && return nothing
     response = nothing
     usage = nothing
-    choices_output = Dict{Int, Dict{Symbol, Any}}()
+    content_buf = IOBuffer()
     for i in eachindex(cb.chunks)
+        ## Note we ignore the index ID, because Anthropic does not support multiple
+        ## parallel generations
         chunk = cb.chunks[i]
         ## validate that we can access choices
         isnothing(chunk.json) && continue
-        !haskey(chunk.json, :choices) && continue
-        if isnothing(response)
+        ## Core of the message body
+        if isnothing(response) && chunk.event == :message_start &&
+           haskey(chunk.json, :message)
             ## do it only once the first time when we have the json
-            response = chunk.json |> copy
+            response = chunk.json[:message] |> copy
+            usage = get(response, :usage, Dict())
         end
-        if isnothing(usage)
-            usage_values = get(chunk.json, :usage, nothing)
-            if !isnothing(usage_values)
-                usage = usage_values |> copy
-            end
+        ## Update stop reason and usage
+        if chunk.event == :message_delta && haskey(chunk.json, :content_block)
+            response = merge(response, get(chunk.json, :delta, Dict()))
+            usage = merge(usage, get(chunk.json, :usage, Dict()))
         end
-        for choice in chunk.json.choices
-            index = get(choice, :index, nothing)
-            isnothing(index) && continue
-            if !haskey(choices_output, index)
-                choices_output[index] = Dict{Symbol, Any}(:index => index)
+
+        ## Load text chunks
+        if chunk.event == :content_block_start ||
+           chunk.event == :content_block_delta || chunk.event == :content_block_stop
+            ## Find the text delta
+            delta_block = get(chunk.json, :content_block, nothing)
+            if isnothing(delta_block)
+                ## look for the delta segment
+                delta_block = get(chunk.json, :delta, Dict())
             end
-            index_dict = choices_output[index]
-            finish_reason = get(choice, :finish_reason, nothing)
-            if !isnothing(finish_reason)
-                index_dict[:finish_reason] = finish_reason
-            end
-            ## skip for now
-            # logprobs = get(choice, :logprobs, nothing)
-            # if !isnothing(logprobs)
-            #     choices_dict[index][:logprobs] = logprobs
-            # end
-            choice_delta = get(choice, :delta, Dict{Symbol, Any}())
-            message_dict = get(index_dict, :message, Dict{Symbol, Any}(:content => ""))
-            role = get(choice_delta, :role, nothing)
-            if !isnothing(role)
-                message_dict[:role] = role
-            end
-            content = get(choice_delta, :content, nothing)
-            if !isnothing(content)
-                message_dict[:content] *= content
-            end
-            ## skip for now
-            # refusal = get(choice_delta, :refusal, nothing)
-            # if !isnothing(refusal)
-            #     message_dict[:refusal] = refusal
-            # end
-            index_dict[:message] = message_dict
+            text = get(delta_block, :text, nothing)
+            !isnothing(text) && write(content_buf, text)
         end
     end
     ## We know we have at least one chunk, let's use it for final response
     if !isnothing(response)
-        # flatten the choices_dict into an array
-        choices = [choices_output[index] for index in sort(collect(keys(choices_output)))]
-        # overwrite the old choices
-        response[:choices] = choices
-        response[:object] = "chat.completion"
-        response[:usage] = usage
+        response[:content] = [Dict(:type => "text", :text => String(take!(content_buf)))]
+        isnothing(usage) && (response[:usage] = usage)
     end
+    @info "Response: $(response)"
     return response
 end
 """
-    extract_content(flavor::OpenAIStreaming, chunk)
+    extract_content(flavor::AnthropicStream, chunk)
 
 Extract the content from the chunk.
 """
-function extract_content(flavor::AnthropicStreaming, chunk::StreamingChunk; kwargs...)
+function extract_content(flavor::AnthropicStream, chunk::StreamChunk; kwargs...)
     if !isnothing(chunk.json)
         ## Can contain more than one choice for multi-sampling, but ignore for callback
-        ## Get only the first choice
-        choices = get(chunk.json, :choices, [])
-        first_choice = get(choices, 1, Dict())
-        delta = get(first_choice, :delta, Dict())
-        out = get(delta, :content, nothing)
+        ## Get only the first choice, index=0
+        index = get(chunk.json, :index, nothing)
+        isnothing(index) || !iszero(index) && return nothing
+
+        delta_block = get(chunk.json, :content_block, nothing)
+        if isnothing(delta_block)
+            ## look for the delta segment
+            delta_block = get(chunk.json, :delta, Dict())
+        end
+        out = get(delta_block, :text, nothing)
     else
         nothing
     end

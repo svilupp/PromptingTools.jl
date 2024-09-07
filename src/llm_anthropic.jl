@@ -138,11 +138,11 @@ function anthropic_api(
         kwargs...)
     @assert endpoint in ["messages"] "Only 'messages' endpoint is supported."
     ##
-    body = Dict("model" => model, "max_tokens" => max_tokens,
-        "stream" => stream, "messages" => messages, kwargs...)
+    body = Dict(:model => model, :max_tokens => max_tokens,
+        :stream => stream, :messages => messages, kwargs...)
     ## provide system message
     if !isnothing(system)
-        body["system"] = system
+        body[:system] = system
     end
     ## Build the headers
     extra_headers = anthropic_extra_headers(;
@@ -152,11 +152,13 @@ function anthropic_api(
         extra_headers)
     api_url = string(url, "/", endpoint)
     if !isnothing(streamcallback)
-        streamcallback, _ = configure_callback!(
+        ## Route to the streaming function
+        streamcallback, new_kwargs = configure_callback!(
             streamcallback, prompt_schema; kwargs...)
-        body["stream"] = true
+        input_buf = IOBuffer()
+        JSON3.write(input_buf, merge(NamedTuple(body), new_kwargs))
         resp = streamed_request!(
-            streamcallback, api_url, headers, JSON3.write(body); http_kwargs...)
+            streamcallback, api_url, headers, input_buf; http_kwargs...)
     else
         resp = HTTP.post(api_url, headers, JSON3.write(body); http_kwargs...)
     end
