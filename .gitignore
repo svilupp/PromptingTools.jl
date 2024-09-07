@@ -11,3 +11,6 @@
 # exclude scratch files
 **/_*
 docs/package-lock.json
+
+# Ignore Cursor rules
+.cursorrules

@@ -68,6 +68,9 @@ include("code_expressions.jl")
 export AICode
 include("code_eval.jl")
 
+## Streaming support
+include("streaming.jl")
+
 ## Individual interfaces
 include("llm_shared.jl")
 include("llm_openai.jl")
