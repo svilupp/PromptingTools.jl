@@ -132,16 +132,17 @@ function anthropic_api(
         max_tokens::Int = 2048,
         model::String = "claude-3-haiku-20240307", http_kwargs::NamedTuple = NamedTuple(),
         stream::Bool = false,
+        streamcallback::Any = nothing,
         url::String = "https://api.anthropic.com/v1",
         cache::Union{Nothing, Symbol} = nothing,
         kwargs...)
     @assert endpoint in ["messages"] "Only 'messages' endpoint is supported."
     ##
-    body = Dict("model" => model, "max_tokens" => max_tokens,
-        "stream" => stream, "messages" => messages, kwargs...)
+    body = Dict(:model => model, :max_tokens => max_tokens,
+        :stream => stream, :messages => messages, kwargs...)
     ## provide system message
     if !isnothing(system)
-        body["system"] = system
+        body[:system] = system
     end
     ## Build the headers
     extra_headers = anthropic_extra_headers(;
@@ -150,7 +151,17 @@ function anthropic_api(
         api_key; bearer = false, x_api_key = true,
         extra_headers)
     api_url = string(url, "/", endpoint)
-    resp = HTTP.post(api_url, headers, JSON3.write(body); http_kwargs...)
+    if !isnothing(streamcallback)
+        ## Route to the streaming function
+        streamcallback, new_kwargs = configure_callback!(
+            streamcallback, prompt_schema; kwargs...)
+        input_buf = IOBuffer()
+        JSON3.write(input_buf, merge(NamedTuple(body), new_kwargs))
+        resp = streamed_request!(
+            streamcallback, api_url, headers, input_buf; http_kwargs...)
+    else
+        resp = HTTP.post(api_url, headers, JSON3.write(body); http_kwargs...)
+    end
     body = JSON3.read(resp.body)
     return (; response = body, resp.status)
 end
@@ -173,6 +184,7 @@ end
         api_key::String = ANTHROPIC_API_KEY, model::String = MODEL_CHAT,
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
+        streamcallback::Any = nothing,
         http_kwargs::NamedTuple = NamedTuple(), api_kwargs::NamedTuple = NamedTuple(),
         cache::Union{Nothing, Symbol} = nothing,
         kwargs...)
@@ -188,6 +200,7 @@ Generate an AI response based on a given prompt using the Anthropic API.
 - `return_all::Bool=false`: If `true`, returns the entire conversation history, otherwise returns only the last message (the `AIMessage`).
 - `dry_run::Bool=false`: If `true`, skips sending the messages to the model (for debugging, often used with `return_all=true`).
 - `conversation::AbstractVector{<:AbstractMessage}=[]`: Not allowed for this schema. Provided only for compatibility.
+- `streamcallback::Any`: A callback function to handle streaming responses. Can be simply `stdout` or `StreamCallback` object. See `?StreamCallback` for details.
 - `http_kwargs::NamedTuple`: Additional keyword arguments for the HTTP request. Defaults to empty `NamedTuple`.
 - `api_kwargs::NamedTuple`: Additional keyword arguments for the Ollama API. Defaults to an empty `NamedTuple`.
     - `max_tokens::Int`: The maximum number of tokens to generate. Defaults to 2048, because it's a required parameter for the API.
@@ -253,6 +266,21 @@ msg = aigenerate(conversation; model="claudeh")
 AIMessage("I sense. But unhealthy it may be. Your iPhone, a tool it is, not a living being. Feelings of affection, understandable they are, <continues>")
 ```
 
+Example of streaming:
+```julia
+# Simplest usage, just provide where to steam the text
+msg = aigenerate("Count from 1 to 100."; streamcallback = stdout, model="claudeh")
+
+streamcallback = PT.StreamCallback()
+msg = aigenerate("Count from 1 to 100."; streamcallback, model="claudeh")
+# this allows you to inspect each chunk with `streamcallback.chunks`. You can them empty it with `empty!(streamcallback)` in between repeated calls.
+
+# Get verbose output with details of each chunk
+streamcallback = PT.StreamCallback(; verbose=true, throw_on_error=true)
+msg = aigenerate("Count from 1 to 10."; streamcallback, model="claudeh")
+```
+
+Note: Streaming support is only for Anthropic models and it doesn't yet support tool calling and a few other features (logprobs, refusals, etc.)
 """
 function aigenerate(
         prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMPT_TYPE;
@@ -261,6 +289,7 @@ function aigenerate(
         model::String = MODEL_CHAT,
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
+        streamcallback::Any = nothing,
         http_kwargs::NamedTuple = NamedTuple(), api_kwargs::NamedTuple = NamedTuple(),
         cache::Union{Nothing, Symbol} = nothing,
         kwargs...)
@@ -274,7 +303,7 @@ function aigenerate(
     if !dry_run
         time = @elapsed resp = anthropic_api(
             prompt_schema, conv_rendered.conversation; api_key,
-            conv_rendered.system, endpoint = "messages", model = model_id, http_kwargs, cache,
+            conv_rendered.system, endpoint = "messages", model = model_id, streamcallback, http_kwargs, cache,
             api_kwargs...)
         tokens_prompt = get(resp.response[:usage], :input_tokens, 0)
         tokens_completion = get(resp.response[:usage], :output_tokens, 0)
