@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.52.0]
+
+### Added
+- Added a new `streamcallback` kwarg for OpenAI and Anthropic schema to enable custom streaming implementations. Simplest usage is simply with `streamcallback=stdout`, which will print each text chunk into the console. See `?StreamCallback` for more information.
+
 ## [0.51.0]
 
 ### Added
