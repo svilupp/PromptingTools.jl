@@ -391,3 +391,350 @@ end
     @test chunks[2].data == "[DONE]"
     @test final_spillover == ""
 end
+
+@testset "extract_content" begin
+    ### OpenAIStream
+    # Test case 1: Valid JSON with content
+    valid_chunk = PT.StreamChunk(
+        nothing,
+        """{"choices":[{"delta":{"content":"Hello"}}]}""",
+        JSON3.read("""{"choices":[{"delta":{"content":"Hello"}}]}""")
+    )
+    @test PT.extract_content(PT.OpenAIStream(), valid_chunk) == "Hello"
+
+    # Test case 2: Valid JSON without content
+    no_content_chunk = PT.StreamChunk(
+        nothing,
+        """{"choices":[{"delta":{}}]}""",
+        JSON3.read("""{"choices":[{"delta":{}}]}""")
+    )
+    @test isnothing(PT.extract_content(PT.OpenAIStream(), no_content_chunk))
+
+    # Test case 3: Valid JSON with empty content
+    empty_content_chunk = PT.StreamChunk(
+        nothing,
+        """{"choices":[{"delta":{"content":""}}]}""",
+        JSON3.read("""{"choices":[{"delta":{"content":""}}]}""")
+    )
+    @test PT.extract_content(PT.OpenAIStream(), empty_content_chunk) == ""
+
+    # Test case 4: Invalid JSON structure
+    invalid_chunk = PT.StreamChunk(
+        nothing,
+        """{"invalid":"structure"}""",
+        JSON3.read("""{"invalid":"structure"}""")
+    )
+    @test isnothing(PT.extract_content(PT.OpenAIStream(), invalid_chunk))
+
+    # Test case 5: Chunk with non-JSON data
+    non_json_chunk = PT.StreamChunk(
+        nothing,
+        "This is not JSON",
+        nothing
+    )
+    @test isnothing(PT.extract_content(PT.OpenAIStream(), non_json_chunk))
+
+    # Test case 6: Multiple choices (should still return first choice)
+    multiple_choices_chunk = PT.StreamChunk(
+        nothing,
+        """{"choices":[{"delta":{"content":"First"}},{"delta":{"content":"Second"}}]}""",
+        JSON3.read("""{"choices":[{"delta":{"content":"First"}},{"delta":{"content":"Second"}}]}""")
+    )
+    @test PT.extract_content(PT.OpenAIStream(), multiple_choices_chunk) == "First"
+
+    ### AnthropicStream
+    # Test case 1: Valid JSON with content in content_block
+    valid_chunk = PT.StreamChunk(
+        nothing,
+        """{"index":0,"content_block":{"text":"Hello from Anthropic"}}""",
+        JSON3.read("""{"index":0,"content_block":{"text":"Hello from Anthropic"}}""")
+    )
+    @test PT.extract_content(PT.AnthropicStream(), valid_chunk) == "Hello from Anthropic"
+
+    # Test case 2: Valid JSON with content in delta
+    delta_chunk = PT.StreamChunk(
+        nothing,
+        """{"index":0,"delta":{"text":"Delta content"}}""",
+        JSON3.read("""{"index":0,"delta":{"text":"Delta content"}}""")
+    )
+    @test PT.extract_content(PT.AnthropicStream(), delta_chunk) == "Delta content"
+
+    # Test case 3: Valid JSON without text in content_block
+    no_text_chunk = PT.StreamChunk(
+        nothing,
+        """{"index":0,"content_block":{"type":"text"}}""",
+        JSON3.read("""{"index":0,"content_block":{"type":"text"}}""")
+    )
+    @test isnothing(PT.extract_content(PT.AnthropicStream(), no_text_chunk))
+
+    # Test case 4: Valid JSON with non-zero index
+    non_zero_index_chunk = PT.StreamChunk(
+        nothing,
+        """{"index":1,"content_block":{"text":"Should be ignored"}}""",
+        JSON3.read("""{"index":1,"content_block":{"text":"Should be ignored"}}""")
+    )
+    @test isnothing(PT.extract_content(PT.AnthropicStream(), non_zero_index_chunk))
+
+    # Test case 5: Chunk with non-JSON data
+    non_json_chunk = PT.StreamChunk(
+        nothing,
+        "This is not JSON",
+        nothing
+    )
+    @test isnothing(PT.extract_content(PT.AnthropicStream(), non_json_chunk))
+
+    # Test case 6: Valid JSON with empty content
+    empty_content_chunk = PT.StreamChunk(
+        nothing,
+        """{"index":0,"content_block":{"text":""}}""",
+        JSON3.read("""{"index":0,"content_block":{"text":""}}""")
+    )
+    @test PT.extract_content(PT.AnthropicStream(), empty_content_chunk) == ""
+
+    # Test case 7: Unknown flavor
+    struct UnknownFlavor <: PT.AbstractStreamFlavor end
+    unknown_flavor = UnknownFlavor()
+    unknown_chunk = PT.StreamChunk(
+        nothing,
+        """{"content": "Test content"}""",
+        JSON3.read("""{"content": "Test content"}""")
+    )
+    @test_throws ArgumentError PT.extract_content(unknown_flavor, unknown_chunk)
+end
+
+@testset "print_content" begin
+    # Test printing to IO
+    io = IOBuffer()
+    PT.print_content(io, "Test content")
+    @test String(take!(io)) == "Test content"
+
+    # Test printing to Channel
+    ch = Channel{String}(1)
+    PT.print_content(ch, "Channel content")
+    @test take!(ch) == "Channel content"
+
+    # Test printing to nothing
+    @test PT.print_content(nothing, "No output") === nothing
+end
+
+@testset "callback" begin
+    # Test with valid content
+    io = IOBuffer()
+    cb = PT.StreamCallback(out = io, flavor = PT.OpenAIStream())
+    valid_chunk = PT.StreamChunk(
+        nothing,
+        """{"choices":[{"delta":{"content":"Hello"}}]}""",
+        JSON3.read("""{"choices":[{"delta":{"content":"Hello"}}]}""")
+    )
+    PT.callback(cb, valid_chunk)
+    @test String(take!(io)) == "Hello"
+
+    # Test with no content
+    io = IOBuffer()
+    cb = PT.StreamCallback(out = io, flavor = PT.OpenAIStream())
+    no_content_chunk = PT.StreamChunk(
+        nothing,
+        """{"choices":[{"delta":{}}]}""",
+        JSON3.read("""{"choices":[{"delta":{}}]}""")
+    )
+    PT.callback(cb, no_content_chunk)
+    @test isempty(take!(io))
+
+    # Test with Channel output
+    ch = Channel{String}(1)
+    cb = PT.StreamCallback(out = ch, flavor = PT.OpenAIStream())
+    PT.callback(cb, valid_chunk)
+    @test take!(ch) == "Hello"
+
+    # Test with nothing output
+    cb = PT.StreamCallback(out = nothing, flavor = PT.OpenAIStream())
+    @test PT.callback(cb, valid_chunk) === nothing
+end
+
+@testset "build_response_body-OpenAIStream" begin
+    # Test case 1: Empty chunks
+    cb_empty = PT.StreamCallback()
+    response = PT.build_response_body(PT.OpenAIStream(), cb_empty)
+    @test isnothing(response)
+
+    # Test case 2: Single complete chunk
+    cb_single = PT.StreamCallback()
+    push!(cb_single.chunks,
+        PT.StreamChunk(
+            nothing,
+            """{"id":"chatcmpl-123","object":"chat.completion.chunk","created":1234567890,"model":"gpt-4","choices":[{"index":0,"delta":{"role":"assistant","content":"Hello"},"finish_reason":null}]}""",
+            JSON3.read("""{"id":"chatcmpl-123","object":"chat.completion.chunk","created":1234567890,"model":"gpt-4","choices":[{"index":0,"delta":{"role":"assistant","content":"Hello"},"finish_reason":null}]}""")
+        ))
+    response = PT.build_response_body(PT.OpenAIStream(), cb_single)
+    @test response[:id] == "chatcmpl-123"
+    @test response[:object] == "chat.completion"
+    @test response[:model] == "gpt-4"
+    @test length(response[:choices]) == 1
+    @test response[:choices][1][:index] == 0
+    @test response[:choices][1][:message][:role] == "assistant"
+    @test response[:choices][1][:message][:content] == "Hello"
+
+    # Test case 3: Multiple chunks forming a complete response
+    cb_multiple = PT.StreamCallback()
+    push!(cb_multiple.chunks,
+        PT.StreamChunk(
+            nothing,
+            """{"id":"chatcmpl-456","object":"chat.completion.chunk","created":1234567890,"model":"gpt-4","choices":[{"index":0,"delta":{"role":"assistant","content":"Hello"},"finish_reason":null}]}""",
+            JSON3.read("""{"id":"chatcmpl-456","object":"chat.completion.chunk","created":1234567890,"model":"gpt-4","choices":[{"index":0,"delta":{"role":"assistant","content":"Hello"},"finish_reason":null}]}""")
+        ))
+    push!(cb_multiple.chunks,
+        PT.StreamChunk(
+            nothing,
+            """{"id":"chatcmpl-456","object":"chat.completion.chunk","created":1234567890,"model":"gpt-4","choices":[{"index":0,"delta":{"content":" world"},"finish_reason":null}]}""",
+            JSON3.read("""{"id":"chatcmpl-456","object":"chat.completion.chunk","created":1234567890,"model":"gpt-4","choices":[{"index":0,"delta":{"content":" world"},"finish_reason":null}]}""")
+        ))
+    push!(cb_multiple.chunks,
+        PT.StreamChunk(
+            nothing,
+            """{"id":"chatcmpl-456","object":"chat.completion.chunk","created":1234567890,"model":"gpt-4","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}""",
+            JSON3.read("""{"id":"chatcmpl-456","object":"chat.completion.chunk","created":1234567890,"model":"gpt-4","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}""")
+        ))
+    response = PT.build_response_body(PT.OpenAIStream(), cb_multiple)
+    @test response[:id] == "chatcmpl-456"
+    @test response[:object] == "chat.completion"
+    @test response[:model] == "gpt-4"
+    @test length(response[:choices]) == 1
+    @test response[:choices][1][:index] == 0
+    @test response[:choices][1][:message][:role] == "assistant"
+    @test response[:choices][1][:message][:content] == "Hello world"
+    @test response[:choices][1][:finish_reason] == "stop"
+
+    # Test case 4: Multiple choices
+    cb_multi_choice = PT.StreamCallback()
+    push!(cb_multi_choice.chunks,
+        PT.StreamChunk(
+            nothing,
+            """{"id":"chatcmpl-789","object":"chat.completion.chunk","created":1234567890,"model":"gpt-4","choices":[{"index":0,"delta":{"role":"assistant","content":"First"},"finish_reason":null},{"index":1,"delta":{"role":"assistant","content":"Second"},"finish_reason":null}]}""",
+            JSON3.read("""{"id":"chatcmpl-789","object":"chat.completion.chunk","created":1234567890,"model":"gpt-4","choices":[{"index":0,"delta":{"role":"assistant","content":"First"},"finish_reason":null},{"index":1,"delta":{"role":"assistant","content":"Second"},"finish_reason":null}]}""")
+        ))
+    response = PT.build_response_body(PT.OpenAIStream(), cb_multi_choice)
+    @test response[:id] == "chatcmpl-789"
+    @test length(response[:choices]) == 2
+    @test response[:choices][1][:index] == 0
+    @test response[:choices][1][:message][:content] == "First"
+    @test response[:choices][2][:index] == 1
+    @test response[:choices][2][:message][:content] == "Second"
+
+    # Test case 5: Usage information
+    cb_usage = PT.StreamCallback()
+    push!(cb_usage.chunks,
+        PT.StreamChunk(
+            nothing,
+            """{"id":"chatcmpl-101112","object":"chat.completion.chunk","created":1234567890,"model":"gpt-4","choices":[{"index":0,"delta":{"role":"assistant","content":"Test"},"finish_reason":null}],"usage":{"prompt_tokens":10,"completion_tokens":1,"total_tokens":11}}""",
+            JSON3.read("""{"id":"chatcmpl-101112","object":"chat.completion.chunk","created":1234567890,"model":"gpt-4","choices":[{"index":0,"delta":{"role":"assistant","content":"Test"},"finish_reason":null}],"usage":{"prompt_tokens":10,"completion_tokens":1,"total_tokens":11}}""")
+        ))
+    response = PT.build_response_body(PT.OpenAIStream(), cb_usage)
+    @test response[:usage][:prompt_tokens] == 10
+    @test response[:usage][:completion_tokens] == 1
+    @test response[:usage][:total_tokens] == 11
+end
+@testset "build_response_body-AnthropicStream" begin
+    # Test case 1: Empty chunks
+    cb_empty = PT.StreamCallback(flavor = PT.AnthropicStream())
+    response = PT.build_response_body(PT.AnthropicStream(), cb_empty)
+    @test isnothing(response)
+
+    # Test case 2: Single message
+    cb_single = PT.StreamCallback(flavor = PT.AnthropicStream())
+    push!(cb_single.chunks,
+        PT.StreamChunk(
+            :message_start,
+            """{"message":{"content":[],"model":"claude-2","stop_reason":null,"stop_sequence":null}}""",
+            JSON3.read("""{"message":{"content":[],"model":"claude-2","stop_reason":null,"stop_sequence":null}}""")
+        ))
+    response = PT.build_response_body(PT.AnthropicStream(), cb_single)
+    @test response[:content][1][:type] == "text"
+    @test response[:content][1][:text] == ""
+    @test response[:model] == "claude-2"
+    @test isnothing(response[:stop_reason])
+    @test isnothing(response[:stop_sequence])
+
+    # Test case 3: Multiple content blocks
+    cb_multiple = PT.StreamCallback(flavor = PT.AnthropicStream())
+    push!(cb_multiple.chunks,
+        PT.StreamChunk(
+            :message_start,
+            """{"message":{"content":[],"model":"claude-2","stop_reason":null,"stop_sequence":null}}""",
+            JSON3.read("""{"message":{"content":[],"model":"claude-2","stop_reason":null,"stop_sequence":null}}""")
+        ))
+    push!(cb_multiple.chunks,
+        PT.StreamChunk(
+            :content_block_start,
+            """{"content_block":{"type":"text","text":"Hello"}}""",
+            JSON3.read("""{"content_block":{"type":"text","text":"Hello"}}""")
+        ))
+    push!(cb_multiple.chunks,
+        PT.StreamChunk(
+            :content_block_delta,
+            """{"delta":{"type":"text","text":" world"}}""",
+            JSON3.read("""{"delta":{"type":"text","text":" world"}}""")
+        ))
+    push!(cb_multiple.chunks,
+        PT.StreamChunk(
+            :content_block_stop,
+            """{"content_block":{"type":"text","text":"!"}}""",
+            JSON3.read("""{"content_block":{"type":"text","text":"!"}}""")
+        ))
+    response = PT.build_response_body(PT.AnthropicStream(), cb_multiple)
+    @test response[:content][1][:type] == "text"
+    @test response[:content][1][:text] == "Hello world!"
+    @test response[:model] == "claude-2"
+
+    # Test case 4: With usage information
+    cb_usage = PT.StreamCallback(flavor = PT.AnthropicStream())
+    push!(cb_usage.chunks,
+        PT.StreamChunk(
+            :message_start,
+            """{"message":{"content":[],"model":"claude-2","stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":10,"output_tokens":5}}}""",
+            JSON3.read("""{"message":{"content":[],"model":"claude-2","stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":10,"output_tokens":5}}}""")
+        ))
+    push!(cb_usage.chunks,
+        PT.StreamChunk(
+            :content_block_start,
+            """{"content_block":{"type":"text","text":"Test"}}""",
+            JSON3.read("""{"content_block":{"type":"text","text":"Test"}}""")
+        ))
+    push!(cb_usage.chunks,
+        PT.StreamChunk(
+            :message_delta,
+            """{"delta":{"stop_reason": "end_turn"},"usage":{"output_tokens":7}}""",
+            JSON3.read("""{"delta":{"stop_reason": "end_turn"},"usage":{"output_tokens":7}}""")
+        ))
+    response = PT.build_response_body(PT.AnthropicStream(), cb_usage)
+    @test response[:content][1][:type] == "text"
+    @test response[:content][1][:text] == "Test"
+    @test response[:usage][:input_tokens] == 10
+    @test response[:usage][:output_tokens] == 7
+    @test response[:stop_reason] == "end_turn"
+
+    # Test case 5: With stop reason
+    cb_stop = PT.StreamCallback(flavor = PT.AnthropicStream())
+    push!(cb_stop.chunks,
+        PT.StreamChunk(
+            :message_start,
+            """{"message":{"content":[],"model":"claude-2","stop_reason":null,"stop_sequence":null}}""",
+            JSON3.read("""{"message":{"content":[],"model":"claude-2","stop_reason":null,"stop_sequence":null}}""")
+        ))
+    push!(cb_stop.chunks,
+        PT.StreamChunk(
+            :content_block_start,
+            """{"content_block":{"type":"text","text":"Final"}}""",
+            JSON3.read("""{"content_block":{"type":"text","text":"Final"}}""")
+        ))
+    push!(cb_stop.chunks,
+        PT.StreamChunk(
+            :message_delta,
+            """{"delta":{"stop_reason":"max_tokens","stop_sequence":null}}""",
+            JSON3.read("""{"delta":{"stop_reason":"max_tokens","stop_sequence":null}}""")
+        ))
+    response = PT.build_response_body(PT.AnthropicStream(), cb_stop)
+    @test response[:content][1][:type] == "text"
+    @test response[:content][1][:text] == "Final"
+    @test response[:stop_reason] == "max_tokens"
+    @test isnothing(response[:stop_sequence])
+end

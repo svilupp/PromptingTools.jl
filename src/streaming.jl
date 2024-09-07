@@ -504,7 +504,7 @@ function build_response_body(
             usage = get(response, :usage, Dict())
         end
         ## Update stop reason and usage
-        if chunk.event == :message_delta && haskey(chunk.json, :content_block)
+        if chunk.event == :message_delta
             response = merge(response, get(chunk.json, :delta, Dict()))
             usage = merge(usage, get(chunk.json, :usage, Dict()))
         end
@@ -525,7 +525,7 @@ function build_response_body(
     ## We know we have at least one chunk, let's use it for final response
     if !isnothing(response)
         response[:content] = [Dict(:type => "text", :text => String(take!(content_buf)))]
-        isnothing(usage) && (response[:usage] = usage)
+        !isnothing(usage) && (response[:usage] = usage)
     end
     return response
 end
