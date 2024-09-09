@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Fixed
+## [0.53.0]
+
+### Added
+- Added beta headers to enable long outputs (up to 8K tokens) with Anthropic's Sonnet 3.5 (see `?anthropic_extra_headers`).
+
+### Updated
+- Documentation of `aigenerate` to make it clear that if `streamcallback` is provide WITH `flavor` set, there is no automatic configuration and the user must provide the correct `api_kwargs`.
+- Grouped Anthropic's beta headers as a comma-separated string as per the latest API specification.
+
 
 ## [0.52.0]
 

@@ -86,6 +86,11 @@ end
     anthropic_extra_headers
 
 Adds API version and beta headers to the request.
+
+# Kwargs / Beta headers
+- `has_tools`: Enables tools in the conversation.
+- `has_cache`: Enables prompt caching.
+- `has_long_output`: Enables long outputs (up to 8K tokens) with Anthropic's Sonnet 3.5.
 """
 function anthropic_extra_headers(;
         has_tools = false, has_cache = false, has_long_output = false)
@@ -305,6 +310,7 @@ function aigenerate(
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         streamcallback::Any = nothing,
+        aiprefill::Union{Nothing, String} = nothing,
         http_kwargs::NamedTuple = NamedTuple(), api_kwargs::NamedTuple = NamedTuple(),
         cache::Union{Nothing, Symbol} = nothing,
         kwargs...)
