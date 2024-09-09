@@ -85,6 +85,9 @@ msg = aigenerate("Count from 1 to 100."; streamcallback)
 streamcallback = PT.StreamCallback(; verbose=true, throw_on_error=true)
 msg = aigenerate("Count from 1 to 10."; streamcallback)
 ```
+
+Note: If you provide a `StreamCallback` object to `aigenerate`, we will configure it and necessary `api_kwargs` via `configure_callback!` unless you specify the `flavor` field.
+If you provide a `StreamCallback` with a specific `flavor`, we leave all configuration to the user (eg, you need to provide the correct `api_kwargs`).
 """
 @kwdef mutable struct StreamCallback{
     T1 <: Any, T2 <: Union{AbstractStreamFlavor, Nothing}} <:
@@ -111,8 +114,11 @@ Base.length(cb::AbstractStreamCallback) = length(cb.chunks)
         api_kwargs...)
 
 Configures the callback `cb` for streaming with a given prompt schema.
-If no `cb.flavor` is provided, adjusts the `flavor` and the provided `api_kwargs` as necessary.
 
+If no `cb.flavor` is provided, adjusts the `flavor` and the provided `api_kwargs` as necessary.
+Eg, for most schemas, we add kwargs like `stream = true` to the `api_kwargs`.
+
+If `cb.flavor` is provided, both `callback` and `api_kwargs` are left unchanged! You need to configure them yourself!
 """
 function configure_callback!(cb::T, schema::AbstractPromptSchema;
         api_kwargs...) where {T <: StreamCallback}

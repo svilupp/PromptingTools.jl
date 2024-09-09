@@ -82,13 +82,26 @@ function render(schema::AbstractAnthropicSchema,
     return (; system, conversation)
 end
 
-function anthropic_extra_headers(; has_tools = false, has_cache = false)
+"""
+    anthropic_extra_headers
+
+Adds API version and beta headers to the request.
+"""
+function anthropic_extra_headers(;
+        has_tools = false, has_cache = false, has_long_output = false)
     extra_headers = ["anthropic-version" => "2023-06-01"]
+    beta_headers = String[]
     if has_tools
-        push!(extra_headers, "anthropic-beta" => "tools-2024-04-04")
+        push!(beta_headers, "tools-2024-04-04")
     end
     if has_cache
-        push!(extra_headers, "anthropic-beta" => "prompt-caching-2024-07-31")
+        push!(beta_headers, "prompt-caching-2024-07-31")
+    end
+    if has_long_output
+        push!(beta_headers, "max-tokens-3-5-sonnet-2024-07-15")
+    end
+    if !isempty(beta_headers)
+        extra_headers = [extra_headers..., "anthropic-beta" => join(beta_headers, ",")]
     end
     return extra_headers
 end
@@ -146,7 +159,8 @@ function anthropic_api(
     end
     ## Build the headers
     extra_headers = anthropic_extra_headers(;
-        has_tools = haskey(kwargs, :tools), has_cache = !isnothing(cache))
+        has_tools = haskey(kwargs, :tools), has_cache = !isnothing(cache),
+        has_long_output = (max_tokens > 4096 && model in ["claude-3-5-sonnet-20240620"]))
     headers = auth_header(
         api_key; bearer = false, x_api_key = true,
         extra_headers)
@@ -201,6 +215,7 @@ Generate an AI response based on a given prompt using the Anthropic API.
 - `dry_run::Bool=false`: If `true`, skips sending the messages to the model (for debugging, often used with `return_all=true`).
 - `conversation::AbstractVector{<:AbstractMessage}=[]`: Not allowed for this schema. Provided only for compatibility.
 - `streamcallback::Any`: A callback function to handle streaming responses. Can be simply `stdout` or `StreamCallback` object. See `?StreamCallback` for details.
+  Note: We configure the `StreamCallback` (and necessary `api_kwargs`) for you, unless you specify the `flavor`. See `?configure_callback!` for details.
 - `http_kwargs::NamedTuple`: Additional keyword arguments for the HTTP request. Defaults to empty `NamedTuple`.
 - `api_kwargs::NamedTuple`: Additional keyword arguments for the Ollama API. Defaults to an empty `NamedTuple`.
     - `max_tokens::Int`: The maximum number of tokens to generate. Defaults to 2048, because it's a required parameter for the API.

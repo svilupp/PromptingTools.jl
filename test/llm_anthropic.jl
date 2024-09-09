@@ -177,8 +177,12 @@ end
 
     @test anthropic_extra_headers(has_tools = true, has_cache = true) == [
         "anthropic-version" => "2023-06-01",
-        "anthropic-beta" => "tools-2024-04-04",
-        "anthropic-beta" => "prompt-caching-2024-07-31"
+        "anthropic-beta" => "tools-2024-04-04,prompt-caching-2024-07-31"
+    ]
+    @test anthropic_extra_headers(
+        has_tools = true, has_cache = true, has_long_output = true) == [
+        "anthropic-version" => "2023-06-01",
+        "anthropic-beta" => "tools-2024-04-04,prompt-caching-2024-07-31,max-tokens-3-5-sonnet-2024-07-15"
     ]
 end
 
