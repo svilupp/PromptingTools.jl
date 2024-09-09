@@ -222,7 +222,7 @@ Returns a list of `StreamChunk` and the next spillover (if message was incomplet
                     try
                         JSON3.read(data)
                     catch e
-                        verbose && @warn "Cannot parse JSON: $raw_chunk"
+                        verbose && @warn "Cannot parse JSON: $data"
                         nothing
                     end
                 else
@@ -248,7 +248,7 @@ Returns a list of `StreamChunk` and the next spillover (if message was incomplet
                     try
                         JSON3.read(data)
                     catch e
-                        verbose && @warn "Cannot parse JSON: $raw_chunk"
+                        verbose && @warn "Cannot parse JSON: $data"
                         nothing
                     end
                 else
