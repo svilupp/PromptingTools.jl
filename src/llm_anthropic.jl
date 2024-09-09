@@ -7,6 +7,7 @@
 """
     render(schema::AbstractAnthropicSchema,
         messages::Vector{<:AbstractMessage};
+        aiprefill::Union{Nothing, AbstractString} = nothing,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         tools::Vector{<:Dict{String, <:Any}} = Dict{String, Any}[],
         cache::Union{Nothing, Symbol} = nothing,
@@ -15,12 +16,14 @@
 Builds a history of the conversation to provide the prompt to the API. All unspecified kwargs are passed as replacements such that `{{key}}=>value` in the template.
 
 # Keyword Arguments
+- `aiprefill`: A string to be used as a prefill for the AI response. This steer the AI response in a certain direction (and potentially save output tokens).
 - `conversation`: Past conversation to be included in the beginning of the prompt (for continued conversations).
 - `tools`: A list of tools to be used in the conversation. Added to the end of the system prompt to enforce its use.
 - `cache`: A symbol representing the caching strategy to be used. Currently only `nothing` (no caching), `:system`, `:tools`,`:last` and `:all` are supported.
 """
 function render(schema::AbstractAnthropicSchema,
         messages::Vector{<:AbstractMessage};
+        aiprefill::Union{Nothing, AbstractString} = nothing,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         tools::Vector{<:Dict{String, <:Any}} = Dict{String, Any}[],
         cache::Union{Nothing, Symbol} = nothing,
@@ -79,6 +82,13 @@ function render(schema::AbstractAnthropicSchema,
     ## Sense check
     @assert !isempty(conversation) "AbstractAnthropicSchema requires at least 1 User message, ie, no `prompt` provided!"
 
+    ## Apply prefilling of responses
+    if !isnothing(aiprefill) && !isempty(aiprefill)
+        aimsg = AIMessage(aiprefill)
+        push!(conversation,
+            Dict("role" => role4render(schema, aimsg),
+                "content" => [Dict{String, Any}("type" => "text", "text" => aiprefill)]))
+    end
     return (; system, conversation)
 end
 
@@ -193,7 +203,7 @@ function anthropic_api(prompt_schema::TestEchoAnthropicSchema,
         cache::Union{Nothing, Symbol} = nothing,
         model::String = "claude-3-haiku-20240307", kwargs...)
     prompt_schema.model_id = model
-    prompt_schema.inputs = (; system, messages)
+    prompt_schema.inputs = (; system, messages = copy(messages))
     return prompt_schema
 end
 
@@ -204,6 +214,7 @@ end
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         streamcallback::Any = nothing,
+        aiprefill::Union{Nothing, AbstractString} = nothing,
         http_kwargs::NamedTuple = NamedTuple(), api_kwargs::NamedTuple = NamedTuple(),
         cache::Union{Nothing, Symbol} = nothing,
         kwargs...)
@@ -221,6 +232,7 @@ Generate an AI response based on a given prompt using the Anthropic API.
 - `conversation::AbstractVector{<:AbstractMessage}=[]`: Not allowed for this schema. Provided only for compatibility.
 - `streamcallback::Any`: A callback function to handle streaming responses. Can be simply `stdout` or `StreamCallback` object. See `?StreamCallback` for details.
   Note: We configure the `StreamCallback` (and necessary `api_kwargs`) for you, unless you specify the `flavor`. See `?configure_callback!` for details.
+- `aiprefill::Union{Nothing, AbstractString}`: A string to be used as a prefill for the AI response. This steer the AI response in a certain direction (and potentially save output tokens). It MUST NOT end with a trailing with space. Useful for JSON formatting.
 - `http_kwargs::NamedTuple`: Additional keyword arguments for the HTTP request. Defaults to empty `NamedTuple`.
 - `api_kwargs::NamedTuple`: Additional keyword arguments for the Ollama API. Defaults to an empty `NamedTuple`.
     - `max_tokens::Int`: The maximum number of tokens to generate. Defaults to 2048, because it's a required parameter for the API.
@@ -301,6 +313,13 @@ msg = aigenerate("Count from 1 to 10."; streamcallback, model="claudeh")
 ```
 
 Note: Streaming support is only for Anthropic models and it doesn't yet support tool calling and a few other features (logprobs, refusals, etc.)
+
+You can also provide a prefill for the AI response to steer the response in a certain direction (eg, formatting, style):
+```julia
+msg = aigenerate("Sum up 1 to 100."; aiprefill = "I'd be happy to answer in one number without any additional text. The answer is:", model="claudeh")
+```
+Note: It MUST NOT end with a trailing with space. You'll get an API error if you do.
+
 """
 function aigenerate(
         prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMPT_TYPE;
@@ -310,18 +329,20 @@ function aigenerate(
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         streamcallback::Any = nothing,
-        aiprefill::Union{Nothing, String} = nothing,
+        aiprefill::Union{Nothing, AbstractString} = nothing,
         http_kwargs::NamedTuple = NamedTuple(), api_kwargs::NamedTuple = NamedTuple(),
         cache::Union{Nothing, Symbol} = nothing,
         kwargs...)
     ##
     global MODEL_ALIASES
     @assert (isnothing(cache)||cache in [:system, :tools, :last, :all]) "Currently only `:system`, `:tools`, `:last` and `:all` are supported for Anthropic Prompt Caching"
+    @assert (isnothing(aiprefill)||!isempty(strip(aiprefill))) "`aiprefill` must not be empty`"
     ## Find the unique ID for the model alias provided
     model_id = get(MODEL_ALIASES, model, model)
-    conv_rendered = render(prompt_schema, prompt; conversation, cache, kwargs...)
+    conv_rendered = render(prompt_schema, prompt; aiprefill, conversation, cache, kwargs...)
 
     if !dry_run
+        @info conv_rendered.conversation
         time = @elapsed resp = anthropic_api(
             prompt_schema, conv_rendered.conversation; api_key,
             conv_rendered.system, endpoint = "messages", model = model_id, streamcallback, http_kwargs, cache,
@@ -329,6 +350,12 @@ function aigenerate(
         tokens_prompt = get(resp.response[:usage], :input_tokens, 0)
         tokens_completion = get(resp.response[:usage], :output_tokens, 0)
         content = mapreduce(x -> get(x, :text, ""), *, resp.response[:content]) |> strip
+        ## add aiprefill to the content
+        if !isnothing(aiprefill) && !isempty(aiprefill)
+            content = aiprefill * content
+            ## remove the prefill from the end of the conversation
+            pop!(conv_rendered.conversation)
+        end
         ## Build metadata
         extras = Dict{Symbol, Any}()
         haskey(resp.response[:usage], :cache_creation_input_tokens) &&

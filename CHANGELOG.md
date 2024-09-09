@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Added beta headers to enable long outputs (up to 8K tokens) with Anthropic's Sonnet 3.5 (see `?anthropic_extra_headers`).
+- Added a kwarg to prefill (`aiprefill`) AI responses with Anthropic's models to improve steerability (see `?aigenerate`).
 
 ### Updated
 - Documentation of `aigenerate` to make it clear that if `streamcallback` is provide WITH `flavor` set, there is no automatic configuration and the user must provide the correct `api_kwargs`.
