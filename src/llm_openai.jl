@@ -460,6 +460,7 @@ Generate an AI response based on a given prompt using the OpenAI API.
 - `dry_run::Bool=false`: If `true`, skips sending the messages to the model (for debugging, often used with `return_all=true`).
 - `conversation`: An optional vector of `AbstractMessage` objects representing the conversation history. If not provided, it is initialized as an empty vector.
 - `streamcallback`: A callback function to handle streaming responses. Can be simply `stdout` or a `StreamCallback` object. See `?StreamCallback` for details.
+  Note: We configure the `StreamCallback` (and necessary `api_kwargs`) for you, unless you specify the `flavor`. See `?configure_callback!` for details.
 - `http_kwargs`: A named tuple of HTTP keyword arguments.
 - `api_kwargs`: A named tuple of API keyword arguments. Useful parameters include:
     - `temperature`: A float representing the temperature for sampling (ie, the amount of "creativity"). Often defaults to `0.7`.
