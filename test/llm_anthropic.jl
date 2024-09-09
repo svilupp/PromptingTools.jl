@@ -160,6 +160,53 @@ using PromptingTools: call_cost, anthropic_api, function_call_signature,
             "content" => [Dict("type" => "text", "text" => "Hello, my name is John",
                 "cache_control" => Dict("type" => "ephemeral"))])])
     @test conversation == expected_output
+
+    # Test aiprefill functionality
+    messages = [
+        SystemMessage("Act as a helpful AI assistant"),
+        UserMessage("Hello, what's your name?")
+    ]
+
+    # Test with aiprefill
+    conversation = render(schema, messages; aiprefill = "My name is Claude")
+    expected_output = (;
+        system = "Act as a helpful AI assistant",
+        conversation = [
+            Dict("role" => "user",
+                "content" => [Dict("type" => "text", "text" => "Hello, what's your name?")]),
+            Dict("role" => "assistant",
+                "content" => [Dict("type" => "text", "text" => "My name is Claude")])
+        ])
+    @test conversation == expected_output
+
+    # Test without aiprefill
+    conversation_without_prefill = render(schema, messages)
+    expected_output_without_prefill = (;
+        system = "Act as a helpful AI assistant",
+        conversation = [
+            Dict("role" => "user",
+            "content" => [Dict("type" => "text", "text" => "Hello, what's your name?")])
+        ])
+    @test conversation_without_prefill == expected_output_without_prefill
+
+    # Test with empty aiprefill
+    conversation_empty_prefill = render(schema, messages; aiprefill = "")
+    @test conversation_empty_prefill == expected_output_without_prefill
+
+    # Test aiprefill with cache
+    conversation_with_cache = render(
+        schema, messages; aiprefill = "My name is Claude", cache = :all)
+    expected_output_with_cache = (;
+        system = Dict{String, Any}[Dict("cache_control" => Dict("type" => "ephemeral"),
+            "text" => "Act as a helpful AI assistant", "type" => "text")],
+        conversation = [
+            Dict("role" => "user",
+                "content" => [Dict("type" => "text", "text" => "Hello, what's your name?",
+                    "cache_control" => Dict("type" => "ephemeral"))]),
+            Dict("role" => "assistant",
+                "content" => [Dict("type" => "text", "text" => "My name is Claude")])
+        ])
+    @test conversation_with_cache == expected_output_with_cache
 end
 
 @testset "anthropic_extra_headers" begin
@@ -177,8 +224,12 @@ end
 
     @test anthropic_extra_headers(has_tools = true, has_cache = true) == [
         "anthropic-version" => "2023-06-01",
-        "anthropic-beta" => "tools-2024-04-04",
-        "anthropic-beta" => "prompt-caching-2024-07-31"
+        "anthropic-beta" => "tools-2024-04-04,prompt-caching-2024-07-31"
+    ]
+    @test anthropic_extra_headers(
+        has_tools = true, has_cache = true, has_long_output = true) == [
+        "anthropic-version" => "2023-06-01",
+        "anthropic-beta" => "tools-2024-04-04,prompt-caching-2024-07-31,max-tokens-3-5-sonnet-2024-07-15"
     ]
 end
 
@@ -243,6 +294,41 @@ end
         "role" => "user", "content" => [Dict("type" => "text", "text" => "Hello World")])]
     @test schema2.model_id == "claude-3-5-sonnet-20240620"
 
+    # Test aiprefill functionality
+    schema2 = TestEchoAnthropicSchema(;
+        response = Dict(
+            :content => [Dict(:text => "The answer is 42")],
+            :stop_reason => "stop",
+            :usage => Dict(:input_tokens => 5, :output_tokens => 4)),
+        status = 200)
+
+    aiprefill = "The answer to the ultimate question of life, the universe, and everything is:"
+    msg = aigenerate(schema2, UserMessage("What is the answer to everything?"),
+        model = "claudes", http_kwargs = (; verbose = 3), api_kwargs = (; temperature = 0),
+        aiprefill = aiprefill)
+
+    expected_output = AIMessage(;
+        content = aiprefill * "The answer is 42" |> strip,
+        status = 200,
+        tokens = (5, 4),
+        finish_reason = "stop",
+        cost = msg.cost,
+        run_id = msg.run_id,
+        sample_id = msg.sample_id,
+        extras = Dict{Symbol, Any}(),
+        elapsed = msg.elapsed)
+
+    @test msg.content == expected_output.content
+    @test schema2.inputs.system == "Act as a helpful AI assistant"
+    @test schema2.inputs.messages == [
+        Dict("role" => "user",
+            "content" => [Dict(
+                "type" => "text", "text" => "What is the answer to everything?")]),
+        Dict("role" => "assistant",
+            "content" => [Dict("type" => "text", "text" => aiprefill)])
+    ]
+    @test schema2.model_id == "claude-3-5-sonnet-20240620"
+
     # With caching
     response3 = Dict(
         :content => [
@@ -276,6 +362,21 @@ end
     ## Bad cache
     @test_throws AssertionError aigenerate(
         schema3, UserMessage("Hello {{name}}"); model = "claudeo", cache = :bad)
+
+    # Test error throw if aiprefill is empty string
+    @test_throws AssertionError aigenerate(
+        AnthropicSchema(),
+        "Hello World";
+        model = "claudeh",
+        aiprefill = ""
+    )
+
+    @test_throws AssertionError aigenerate(
+        AnthropicSchema(),
+        "Hello World";
+        model = "claudeh",
+        aiprefill = "   "  # Only whitespace
+    )
 end
 
 @testset "aiextract-Anthropic" begin
