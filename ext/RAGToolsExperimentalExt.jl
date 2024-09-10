@@ -158,9 +158,10 @@ function RT.document_term_matrix(
     for di in eachindex(documents)
         empty!(unique_terms)
         doc = documents[di]
-        for t in doc
+        @inbounds for t in doc
             doc_lengths[di] += 1
-            tid = vocab_lookup[t]
+            tid = get(vocab_lookup, t, nothing)
+            tid === nothing && continue
             push!(I, di)
             push!(J, tid)
             push!(V, 1.0f0)
