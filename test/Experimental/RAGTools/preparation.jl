@@ -115,6 +115,32 @@ end
     @test Set(dtm.vocab) == Set(["this", "test", "document", "anoth", "more", "text"])
     @test size(dtm.tf) == (2, 6)
 
+    # Test for KeywordsProcessor with min_term_freq and max_terms
+    docs_freq = [
+        "apple banana cherry apple",
+        "banana date fig grape",
+        "apple banana cherry date",
+        "elephant fig grape"
+    ]
+    processor_freq = KeywordsProcessor()
+
+    # Test with min_term_freq = 2
+    dtm_freq = get_keywords(processor_freq, docs_freq; min_term_freq = 2)
+    @test Set(dtm_freq.vocab) ==
+          Set(["appl", "banana", "cherri", "date", "fig", "grape"])
+    @test size(dtm_freq.tf) == (4, 6)
+
+    # Test with max_terms = 3
+    dtm_max = get_keywords(processor_freq, docs_freq; max_terms = 3)
+    @test length(dtm_max.vocab) == 3
+    @test size(dtm_max.tf) == (4, 3)
+
+    # Test with both min_term_freq = 2 and max_terms = 2
+    dtm_both = get_keywords(processor_freq, docs_freq; min_term_freq = 2, max_terms = 2)
+    @test length(dtm_both.vocab) == 2
+    @test size(dtm_both.tf) == (4, 2)
+    @test all(sum(dtm_both.tf, dims = 1) .>= 2)
+
     # Test for KeywordsProcessor with custom stemmer and stopwords
     custom_stemmer = Snowball.Stemmer("french")
     dtm_custom = get_keywords(
