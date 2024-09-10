@@ -110,7 +110,9 @@ function Base.hcat(d1::RT.DocumentTermMatrix{<:AbstractSparseMatrix},
 end
 
 """
-    document_term_matrix(documents::AbstractVector{<:AbstractVector{<:AbstractString}})
+    RT.document_term_matrix(
+        documents::AbstractVector{<:AbstractVector{T}};
+        min_term_freq::Int = 1, max_terms::Int = typemax(Int)) where {T <: AbstractString}
 
 Builds a sparse matrix of term frequencies and document lengths from the given vector of documents wrapped in type `DocumentTermMatrix`.
 
@@ -118,33 +120,58 @@ Expects a vector of preprocessed (tokenized) documents, where each document is a
 
 Returns: `DocumentTermMatrix`
 
+# Arguments
+- `documents`: A vector of documents, where each document is a vector of terms (clean tokens).
+- `min_term_freq`: The minimum frequency a term must have to be included in the vocabulary, eg, `min_term_freq = 2` means only terms that appear at least twice will be included.
+- `max_terms`: The maximum number of terms to include in the vocabulary, eg, `max_terms = 100` means only the 100 most frequent terms will be included.
+
 # Example
 ```
 documents = [["this", "is", "a", "test"], ["this", "is", "another", "test"], ["foo", "bar", "baz"]]
 dtm = document_term_matrix(documents)
 ```
 """
-function RT.document_term_matrix(documents::AbstractVector{<:AbstractVector{<:AbstractString}})
-    T = eltype(documents) |> eltype
-    vocab = convert(Vector{T}, unique(vcat(documents...)))
-    vocab_lookup = Dict{T, Int}(t => i for (i, t) in enumerate(vocab))
+function RT.document_term_matrix(
+        documents::AbstractVector{<:AbstractVector{T}};
+        min_term_freq::Int = 1, max_terms::Int = typemax(Int)) where {T <: AbstractString}
+    ## Calculate term frequencies, sort descending
+    counts = Dict{T, Int}()
+    @inbounds for doc in documents
+        for term in doc
+            counts[term] = get(counts, term, 0) + 1
+        end
+    end
+    counts = sort(collect(counts), by = x -> -x[2]) |> Base.Fix2(first, max_terms) |>
+             Base.Fix1(filter!, x -> x[2] >= min_term_freq)
+    ## Create vocabulary
+    vocab = convert(Vector{T}, getindex.(counts, 1))
+    vocab_lookup = Dict{T, Int}(term => i for (i, term) in enumerate(vocab))
     N = length(documents)
     doc_freq = zeros(Int, length(vocab))
-    term_freq = spzeros(Float32, N, length(vocab))
     doc_lengths = zeros(Float32, N)
+    ## Term frequency matrix to be recorded via its sparse entries: I, J, V
+    # term_freq = spzeros(Float32, N, length(vocab))
+    I, J, V = Int[], Int[], Float32[]
+
+    unique_terms = Set{eltype(vocab)}()
+    sizehint!(unique_terms, 1000)
     for di in eachindex(documents)
-        unique_terms = Set{eltype(vocab)}()
+        empty!(unique_terms)
         doc = documents[di]
         for t in doc
             doc_lengths[di] += 1
             tid = vocab_lookup[t]
-            term_freq[di, tid] += 1
+            push!(I, di)
+            push!(J, tid)
+            push!(V, 1.0f0)
             if !(t in unique_terms)
                 doc_freq[tid] += 1
                 push!(unique_terms, t)
             end
         end
     end
+    ## combine repeated terms with `+`
+    term_freq = sparse(I, J, V, N, length(vocab), +)
     idf = @. log(1.0f0 + (N - doc_freq + 0.5f0) / (doc_freq + 0.5f0))
     sumdl = sum(doc_lengths)
     doc_rel_length = sumdl == 0 ? zeros(Float32, N) : doc_lengths ./ (sumdl / N)
