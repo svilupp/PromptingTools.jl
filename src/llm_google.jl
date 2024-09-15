@@ -10,21 +10,24 @@ end
     render(schema::AbstractGoogleSchema,
         messages::Vector{<:AbstractMessage};
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
+        no_system_message::Bool = false,
         kwargs...)
 
 Builds a history of the conversation to provide the prompt to the API. All unspecified kwargs are passed as replacements such that `{{key}}=>value` in the template.
 
 # Keyword Arguments
 - `conversation`: An optional vector of `AbstractMessage` objects representing the conversation history. If not provided, it is initialized as an empty vector.
-
+- `no_system_message::Bool=false`: If `true`, do not include the default system message in the conversation history OR convert any provided system message to a user message.
 """
 function render(schema::AbstractGoogleSchema,
         messages::Vector{<:AbstractMessage};
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
+        no_system_message::Bool = false,
         kwargs...)
     ##
     ## First pass: keep the message types but make the replacements provided in `kwargs`
-    messages_replaced = render(NoSchema(), messages; conversation, kwargs...)
+    messages_replaced = render(
+        NoSchema(), messages; conversation, no_system_message, kwargs...)
 
     ## Second pass: convert to the OpenAI schema
     conversation = Dict{Symbol, Any}[]
@@ -78,6 +81,8 @@ end
         verbose::Bool = true,
         api_key::String = GOOGLE_API_KEY,
         model::String = "gemini-pro", return_all::Bool = false, dry_run::Bool = false,
+        conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
+        no_system_message::Bool = false,
         http_kwargs::NamedTuple = (retry_non_idempotent = true,
             retries = 5,
             readtimeout = 120), api_kwargs::NamedTuple = NamedTuple(),
@@ -98,6 +103,7 @@ Note:
 - `return_all::Bool=false`: If `true`, returns the entire conversation history, otherwise returns only the last message (the `AIMessage`).
 - `dry_run::Bool=false`: If `true`, skips sending the messages to the model (for debugging, often used with `return_all=true`).
 - `conversation`: An optional vector of `AbstractMessage` objects representing the conversation history. If not provided, it is initialized as an empty vector.
+- `no_system_message::Bool=false`: If `true`, do not include the default system message in the conversation history OR convert any provided system message to a user message.
 - `http_kwargs`: A named tuple of HTTP keyword arguments.
 - `api_kwargs`: A named tuple of API keyword arguments.
 - `kwargs`: Prompt variables to be used to fill the prompt/template
@@ -151,6 +157,7 @@ function aigenerate(prompt_schema::AbstractGoogleSchema, prompt::ALLOWED_PROMPT_
         api_key::String = GOOGLE_API_KEY,
         model::String = "gemini-pro", return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
+        no_system_message::Bool = false,
         http_kwargs::NamedTuple = (retry_non_idempotent = true,
             retries = 5,
             readtimeout = 120), api_kwargs::NamedTuple = NamedTuple(),
@@ -166,7 +173,8 @@ function aigenerate(prompt_schema::AbstractGoogleSchema, prompt::ALLOWED_PROMPT_
 
     ## Find the unique ID for the model alias provided
     model_id = get(MODEL_ALIASES, model, model)
-    conv_rendered = render(prompt_schema, prompt; conversation, kwargs...)
+    conv_rendered = render(
+        prompt_schema, prompt; conversation, no_system_message, kwargs...)
 
     if !dry_run
         time = @elapsed r = ggi_generate_content(prompt_schema, api_key,
@@ -195,6 +203,7 @@ function aigenerate(prompt_schema::AbstractGoogleSchema, prompt::ALLOWED_PROMPT_
         conversation,
         return_all,
         dry_run,
+        no_system_message,
         kwargs...)
 
     return output

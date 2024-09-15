@@ -14,6 +14,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Added support for OpenAI's JSON mode for `aiextract` (just provide kwarg `json_mode=true`). Reference [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs).
+- Added support for OpenRouter's API (you must set ENV `OPENROUTER_API_KEY`) to provide access to more models like Cohere Command R+ and OpenAI's o1 series. Reference [OpenRouter](https://openrouter.ai/).
+- Added new OpenRouter hosted models to the model registry (prefixed with `or`): `oro1` (OpenAI's o1-preview), `oro1m` (OpenAI's o1-mini), `orcop` (Cohere's command-r-plus), `orco` (Cohere's command-r). The `or` prefix is to avoid conflicts with existing models and OpenAI's aliases, then the goal is to provide 2 letters for each model and 1 letter for additional qualifier (eg, "p" for plus, "m" for mini) -> `orcop` (OpenRouter cohere's COmmand-r-Plus).
+
+### Updated
+- Updated FAQ with instructions on how to access new OpenAI o1 models via OpenRouter.
+- Updated FAQ with instructions on how to add custom APIs (with an example `examples/adding_custom_API.jl`).
 
 ### Fixed
 - Fixed a bug in `aiclassify` for the OpenAI GPT4o models that have a different tokenizer. Unknown model IDs will throw an error.

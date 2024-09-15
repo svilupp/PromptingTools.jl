@@ -1,6 +1,6 @@
 using PromptingTools: render, NoSchema
 using PromptingTools: AIMessage, SystemMessage, AbstractMessage, AbstractChatMessage
-using PromptingTools: UserMessage, UserMessageWithImages
+using PromptingTools: UserMessage, UserMessageWithImages, DataMessage
 using PromptingTools: finalize_outputs, role4render
 
 @testset "render-NoSchema" begin
@@ -179,9 +179,34 @@ using PromptingTools: finalize_outputs, role4render
     ]
     conversation = render(schema, messages)
     @test conversation == expected_output
+
+    # Test no_system_message
+    messages = [
+        SystemMessage("System message 1"),
+        UserMessage("User message")
+    ]
+    expected_output = [
+        UserMessage("System message 1"),
+        UserMessage("User message")
+    ]
+    conversation = render(schema, messages; no_system_message = true)
+    @test conversation[1] isa UserMessage
+    @test conversation[2] isa UserMessage
+    @test conversation[1].content == "System message 1"
+    @test conversation[2].content == "User message"
+
+    ## No default message 
+    messages = [
+        UserMessage("User message")
+    ]
+    expected_output = [
+        UserMessage("User message")
+    ]
+    conversation = render(schema, messages; no_system_message = true)
+    @test conversation[1] isa UserMessage
+    @test conversation[1].content == "User message"
 end
 
-# Write 5 unit tests for finalize_outputs for various combinations of inputs. Use @test calls
 @testset "finalize_outputs" begin
     # Given a vector of messages and a single message, it should return the last message.
     messages = [
