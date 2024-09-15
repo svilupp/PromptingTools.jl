@@ -6,6 +6,7 @@ using PromptingTools: CustomProvider,
                       MODEL_IMAGE_GENERATION
 using PromptingTools: encode_choices, decode_choices, response_to_message, call_cost,
                       isextracted
+using PromptingTools: pick_tokenizer, OPENAI_TOKEN_IDS_GPT35_GPT4, OPENAI_TOKEN_IDS_GPT4O
 
 @testset "render-OpenAI" begin
     schema = OpenAISchema()
@@ -475,16 +476,46 @@ end
     @test schema2.model_id == "gpt-4" # not possible - just an example
 end
 
+@testset "pick_tokenizer" begin
+    # Test for GPT-3.5 models
+    @test pick_tokenizer("gpt-3.5-turbo") == OPENAI_TOKEN_IDS_GPT35_GPT4
+    @test pick_tokenizer("gpt-3.5-turbo-16k") == OPENAI_TOKEN_IDS_GPT35_GPT4
+
+    # Test for GPT-4 models
+    @test pick_tokenizer("gpt-4") == OPENAI_TOKEN_IDS_GPT35_GPT4
+    @test pick_tokenizer("gpt-4-32k") == OPENAI_TOKEN_IDS_GPT35_GPT4
+
+    # Test for GPT-4 Turbo models
+    @test pick_tokenizer("gpt-4-1106-preview") == OPENAI_TOKEN_IDS_GPT35_GPT4
+    @test pick_tokenizer("gpt-4-0125-preview") == OPENAI_TOKEN_IDS_GPT35_GPT4
+
+    # Test for GPT-4 Vision models
+    @test pick_tokenizer("gpt-4-vision-preview") == OPENAI_TOKEN_IDS_GPT35_GPT4
+
+    # Test for GPT-4 Turbo with vision
+    @test pick_tokenizer("gpt-4-all") == OPENAI_TOKEN_IDS_GPT35_GPT4
+
+    # Test for GPT-4 Turbo with OpenAI organization
+    @test pick_tokenizer("gpt-4o") == OPENAI_TOKEN_IDS_GPT4O
+    @test pick_tokenizer("gpt-4o-xyz") == OPENAI_TOKEN_IDS_GPT4O
+
+    # Test for unsupported model
+    @test_throws ArgumentError pick_tokenizer("unsupported-model")
+end
+
 @testset "encode_choices" begin
+    MODEL = "gpt-4-turbo"
     # Test encoding simple string choices
-    choices_prompt, logit_bias, ids = encode_choices(OpenAISchema(), ["true", "false"])
+    choices_prompt, logit_bias, ids = encode_choices(
+        OpenAISchema(), ["true", "false"], model = MODEL)
     # Checks if the encoded choices format and logit_bias are correct
     @test choices_prompt == "true for \"true\"\nfalse for \"false\""
     @test logit_bias == Dict(837 => 100, 905 => 100)
     @test ids == ["true", "false"]
 
     # Test encoding more than two choices
-    choices_prompt, logit_bias, ids = encode_choices(OpenAISchema(), ["animal", "plant"])
+    choices_prompt, logit_bias, ids = encode_choices(
+        OpenAISchema(), ["animal", "plant"], model = MODEL)
     # Checks the format for multiple choices and correct logit_bias mapping
     @test choices_prompt == "1. \"animal\"\n2. \"plant\""
     @test logit_bias == Dict(16 => 100, 17 => 100)
@@ -496,7 +527,7 @@ end
             ("A", "any animal or creature"),
             ("P", "for any plant or tree"),
             ("O", "for everything else")
-        ])
+        ], model = MODEL)
     expected_prompt = "1. \"A\" for any animal or creature\n2. \"P\" for for any plant or tree\n3. \"O\" for for everything else"
     expected_logit_bias = Dict(16 => 100, 17 => 100, 18 => 100)
     @test choices_prompt == expected_prompt
@@ -507,7 +538,7 @@ end
         [
             ("true", "If the statement is true"),
             ("false", "If the statement is false")
-        ])
+        ], model = MODEL)
     expected_prompt = "true for \"If the statement is true\"\nfalse for \"If the statement is false\""
     expected_logit_bias = Dict(837 => 100, 905 => 100)
     @test choices_prompt == expected_prompt
@@ -515,31 +546,42 @@ end
     @test ids == ["true", "false"]
 
     # Test encoding with an invalid number of choices
-    @test_throws ArgumentError encode_choices(OpenAISchema(), string.(collect(1:100)))
-    @test_throws ArgumentError encode_choices(OpenAISchema(), [("$i", "$i") for i in 1:50])
+    @test_throws ArgumentError encode_choices(
+        OpenAISchema(), string.(collect(1:100)), model = MODEL)
+    @test_throws ArgumentError encode_choices(
+        OpenAISchema(), [("$i", "$i") for i in 1:50], model = MODEL)
 
-    @test_throws ArgumentError encode_choices(PT.OllamaSchema(), ["true", "false"])
+    @test_throws ArgumentError encode_choices(
+        PT.OllamaSchema(), ["true", "false"], model = MODEL)
+
+    ## Test a few token IDs for GPT4o models
+    choices_prompt, logit_bias, ids = encode_choices(OpenAISchema(),
+        ["A", "B", "C"], model = "gpt-4o-2024-07-18")
+    @test choices_prompt == "1. \"A\"\n2. \"B\"\n3. \"C\""
+    @test logit_bias == Dict(16 => 100, 17 => 100, 18 => 100)
+    @test ids == ["A", "B", "C"]
 end
 
 @testset "decode_choices" begin
+    MODEL = "gpt-4-turbo"
     # Test decoding a choice based on its ID
     msg = AIMessage("1")
-    decoded_msg = decode_choices(OpenAISchema(), ["true", "false"], msg)
+    decoded_msg = decode_choices(OpenAISchema(), ["true", "false"], msg, model = MODEL)
     @test decoded_msg.content == "true"
 
     # Test decoding with a direct mapping (e.g., true/false)
     msg = AIMessage("false")
-    decoded_msg = decode_choices(OpenAISchema(), ["true", "false"], msg)
+    decoded_msg = decode_choices(OpenAISchema(), ["true", "false"], msg, model = MODEL)
     @test decoded_msg.content == "false"
 
     # Test decoding failure (invalid content)
     msg = AIMessage("invalid")
-    decoded_msg = decode_choices(OpenAISchema(), ["true", "false"], msg)
+    decoded_msg = decode_choices(OpenAISchema(), ["true", "false"], msg, model = MODEL)
     @test isnothing(decoded_msg.content)
 
     # Decode from conversation
     conv = [AIMessage("1")]
-    decoded_conv = decode_choices(OpenAISchema(), ["true", "false"], conv)
+    decoded_conv = decode_choices(OpenAISchema(), ["true", "false"], conv, model = MODEL)
     @test decoded_conv[end].content == "true"
 
     # Decode with multiple samples
@@ -548,18 +590,19 @@ end
         AIMessage(; content = "1", run_id = 1, sample_id = 1),
         AIMessage(; content = "1", run_id = 1, sample_id = 2)
     ]
-    decoded_conv = decode_choices(OpenAISchema(), ["true", "false"], conv)
+    decoded_conv = decode_choices(OpenAISchema(), ["true", "false"], conv, model = MODEL)
     @test decoded_conv[1].content == "1"
     @test decoded_conv[2].content == "true"
     @test decoded_conv[3].content == "true"
 
     # Nothing (when dry_run=true)
-    @test isnothing(decode_choices(OpenAISchema(), ["true", "false"], nothing))
+    @test isnothing(decode_choices(
+        OpenAISchema(), ["true", "false"], nothing, model = MODEL))
 
     # unimplemented
     @test_throws ArgumentError decode_choices(PT.OllamaSchema(),
         ["true", "false"],
-        AIMessage("invalid"))
+        AIMessage("invalid"), model = MODEL)
 end
 
 @testset "aiclassify-OpenAI" begin
@@ -669,6 +712,89 @@ end
         api_kwargs = (; temperature = 0, n = 2))
     conv[1].content isa AbstractDict
     conv[2].content isa AbstractDict
+
+    ### JSON mode testing
+    # Prepare mock response for JSON mode
+    json_response = Dict(
+        :choices => [
+            Dict(
+            :message => Dict(
+                :content => JSON3.write(Dict(:age => 30, :height => 180, :weight => 80.0))
+            ),
+            :finish_reason => "stop"
+        )
+        ],
+        :usage => Dict(:total_tokens => 20, :prompt_tokens => 15, :completion_tokens => 5)
+    )
+    schema_json = TestEchoOpenAISchema(; response = json_response, status = 200)
+
+    # Define test struct
+    struct TestMeasurement
+        age::Int
+        height::Union{Int, Nothing}
+        weight::Union{Float64, Nothing}
+    end
+
+    # Test with JSON mode enabled
+    msg_json = aiextract(schema_json, "James is 30, weighs 80kg. He's 180cm tall.";
+        return_type = TestMeasurement,
+        json_mode = true,
+        model = "gpt4",
+        api_kwargs = (; temperature = 0))
+
+    @test msg_json.content isa TestMeasurement
+    @test msg_json.content.age == 30
+    @test msg_json.content.height == 180
+    @test msg_json.content.weight == 80.0
+    @test msg_json.tokens == (15, 5)
+
+    # Test with field descriptions
+    fields_with_desc = [
+        :age => Int,
+        :age__description => "Person's age in years",
+        :height => Union{Int, Nothing},
+        :height__description => "Person's height in centimeters",
+        :weight => Union{Float64, Nothing},
+        :weight__description => "Person's weight in kilograms"
+    ]
+
+    msg_json_fields = aiextract(schema_json, "James is 30, weighs 80kg. He's 180cm tall.";
+        return_type = fields_with_desc,
+        json_mode = true,
+        model = "gpt4",
+        api_kwargs = (; temperature = 0))
+
+    @test isextracted(msg_json_fields.content)
+    @test msg_json_fields.content.age == 30
+    @test msg_json_fields.content.height == 180
+    @test msg_json_fields.content.weight == 80.0
+
+    # Test with partial information
+    partial_response = Dict(
+        :choices => [
+            Dict(
+            :message => Dict(
+                :content => JSON3.write(Dict(
+                :age => 25, :height => nothing, :weight => nothing))
+            ),
+            :finish_reason => "stop"
+        )
+        ],
+        :usage => Dict(:total_tokens => 18, :prompt_tokens => 15, :completion_tokens => 3)
+    )
+    schema_partial = TestEchoOpenAISchema(; response = partial_response, status = 200)
+
+    msg_partial = aiextract(schema_partial, "Sarah is 25 years old.";
+        return_type = TestMeasurement,
+        json_mode = true,
+        model = "gpt4",
+        api_kwargs = (; temperature = 0))
+
+    @test msg_partial.content isa TestMeasurement
+    @test msg_partial.content.age == 25
+    @test msg_partial.content.height === nothing
+    @test msg_partial.content.weight === nothing
+    @test msg_partial.tokens == (15, 3)
 end
 
 @testset "aiscan-OpenAI" begin
