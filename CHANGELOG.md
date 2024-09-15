@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.55.0]
+
+### Added
+- Added support for OpenAI's JSON mode for `aiextract` (just provide kwarg `json_mode=true`). Reference [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs).
+
+### Fixed
+- Fixed a bug in `aiclassify` for the OpenAI GPT4o models that have a different tokenizer. Unknown model IDs will throw an error.
+
 ## [0.54.0]
 
 ### Updated
