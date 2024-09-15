@@ -677,7 +677,7 @@ function aiembed(prompt_schema::AbstractOpenAISchema,
 end
 
 "Token IDs for GPT3.5 and GPT4 from https://platform.openai.com/tokenizer"
-const OPENAI_TOKEN_IDS = Dict("true" => 837,
+const OPENAI_TOKEN_IDS_GPT35_GPT4 = Dict("true" => 837,
     "false" => 905,
     "unknown" => 9987,
     "other" => 1023,
@@ -723,50 +723,64 @@ const OPENAI_TOKEN_IDS = Dict("true" => 837,
     "40" => 1272
 )
 # GPT-4o token IDs as per tiktoken
-# "true": 3309,
-# "false": 7556,
-# "unknown": 33936,
-# "other": 2141,
-# "1": 16,
-# "2": 17,
-# "3": 18,
-# "4": 19,
-# "5": 20,
-# "6": 21,
-# "7": 22,
-# "8": 23,
-# "9": 24,
-# "10": 702,
-# "11": 994,
-# "12": 899,
-# "13": 1311,
-# "14": 1265,
-# "15": 1055,
-# "16": 1125,
-# "17": 1422,
-# "18": 1157,
-# "19": 858,
-# "20": 455,
-# "21": 2040,
-# "22": 1709,
-# "23": 1860,
-# "24": 1494,
-# "25": 1161,
-# "26": 2109,
-# "27": 2092,
-# "28": 2029,
-# "29": 2270,
-# "30": 1130,
-# "31": 2911,
-# "32": 1398,
-# "33": 2546,
-# "34": 3020,
-# "35": 2467,
-# "36": 2636,
-# "37": 2991,
-# "38": 3150,
-# "39": 3255,
-# "40": 1723,
+const OPENAI_TOKEN_IDS_GPT4O = Dict(
+    "true" => 3309,
+    "false" => 7556,
+    "unknown" => 33936,
+    "other" => 2141,
+    "1" => 16,
+    "2" => 17,
+    "3" => 18,
+    "4" => 19,
+    "5" => 20,
+    "6" => 21,
+    "7" => 22,
+    "8" => 23,
+    "9" => 24,
+    "10" => 702,
+    "11" => 994,
+    "12" => 899,
+    "13" => 1311,
+    "14" => 1265,
+    "15" => 1055,
+    "16" => 1125,
+    "17" => 1422,
+    "18" => 1157,
+    "19" => 858,
+    "20" => 455,
+    "21" => 2040,
+    "22" => 1709,
+    "23" => 1860,
+    "24" => 1494,
+    "25" => 1161,
+    "26" => 2109,
+    "27" => 2092,
+    "28" => 2029,
+    "29" => 2270,
+    "30" => 1130,
+    "31" => 2911,
+    "32" => 1398,
+    "33" => 2546,
+    "34" => 3020,
+    "35" => 2467,
+    "36" => 2636,
+    "37" => 2991,
+    "38" => 3150,
+    "39" => 3255,
+    "40" => 1723)
+
+function pick_tokenizer(model::AbstractString)
+    global OPENAI_TOKEN_IDS_GPT35_GPT4, OPENAI_TOKEN_IDS_GPT4O
+    OPENAI_TOKEN_IDS = if model == "gpt-4" || startswith(model, "gpt-3.5") ||
+                          startswith(model, "gpt-4-")
+        OPENAI_TOKEN_IDS_GPT35_GPT4
+    elseif startswith(model, "gpt-4o")
+        OPENAI_TOKEN_IDS_GPT4O
+    else
+        throw(ArgumentError("Model $model is not supported by `encode_choices`. We don't have token IDs for it."))
+    end
+    return OPENAI_TOKEN_IDS
+end
 
 """
     encode_choices(schema::OpenAISchema, choices::AbstractVector{<:AbstractString}; kwargs...)
@@ -810,10 +824,11 @@ logit_bias # Output: Dict(16 => 100, 17 => 100, 18 => 100)
 """
 function encode_choices(schema::OpenAISchema,
         choices::AbstractVector{<:AbstractString};
+        model::AbstractString,
         kwargs...)
-    global OPENAI_TOKEN_IDS
+    OPENAI_TOKEN_IDS = pick_tokenizer(model)
     ## if all choices are in the dictionary, use the dictionary
-    if all(x -> haskey(OPENAI_TOKEN_IDS, x), choices)
+    if all(Base.Fix1(haskey, OPENAI_TOKEN_IDS), choices)
         choices_prompt = ["$c for \"$c\"" for c in choices]
         logit_bias = Dict(OPENAI_TOKEN_IDS[c] => 100 for c in choices)
     elseif length(choices) <= 40
@@ -828,18 +843,19 @@ function encode_choices(schema::OpenAISchema,
 end
 function encode_choices(schema::OpenAISchema,
         choices::AbstractVector{T};
+        model::AbstractString,
         kwargs...) where {T <: Tuple{<:AbstractString, <:AbstractString}}
-    global OPENAI_TOKEN_IDS
+    OPENAI_TOKEN_IDS = pick_tokenizer(model)
     ## if all choices are in the dictionary, use the dictionary
-    if all(x -> haskey(OPENAI_TOKEN_IDS, first(x)), choices)
+    if all(Base.Fix1(haskey, OPENAI_TOKEN_IDS), first.(choices))
         choices_prompt = ["$c for \"$desc\"" for (c, desc) in choices]
         logit_bias = Dict(OPENAI_TOKEN_IDS[c] => 100 for (c, desc) in choices)
-    elseif length(choices) <= 20
+    elseif length(choices) <= 40
         ## encode choices to IDs 1..20
         choices_prompt = ["$(i). \"$c\" for $desc" for (i, (c, desc)) in enumerate(choices)]
         logit_bias = Dict(OPENAI_TOKEN_IDS[string(i)] => 100 for i in 1:length(choices))
     else
-        throw(ArgumentError("The number of choices must be less than or equal to 20."))
+        throw(ArgumentError("The number of choices must be less than or equal to 40."))
     end
 
     return join(choices_prompt, "\n"), logit_bias, first.(choices)
@@ -857,7 +873,9 @@ function decode_choices(schema::TestEchoOpenAISchema,
     return decode_choices(OpenAISchema(), choices, conv; kwargs...)
 end
 
-function decode_choices(schema::OpenAISchema, choices, conv::AbstractVector; kwargs...)
+function decode_choices(schema::OpenAISchema, choices, conv::AbstractVector;
+        model::AbstractString,
+        kwargs...)
     if length(conv) > 0 && last(conv) isa AIMessage && hasproperty(last(conv), :run_id)
         ## if it is a multi-sample response, 
         ## Remember its run ID and convert all samples in that run
@@ -865,7 +883,7 @@ function decode_choices(schema::OpenAISchema, choices, conv::AbstractVector; kwa
         for i in eachindex(conv)
             msg = conv[i]
             if isaimessage(msg) && msg.run_id == run_id
-                conv[i] = decode_choices(schema, choices, msg)
+                conv[i] = decode_choices(schema, choices, msg; model)
             end
         end
     end
@@ -875,7 +893,7 @@ end
 """
     decode_choices(schema::OpenAISchema,
         choices::AbstractVector{<:AbstractString},
-        msg::AIMessage; kwargs...)
+        msg::AIMessage; model::AbstractString, kwargs...)
 
 Decodes the underlying AIMessage against the original choices to lookup what the category name was.
 
@@ -883,8 +901,8 @@ If it fails, it will return `msg.content == nothing`
 """
 function decode_choices(schema::OpenAISchema,
         choices::AbstractVector{<:AbstractString},
-        msg::AIMessage; kwargs...)
-    global OPENAI_TOKEN_IDS
+        msg::AIMessage; model::AbstractString, kwargs...)
+    OPENAI_TOKEN_IDS = pick_tokenizer(model)
     parsed_digit = tryparse(Int, strip(msg.content))
     if !isnothing(parsed_digit) && haskey(OPENAI_TOKEN_IDS, strip(msg.content))
         ## It's encoded
@@ -903,6 +921,7 @@ end
 """
     aiclassify(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE;
         choices::AbstractVector{T} = ["true", "false", "unknown"],
+        model::AbstractString = MODEL_CHAT,
         api_kwargs::NamedTuple = NamedTuple(),
         kwargs...) where {T <: Union{AbstractString, Tuple{<:AbstractString, <:AbstractString}}}
 
@@ -921,6 +940,9 @@ It uses Logit bias trick and limits the output to 1 token to force the model to 
 - `prompt_schema::AbstractOpenAISchema`: The schema for the prompt.
 - `prompt`: The prompt/statement to classify if it's a `String`. If it's a `Symbol`, it is expanded as a template via `render(schema,template)`. Eg, templates `:JudgeIsItTrue` or `:InputClassifier`
 - `choices::AbstractVector{T}`: The choices to be classified into. It can be a vector of strings or a vector of tuples, where the first element is the choice and the second is the description.
+- `model::AbstractString = MODEL_CHAT`: The model to use for classification. Can be an alias corresponding to a model ID defined in `MODEL_ALIASES`.
+- `api_kwargs::NamedTuple = NamedTuple()`: Additional keyword arguments for the API call.
+- `kwargs`: Additional keyword arguments for the prompt template.
 
 # Example
 
@@ -978,20 +1000,23 @@ aiclassify(:JudgeIsItTrue;
 """
 function aiclassify(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE;
         choices::AbstractVector{T} = ["true", "false", "unknown"],
+        model::AbstractString = MODEL_CHAT,
         api_kwargs::NamedTuple = NamedTuple(),
         kwargs...) where {T <:
                           Union{AbstractString, Tuple{<:AbstractString, <:AbstractString}}}
     ## Encode the choices and the corresponding prompt 
-    ## TODO: maybe check the model provided as well?
-    choices_prompt, logit_bias, decode_ids = encode_choices(prompt_schema, choices)
+    model_id = get(MODEL_ALIASES, model, model)
+    choices_prompt, logit_bias, decode_ids = encode_choices(
+        prompt_schema, choices; model = model_id)
     ## We want only 1 token
     api_kwargs = merge(api_kwargs, (; logit_bias, max_tokens = 1, temperature = 0))
     msg_or_conv = aigenerate(prompt_schema,
         prompt;
         choices = choices_prompt,
+        model = model_id,
         api_kwargs,
         kwargs...)
-    return decode_choices(prompt_schema, decode_ids, msg_or_conv)
+    return decode_choices(prompt_schema, decode_ids, msg_or_conv; model = model_id)
 end
 
 function response_to_message(schema::AbstractOpenAISchema,
@@ -1002,7 +1027,8 @@ function response_to_message(schema::AbstractOpenAISchema,
         model_id::AbstractString = "",
         time::Float64 = 0.0,
         run_id::Int = Int(rand(Int32)),
-        sample_id::Union{Nothing, Integer} = nothing)
+        sample_id::Union{Nothing, Integer} = nothing,
+        json_mode::Union{Nothing, Bool} = nothing)
     @assert !isnothing(return_type) "You must provide a return_type for DataMessage construction"
     ## extract sum log probability
     has_log_prob = haskey(choice, :logprobs) &&
@@ -1019,7 +1045,11 @@ function response_to_message(schema::AbstractOpenAISchema,
     tokens_completion = get(resp.response, :usage, Dict(:completion_tokens => 0))[:completion_tokens]
     cost = call_cost(tokens_prompt, tokens_completion, model_id)
     # "Safe" parsing of the response - it still fails if JSON is invalid
-    args = choice[:message][:tool_calls][1][:function][:arguments]
+    args = if json_mode == true
+        choice[:message][:content]
+    else
+        choice[:message][:tool_calls][1][:function][:arguments]
+    end
     content = try
         ## Must invoke latest because we might have generated the struct
         Base.invokelatest(JSON3.read, args, return_type)::return_type
@@ -1080,6 +1110,9 @@ It's effectively a light wrapper around `aigenerate` call, which requires additi
     Defaults to `"exact"`, which is a made-up value to enforce the OpenAI requirements if we want one exact function.
     Providers like Mistral, Together, etc. use `"any"` instead.
 - `strict::Union{Nothing, Bool} = nothing`: A boolean indicating whether to enforce strict generation of the response (supported only for OpenAI models). It has additional latency for the first request. If `nothing`, standard function calling is used.
+- `json_mode::Union{Nothing, Bool} = nothing`: If `json_mode = true`, we use JSON mode for the response (supported only for OpenAI models). If `nothing`, standard function calling is used.
+    JSON mode is understood to be more creative and smarter than function calling mode, as it's not mascarading as a function call,
+    but there is extra latency for the first request to produce grammar for constrained sampling.
 - `kwargs`: Prompt variables to be used to fill the prompt/template
 
 # Returns
@@ -1196,6 +1229,26 @@ fields_with_descriptions = [
 ]
 msg = aiextract("The weather in New York is sunny and 72.5 degrees Fahrenheit."; return_type = fields_with_descriptions)
 ```
+
+If you feel that the extraction is not smart/creative enough, you can use `json_mode = true` to enforce the JSON mode, 
+which automatically enables the structured output mode (as opposed to function calling mode).
+
+The JSON mode is useful for cases when you want to enforce a specific output format, such as JSON, and want the model to adhere to that format, but don't want to pretend it's a "function call".
+Expect a few second delay on the first call for a specific struct, as the provider has to produce the constrained grammer first.
+
+```julia
+msg = aiextract("Extract the following information from the text: location, temperature, condition. Text: The weather in New York is sunny and 72.5 degrees Fahrenheit."; 
+return_type = fields_with_descriptions, json_mode = true)
+# PromptingTools.DataMessage(NamedTuple)
+
+msg.content
+# (location = "New York", temperature = 72.5, condition = "sunny")
+```
+
+It works equally well for structs provided as return types:
+```julia
+msg = aiextract("James is 30, weighs 80kg. He's 180cm tall."; return_type=MyMeasurement, json_mode=true)
+```
 """
 function aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE;
         return_type::Union{Type, Vector},
@@ -1209,11 +1262,14 @@ function aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_T
             readtimeout = 120), api_kwargs::NamedTuple = (;
             tool_choice = "exact"),
         strict::Union{Nothing, Bool} = nothing,
+        json_mode::Union{Nothing, Bool} = nothing,
         kwargs...)
     ##
     global MODEL_ALIASES
     ## Function calling specifics
-    schema, datastructtype = function_call_signature(return_type; strict)
+    ## Set strict mode on for JSON mode
+    strict_ = json_mode == true ? true : strict
+    schema, datastructtype = function_call_signature(return_type; strict = strict_)
     tools = [Dict(
         :type => "function", :function => schema)]
     ## force our function to be used
@@ -1227,8 +1283,16 @@ function aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_T
         tool_choice_
     end
 
-    ## Add the function call signature to the api_kwargs
-    api_kwargs = merge(api_kwargs, (; tools, tool_choice))
+    ## Build the API kwargs
+    api_kwargs = if json_mode == true
+        json_schema = Dict(
+            :schema => schema["parameters"], :strict => true, :name => schema["name"])
+        (; [k => v for (k, v) in pairs(api_kwargs) if k != :tool_choice]...,
+            response_format = (; type = "json_schema", json_schema))
+    else
+        merge(api_kwargs, (; tools, tool_choice))
+    end
+
     ## Find the unique ID for the model alias provided
     model_id = get(MODEL_ALIASES, model, model)
     conv_rendered = render(prompt_schema, prompt; conversation, kwargs...)
@@ -1244,7 +1308,7 @@ function aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_T
             run_id = Int(rand(Int32)) # remember one run ID
             ## extract all message
             msgs = [response_to_message(prompt_schema, DataMessage, choice, r;
-                        return_type = datastructtype, time, model_id, run_id, sample_id = i)
+                        return_type = datastructtype, time, model_id, run_id, sample_id = i, json_mode)
                     for (i, choice) in enumerate(r.response[:choices])]
             ## Order by log probability if available
             ## bigger is better, keep it last
@@ -1257,7 +1321,7 @@ function aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_T
             ## only 1 sample / 1 completion
             choice = r.response[:choices][begin]
             response_to_message(prompt_schema, DataMessage, choice, r;
-                return_type = datastructtype, time, model_id)
+                return_type = datastructtype, time, model_id, json_mode)
         end
         ## Reporting
         verbose && @info _report_stats(msg, model_id)
