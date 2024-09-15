@@ -28,7 +28,11 @@ const RESERVED_KWARGS = [
     :image_url,
     :image_path,
     :image_detail,
-    :model
+    :model,
+    :strict,
+    :json_mode,
+    :no_system_message,
+    :aiprefill
 ]
 
 # export replace_words, recursive_splitter, split_by_length, call_cost, auth_header # for debugging only
