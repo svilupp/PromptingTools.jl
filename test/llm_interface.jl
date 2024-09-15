@@ -27,7 +27,8 @@ using PromptingTools: response_to_message, AbstractPromptSchema
     @test msg == expected_output
 
     ### AIClassify
-    msg = aiclassify("Hello World"; choices = ["true", "false", "unknown"], model = "xyz")
+    msg = aiclassify(
+        "Hello World"; choices = ["true", "false", "unknown"], model = "gpt-4o-made-up-model")
     expected_output = AIMessage(;
         content = nothing,
         status = 200,
