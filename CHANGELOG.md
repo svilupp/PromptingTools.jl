@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added new OpenRouter hosted models to the model registry (prefixed with `or`): `oro1` (OpenAI's o1-preview), `oro1m` (OpenAI's o1-mini), `orcop` (Cohere's command-r-plus), `orco` (Cohere's command-r). The `or` prefix is to avoid conflicts with existing models and OpenAI's aliases, then the goal is to provide 2 letters for each model and 1 letter for additional qualifier (eg, "p" for plus, "m" for mini) -> `orcop` (OpenRouter cohere's COmmand-r-Plus).
 
 ### Updated
-- Updated FAQ with instructions how to access new OpenAI o1 models via OpenRouter.
+- Updated FAQ with instructions on how to access new OpenAI o1 models via OpenRouter.
 - Updated FAQ with instructions on how to add custom APIs (with an example `examples/adding_custom_API.jl`).
 
 ### Fixed
