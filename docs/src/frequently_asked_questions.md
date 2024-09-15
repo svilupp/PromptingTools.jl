@@ -119,6 +119,33 @@ Assuming the price per call was $0.0001, you'd pay 2 cents for the job and save 
 Resources:
 - [OpenAI Pricing per 1000 tokens](https://openai.com/pricing)
 
+## How to try new OpenAI models if I'm not Tier 5 customer?
+
+As of September 2024, you cannot access the new o1 models via API unless you're a Tier 5 customer.
+
+Fortunately, you can use OpenRouter to access these new models.
+
+1) Get your API key from [OpenRouter](https://openrouter.ai/keys)
+2) Add some minimum [Credits](https://openrouter.ai/credits) to the account (eg, $5).
+3) Set it as an environment variable (or use local preferences): `ENV["OPENROUTER_API_KEY"] = "<your key>"`
+4) Use the model aliases with `or` prefix, eg, `oro1` for o1-preview or `oro1m` for o1-mini.
+
+Example:
+```julia
+# Let's use o1-preview model hosted on OpenRouter ("or" prefix)
+msg = aigenerate("What is the meaning of life?"; model="oro1")
+```
+
+Note: There are some quirks for the o1 models. 
+For example, the new o1 series does NOT support `SystemMessage` yet, so OpenRouter does some tricks (likely converting them to normal user messages).
+To be in control of this behavior and have comparable behavior to the native OpenAI API, you can use kwarg `no_system_message=true` in `aigenerate` to ensure OpenRouter does not do any tricks.
+
+Example:
+```julia
+# Let's use o1-mini and disable adding automatic system message
+msg = aigenerate("What is the meaning of life?"; model="oro1m", no_system_message=true)
+```
+
 ## Configuring the Environment Variable for API Key
 
 This is a guide for OpenAI's API key, but it works for any other API key you might need (eg, `MISTRALAI_API_KEY` for MistralAI API).
@@ -201,6 +228,19 @@ There are three ways how you can customize your workflows (especially when you u
 1) Import the functions/types you need explicitly at the top (eg, `using PromptingTools: OllamaSchema`)
 2) Register your model and its associated schema  (`PT.register_model!(; name="123", schema=PT.OllamaSchema())`). You won't have to specify the schema anymore only the model name. See [Working with Ollama](#working-with-ollama) for more information.
 3) Override your default model (`PT.MODEL_CHAT`) and schema (`PT.PROMPT_SCHEMA`). It can be done persistently with Preferences, eg, `PT.set_preferences!("PROMPT_SCHEMA" => "OllamaSchema", "MODEL_CHAT"=>"llama2")`.
+
+## Using Custom API Providers like Azure or Databricks
+
+Several providers are directly supported (eg, Databricks), check the available prompt schemas (eg, `subtypes(PT.AbstractOpenAISchema)`).
+
+If you need a custom URL or a few keyword parameters, refer to the implementation of DatabricksOpenAISchema.
+You effectively need to create your own prompt schema (`struct MySchema <: PT.AbstractOpenAISchema`) and override the OpenAI.jl behavior. The easiest way is to provide your custom method for `OpenAI.create_chat` and customize the `url`, `api_key`, and other `kwargs` fields.
+You can follow the implementation of `create_chat` for `DatabricksOpenAISchema` in `src/llm_openAI.jl`.
+
+Once your schema is ready, you can register the necessary models via `PT.register_model!(; name="myschema", schema=MySchema())`.
+You can also add aliases for easier access (eg, `PT.MODEL_ALIASES["mymodel"] = "my-model-with-really-long-name"`).
+
+If you would like to use some heavily customized API, eg, your company's internal LLM proxy (to change headers, URL paths, etc.), refer to the example `examples/adding_custom_API.jl` in the repo.
 
 ## How to have Multi-turn Conversations?
 

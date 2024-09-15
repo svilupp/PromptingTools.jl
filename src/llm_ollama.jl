@@ -12,21 +12,24 @@
     render(schema::AbstractOllamaSchema,
         messages::Vector{<:AbstractMessage};
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
+        no_system_message::Bool = false,
         kwargs...)
 
 Builds a history of the conversation to provide the prompt to the API. All unspecified kwargs are passed as replacements such that `{{key}}=>value` in the template.
 
 # Keyword Arguments
 - `conversation`: An optional vector of `AbstractMessage` objects representing the conversation history. If not provided, it is initialized as an empty vector.
-
+- `no_system_message`: If `true`, do not include the default system message in the conversation history OR convert any provided system message to a user message.
 """
 function render(schema::AbstractOllamaSchema,
         messages::Vector{<:AbstractMessage};
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
+        no_system_message::Bool = false,
         kwargs...)
     ##
     ## First pass: keep the message types but make the replacements provided in `kwargs`
-    messages_replaced = render(NoSchema(), messages; conversation, kwargs...)
+    messages_replaced = render(
+        NoSchema(), messages; conversation, no_system_message, kwargs...)
 
     ## Second pass: convert to the OpenAI schema
     conversation = Dict{String, Any}[]
@@ -140,13 +143,15 @@ function aigenerate(prompt_schema::AbstractOllamaSchema, prompt::ALLOWED_PROMPT_
         model::String = MODEL_CHAT,
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
+        no_system_message::Bool = false,
         http_kwargs::NamedTuple = NamedTuple(), api_kwargs::NamedTuple = NamedTuple(),
         kwargs...)
     ##
     global MODEL_ALIASES
     ## Find the unique ID for the model alias provided
     model_id = get(MODEL_ALIASES, model, model)
-    conv_rendered = render(prompt_schema, prompt; conversation, kwargs...)
+    conv_rendered = render(
+        prompt_schema, prompt; conversation, no_system_message, kwargs...)
 
     if !dry_run
         time = @elapsed resp = ollama_api(prompt_schema, nothing;
@@ -176,6 +181,7 @@ function aigenerate(prompt_schema::AbstractOllamaSchema, prompt::ALLOWED_PROMPT_
         conversation,
         return_all,
         dry_run,
+        no_system_message,
         kwargs...)
     return output
 end

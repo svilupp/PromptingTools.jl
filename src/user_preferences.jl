@@ -21,6 +21,7 @@ Check your preferences by calling `get_preferences(key::String)`.
 - `VOYAGE_API_KEY`: The API key for the Voyage API. Free tier is upto 50M tokens! Get yours from [here](https://dash.voyageai.com/api-keys).
 - `GROQ_API_KEY`: The API key for the Groq API. Free in beta! Get yours from [here](https://console.groq.com/keys).
 - `DEEPSEEK_API_KEY`: The API key for the DeepSeek API. Get \$5 credit when you join. Get yours from [here](https://platform.deepseek.com/api_keys).
+- `OPENROUTER_API_KEY`: The API key for the OpenRouter API. Get yours from [here](https://openrouter.ai/keys).
 - `MODEL_CHAT`: The default model to use for aigenerate and most ai* calls. See `MODEL_REGISTRY` for a list of available models or define your own.
 - `MODEL_EMBEDDING`: The default model to use for aiembed (embedding documents). See `MODEL_REGISTRY` for a list of available models or define your own.
 - `PROMPT_SCHEMA`: The default prompt schema to use for aigenerate and most ai* calls (if not specified in `MODEL_REGISTRY`). Set as a string, eg, `"OpenAISchema"`.
@@ -49,6 +50,7 @@ Define your `register_model!()` calls in your `startup.jl` file to make them ava
 - `VOYAGE_API_KEY`: The API key for the Voyage API. Free tier is upto 50M tokens! Get yours from [here](https://dash.voyageai.com/api-keys).
 - `GROQ_API_KEY`: The API key for the Groq API. Free in beta! Get yours from [here](https://console.groq.com/keys).
 - `DEEPSEEK_API_KEY`: The API key for the DeepSeek API. Get \$5 credit when you join. Get yours from [here](https://platform.deepseek.com/api_keys).
+- `OPENROUTER_API_KEY`: The API key for the OpenRouter API. Get yours from [here](https://openrouter.ai/keys).
 - `LOG_DIR`: The directory to save the logs to, eg, when using `SaverSchema <: AbstractTracerSchema`. Defaults to `joinpath(pwd(), "log")`. Refer to `?SaverSchema` for more information on how it works and examples.
 
 Preferences.jl takes priority over ENV variables, so if you set a preference, it will take precedence over the ENV variable.
@@ -69,6 +71,7 @@ const ALLOWED_PREFERENCES = ["MISTRALAI_API_KEY",
     "VOYAGE_API_KEY",
     "GROQ_API_KEY",
     "DEEPSEEK_API_KEY",
+    "OPENROUTER_API_KEY",  # Added OPENROUTER_API_KEY
     "MODEL_CHAT",
     "MODEL_EMBEDDING",
     "MODEL_ALIASES",
@@ -147,6 +150,7 @@ global ANTHROPIC_API_KEY::String = ""
 global VOYAGE_API_KEY::String = ""
 global GROQ_API_KEY::String = ""
 global DEEPSEEK_API_KEY::String = ""
+global OPENROUTER_API_KEY::String = ""
 global LOCAL_SERVER::String = ""
 global LOG_DIR::String = ""
 
@@ -196,6 +200,9 @@ function load_api_keys!()
     global DEEPSEEK_API_KEY
     DEEPSEEK_API_KEY = @load_preference("DEEPSEEK_API_KEY",
         default=get(ENV, "DEEPSEEK_API_KEY", ""))
+    global OPENROUTER_API_KEY  # Added OPENROUTER_API_KEY
+    OPENROUTER_API_KEY = @load_preference("OPENROUTER_API_KEY",
+        default=get(ENV, "OPENROUTER_API_KEY", ""))
     global LOCAL_SERVER
     LOCAL_SERVER = @load_preference("LOCAL_SERVER",
         default=get(ENV, "LOCAL_SERVER", ""))
@@ -392,7 +399,12 @@ aliases = merge(
         "ggemma9" => "gemma2-9b-it",
         ## DeepSeek
         "dschat" => "deepseek-chat",
-        "dscode" => "deepseek-coder"
+        "dscode" => "deepseek-coder",
+        ## OpenRouter
+        "oro1" => "openai/o1-preview",
+        "oro1m" => "openai/o1-mini",
+        "orcop" => "cohere/command-r-plus-08-2024",
+        "orco" => "cohere/command-r-08-2024"
     ),
     ## Load aliases from preferences as well
     @load_preference("MODEL_ALIASES", default=Dict{String, String}()))
@@ -824,7 +836,43 @@ registry = Dict{String, ModelSpec}(
         DeepSeekOpenAISchema(),
         1.4e-7,
         2.8e-7,
-        "Deepseek.com-hosted coding model. Max 16K context. See details [here](https://platform.deepseek.com/docs)")
+        "Deepseek.com-hosted coding model. Max 16K context. See details [here](https://platform.deepseek.com/docs)"),
+    ## OpenRouter models
+    "openai/o1-preview" => ModelSpec("openai/o1-preview",
+        OpenRouterOpenAISchema(),
+        15e-6,
+        60e-6,
+        "OpenRouter's hosted version of OpenAI's latest reasoning model o1-preview. 128K context, max output 32K tokens. Details unknown."),
+    "openai/o1-preview-2024-09-12" => ModelSpec("openai/o1-preview-2024-09-12",
+        OpenRouterOpenAISchema(),
+        15e-6,
+        60e-6,
+        "OpenRouter's hosted version of OpenAI's latest reasoning model o1-preview, version 2024-09-12. 128K context, max output 32K tokens. Details unknown."),
+    "openai/o1-mini" => ModelSpec("openai/o1-mini",
+        OpenRouterOpenAISchema(),
+        3e-6,
+        12e-6,
+        "OpenRouter's hosted version of OpenAI's latest and smallest reasoning model o1-mini. 128K context, max output 65K tokens. Details unknown."),
+    "openai/o1-mini-2024-09-12" => ModelSpec("openai/o1-mini-2024-09-12",
+        OpenRouterOpenAISchema(),
+        3e-6,
+        12e-6,
+        "OpenRouter's hosted version of OpenAI's latest and smallest reasoning model o1-mini, version 2024-09-12. 128K context, max output 65K tokens. Details unknown."),
+    "cohere/command-r-plus-08-2024" => ModelSpec("cohere/command-r-plus-08-2024",
+        OpenRouterOpenAISchema(),
+        2.5e-6,
+        10e-6,
+        "OpenRouter's hosted version of Cohere's latest and strongest model Command R Plus. 128K context, max output 4K tokens."),
+    "cohere/command-r-08-2024" => ModelSpec("cohere/command-r-08-2024",
+        OpenRouterOpenAISchema(),
+        1.5e-7,
+        6e-7,
+        "OpenRouter's hosted version of Cohere's latest smaller model Command R. 128K context, max output 4K tokens."),
+    "meta-llama/llama-3.1-405b" => ModelSpec("meta-llama/llama-3.1-405b",
+        OpenRouterOpenAISchema(),
+        2e-6,
+        2e-6,
+        "Meta's Llama3.1 405b, hosted by OpenRouter. This is a BASE model!! Max output 32K tokens, 131K context. See details [here](https://openrouter.ai/models/meta-llama/llama-3.1-405b)")
 )
 
 """
