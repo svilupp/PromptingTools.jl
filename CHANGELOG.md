@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Added support for OpenAI's JSON mode for `aiextract` (just provide kwarg `json_mode=true`). Reference [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs).
+- Added support for OpenRouter's API (you must set ENV `OPENROUTER_API_KEY`) to provide access to more models like Cohere Command R+ and OpenAI's o1 series. Reference [OpenRouter](https://openrouter.ai/).
 
 ### Fixed
 - Fixed a bug in `aiclassify` for the OpenAI GPT4o models that have a different tokenizer. Unknown model IDs will throw an error.

@@ -207,6 +207,21 @@ Requires one environment variables to be set:
 """
 struct DeepSeekOpenAISchema <: AbstractOpenAISchema end
 
+"""
+    OpenRouterOpenAISchema
+
+Schema to call the [OpenRouter](https://openrouter.ai/) API.
+
+Links:
+- [Get your API key](https://openrouter.ai/keys)
+- [API Reference](https://openrouter.ai/docs)
+- [Available models](https://openrouter.ai/models)
+
+Requires one environment variable to be set:
+- `OPENROUTER_API_KEY`: Your API key
+"""
+struct OpenRouterOpenAISchema <: AbstractOpenAISchema end
+
 abstract type AbstractOllamaSchema <: AbstractPromptSchema end
 
 """
