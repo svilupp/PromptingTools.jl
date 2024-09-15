@@ -4,6 +4,7 @@
         messages::Vector{<:AbstractMessage};
         image_detail::AbstractString = "auto",
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
+        no_system_message::Bool = false,
         kwargs...)
 
 Builds a history of the conversation to provide the prompt to the API. All unspecified kwargs are passed as replacements such that `{{key}}=>value` in the template.
@@ -11,17 +12,19 @@ Builds a history of the conversation to provide the prompt to the API. All unspe
 # Keyword Arguments
 - `image_detail`: Only for `UserMessageWithImages`. It represents the level of detail to include for images. Can be `"auto"`, `"high"`, or `"low"`.
 - `conversation`: An optional vector of `AbstractMessage` objects representing the conversation history. If not provided, it is initialized as an empty vector.
-
+- `no_system_message`: If `true`, do not include the default system message in the conversation history OR convert any provided system message to a user message.
 """
 function render(schema::AbstractOpenAISchema,
         messages::Vector{<:AbstractMessage};
         image_detail::AbstractString = "auto",
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
+        no_system_message::Bool = false,
         kwargs...)
     ##
     @assert image_detail in ["auto", "high", "low"] "Image detail must be one of: auto, high, low"
     ## First pass: keep the message types but make the replacements provided in `kwargs`
-    messages_replaced = render(NoSchema(), messages; conversation, kwargs...)
+    messages_replaced = render(
+        NoSchema(), messages; conversation, no_system_message, kwargs...)
 
     ## Second pass: convert to the OpenAI schema
     conversation = Dict{String, Any}[]
@@ -223,6 +226,19 @@ function OpenAI.create_chat(schema::DeepSeekOpenAISchema,
     # try to override provided api_key because the default is OpenAI key
     provider = CustomProvider(;
         api_key = isempty(DEEPSEEK_API_KEY) ? api_key : DEEPSEEK_API_KEY,
+        base_url = url)
+    OpenAI.create_chat(provider, model, conversation; kwargs...)
+end
+function OpenAI.create_chat(schema::OpenRouterOpenAISchema,
+        api_key::AbstractString,
+        model::AbstractString,
+        conversation;
+        url::String = "https://openrouter.ai/api/v1",
+        kwargs...)
+    # Build the corresponding provider object
+    # try to override provided api_key because the default is OpenAI key
+    provider = CustomProvider(;
+        api_key = isempty(OPENROUTER_API_KEY) ? api_key : OPENROUTER_API_KEY,
         base_url = url)
     OpenAI.create_chat(provider, model, conversation; kwargs...)
 end
@@ -443,6 +459,7 @@ end
         model::String = MODEL_CHAT, return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         streamcallback::Any = nothing,
+        no_system_message::Bool = false,
         http_kwargs::NamedTuple = (retry_non_idempotent = true,
             retries = 5,
             readtimeout = 120), api_kwargs::NamedTuple = NamedTuple(),
@@ -461,6 +478,7 @@ Generate an AI response based on a given prompt using the OpenAI API.
 - `conversation`: An optional vector of `AbstractMessage` objects representing the conversation history. If not provided, it is initialized as an empty vector.
 - `streamcallback`: A callback function to handle streaming responses. Can be simply `stdout` or a `StreamCallback` object. See `?StreamCallback` for details.
   Note: We configure the `StreamCallback` (and necessary `api_kwargs`) for you, unless you specify the `flavor`. See `?configure_callback!` for details.
+- `no_system_message::Bool=false`: If `true`, the default system message is not included in the conversation history. Any existing system message is converted to a `UserMessage`.
 - `http_kwargs`: A named tuple of HTTP keyword arguments.
 - `api_kwargs`: A named tuple of API keyword arguments. Useful parameters include:
     - `temperature`: A float representing the temperature for sampling (ie, the amount of "creativity"). Often defaults to `0.7`.
@@ -538,6 +556,7 @@ function aigenerate(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_
         model::String = MODEL_CHAT, return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         streamcallback::Any = nothing,
+        no_system_message::Bool = false,
         http_kwargs::NamedTuple = (retry_non_idempotent = true,
             retries = 5,
             readtimeout = 120), api_kwargs::NamedTuple = NamedTuple(),
@@ -546,7 +565,8 @@ function aigenerate(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_
     global MODEL_ALIASES
     ## Find the unique ID for the model alias provided
     model_id = get(MODEL_ALIASES, model, model)
-    conv_rendered = render(prompt_schema, prompt; conversation, kwargs...)
+    conv_rendered = render(
+        prompt_schema, prompt; conversation, no_system_message, kwargs...)
 
     if !dry_run
         time = @elapsed r = create_chat(prompt_schema, api_key,
@@ -587,6 +607,7 @@ function aigenerate(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_
         conversation,
         return_all,
         dry_run,
+        no_system_message,
         kwargs...)
 
     return output

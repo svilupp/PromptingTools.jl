@@ -9,6 +9,7 @@
         messages::Vector{<:AbstractMessage};
         aiprefill::Union{Nothing, AbstractString} = nothing,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
+        no_system_message::Bool = false,
         tools::Vector{<:Dict{String, <:Any}} = Dict{String, Any}[],
         cache::Union{Nothing, Symbol} = nothing,
         kwargs...)
@@ -18,6 +19,7 @@ Builds a history of the conversation to provide the prompt to the API. All unspe
 # Keyword Arguments
 - `aiprefill`: A string to be used as a prefill for the AI response. This steer the AI response in a certain direction (and potentially save output tokens).
 - `conversation`: Past conversation to be included in the beginning of the prompt (for continued conversations).
+- `no_system_message`: If `true`, do not include the default system message in the conversation history OR convert any provided system message to a user message.
 - `tools`: A list of tools to be used in the conversation. Added to the end of the system prompt to enforce its use.
 - `cache`: A symbol representing the caching strategy to be used. Currently only `nothing` (no caching), `:system`, `:tools`,`:last` and `:all` are supported.
 """
@@ -25,6 +27,7 @@ function render(schema::AbstractAnthropicSchema,
         messages::Vector{<:AbstractMessage};
         aiprefill::Union{Nothing, AbstractString} = nothing,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
+        no_system_message::Bool = false,
         tools::Vector{<:Dict{String, <:Any}} = Dict{String, Any}[],
         cache::Union{Nothing, Symbol} = nothing,
         kwargs...)
@@ -35,7 +38,8 @@ function render(schema::AbstractAnthropicSchema,
     system = nothing
 
     ## First pass: keep the message types but make the replacements provided in `kwargs`
-    messages_replaced = render(NoSchema(), messages; conversation, kwargs...)
+    messages_replaced = render(
+        NoSchema(), messages; conversation, no_system_message, kwargs...)
 
     ## Second pass: convert to the message-based schema
     conversation = Dict{String, Any}[]
@@ -73,7 +77,7 @@ function render(schema::AbstractAnthropicSchema,
     if is_valid_conversation && (cache == :last || cache == :all)
         conversation[end]["content"][end]["cache_control"] = Dict("type" => "ephemeral")
     end
-    if !isnothing(system) && (cache == :system || cache == :all)
+    if !no_system_message && !isnothing(system) && (cache == :system || cache == :all)
         ## Apply cache for system message
         system = [Dict("type" => "text", "text" => system,
             "cache_control" => Dict("type" => "ephemeral"))]
@@ -214,6 +218,7 @@ end
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         streamcallback::Any = nothing,
+        no_system_message::Bool = false,
         aiprefill::Union{Nothing, AbstractString} = nothing,
         http_kwargs::NamedTuple = NamedTuple(), api_kwargs::NamedTuple = NamedTuple(),
         cache::Union{Nothing, Symbol} = nothing,
@@ -232,6 +237,7 @@ Generate an AI response based on a given prompt using the Anthropic API.
 - `conversation::AbstractVector{<:AbstractMessage}=[]`: Not allowed for this schema. Provided only for compatibility.
 - `streamcallback::Any`: A callback function to handle streaming responses. Can be simply `stdout` or `StreamCallback` object. See `?StreamCallback` for details.
   Note: We configure the `StreamCallback` (and necessary `api_kwargs`) for you, unless you specify the `flavor`. See `?configure_callback!` for details.
+- `no_system_message::Bool=false`: If `true`, do not include the default system message in the conversation history OR convert any provided system message to a user message.
 - `aiprefill::Union{Nothing, AbstractString}`: A string to be used as a prefill for the AI response. This steer the AI response in a certain direction (and potentially save output tokens). It MUST NOT end with a trailing with space. Useful for JSON formatting.
 - `http_kwargs::NamedTuple`: Additional keyword arguments for the HTTP request. Defaults to empty `NamedTuple`.
 - `api_kwargs::NamedTuple`: Additional keyword arguments for the Ollama API. Defaults to an empty `NamedTuple`.
@@ -329,6 +335,7 @@ function aigenerate(
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         streamcallback::Any = nothing,
+        no_system_message::Bool = false,
         aiprefill::Union{Nothing, AbstractString} = nothing,
         http_kwargs::NamedTuple = NamedTuple(), api_kwargs::NamedTuple = NamedTuple(),
         cache::Union{Nothing, Symbol} = nothing,
@@ -339,7 +346,8 @@ function aigenerate(
     @assert (isnothing(aiprefill)||!isempty(strip(aiprefill))) "`aiprefill` must not be empty`"
     ## Find the unique ID for the model alias provided
     model_id = get(MODEL_ALIASES, model, model)
-    conv_rendered = render(prompt_schema, prompt; aiprefill, conversation, cache, kwargs...)
+    conv_rendered = render(
+        prompt_schema, prompt; no_system_message, aiprefill, conversation, cache, kwargs...)
 
     if !dry_run
         @info conv_rendered.conversation
@@ -383,6 +391,7 @@ function aigenerate(
         conversation,
         return_all,
         dry_run,
+        no_system_message,
         kwargs...)
     return output
 end
