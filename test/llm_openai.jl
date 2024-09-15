@@ -669,6 +669,89 @@ end
         api_kwargs = (; temperature = 0, n = 2))
     conv[1].content isa AbstractDict
     conv[2].content isa AbstractDict
+
+    ### JSON mode testing
+    # Prepare mock response for JSON mode
+    json_response = Dict(
+        :choices => [
+            Dict(
+            :message => Dict(
+                :content => JSON3.write(Dict(:age => 30, :height => 180, :weight => 80.0))
+            ),
+            :finish_reason => "stop"
+        )
+        ],
+        :usage => Dict(:total_tokens => 20, :prompt_tokens => 15, :completion_tokens => 5)
+    )
+    schema_json = TestEchoOpenAISchema(; response = json_response, status = 200)
+
+    # Define test struct
+    struct TestMeasurement
+        age::Int
+        height::Union{Int, Nothing}
+        weight::Union{Float64, Nothing}
+    end
+
+    # Test with JSON mode enabled
+    msg_json = aiextract(schema_json, "James is 30, weighs 80kg. He's 180cm tall.";
+        return_type = TestMeasurement,
+        json_mode = true,
+        model = "gpt4",
+        api_kwargs = (; temperature = 0))
+
+    @test msg_json.content isa TestMeasurement
+    @test msg_json.content.age == 30
+    @test msg_json.content.height == 180
+    @test msg_json.content.weight == 80.0
+    @test msg_json.tokens == (15, 5)
+
+    # Test with field descriptions
+    fields_with_desc = [
+        :age => Int,
+        :age__description => "Person's age in years",
+        :height => Union{Int, Nothing},
+        :height__description => "Person's height in centimeters",
+        :weight => Union{Float64, Nothing},
+        :weight__description => "Person's weight in kilograms"
+    ]
+
+    msg_json_fields = aiextract(schema_json, "James is 30, weighs 80kg. He's 180cm tall.";
+        return_type = fields_with_desc,
+        json_mode = true,
+        model = "gpt4",
+        api_kwargs = (; temperature = 0))
+
+    @test isextracted(msg_json_fields.content)
+    @test msg_json_fields.content.age == 30
+    @test msg_json_fields.content.height == 180
+    @test msg_json_fields.content.weight == 80.0
+
+    # Test with partial information
+    partial_response = Dict(
+        :choices => [
+            Dict(
+            :message => Dict(
+                :content => JSON3.write(Dict(
+                :age => 25, :height => nothing, :weight => nothing))
+            ),
+            :finish_reason => "stop"
+        )
+        ],
+        :usage => Dict(:total_tokens => 18, :prompt_tokens => 15, :completion_tokens => 3)
+    )
+    schema_partial = TestEchoOpenAISchema(; response = partial_response, status = 200)
+
+    msg_partial = aiextract(schema_partial, "Sarah is 25 years old.";
+        return_type = TestMeasurement,
+        json_mode = true,
+        model = "gpt4",
+        api_kwargs = (; temperature = 0))
+
+    @test msg_partial.content isa TestMeasurement
+    @test msg_partial.content.age == 25
+    @test msg_partial.content.height === nothing
+    @test msg_partial.content.weight === nothing
+    @test msg_partial.tokens == (15, 3)
 end
 
 @testset "aiscan-OpenAI" begin

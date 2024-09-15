@@ -813,7 +813,7 @@ function encode_choices(schema::OpenAISchema,
         kwargs...)
     global OPENAI_TOKEN_IDS
     ## if all choices are in the dictionary, use the dictionary
-    if all(x -> haskey(OPENAI_TOKEN_IDS, x), choices)
+    if all(Base.Fix1(haskey, OPENAI_TOKEN_IDS), choices)
         choices_prompt = ["$c for \"$c\"" for c in choices]
         logit_bias = Dict(OPENAI_TOKEN_IDS[c] => 100 for c in choices)
     elseif length(choices) <= 40
@@ -831,7 +831,7 @@ function encode_choices(schema::OpenAISchema,
         kwargs...) where {T <: Tuple{<:AbstractString, <:AbstractString}}
     global OPENAI_TOKEN_IDS
     ## if all choices are in the dictionary, use the dictionary
-    if all(x -> haskey(OPENAI_TOKEN_IDS, first(x)), choices)
+    if all(Base.Fix1(haskey, OPENAI_TOKEN_IDS), first.(choices))
         choices_prompt = ["$c for \"$desc\"" for (c, desc) in choices]
         logit_bias = Dict(OPENAI_TOKEN_IDS[c] => 100 for (c, desc) in choices)
     elseif length(choices) <= 20
@@ -1002,7 +1002,8 @@ function response_to_message(schema::AbstractOpenAISchema,
         model_id::AbstractString = "",
         time::Float64 = 0.0,
         run_id::Int = Int(rand(Int32)),
-        sample_id::Union{Nothing, Integer} = nothing)
+        sample_id::Union{Nothing, Integer} = nothing,
+        json_mode::Union{Nothing, Bool} = nothing)
     @assert !isnothing(return_type) "You must provide a return_type for DataMessage construction"
     ## extract sum log probability
     has_log_prob = haskey(choice, :logprobs) &&
@@ -1019,7 +1020,11 @@ function response_to_message(schema::AbstractOpenAISchema,
     tokens_completion = get(resp.response, :usage, Dict(:completion_tokens => 0))[:completion_tokens]
     cost = call_cost(tokens_prompt, tokens_completion, model_id)
     # "Safe" parsing of the response - it still fails if JSON is invalid
-    args = choice[:message][:tool_calls][1][:function][:arguments]
+    args = if json_mode == true
+        choice[:message][:content]
+    else
+        choice[:message][:tool_calls][1][:function][:arguments]
+    end
     content = try
         ## Must invoke latest because we might have generated the struct
         Base.invokelatest(JSON3.read, args, return_type)::return_type
@@ -1080,6 +1085,9 @@ It's effectively a light wrapper around `aigenerate` call, which requires additi
     Defaults to `"exact"`, which is a made-up value to enforce the OpenAI requirements if we want one exact function.
     Providers like Mistral, Together, etc. use `"any"` instead.
 - `strict::Union{Nothing, Bool} = nothing`: A boolean indicating whether to enforce strict generation of the response (supported only for OpenAI models). It has additional latency for the first request. If `nothing`, standard function calling is used.
+- `json_mode::Union{Nothing, Bool} = nothing`: If `json_mode = true`, we use JSON mode for the response (supported only for OpenAI models). If `nothing`, standard function calling is used.
+    JSON mode is understood to be more creative and smarter than function calling mode, as it's not mascarading as a function call,
+    but there is extra latency for the first request to produce grammar for constrained sampling.
 - `kwargs`: Prompt variables to be used to fill the prompt/template
 
 # Returns
@@ -1196,6 +1204,26 @@ fields_with_descriptions = [
 ]
 msg = aiextract("The weather in New York is sunny and 72.5 degrees Fahrenheit."; return_type = fields_with_descriptions)
 ```
+
+If you feel that the extraction is not smart/creative enough, you can use `json_mode = true` to enforce the JSON mode, 
+which automatically enables the structured output mode (as opposed to function calling mode).
+
+The JSON mode is useful for cases when you want to enforce a specific output format, such as JSON, and want the model to adhere to that format, but don't want to pretend it's a "function call".
+Expect a few second delay on the first call for a specific struct, as the provider has to produce the constrained grammer first.
+
+```julia
+msg = aiextract("Extract the following information from the text: location, temperature, condition. Text: The weather in New York is sunny and 72.5 degrees Fahrenheit."; 
+return_type = fields_with_descriptions, json_mode = true)
+# PromptingTools.DataMessage(NamedTuple)
+
+msg.content
+# (location = "New York", temperature = 72.5, condition = "sunny")
+```
+
+It works equally well for structs provided as return types:
+```julia
+msg = aiextract("James is 30, weighs 80kg. He's 180cm tall."; return_type=MyMeasurement, json_mode=true)
+```
 """
 function aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE;
         return_type::Union{Type, Vector},
@@ -1209,11 +1237,14 @@ function aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_T
             readtimeout = 120), api_kwargs::NamedTuple = (;
             tool_choice = "exact"),
         strict::Union{Nothing, Bool} = nothing,
+        json_mode::Union{Nothing, Bool} = nothing,
         kwargs...)
     ##
     global MODEL_ALIASES
     ## Function calling specifics
-    schema, datastructtype = function_call_signature(return_type; strict)
+    ## Set strict mode on for JSON mode
+    strict_ = json_mode == true ? true : strict
+    schema, datastructtype = function_call_signature(return_type; strict = strict_)
     tools = [Dict(
         :type => "function", :function => schema)]
     ## force our function to be used
@@ -1227,8 +1258,16 @@ function aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_T
         tool_choice_
     end
 
-    ## Add the function call signature to the api_kwargs
-    api_kwargs = merge(api_kwargs, (; tools, tool_choice))
+    ## Build the API kwargs
+    api_kwargs = if json_mode == true
+        json_schema = Dict(
+            :schema => schema["parameters"], :strict => true, :name => schema["name"])
+        (; [k => v for (k, v) in pairs(api_kwargs) if k != :tool_choice]...,
+            response_format = (; type = "json_schema", json_schema))
+    else
+        merge(api_kwargs, (; tools, tool_choice))
+    end
+
     ## Find the unique ID for the model alias provided
     model_id = get(MODEL_ALIASES, model, model)
     conv_rendered = render(prompt_schema, prompt; conversation, kwargs...)
@@ -1244,7 +1283,7 @@ function aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_T
             run_id = Int(rand(Int32)) # remember one run ID
             ## extract all message
             msgs = [response_to_message(prompt_schema, DataMessage, choice, r;
-                        return_type = datastructtype, time, model_id, run_id, sample_id = i)
+                        return_type = datastructtype, time, model_id, run_id, sample_id = i, json_mode)
                     for (i, choice) in enumerate(r.response[:choices])]
             ## Order by log probability if available
             ## bigger is better, keep it last
@@ -1257,7 +1296,7 @@ function aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_T
             ## only 1 sample / 1 completion
             choice = r.response[:choices][begin]
             response_to_message(prompt_schema, DataMessage, choice, r;
-                return_type = datastructtype, time, model_id)
+                return_type = datastructtype, time, model_id, json_mode)
         end
         ## Reporting
         verbose && @info _report_stats(msg, model_id)
@@ -1396,6 +1435,7 @@ function aiscan(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE
             conv_rendered;
             http_kwargs,
             api_kwargs...)
+        @info JSON3.pretty(r.response)
         ## Process one of more samples returned
         msg = if length(r.response[:choices]) > 1
             run_id = Int(rand(Int32)) # remember one run ID
