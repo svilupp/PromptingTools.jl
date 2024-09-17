@@ -89,11 +89,9 @@ msg = aigenerate("Count from 1 to 10."; streamcallback)
 Note: If you provide a `StreamCallback` object to `aigenerate`, we will configure it and necessary `api_kwargs` via `configure_callback!` unless you specify the `flavor` field.
 If you provide a `StreamCallback` with a specific `flavor`, we leave all configuration to the user (eg, you need to provide the correct `api_kwargs`).
 """
-@kwdef mutable struct StreamCallback{
-    T1 <: Any, T2 <: Union{AbstractStreamFlavor, Nothing}} <:
-                      AbstractStreamCallback
+@kwdef mutable struct StreamCallback{T1 <: Any} <: AbstractStreamCallback
     out::T1 = stdout
-    flavor::T2 = nothing
+    flavor::Union{AbstractStreamFlavor, Nothing} = nothing
     chunks::Vector{<:StreamChunk} = StreamChunk[]
     verbose::Bool = false
     throw_on_error::Bool = false
@@ -121,7 +119,7 @@ Eg, for most schemas, we add kwargs like `stream = true` to the `api_kwargs`.
 If `cb.flavor` is provided, both `callback` and `api_kwargs` are left unchanged! You need to configure them yourself!
 """
 function configure_callback!(cb::T, schema::AbstractPromptSchema;
-        api_kwargs...) where {T <: StreamCallback}
+        api_kwargs...) where {T <: AbstractStreamCallback}
     ## Check if we are in passthrough mode or if we should configure the callback
     if isnothing(cb.flavor)
         if schema isa OpenAISchema
@@ -134,8 +132,7 @@ function configure_callback!(cb::T, schema::AbstractPromptSchema;
         else
             error("Unsupported schema type: $(typeof(schema)). Currently supported: OpenAISchema and AnthropicSchema.")
         end
-        cb = StreamCallback(; [f => getfield(cb, f) for f in fieldnames(T)]...,
-            flavor)
+        cb.flavor = flavor
     end
     return cb, api_kwargs
 end
@@ -357,14 +354,14 @@ Handles error messages from the streaming response.
 end
 
 """
-    build_response_body(flavor::OpenAIStream, cb::StreamCallback; verbose::Bool = false, kwargs...)
+    build_response_body(flavor::OpenAIStream, cb::AbstractStreamCallback; verbose::Bool = false, kwargs...)
 
 Build the response body from the chunks to mimic receiving a standard response from the API.
 
 Note: Limited functionality for now. Does NOT support tool use, refusals, logprobs. Use standard responses for these.
 """
 function build_response_body(
-        flavor::OpenAIStream, cb::StreamCallback; verbose::Bool = false, kwargs...)
+        flavor::OpenAIStream, cb::AbstractStreamCallback; verbose::Bool = false, kwargs...)
     isempty(cb.chunks) && return nothing
     response = nothing
     usage = nothing
@@ -484,14 +481,14 @@ end
 ### Additional methods required for AnthropicStream
 """
     build_response_body(
-        flavor::AnthropicStream, cb::StreamCallback; verbose::Bool = false, kwargs...)
+        flavor::AnthropicStream, cb::AbstractStreamCallback; verbose::Bool = false, kwargs...)
 
 Build the response body from the chunks to mimic receiving a standard response from the API.
 
 Note: Limited functionality for now. Does NOT support tool use. Use standard responses for these.
 """
 function build_response_body(
-        flavor::AnthropicStream, cb::StreamCallback; verbose::Bool = false, kwargs...)
+        flavor::AnthropicStream, cb::AbstractStreamCallback; verbose::Bool = false, kwargs...)
     isempty(cb.chunks) && return nothing
     response = nothing
     usage = nothing

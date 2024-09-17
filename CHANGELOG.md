@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Fixed
+- Relaxed the type-assertions in `StreamCallback` to allow for more flexibility.
 
 ## [0.55.0]
 
