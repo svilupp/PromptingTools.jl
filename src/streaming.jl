@@ -122,7 +122,8 @@ function configure_callback!(cb::T, schema::AbstractPromptSchema;
         api_kwargs...) where {T <: AbstractStreamCallback}
     ## Check if we are in passthrough mode or if we should configure the callback
     if isnothing(cb.flavor)
-        if schema isa OpenAISchema
+        ## Enable streaming for all OpenAI-compatible APIs
+        if schema isa AbstractOpenAISchema
             api_kwargs = (;
                 api_kwargs..., stream = true, stream_options = (; include_usage = true))
             flavor = OpenAIStream()
@@ -287,7 +288,6 @@ Print the content to the IO output stream `out`.
 """
 @inline function print_content(out::IO, text::AbstractString; kwargs...)
     print(out, text)
-    # flush(stdout)
 end
 """
     print_content(out::Channel, text::AbstractString; kwargs...)
@@ -471,6 +471,8 @@ function streamed_request!(cb::AbstractStreamCallback, url, headers, input; kwar
         end
         HTTP.closeread(stream)
     end
+    ## For estetic reasons, if printing to stdout, we send a newline and flush
+    cb.out == stdout && (println(); flush(stdout))
 
     body = build_response_body(cb.flavor, cb; verbose, cb.kwargs...)
     resp.body = JSON3.write(body)

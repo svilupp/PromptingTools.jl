@@ -108,11 +108,13 @@ end
 
 """
     OpenAI.create_chat(schema::CustomOpenAISchema,
-  api_key::AbstractString,
-  model::AbstractString,
-  conversation;
-  url::String="http://localhost:8080",
-  kwargs...)
+        api_key::AbstractString,
+        model::AbstractString,
+        conversation;
+        http_kwargs::NamedTuple = NamedTuple(),
+        streamcallback::Any = nothing,
+        url::String = "http://localhost:8080",
+        kwargs...)
 
 Dispatch to the OpenAI.create_chat function, for any OpenAI-compatible API. 
 
@@ -124,12 +126,27 @@ function OpenAI.create_chat(schema::CustomOpenAISchema,
         api_key::AbstractString,
         model::AbstractString,
         conversation;
+        http_kwargs::NamedTuple = NamedTuple(),
+        streamcallback::Any = nothing,
         url::String = "http://localhost:8080",
         kwargs...)
     # Build the corresponding provider object
     # Create chat will automatically pass our data to endpoint `/chat/completions`
     provider = CustomProvider(; api_key, base_url = url)
-    OpenAI.create_chat(provider, model, conversation; kwargs...)
+    if !isnothing(streamcallback)
+        ## Take over from OpenAI.jl
+        url = OpenAI.build_url(provider, "chat/completions")
+        headers = OpenAI.auth_header(provider, api_key)
+        streamcallback, new_kwargs = configure_callback!(
+            streamcallback, schema; kwargs...)
+        input = OpenAI.build_params((; messages = conversation, model, new_kwargs...))
+        ## Use the streaming callback
+        resp = streamed_request!(streamcallback, url, headers, input; http_kwargs...)
+        OpenAI.OpenAIResponse(resp.status, JSON3.read(resp.body))
+    else
+        ## Use OpenAI.jl default
+        OpenAI.create_chat(provider, model, conversation; http_kwargs, kwargs...)
+    end
 end
 
 """
@@ -170,12 +187,9 @@ function OpenAI.create_chat(schema::MistralOpenAISchema,
         conversation;
         url::String = "https://api.mistral.ai/v1",
         kwargs...)
-    # Build the corresponding provider object
     # try to override provided api_key because the default is OpenAI key
-    provider = CustomProvider(;
-        api_key = isempty(MISTRALAI_API_KEY) ? api_key : MISTRALAI_API_KEY,
-        base_url = url)
-    OpenAI.create_chat(provider, model, conversation; kwargs...)
+    api_key = isempty(MISTRALAI_API_KEY) ? api_key : MISTRALAI_API_KEY
+    OpenAI.create_chat(CustomOpenAISchema(), api_key, model, conversation; url, kwargs...)
 end
 function OpenAI.create_chat(schema::FireworksOpenAISchema,
         api_key::AbstractString,
@@ -183,12 +197,9 @@ function OpenAI.create_chat(schema::FireworksOpenAISchema,
         conversation;
         url::String = "https://api.fireworks.ai/inference/v1",
         kwargs...)
-    # Build the corresponding provider object
     # try to override provided api_key because the default is OpenAI key
-    provider = CustomProvider(;
-        api_key = isempty(FIREWORKS_API_KEY) ? api_key : FIREWORKS_API_KEY,
-        base_url = url)
-    OpenAI.create_chat(provider, model, conversation; kwargs...)
+    api_key = isempty(FIREWORKS_API_KEY) ? api_key : FIREWORKS_API_KEY
+    OpenAI.create_chat(CustomOpenAISchema(), api_key, model, conversation; url, kwargs...)
 end
 function OpenAI.create_chat(schema::TogetherOpenAISchema,
         api_key::AbstractString,
@@ -196,12 +207,8 @@ function OpenAI.create_chat(schema::TogetherOpenAISchema,
         conversation;
         url::String = "https://api.together.xyz/v1",
         kwargs...)
-    # Build the corresponding provider object
-    # try to override provided api_key because the default is OpenAI key
-    provider = CustomProvider(;
-        api_key = isempty(TOGETHER_API_KEY) ? api_key : TOGETHER_API_KEY,
-        base_url = url)
-    OpenAI.create_chat(provider, model, conversation; kwargs...)
+    api_key = isempty(TOGETHER_API_KEY) ? api_key : TOGETHER_API_KEY
+    OpenAI.create_chat(CustomOpenAISchema(), api_key, model, conversation; url, kwargs...)
 end
 function OpenAI.create_chat(schema::GroqOpenAISchema,
         api_key::AbstractString,
@@ -209,12 +216,8 @@ function OpenAI.create_chat(schema::GroqOpenAISchema,
         conversation;
         url::String = "https://api.groq.com/openai/v1",
         kwargs...)
-    # Build the corresponding provider object
-    # try to override provided api_key because the default is OpenAI key
-    provider = CustomProvider(;
-        api_key = isempty(GROQ_API_KEY) ? api_key : GROQ_API_KEY,
-        base_url = url)
-    OpenAI.create_chat(provider, model, conversation; kwargs...)
+    api_key = isempty(GROQ_API_KEY) ? api_key : GROQ_API_KEY
+    OpenAI.create_chat(CustomOpenAISchema(), api_key, model, conversation; url, kwargs...)
 end
 function OpenAI.create_chat(schema::DeepSeekOpenAISchema,
         api_key::AbstractString,
@@ -222,12 +225,8 @@ function OpenAI.create_chat(schema::DeepSeekOpenAISchema,
         conversation;
         url::String = "https://api.deepseek.com/v1",
         kwargs...)
-    # Build the corresponding provider object
-    # try to override provided api_key because the default is OpenAI key
-    provider = CustomProvider(;
-        api_key = isempty(DEEPSEEK_API_KEY) ? api_key : DEEPSEEK_API_KEY,
-        base_url = url)
-    OpenAI.create_chat(provider, model, conversation; kwargs...)
+    api_key = isempty(DEEPSEEK_API_KEY) ? api_key : DEEPSEEK_API_KEY
+    OpenAI.create_chat(CustomOpenAISchema(), api_key, model, conversation; url, kwargs...)
 end
 function OpenAI.create_chat(schema::OpenRouterOpenAISchema,
         api_key::AbstractString,
@@ -235,30 +234,42 @@ function OpenAI.create_chat(schema::OpenRouterOpenAISchema,
         conversation;
         url::String = "https://openrouter.ai/api/v1",
         kwargs...)
-    # Build the corresponding provider object
-    # try to override provided api_key because the default is OpenAI key
-    provider = CustomProvider(;
-        api_key = isempty(OPENROUTER_API_KEY) ? api_key : OPENROUTER_API_KEY,
-        base_url = url)
-    OpenAI.create_chat(provider, model, conversation; kwargs...)
+    api_key = isempty(OPENROUTER_API_KEY) ? api_key : OPENROUTER_API_KEY
+    OpenAI.create_chat(CustomOpenAISchema(), api_key, model, conversation; url, kwargs...)
 end
 function OpenAI.create_chat(schema::DatabricksOpenAISchema,
         api_key::AbstractString,
         model::AbstractString,
         conversation;
+        http_kwargs::NamedTuple = NamedTuple(),
+        streamcallback::Any = nothing,
         url::String = "https://<workspace_host>.databricks.com",
         kwargs...)
     # Build the corresponding provider object
     provider = CustomProvider(;
         api_key = isempty(DATABRICKS_API_KEY) ? api_key : DATABRICKS_API_KEY,
         base_url = isempty(DATABRICKS_HOST) ? url : DATABRICKS_HOST)
-    # Override standard OpenAI request endpoint
-    OpenAI.openai_request("serving-endpoints/$model/invocations",
-        provider;
-        method = "POST",
-        model,
-        messages = conversation,
-        kwargs...)
+    if !isnothing(streamcallback)
+        throw(ArgumentError("Streaming is not supported for Databricks models yet!"))
+        ## Take over from OpenAI.jl
+        # url = OpenAI.build_url(provider, "serving-endpoints/$model/invocations")
+        # headers = OpenAI.auth_header(provider, api_key)
+        # streamcallback, new_kwargs = configure_callback!(
+        #     streamcallback, schema; kwargs...)
+        # input = OpenAI.build_params((; messages = conversation, model, new_kwargs...))
+        # ## Use the streaming callback
+        # resp = streamed_request!(streamcallback, url, headers, input; http_kwargs...)
+        # OpenAI.OpenAIResponse(resp.status, JSON3.read(resp.body))
+    else
+        # Override standard OpenAI request endpoint
+        OpenAI.openai_request("serving-endpoints/$model/invocations",
+            provider;
+            method = "POST",
+            model,
+            messages = conversation,
+            http_kwargs,
+            kwargs...)
+    end
 end
 
 # Extend OpenAI create_embeddings to allow for testing
