@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Fixed
+
+## [0.56.0]
+
+### Updated
+- Enabled Streaming for OpenAI-compatible APIs (eg, DeepSeek Coder)
+- If streaming to stdout, also print a newline at the end of streaming (to separate multiple outputs).
+
+### Fixed
 - Relaxed the type-assertions in `StreamCallback` to allow for more flexibility.
 
 ## [0.55.0]
