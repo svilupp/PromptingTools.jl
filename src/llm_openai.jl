@@ -241,19 +241,35 @@ function OpenAI.create_chat(schema::DatabricksOpenAISchema,
         api_key::AbstractString,
         model::AbstractString,
         conversation;
+        http_kwargs::NamedTuple = NamedTuple(),
+        streamcallback::Any = nothing,
         url::String = "https://<workspace_host>.databricks.com",
         kwargs...)
     # Build the corresponding provider object
     provider = CustomProvider(;
         api_key = isempty(DATABRICKS_API_KEY) ? api_key : DATABRICKS_API_KEY,
         base_url = isempty(DATABRICKS_HOST) ? url : DATABRICKS_HOST)
-    # Override standard OpenAI request endpoint
-    OpenAI.openai_request("serving-endpoints/$model/invocations",
-        provider;
-        method = "POST",
-        model,
-        messages = conversation,
-        kwargs...)
+    if !isnothing(streamcallback)
+        throw(ArgumentError("Streaming is not supported for Databricks models yet!"))
+        ## Take over from OpenAI.jl
+        # url = OpenAI.build_url(provider, "serving-endpoints/$model/invocations")
+        # headers = OpenAI.auth_header(provider, api_key)
+        # streamcallback, new_kwargs = configure_callback!(
+        #     streamcallback, schema; kwargs...)
+        # input = OpenAI.build_params((; messages = conversation, model, new_kwargs...))
+        # ## Use the streaming callback
+        # resp = streamed_request!(streamcallback, url, headers, input; http_kwargs...)
+        # OpenAI.OpenAIResponse(resp.status, JSON3.read(resp.body))
+    else
+        # Override standard OpenAI request endpoint
+        OpenAI.openai_request("serving-endpoints/$model/invocations",
+            provider;
+            method = "POST",
+            model,
+            messages = conversation,
+            http_kwargs,
+            kwargs...)
+    end
 end
 
 # Extend OpenAI create_embeddings to allow for testing

@@ -471,6 +471,8 @@ function streamed_request!(cb::AbstractStreamCallback, url, headers, input; kwar
         end
         HTTP.closeread(stream)
     end
+    ## For estetic reasons, if printing to stdout, we send a newline and flush
+    cb.out == stdout && (println(); flush(stdout))
 
     body = build_response_body(cb.flavor, cb; verbose, cb.kwargs...)
     resp.body = JSON3.write(body)
