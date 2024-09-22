@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.56.1]
+
+### Fixed
+- Removed accidental INFO log in Anthropic's `aigenerate`
+- Changed internal logging in `streamcallback` to use `@debug` when printing raw data chunks.
+
 ## [0.56.0]
 
 ### Updated
