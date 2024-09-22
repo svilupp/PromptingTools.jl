@@ -350,7 +350,6 @@ function aigenerate(
         prompt_schema, prompt; no_system_message, aiprefill, conversation, cache, kwargs...)
 
     if !dry_run
-        @info conv_rendered.conversation
         time = @elapsed resp = anthropic_api(
             prompt_schema, conv_rendered.conversation; api_key,
             conv_rendered.system, endpoint = "messages", model = model_id, streamcallback, http_kwargs, cache,
