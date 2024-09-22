@@ -49,7 +49,7 @@ For more complex use cases, you can define your own `callback`. See the interfac
 - `out`: The output stream, eg, `stdout` or a pipe.
 - `flavor`: The stream flavor which might or might not differ between different providers, eg, `OpenAIStream` or `AnthropicStream`.
 - `chunks`: The list of received `StreamChunk` chunks.
-- `verbose`: Whether to print verbose information.
+- `verbose`: Whether to print verbose information. If you enable DEBUG logging, you will see the chunks as they come in.
 - `throw_on_error`: Whether to throw an error if an error message is detected in the streaming response.
 - `kwargs`: Any custom keyword arguments required for your use case.
 
@@ -458,7 +458,8 @@ function streamed_request!(cb::AbstractStreamCallback, url, headers, input; kwar
                 cb.flavor, masterchunk; verbose, spillover, cb.kwargs...)
 
             for chunk in chunks
-                verbose && @info "Chunk Data: $(chunk.data)"
+                ## Note you must have debug logging enabled to see this
+                verbose && @debug "Chunk Data: $(chunk.data)"
                 ## look for errors
                 handle_error_message(chunk; cb.throw_on_error, verbose, cb.kwargs...)
                 ## look for termination signal, but process all remaining chunks first
