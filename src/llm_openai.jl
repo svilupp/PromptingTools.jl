@@ -280,23 +280,24 @@ function OpenAI.create_chat(schema::AzureOpenAISchema,
     streamcallback::Any = nothing,
     url::String = "https://<resource-name>.openai.azure.com",
     kwargs...)
+
     # Build the corresponding provider object
-    api = "openai/deployments/$model/chat/completions"
     provider = OpenAI.AzureProvider(;
         api_key = isempty(AZURE_OPENAI_API_KEY) ? api_key : AZURE_OPENAI_API_KEY,
         base_url = isempty(AZURE_OPENAI_ENDPOINT) ? url : AZURE_OPENAI_ENDPOINT,
-        api_version = api_version)
+        api_version = api_version
+    )
     # Override standard OpenAI request endpoint
     OpenAI.openai_request(
-        api,
+        "openai/deployments/$model/chat/completions",
         provider;
         method = "POST",
         http_kwargs = http_kwargs,
-        model = model,
         messages = conversation,
+        query = Dict("api-version", provider.api_version),
         streamcallback = streamcallback,
         kwargs...
-    )
+    )  
 end
 
 # Extend OpenAI create_embeddings to allow for testing
@@ -413,6 +414,7 @@ function OpenAI.create_embeddings(schema::AzureOpenAISchema,
         provider;
         method = "POST",
         input = docs,
+        query = Dict("api-version", provider.api_version),
         kwargs...
     )
 end
