@@ -149,6 +149,17 @@ Requires two environment variables to be set:
 struct DatabricksOpenAISchema <: AbstractOpenAISchema end
 
 """
+   AzureOpenAISchema
+
+AzureOpenAISchema() allows user to call Azure OpenAI API. [API Reference](https://learn.microsoft.com/en-us/azure/ai-services/openai/reference)
+
+Requires two environment variables to be set:
+- `AZURE_OPENAI_API_KEY`: Azure token
+- `AZURE_OPENAI_ENDPOINT`: Address of the Azure resource (`"https://<resource>.openai.azure.com/"`)
+"""
+struct AzureOpenAISchema <: AbstractOpenAISchema end
+
+"""
     FireworksOpenAISchema
 
 Schema to call the [Fireworks.ai](https://fireworks.ai/) API.
