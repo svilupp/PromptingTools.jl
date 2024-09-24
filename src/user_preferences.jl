@@ -12,7 +12,7 @@ Check your preferences by calling `get_preferences(key::String)`.
 # Available Preferences (for `set_preferences!`)
 - `OPENAI_API_KEY`: The API key for the OpenAI API. See [OpenAI's documentation](https://platform.openai.com/docs/quickstart?context=python) for more information.
 - `AZURE_OPENAI_API_KEY`: The API key for the Azure OpenAI API. See [Azure OpenAI's documentation](https://learn.microsoft.com/en-us/azure/ai-services/openai/reference) for more information.
-- `AZURE_OPENAI_ENDPOINT`: The endpoint for the Azure OpenAI API. See [Azure OpenAI's documentation](https://learn.microsoft.com/en-us/azure/ai-services/openai/reference) for more information.
+- `AZURE_OPENAI_HOST`: The endpoint for the Azure OpenAI API. See [Azure OpenAI's documentation](https://learn.microsoft.com/en-us/azure/ai-services/openai/reference) for more information.
 - `MISTRALAI_API_KEY`: The API key for the Mistral AI API. See [Mistral AI's documentation](https://docs.mistral.ai/) for more information.
 - `COHERE_API_KEY`: The API key for the Cohere API. See [Cohere's documentation](https://docs.cohere.com/docs/the-cohere-platform) for more information.
 - `DATABRICKS_API_KEY`: The API key for the Databricks Foundation Model API. See [Databricks' documentation](https://docs.databricks.com/en/machine-learning/foundation-models/api-reference.html) for more information.
@@ -42,7 +42,7 @@ Define your `register_model!()` calls in your `startup.jl` file to make them ava
 # Available ENV Variables
 - `OPENAI_API_KEY`: The API key for the OpenAI API. 
 - `AZURE_OPENAI_API_KEY`: The API key for the Azure OpenAI API. 
-- `AZURE_OPENAI_ENDPOINT`: The endpoint for the Azure OpenAI API. This is the URL built as 'https://<resource-name>.openai.azure.com'.
+- `AZURE_OPENAI_HOST`: The endpoint for the Azure OpenAI API. This is the URL built as 'https://<resource-name>.openai.azure.com'.
 - `MISTRALAI_API_KEY`: The API key for the Mistral AI API.
 - `COHERE_API_KEY`: The API key for the Cohere API.
 - `LOCAL_SERVER`: The URL of the local server to use for `ai*` calls. Defaults to `http://localhost:10897/v1`. This server is called when you call `model="local"`
@@ -67,7 +67,7 @@ const PREFERENCES = nothing
 const ALLOWED_PREFERENCES = ["MISTRALAI_API_KEY",
     "OPENAI_API_KEY",
     "AZURE_OPENAI_API_KEY",
-    "AZURE_OPENAI_ENDPOINT",
+    "AZURE_OPENAI_HOST",
     "COHERE_API_KEY",
     "DATABRICKS_API_KEY",
     "DATABRICKS_HOST",
@@ -145,7 +145,7 @@ global MODEL_IMAGE_GENERATION::String = @load_preference("MODEL_IMAGE_GENERATION
 # Instantiate empty global variables
 global OPENAI_API_KEY::String = ""
 global AZURE_OPENAI_API_KEY::String = ""
-global AZURE_OPENAI_ENDPOINT::String = ""
+global AZURE_OPENAI_HOST::String = ""
 global MISTRALAI_API_KEY::String = ""
 global COHERE_API_KEY::String = ""
 global DATABRICKS_API_KEY::String = ""
@@ -175,8 +175,8 @@ function load_api_keys!()
     AZURE_OPENAI_API_KEY = @load_preference("AZURE_OPENAI_API_KEY",
         default=get(ENV, "AZURE_OPENAI_API_KEY", ""))
     global AZURE_HOST
-    AZURE_OPENAI_ENDPOINT = @load_preference("AZURE_OPENAI_ENDPOINT",
-        default=get(ENV, "AZURE_OPENAI_ENDPOINT", ""))
+    AZURE_OPENAI_HOST = @load_preference("AZURE_OPENAI_HOST",
+        default=get(ENV, "AZURE_OPENAI_HOST", ""))
     global MISTRALAI_API_KEY
     MISTRALAI_API_KEY = @load_preference("MISTRALAI_API_KEY",
         default=get(ENV, "MISTRALAI_API_KEY", ""))
