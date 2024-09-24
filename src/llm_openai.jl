@@ -271,6 +271,34 @@ function OpenAI.create_chat(schema::DatabricksOpenAISchema,
             kwargs...)
     end
 end
+function OpenAI.create_chat(schema::AzureOpenAISchema,
+    api_key::AbstractString,
+    model::AbstractString,
+    conversation;
+    api_version::String = "2023-03-15-preview",
+    http_kwargs::NamedTuple = NamedTuple(),
+    streamcallback::Any = nothing,
+    url::String = "https://<resource-name>.openai.azure.com",
+    kwargs...)
+
+    # Build the corresponding provider object
+    provider = OpenAI.AzureProvider(;
+        api_key = isempty(AZURE_OPENAI_API_KEY) ? api_key : AZURE_OPENAI_API_KEY,
+        base_url = (isempty(AZURE_OPENAI_HOST) ? url : AZURE_OPENAI_HOST) * "/openai/deployments/$model",
+        api_version = api_version
+    )
+    # Override standard OpenAI request endpoint
+    OpenAI.openai_request(
+        "chat/completions",
+        provider;
+        method = "POST",
+        http_kwargs = http_kwargs,
+        messages = conversation,
+        query = Dict("api-version" => provider.api_version),
+        streamcallback = streamcallback,
+        kwargs...
+    )  
+end
 
 # Extend OpenAI create_embeddings to allow for testing
 function OpenAI.create_embeddings(schema::AbstractOpenAISchema,
@@ -366,6 +394,29 @@ function OpenAI.create_embeddings(schema::FireworksOpenAISchema,
         api_key = isempty(FIREWORKS_API_KEY) ? api_key : FIREWORKS_API_KEY,
         base_url = url)
     OpenAI.create_embeddings(provider, docs, model; kwargs...)
+end
+function OpenAI.create_embeddings(schema::AzureOpenAISchema,
+    api_key::AbstractString,
+    docs,
+    model::AbstractString;
+    api_version::String = "2023-03-15-preview",
+    url::String = "https://<resource-name>.openai.azure.com",
+    kwargs...)
+
+    # Build the corresponding provider object
+    provider = OpenAI.AzureProvider(;
+        api_key = isempty(AZURE_OPENAI_API_KEY) ? api_key : AZURE_OPENAI_API_KEY,
+        base_url = (isempty(AZURE_OPENAI_HOST) ? url : AZURE_OPENAI_HOST) *  "/openai/deployments/$model",
+        api_version = api_version)
+    # Override standard OpenAI request endpoint
+    OpenAI.openai_request(
+        "embeddings",
+        provider;
+        method = "POST",
+        input = docs,
+        query = Dict("api-version" => provider.api_version),
+        kwargs...
+    )
 end
 
 ## Temporary fix -- it will be moved upstream

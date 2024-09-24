@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Support for [Azure OpenAI API](https://learn.microsoft.com/en-us/azure/ai-services/openai/reference). Requires two environment variables to be st: `AZURE_OPENAI_API_KEY` and `AZURE_OPENAI_HOST`(i.e. https://<resource-name>.openai.azure.com).
+
 ### Fixed
 
 ## [0.56.1]
