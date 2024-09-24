@@ -42,7 +42,7 @@ Define your `register_model!()` calls in your `startup.jl` file to make them ava
 # Available ENV Variables
 - `OPENAI_API_KEY`: The API key for the OpenAI API. 
 - `AZURE_OPENAI_API_KEY`: The API key for the Azure OpenAI API. 
-- `AZURE_OPENAI_HOST`: The host for the Azure OpenAI API. This is the URL built as 'https://<resource-name>.openai.azure.com'.
+- `AZURE_OPENAI_HOST`: The host for the Azure OpenAI API. This is the URL built as `https://<resource-name>.openai.azure.com`.
 - `MISTRALAI_API_KEY`: The API key for the Mistral AI API.
 - `COHERE_API_KEY`: The API key for the Cohere API.
 - `LOCAL_SERVER`: The URL of the local server to use for `ai*` calls. Defaults to `http://localhost:10897/v1`. This server is called when you call `model="local"`
