@@ -284,7 +284,7 @@ function OpenAI.create_chat(schema::AzureOpenAISchema,
     # Build the corresponding provider object
     provider = OpenAI.AzureProvider(;
         api_key = isempty(AZURE_OPENAI_API_KEY) ? api_key : AZURE_OPENAI_API_KEY,
-        base_url = isempty(AZURE_OPENAI_ENDPOINT) ? url : AZURE_OPENAI_ENDPOINT,
+        base_url = isempty(AZURE_OPENAI_HOST) ? url : AZURE_OPENAI_HOST,
         api_version = api_version
     )
     # Override standard OpenAI request endpoint
@@ -294,7 +294,7 @@ function OpenAI.create_chat(schema::AzureOpenAISchema,
         method = "POST",
         http_kwargs = http_kwargs,
         messages = conversation,
-        query = Dict("api-version", provider.api_version),
+        query = Dict("api-version" => provider.api_version),
         streamcallback = streamcallback,
         kwargs...
     )  
@@ -406,7 +406,7 @@ function OpenAI.create_embeddings(schema::AzureOpenAISchema,
     # Build the corresponding provider object
     provider = OpenAI.AzureProvider(;
         api_key = isempty(AZURE_OPENAI_API_KEY) ? api_key : AZURE_OPENAI_API_KEY,
-        base_url = isempty(AZURE_OPENAI_ENDPOINT) ? url : AZURE_OPENAI_ENDPOINT,
+        base_url = isempty(AZURE_OPENAI_HOST) ? url : AZURE_OPENAI_HOST,
         api_version = api_version)
     # Override standard OpenAI request endpoint
     OpenAI.openai_request(
@@ -414,7 +414,7 @@ function OpenAI.create_embeddings(schema::AzureOpenAISchema,
         provider;
         method = "POST",
         input = docs,
-        query = Dict("api-version", provider.api_version),
+        query = Dict("api-version" => provider.api_version),
         kwargs...
     )
 end
