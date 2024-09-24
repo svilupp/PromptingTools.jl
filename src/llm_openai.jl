@@ -284,12 +284,12 @@ function OpenAI.create_chat(schema::AzureOpenAISchema,
     # Build the corresponding provider object
     provider = OpenAI.AzureProvider(;
         api_key = isempty(AZURE_OPENAI_API_KEY) ? api_key : AZURE_OPENAI_API_KEY,
-        base_url = isempty(AZURE_OPENAI_HOST) ? url : AZURE_OPENAI_HOST,
+        base_url = (isempty(AZURE_OPENAI_HOST) ? url : AZURE_OPENAI_HOST) * "/openai/deployments/$model",
         api_version = api_version
     )
     # Override standard OpenAI request endpoint
     OpenAI.openai_request(
-        "openai/deployments/$model/chat/completions",
+        "/chat/completions",
         provider;
         method = "POST",
         http_kwargs = http_kwargs,
@@ -406,11 +406,11 @@ function OpenAI.create_embeddings(schema::AzureOpenAISchema,
     # Build the corresponding provider object
     provider = OpenAI.AzureProvider(;
         api_key = isempty(AZURE_OPENAI_API_KEY) ? api_key : AZURE_OPENAI_API_KEY,
-        base_url = isempty(AZURE_OPENAI_HOST) ? url : AZURE_OPENAI_HOST,
+        base_url = (isempty(AZURE_OPENAI_HOST) ? url : AZURE_OPENAI_HOST) *  "/openai/deployments/$model",
         api_version = api_version)
     # Override standard OpenAI request endpoint
     OpenAI.openai_request(
-        "openai/deployments/$model/embeddings",
+        "embeddings",
         provider;
         method = "POST",
         input = docs,
