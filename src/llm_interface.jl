@@ -155,7 +155,7 @@ AzureOpenAISchema() allows user to call Azure OpenAI API. [API Reference](https:
 
 Requires two environment variables to be set:
 - `AZURE_OPENAI_API_KEY`: Azure token
-- `AZURE_OPENAI_HOST`: Address of the Azure resource (`"https://<resource>.openai.azure.com/"`)
+- `AZURE_OPENAI_HOST`: Address of the Azure resource (`"https://<resource>.openai.azure.com"`)
 """
 struct AzureOpenAISchema <: AbstractOpenAISchema end
 

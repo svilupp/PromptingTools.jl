@@ -289,7 +289,7 @@ function OpenAI.create_chat(schema::AzureOpenAISchema,
     )
     # Override standard OpenAI request endpoint
     OpenAI.openai_request(
-        "/chat/completions",
+        "chat/completions",
         provider;
         method = "POST",
         http_kwargs = http_kwargs,
