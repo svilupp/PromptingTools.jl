@@ -78,27 +78,17 @@ Dispatch for `AbstractManagedIndex` with `AbstractCandidateWithChunks`.
 function build_context(contexter::ContextEnumerator,
         index::AbstractManagedIndex,
         candidates::AbstractCandidateWithChunks;
-        verbose::Bool = true,
-        chunks_window_margin::Tuple{Int, Int} = (1, 1), kwargs...)
-    ## Checks
-    @assert chunks_window_margin[1] >= 0&&chunks_window_margin[2] >= 0 "Both `chunks_window_margin` values must be non-negative"
-
+        verbose::Bool = true, kwargs...)
     context = String[]
-    for (i, position) in enumerate(positions(candidates))
+    for (i, _) in enumerate(positions(candidates))
         ## select the right index
         id = candidates isa MultiCandidateChunks ? candidates.index_ids[i] :
              candidates.index_id
         index_ = index isa AbstractChunkIndex ? index : index[id]
         isnothing(index_) && continue
 
-        chunks_ = chunks(candidates)[
-            max(1, position - chunks_window_margin[1]):min(end,
-            position + chunks_window_margin[2])]
-        ## Check if surrounding chunks are from the same source
-        is_same_source = sources(candidates)[
-            max(1, position - chunks_window_margin[1]):min(end,
-            position + chunks_window_margin[2])] .== sources(candidates)[position]
-        push!(context, "$(i). $(join(chunks_[is_same_source], "\n"))")
+        chunks_ = chunks(candidates)
+        push!(context, "$(i). $(join(chunks_, "\n"))")
     end
     return context
 end
@@ -729,6 +719,30 @@ result = airag(cfg, multi_index; question, return_all=true)
 
 # Pretty-print the result
 PT.pprint(result)
+
+
+Example for Pinecone.
+
+```julia
+import LinearAlgebra, Unicode, SparseArrays
+using Pinecone
+
+# configure your Pinecone API key, index and namespace
+
+docs_files = ... # files containing docs that you want to upsert to Pinecone
+metadata = [Dict{String, Any}("source" => <docs_source>) for file in docs_files]  # replace <docs_source> with your docs' sources
+index_pinecone = RT.build_index(
+    RT.PineconeIndexer(),
+    docs_files;
+    pinecone_context,  # API key wrapped with `Pinecone.jl`
+    pinecone_index,
+    pinecone_namespace,
+    metadata,
+    upsert = true
+)
+
+question = "How do I multiply two vectors in Julia?"
+result = RT.airag(index_pinecone; question)
 ```
 
 For easier manipulation of nested kwargs, see utilities `getpropertynested`, `setpropertynested`, `merge_kwargs_nested`.

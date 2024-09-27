@@ -289,7 +289,7 @@ function find_closest(
 
     # get the chunks / metadata / sources / scores
     positions = [1 for _ in matches]  # TODO: change this
-    scores = [m.score for m in matches]
+    scores = sort([m.score for m in matches], rev=true)
     chunks = [m.metadata.content for m in matches]
     metadata = [JSON3.read(JSON3.write(m.metadata), Dict{String, Any}) for m in matches]
     # TODO: metadata might not have `source`, change this
@@ -1024,7 +1024,7 @@ Dispatch for `retrieve` for Pinecone.
 
 # Fields
 - `rephraser::AbstractRephraser`: the rephrasing method, dispatching `rephrase` - uses `NoRephraser`
-- `embedder::AbstractEmbedder`: the embedding method, dispatching `get_embeddings` (see Preparation Stage for more details) - uses `SimpleEmbedder`
+- `embedder::AbstractEmbedder`: the embedding method, dispatching `get_embeddings` (see Preparation Stage for more details) - uses `BatchEmbedder`
 - `processor::AbstractProcessor`: the processor method, dispatching `get_keywords` (see Preparation Stage for more details) - uses `NoProcessor`
 - `finder::AbstractSimilarityFinder`: the similarity search method, dispatching `find_closest` - uses `CosineSimilarity`
 - `tagger::AbstractTagger`: the tag generating method, dispatching `get_tags` (see Preparation Stage for more details) - uses `NoTagger`
@@ -1034,7 +1034,7 @@ Dispatch for `retrieve` for Pinecone.
 @kwdef mutable struct PineconeRetriever <: AbstractRetriever
     rephraser::AbstractRephraser = NoRephraser()
     # TODO: BatchEmbedder?
-    embedder::AbstractEmbedder = SimpleEmbedder()
+    embedder::AbstractEmbedder = BatchEmbedder()
     processor::AbstractProcessor = NoProcessor()
     # TODO: actually do something with this; Pinecone allows choosing finder
     finder::AbstractSimilarityFinder = CosineSimilarity()

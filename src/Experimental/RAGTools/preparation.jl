@@ -29,13 +29,6 @@ No-op embedder for `get_embeddings` functions. It returns `nothing`.
 struct NoEmbedder <: AbstractEmbedder end
 
 """
-    SimpleEmbedder <: AbstractEmbedder
-
-Simply passes the input to `aiembed`.
-"""
-struct SimpleEmbedder <: AbstractEmbedder end
-
-"""
     BatchEmbedder <: AbstractEmbedder
 
 Default embedder for `get_embeddings` functions. It passes individual documents to be embedded in chunks to `aiembed`.
@@ -146,12 +139,11 @@ end
 
 Pinecone index to be returned by `build_index`.
 
-It uses `FileChunker`, `SimpleEmbedder` and `NoTagger` as default chunker, embedder and tagger.
+It uses `FileChunker`, `BatchEmbedder` and `NoTagger` as default chunker, embedder and tagger.
 """
 @kwdef mutable struct PineconeIndexer <: AbstractIndexBuilder
     chunker::AbstractChunker = FileChunker()
-    # TODO: BatchEmbedder?
-    embedder::AbstractEmbedder = SimpleEmbedder()
+    embedder::AbstractEmbedder = BatchEmbedder()
     tagger::AbstractTagger = NoTagger()
 end
 
@@ -246,13 +238,6 @@ end
 function get_embeddings(
         embedder::NoEmbedder, docs::AbstractVector{<:AbstractString}; kwargs...)
     return nothing
-end
-
-function get_embeddings(
-        embedder::SimpleEmbedder, docs::AbstractVector{<:AbstractString};
-        model::AbstractString = PT.MODEL_EMBEDDING,
-        kwargs...)
-    return hcat([Vector{Float32}(aiembed(doc; model).content) for doc in docs]...)
 end
 
 """
