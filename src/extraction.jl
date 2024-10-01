@@ -6,6 +6,24 @@
 # There are potential formats: 1) JSON-based for OpenAI compatible APIs, 2) XML-based for Anthropic compatible APIs (used also by Hermes-2-Pro model). 
 #
 
+"""
+    JSON_PRIMITIVE_TYPES
+
+A set of primitive types that are supported by JSON. If a type
+is not in this set, the JSON typer [`to_json_type`](@ref) will 
+assume that the type is a `struct` and will attempt to recursively
+unpack the fields of the struct.
+"""
+const JSON_PRIMITIVE_TYPES = Union{
+    Integer,
+    Real,
+    AbstractString,
+    Bool,
+    Nothing,
+    Missing,
+    AbstractArray
+}
+
 ######################
 # 1) OpenAI / JSON format
 ######################
@@ -15,7 +33,14 @@ to_json_type(n::Type{<:Real}) = "number"
 to_json_type(n::Type{<:Integer}) = "integer"
 to_json_type(b::Type{Bool}) = "boolean"
 to_json_type(t::Type{<:Union{Missing, Nothing}}) = "null"
-to_json_type(t::Type{<:Any}) = "string" # object?
+to_json_type(t::Type{T}) where {T <: AbstractArray} = to_json_type(eltype(t)) * "[]"
+to_json_type(t::Type{Any}) = throw(ArgumentError("""
+Type $t is not a valid type for to_json_type. Please provide a valid type found in:
+
+$JSON_PRIMITIVE_TYPES
+
+You may be using to_json_schema but forgot to properly type the fields of your struct.
+"""))
 
 has_null_type(T::Type{Missing}) = true
 has_null_type(T::Type{Nothing}) = true
@@ -445,4 +470,109 @@ Extract zero, one or more specified items from the provided data.
 """
 struct ItemsExtract{T <: Any}
     items::Vector{T}
+end
+
+"""
+    typed_json_schema(x::Type{T}) where {T}
+
+Convert a Julia type to a JSON schema that lists keys as field names and values as 
+the types of those field names.
+
+WARNING! Every field in your struct, and all nested structs, must be typed using a subtype of values in [`JSON_PRIMITIVE_TYPES`](@ref) 
+before calling this function. Otherwise, you will get a recursion error.
+
+## Example
+
+```julia
+# Simple flat structure where each field is a primitive type
+struct SimpleSingleton
+    singleton_value::Int
+end
+
+typed_json_schema(SimpleSingleton)
+```
+
+```
+Dict{Any, Any} with 1 entry:
+  :singleton_value => "integer"
+```
+
+Or using nested structs
+
+```julia
+# Test a struct that contains another struct.
+struct Nested
+    inside_element::SimpleSingleton
+end
+
+typed_json_schema(Nested)
+```
+
+```julia
+Dict{Any, Any} with 1 entry:
+  :inside_element => Dict{Any, Any}("singleton_value" => "integer")
+```
+
+Lists of created Julia types will be specified as `List[Object]` with the value being the type of the elements,
+i.e.
+
+```julia
+# Test a struct with a vector of primitives
+struct ABunchOfVectors
+    strings::Vector{String}
+    ints::Vector{Int}
+    floats::Vector{Float64}
+    nested_vector::Vector{Nested}
+end
+
+typed_json_schema(ABunchOfVectors)
+```
+
+```
+Dict{Any, Any} with 4 entries:
+  :strings       => "string[]"
+  :ints          => "integer[]"
+  :nested_vector => Dict("list[Object]"=>"{\"inside_element\":{\"singleton_value\":\"integer\"}}")
+  :floats        => "number[]"
+```
+
+## Resources
+- the [original issue](https://github.com/svilupp/PromptingTools.jl/issues/143) 
+- the [motivation](https://www.boundaryml.com/blog/type-definition-prompting-baml)
+"""
+function typed_json_schema(x::Type{T}) where {T}
+    # We can return early if the type is a non-array primitive
+    if T <: JSON_PRIMITIVE_TYPES && !(T <: AbstractArray)
+        return to_json_type(T)
+    end
+
+    # If there are no fields, return the type
+    if isempty(fieldnames(T))
+        # Check if this is a vector type. If so, return the type of the elements.
+        if T <: AbstractArray
+            # Now check if the element type is a non-primitive. If so, recursively call typed_json_schema.
+            if eltype(T) <: JSON_PRIMITIVE_TYPES
+                return to_json_type(T)
+            else
+                return Dict("list[Object]" => JSON3.write(typed_json_schema(eltype(T))))
+                # return "List[" * JSON3.write(typed_json_schema(eltype(T))) * "]"
+            end
+        end
+
+        # Check if the type is a non-primitive.
+        if T <: JSON_PRIMITIVE_TYPES
+            return to_json_type(T)
+        else
+            return typed_json_schema(T)
+        end
+    end
+
+    # Preallocate a mapping
+    mapping = Dict()
+    for (type, field) in zip(T.types, fieldnames(T))
+        mapping[field] = typed_json_schema(type)
+    end
+
+    # Get property names
+    return mapping
 end
