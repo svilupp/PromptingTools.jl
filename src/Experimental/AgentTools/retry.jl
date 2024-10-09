@@ -302,7 +302,6 @@ function airetry!(f_cond::Function, aicall::AICallBlock,
         ## Evaluation + feedback (sample is either the "successful" node or the best node to retry from)
         condition_passed, sample = evaluate_condition!(f_cond, aicall, feedback;
             evaluate_all, feedback_expensive)
-        @info "Condition passed: $condition_passed, sample: $(sample.data)"
 
         ## Update the aicall
         aicall.conversation = sample.data
@@ -330,7 +329,6 @@ function airetry!(f_cond::Function, aicall::AICallBlock,
 
         ## Append feedback if provided
         if sample.feedback != ""
-            @info "Adding feedback: $(sample.feedback) with feedback_inplace: $feedback_inplace"
             aicall.conversation = add_feedback!(aicall.conversation, sample;
                 feedback_inplace, feedback_template)
         end
@@ -438,7 +436,6 @@ function evaluate_condition!(f_cond::Function, aicall::AICallBlock,
                         sample.feedback *= "\n" * feedback
                     end
                 end
-                @info "Sample ($(sample.id)) feedback: $(sample.feedback)"
             end
             ## Backprop the results
             backpropagate!(sample; wins = result, visits = 1)
@@ -519,7 +516,6 @@ function add_feedback!(conversation::AbstractVector{<:PT.AbstractMessage},
     else
         sample.feedback
     end
-    @info "All feedback: $(all_feedback)"
     ## short circuit if no feedback
     if strip(all_feedback) == ""
         return conversation
@@ -532,7 +528,6 @@ function add_feedback!(conversation::AbstractVector{<:PT.AbstractMessage},
         output = PT.render(schema, output; feedback = all_feedback) # replace the placeholder
         output[end] # UserMessage with the feedback
     end
-    @info "Feedback message: $(feedback_message.content)"
     if feedback_inplace
         ## Remove AI Message and extract he user message
         user_msg = pop!(conversation) ## pop the last AI message
@@ -541,7 +536,6 @@ function add_feedback!(conversation::AbstractVector{<:PT.AbstractMessage},
                 throw("Something went wrong, no user messages detected to add feedback into.")
             ## keep popping until we find the user message
             user_msg = pop!(conversation)
-            @info "Popped user message: $(user_msg.content)"
         end
         ## Concatenate the feedback message with the user message
         user_msg = PT.UserMessage(;
@@ -551,6 +545,5 @@ function add_feedback!(conversation::AbstractVector{<:PT.AbstractMessage},
         ## append the feedback message to the conversation
         push!(conversation, feedback_message)
     end
-    @info "Conversation: $(conversation[end].content)"
     return conversation
 end

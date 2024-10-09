@@ -42,10 +42,10 @@ using PromptingTools.Experimental.AgentTools: add_feedback!,
     child = expand!(sample, nothing; feedback = "Extra test")
     conversation = [
         PT.UserMessage("User says hello"), PT.AIMessage(; content = "AI responds")]
-    updated_conversation = add_feedback!(conversation, child)
-    @test length(updated_conversation) == 3
+    updated_conversation = add_feedback!(conversation, child; feedback_inplace = true)
+    @test length(updated_conversation) == 1
     @test updated_conversation[end].content ==
-          "### Feedback from Evaluator\nTest Feedback\n----------\nExtra test\n"
+          "User says hello\n\n### Feedback from Evaluator\nTest Feedback\n----------\nExtra test\n"
 
     # Test for attempting to add feedback inplace with no prior user message
     sample = SampleNode(; data = nothing, feedback = "Orphan Feedback")
@@ -140,7 +140,7 @@ end
     ## Try to run before it's initialized
     aicall = AIGenerate(schema, "Say hi!";
         config = RetryConfig(max_retries = 0, retries = 0, calls = 0))
-    @test_throws AssertionError airetry!(condition_func, aicall)
+    @test_throws AssertionError airetry!(==(0), aicall)
 
     # Check condition passing without retries
     aicall = AIGenerate(schema, "Say hi!";
