@@ -137,6 +137,11 @@ end
         :usage => Dict(:total_tokens => 3, :prompt_tokens => 2, :completion_tokens => 1))
     schema = PT.TestEchoOpenAISchema(; response, status = 200)
 
+    ## Try to run before it's initialized
+    aicall = AIGenerate(schema, "Say hi!";
+        config = RetryConfig(max_retries = 0, retries = 0, calls = 0))
+    @test_throws AssertionError airetry!(condition_func, aicall)
+
     # Check condition passing without retries
     aicall = AIGenerate(schema, "Say hi!";
         config = RetryConfig(max_retries = 0, retries = 0, calls = 0))
