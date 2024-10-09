@@ -237,6 +237,15 @@ function OpenAI.create_chat(schema::OpenRouterOpenAISchema,
     api_key = isempty(OPENROUTER_API_KEY) ? api_key : OPENROUTER_API_KEY
     OpenAI.create_chat(CustomOpenAISchema(), api_key, model, conversation; url, kwargs...)
 end
+function OpenAI.create_chat(schema::CerebrasOpenAISchema,
+        api_key::AbstractString,
+        model::AbstractString,
+        conversation;
+        url::String = "https://api.cerebras.ai/v1",
+        kwargs...)
+    api_key = isempty(CEREBRAS_API_KEY) ? api_key : CEREBRAS_API_KEY
+    OpenAI.create_chat(CustomOpenAISchema(), api_key, model, conversation; url, kwargs...)
+end
 function OpenAI.create_chat(schema::DatabricksOpenAISchema,
         api_key::AbstractString,
         model::AbstractString,
@@ -272,19 +281,20 @@ function OpenAI.create_chat(schema::DatabricksOpenAISchema,
     end
 end
 function OpenAI.create_chat(schema::AzureOpenAISchema,
-    api_key::AbstractString,
-    model::AbstractString,
-    conversation;
-    api_version::String = "2023-03-15-preview",
-    http_kwargs::NamedTuple = NamedTuple(),
-    streamcallback::Any = nothing,
-    url::String = "https://<resource-name>.openai.azure.com",
-    kwargs...)
+        api_key::AbstractString,
+        model::AbstractString,
+        conversation;
+        api_version::String = "2023-03-15-preview",
+        http_kwargs::NamedTuple = NamedTuple(),
+        streamcallback::Any = nothing,
+        url::String = "https://<resource-name>.openai.azure.com",
+        kwargs...)
 
     # Build the corresponding provider object
     provider = OpenAI.AzureProvider(;
         api_key = isempty(AZURE_OPENAI_API_KEY) ? api_key : AZURE_OPENAI_API_KEY,
-        base_url = (isempty(AZURE_OPENAI_HOST) ? url : AZURE_OPENAI_HOST) * "/openai/deployments/$model",
+        base_url = (isempty(AZURE_OPENAI_HOST) ? url : AZURE_OPENAI_HOST) *
+                   "/openai/deployments/$model",
         api_version = api_version
     )
     # Override standard OpenAI request endpoint
@@ -297,7 +307,7 @@ function OpenAI.create_chat(schema::AzureOpenAISchema,
         query = Dict("api-version" => provider.api_version),
         streamcallback = streamcallback,
         kwargs...
-    )  
+    )
 end
 
 # Extend OpenAI create_embeddings to allow for testing
@@ -396,17 +406,18 @@ function OpenAI.create_embeddings(schema::FireworksOpenAISchema,
     OpenAI.create_embeddings(provider, docs, model; kwargs...)
 end
 function OpenAI.create_embeddings(schema::AzureOpenAISchema,
-    api_key::AbstractString,
-    docs,
-    model::AbstractString;
-    api_version::String = "2023-03-15-preview",
-    url::String = "https://<resource-name>.openai.azure.com",
-    kwargs...)
+        api_key::AbstractString,
+        docs,
+        model::AbstractString;
+        api_version::String = "2023-03-15-preview",
+        url::String = "https://<resource-name>.openai.azure.com",
+        kwargs...)
 
     # Build the corresponding provider object
     provider = OpenAI.AzureProvider(;
         api_key = isempty(AZURE_OPENAI_API_KEY) ? api_key : AZURE_OPENAI_API_KEY,
-        base_url = (isempty(AZURE_OPENAI_HOST) ? url : AZURE_OPENAI_HOST) *  "/openai/deployments/$model",
+        base_url = (isempty(AZURE_OPENAI_HOST) ? url : AZURE_OPENAI_HOST) *
+                   "/openai/deployments/$model",
         api_version = api_version)
     # Override standard OpenAI request endpoint
     OpenAI.openai_request(
@@ -851,11 +862,15 @@ const OPENAI_TOKEN_IDS_GPT4O = Dict(
     "38" => 3150,
     "39" => 3255,
     "40" => 1723)
+## Note: You can provide your own token IDs map to `encode_choices` to use a custom mapping via kwarg: token_ids_map
 
-function pick_tokenizer(model::AbstractString)
+function pick_tokenizer(model::AbstractString;
+        token_ids_map::Union{Nothing, Dict{<:AbstractString, <:Integer}} = nothing)
     global OPENAI_TOKEN_IDS_GPT35_GPT4, OPENAI_TOKEN_IDS_GPT4O
-    OPENAI_TOKEN_IDS = if model == "gpt-4" || startswith(model, "gpt-3.5") ||
-                          startswith(model, "gpt-4-")
+    OPENAI_TOKEN_IDS = if !isnothing(token_ids_map)
+        token_ids_map
+    elseif (model == "gpt-4" || startswith(model, "gpt-3.5") ||
+            startswith(model, "gpt-4-"))
         OPENAI_TOKEN_IDS_GPT35_GPT4
     elseif startswith(model, "gpt-4o")
         OPENAI_TOKEN_IDS_GPT4O
@@ -866,10 +881,15 @@ function pick_tokenizer(model::AbstractString)
 end
 
 """
-    encode_choices(schema::OpenAISchema, choices::AbstractVector{<:AbstractString}; kwargs...)
+    encode_choices(schema::OpenAISchema, choices::AbstractVector{<:AbstractString};
+        model::AbstractString,
+        token_ids_map::Union{Nothing, Dict{<:AbstractString, <:Integer}} = nothing,
+        kwargs...)
 
     encode_choices(schema::OpenAISchema, choices::AbstractVector{T};
-    kwargs...) where {T <: Tuple{<:AbstractString, <:AbstractString}}
+        model::AbstractString,
+        token_ids_map::Union{Nothing, Dict{<:AbstractString, <:Integer}} = nothing,
+        kwargs...) where {T <: Tuple{<:AbstractString, <:AbstractString}}
 
 Encode the choices into an enumerated list that can be interpolated into the prompt and creates the corresponding logit biases (to choose only from the selected tokens).
 
@@ -880,6 +900,8 @@ There can be at most 40 choices provided.
 # Arguments
 - `schema::OpenAISchema`: The OpenAISchema object.
 - `choices::AbstractVector{<:Union{AbstractString,Tuple{<:AbstractString, <:AbstractString}}}`: The choices to be encoded, represented as a vector of the choices directly, or tuples where each tuple contains a choice and its description.
+- `model::AbstractString`: The model to use for encoding. Can be an alias corresponding to a model ID defined in `MODEL_ALIASES`.
+- `token_ids_map::Union{Nothing, Dict{<:AbstractString, <:Integer}} = nothing`: A dictionary mapping custom token IDs to their corresponding integer values. If `nothing`, it will use the default token IDs for the given model.
 - `kwargs...`: Additional keyword arguments.
 
 # Returns
@@ -908,8 +930,9 @@ logit_bias # Output: Dict(16 => 100, 17 => 100, 18 => 100)
 function encode_choices(schema::OpenAISchema,
         choices::AbstractVector{<:AbstractString};
         model::AbstractString,
+        token_ids_map::Union{Nothing, Dict{<:AbstractString, <:Integer}} = nothing,
         kwargs...)
-    OPENAI_TOKEN_IDS = pick_tokenizer(model)
+    OPENAI_TOKEN_IDS = pick_tokenizer(model; token_ids_map)
     ## if all choices are in the dictionary, use the dictionary
     if all(Base.Fix1(haskey, OPENAI_TOKEN_IDS), choices)
         choices_prompt = ["$c for \"$c\"" for c in choices]
@@ -927,8 +950,9 @@ end
 function encode_choices(schema::OpenAISchema,
         choices::AbstractVector{T};
         model::AbstractString,
+        token_ids_map::Union{Nothing, Dict{<:AbstractString, <:Integer}} = nothing,
         kwargs...) where {T <: Tuple{<:AbstractString, <:AbstractString}}
-    OPENAI_TOKEN_IDS = pick_tokenizer(model)
+    OPENAI_TOKEN_IDS = pick_tokenizer(model; token_ids_map)
     ## if all choices are in the dictionary, use the dictionary
     if all(Base.Fix1(haskey, OPENAI_TOKEN_IDS), first.(choices))
         choices_prompt = ["$c for \"$desc\"" for (c, desc) in choices]
@@ -958,6 +982,7 @@ end
 
 function decode_choices(schema::OpenAISchema, choices, conv::AbstractVector;
         model::AbstractString,
+        token_ids_map::Union{Nothing, Dict{<:AbstractString, <:Integer}} = nothing,
         kwargs...)
     if length(conv) > 0 && last(conv) isa AIMessage && hasproperty(last(conv), :run_id)
         ## if it is a multi-sample response, 
@@ -966,7 +991,7 @@ function decode_choices(schema::OpenAISchema, choices, conv::AbstractVector;
         for i in eachindex(conv)
             msg = conv[i]
             if isaimessage(msg) && msg.run_id == run_id
-                conv[i] = decode_choices(schema, choices, msg; model)
+                conv[i] = decode_choices(schema, choices, msg; model, token_ids_map)
             end
         end
     end
@@ -976,7 +1001,9 @@ end
 """
     decode_choices(schema::OpenAISchema,
         choices::AbstractVector{<:AbstractString},
-        msg::AIMessage; model::AbstractString, kwargs...)
+        msg::AIMessage; model::AbstractString,
+        token_ids_map::Union{Nothing, Dict{<:AbstractString, <:Integer}} = nothing,
+        kwargs...)
 
 Decodes the underlying AIMessage against the original choices to lookup what the category name was.
 
@@ -984,8 +1011,10 @@ If it fails, it will return `msg.content == nothing`
 """
 function decode_choices(schema::OpenAISchema,
         choices::AbstractVector{<:AbstractString},
-        msg::AIMessage; model::AbstractString, kwargs...)
-    OPENAI_TOKEN_IDS = pick_tokenizer(model)
+        msg::AIMessage; model::AbstractString,
+        token_ids_map::Union{Nothing, Dict{<:AbstractString, <:Integer}} = nothing,
+        kwargs...)
+    OPENAI_TOKEN_IDS = pick_tokenizer(model; token_ids_map)
     parsed_digit = tryparse(Int, strip(msg.content))
     if !isnothing(parsed_digit) && haskey(OPENAI_TOKEN_IDS, strip(msg.content))
         ## It's encoded
@@ -1006,6 +1035,7 @@ end
         choices::AbstractVector{T} = ["true", "false", "unknown"],
         model::AbstractString = MODEL_CHAT,
         api_kwargs::NamedTuple = NamedTuple(),
+        token_ids_map::Union{Nothing, Dict{<:AbstractString, <:Integer}} = nothing,
         kwargs...) where {T <: Union{AbstractString, Tuple{<:AbstractString, <:AbstractString}}}
 
 Classifies the given prompt/statement into an arbitrary list of `choices`, which must be only the choices (vector of strings) or choices and descriptions are provided (vector of tuples, ie, `("choice","description")`).
@@ -1025,6 +1055,7 @@ It uses Logit bias trick and limits the output to 1 token to force the model to 
 - `choices::AbstractVector{T}`: The choices to be classified into. It can be a vector of strings or a vector of tuples, where the first element is the choice and the second is the description.
 - `model::AbstractString = MODEL_CHAT`: The model to use for classification. Can be an alias corresponding to a model ID defined in `MODEL_ALIASES`.
 - `api_kwargs::NamedTuple = NamedTuple()`: Additional keyword arguments for the API call.
+- `token_ids_map::Union{Nothing, Dict{<:AbstractString, <:Integer}} = nothing`: A dictionary mapping custom token IDs to their corresponding integer values. If `nothing`, it will use the default token IDs for the given model.
 - `kwargs`: Additional keyword arguments for the prompt template.
 
 # Example
@@ -1085,12 +1116,13 @@ function aiclassify(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_
         choices::AbstractVector{T} = ["true", "false", "unknown"],
         model::AbstractString = MODEL_CHAT,
         api_kwargs::NamedTuple = NamedTuple(),
+        token_ids_map::Union{Nothing, Dict{<:AbstractString, <:Integer}} = nothing,
         kwargs...) where {T <:
                           Union{AbstractString, Tuple{<:AbstractString, <:AbstractString}}}
     ## Encode the choices and the corresponding prompt 
     model_id = get(MODEL_ALIASES, model, model)
     choices_prompt, logit_bias, decode_ids = encode_choices(
-        prompt_schema, choices; model = model_id)
+        prompt_schema, choices; model = model_id, token_ids_map)
     ## We want only 1 token
     api_kwargs = merge(api_kwargs, (; logit_bias, max_tokens = 1, temperature = 0))
     msg_or_conv = aigenerate(prompt_schema,
@@ -1099,7 +1131,8 @@ function aiclassify(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_
         model = model_id,
         api_kwargs,
         kwargs...)
-    return decode_choices(prompt_schema, decode_ids, msg_or_conv; model = model_id)
+    return decode_choices(
+        prompt_schema, decode_ids, msg_or_conv; model = model_id, token_ids_map)
 end
 
 function response_to_message(schema::AbstractOpenAISchema,
