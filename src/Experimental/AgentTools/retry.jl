@@ -4,9 +4,11 @@
         verbose::Bool = true, throw::Bool = false, evaluate_all::Bool = true, feedback_expensive::Bool = false,
         max_retries::Union{Nothing, Int} = nothing, retry_delay::Union{Nothing, Int} = nothing)
 
-Evaluates the condition `f_cond` on the `aicall` object. 
+Evaluates the condition `f_cond` on the `aicall` object.
 If the condition is not met, it will return the best sample to retry from and provide `feedback` (string or function) to `aicall`. That's why it's mutating.
 It will retry maximum `max_retries` times, with `throw=true`, an error will be thrown if the condition is not met after `max_retries` retries.
+
+Note: `aicall` must be run first via `run!(aicall)` before calling `airetry!`.
 
 Function signatures
 - `f_cond(aicall::AICallBlock) -> Bool`, ie, it must accept the aicall object and return a boolean value.
@@ -286,6 +288,9 @@ function airetry!(f_cond::Function, aicall::AICallBlock,
     (; config) = aicall
     (; max_calls, feedback_inplace, feedback_template) = aicall.config
 
+    ## Validate that the aicall has been run first
+    @assert aicall.success isa Bool "Provided `aicall` has not been run yet. Use `run!(aicall)` first, before calling `airetry!` to check the condition."
+
     max_retries = max_retries isa Nothing ? config.max_retries : max_retries
     retry_delay = retry_delay isa Nothing ? config.retry_delay : retry_delay
     verbose = min(verbose, get(aicall.kwargs, :verbose, 99))
@@ -505,8 +510,12 @@ conversation[end].content ==
 function add_feedback!(conversation::AbstractVector{<:PT.AbstractMessage},
         sample::SampleNode; feedback_inplace::Bool = false,
         feedback_template::Symbol = :FeedbackFromEvaluator)
-    ##
-    all_feedback = collect_all_feedback(sample)
+    ## If you use in-place feedback, collect all feedback from ancestors (because you won't see the history otherwise)
+    all_feedback = if feedback_inplace
+        collect_all_feedback(sample)
+    else
+        sample.feedback
+    end
     ## short circuit if no feedback
     if strip(all_feedback) == ""
         return conversation
