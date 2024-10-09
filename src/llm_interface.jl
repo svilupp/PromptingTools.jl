@@ -233,6 +233,20 @@ Requires one environment variable to be set:
 """
 struct OpenRouterOpenAISchema <: AbstractOpenAISchema end
 
+"""
+    CerebrasOpenAISchema
+
+Schema to call the [Cerebras](https://cerebras.ai/) API.
+
+Links:
+- [Get your API key](https://cloud.cerebras.ai)
+- [API Reference](https://inference-docs.cerebras.ai/api-reference/chat-completions)
+
+Requires one environment variable to be set:
+- `CEREBRAS_API_KEY`: Your API key
+"""
+struct CerebrasOpenAISchema <: AbstractOpenAISchema end
+
 abstract type AbstractOllamaSchema <: AbstractPromptSchema end
 
 """

@@ -24,6 +24,7 @@ Check your preferences by calling `get_preferences(key::String)`.
 - `GROQ_API_KEY`: The API key for the Groq API. Free in beta! Get yours from [here](https://console.groq.com/keys).
 - `DEEPSEEK_API_KEY`: The API key for the DeepSeek API. Get \$5 credit when you join. Get yours from [here](https://platform.deepseek.com/api_keys).
 - `OPENROUTER_API_KEY`: The API key for the OpenRouter API. Get yours from [here](https://openrouter.ai/keys).
+- `CEREBRAS_API_KEY`: The API key for the Cerebras API. Get yours from [here](https://cloud.cerebras.ai/).
 - `MODEL_CHAT`: The default model to use for aigenerate and most ai* calls. See `MODEL_REGISTRY` for a list of available models or define your own.
 - `MODEL_EMBEDDING`: The default model to use for aiembed (embedding documents). See `MODEL_REGISTRY` for a list of available models or define your own.
 - `PROMPT_SCHEMA`: The default prompt schema to use for aigenerate and most ai* calls (if not specified in `MODEL_REGISTRY`). Set as a string, eg, `"OpenAISchema"`.
@@ -55,6 +56,7 @@ Define your `register_model!()` calls in your `startup.jl` file to make them ava
 - `GROQ_API_KEY`: The API key for the Groq API. Free in beta! Get yours from [here](https://console.groq.com/keys).
 - `DEEPSEEK_API_KEY`: The API key for the DeepSeek API. Get \$5 credit when you join. Get yours from [here](https://platform.deepseek.com/api_keys).
 - `OPENROUTER_API_KEY`: The API key for the OpenRouter API. Get yours from [here](https://openrouter.ai/keys).
+- `CEREBRAS_API_KEY`: The API key for the Cerebras API.
 - `LOG_DIR`: The directory to save the logs to, eg, when using `SaverSchema <: AbstractTracerSchema`. Defaults to `joinpath(pwd(), "log")`. Refer to `?SaverSchema` for more information on how it works and examples.
 
 Preferences.jl takes priority over ENV variables, so if you set a preference, it will take precedence over the ENV variable.
@@ -78,6 +80,7 @@ const ALLOWED_PREFERENCES = ["MISTRALAI_API_KEY",
     "GROQ_API_KEY",
     "DEEPSEEK_API_KEY",
     "OPENROUTER_API_KEY",  # Added OPENROUTER_API_KEY
+    "CEREBRAS_API_KEY",
     "MODEL_CHAT",
     "MODEL_EMBEDDING",
     "MODEL_ALIASES",
@@ -159,6 +162,7 @@ global VOYAGE_API_KEY::String = ""
 global GROQ_API_KEY::String = ""
 global DEEPSEEK_API_KEY::String = ""
 global OPENROUTER_API_KEY::String = ""
+global CEREBRAS_API_KEY::String = ""
 global LOCAL_SERVER::String = ""
 global LOG_DIR::String = ""
 
@@ -216,6 +220,9 @@ function load_api_keys!()
     global OPENROUTER_API_KEY  # Added OPENROUTER_API_KEY
     OPENROUTER_API_KEY = @load_preference("OPENROUTER_API_KEY",
         default=get(ENV, "OPENROUTER_API_KEY", ""))
+    global CEREBRAS_API_KEY
+    CEREBRAS_API_KEY = @load_preference("CEREBRAS_API_KEY",
+        default=get(ENV, "CEREBRAS_API_KEY", ""))
     global LOCAL_SERVER
     LOCAL_SERVER = @load_preference("LOCAL_SERVER",
         default=get(ENV, "LOCAL_SERVER", ""))
@@ -410,6 +417,11 @@ aliases = merge(
         "gll" => "llama-3.1-405b-reasoning", #l for large
         "gmixtral" => "mixtral-8x7b-32768",
         "ggemma9" => "gemma2-9b-it",
+        ## Cerebras
+        "cl3" => "llama3.1-8b",
+        "cllama3" => "llama3.1-8b",
+        "cl70" => "llama3.1-70b",
+        "cllama70" => "llama3.1-70b",
         ## DeepSeek
         "dschat" => "deepseek-chat",
         "dscode" => "deepseek-coder",
@@ -885,7 +897,17 @@ registry = Dict{String, ModelSpec}(
         OpenRouterOpenAISchema(),
         2e-6,
         2e-6,
-        "Meta's Llama3.1 405b, hosted by OpenRouter. This is a BASE model!! Max output 32K tokens, 131K context. See details [here](https://openrouter.ai/models/meta-llama/llama-3.1-405b)")
+        "Meta's Llama3.1 405b, hosted by OpenRouter. This is a BASE model!! Max output 32K tokens, 131K context. See details [here](https://openrouter.ai/models/meta-llama/llama-3.1-405b)"),
+    "llama3.1-8b" => ModelSpec("llama3.1-8b",
+        CerebrasOpenAISchema(),
+        1e-7,
+        1e-7,
+        "Meta's Llama3.1 8b, hosted by Cerebras.ai. Max 8K context."),
+    "llama3.1-70b" => ModelSpec("llama3.1-70b",
+        CerebrasOpenAISchema(),
+        6e-7,
+        6e-7,
+        "Meta's Llama3.1 70b, hosted by Cerebras.ai. Max 8K context.")
 )
 
 """

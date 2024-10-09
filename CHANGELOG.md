@@ -10,6 +10,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.58.0]
+
+### Added
+- Added support for [Cerebras](https://cloud.cerebras.ai) hosted models (set your ENV `CEREBRAS_API_KEY`). Available model aliases: `cl3` (Llama3.1 8bn), `cl70` (Llama3.1 70bn).
+- Added a kwarg to `aiclassify` to provide a custom token ID mapping (`token_ids_map`) to work with custom tokenizers.
+
+### Updated
+- Improved the implementation of `airetry!` to concatenate feedback from all ancestor nodes ONLY IF `feedback_inplace=true` (because otherwise LLM can see it in the message history).
+
+### Fixed
+- Fixed a potential bug in `airetry!` where the `aicall` object was not properly validated to ensure it has been `run!` first.
+
 ## [0.57.0]
 
 ### Added
