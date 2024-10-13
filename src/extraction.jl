@@ -245,7 +245,7 @@ end
 """
     function_call_signature(
         datastructtype::Type; strict::Union{Nothing, Bool} = nothing,
-        max_description_length::Int = 200)
+        max_description_length::Int = 200, name::Union{Nothing, String} = nothing)
 
 Extract the argument names, types and docstrings from a struct to create the function call signature in JSON schema.
 
@@ -315,12 +315,15 @@ That way, you can handle the error gracefully and get a reason why extraction fa
 """
 function function_call_signature(
         datastructtype::Type; strict::Union{Nothing, Bool} = nothing,
-        max_description_length::Int = 200)
+        max_description_length::Int = 200, name::Union{Nothing, String} = nothing)
     !isstructtype(datastructtype) &&
         error("Only Structs are supported (provided type: $datastructtype")
     ## Standardize the name
-    name = string(datastructtype, "_extractor") |>
-           x -> replace(x, r"[^0-9A-Za-z_-]" => "") |> x -> first(x, 64)
+    name = if isnothing(name)
+        replace(string(datastructtype), r"[^0-9A-Za-z_-]" => "") |> x -> first(x, 64)
+    else
+        name
+    end
     schema = Dict{String, Any}("name" => name,
         "parameters" => to_json_schema(datastructtype; max_description_length))
     ## docstrings
@@ -340,7 +343,20 @@ function function_call_signature(
             set_properties_strict!(schema["parameters"])
         end
     end
-    return schema, datastructtype
+    return [schema], Dict(schema["name"] => datastructtype)
+end
+
+function function_call_signature(types::Vector{<:Type}; kwargs...)
+    schemas = []
+    type_map = Dict{String, Type}()
+    for datatype in types
+        schema, datatype_map = function_call_signature(datatype; kwargs...)
+        name = only(schema)["name"]
+        @assert !haskey(type_map, name) "Duplicate tool name: $name. Please provide unique names for each tool."
+        append!(schemas, schema)
+        merge!(type_map, datatype_map)
+    end
+    return schemas, type_map
 end
 
 """
@@ -381,13 +397,13 @@ function function_call_signature(fields::Vector;
     datastructtype, descriptions = generate_struct(fields)
 
     # Create the schema
-    schema, _ = function_call_signature(
+    schemas, _ = function_call_signature(
         datastructtype; strict, max_description_length)
 
     # Update the schema with descriptions
     update_schema_descriptions!(schema, descriptions; max_description_length)
 
-    return schema, datastructtype
+    return schemas, Dict(only(schemas)["name"] => datastructtype)
 end
 
 ######################

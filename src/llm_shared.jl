@@ -6,6 +6,7 @@ role4render(schema::AbstractPromptSchema, msg::SystemMessage) = "system"
 role4render(schema::AbstractPromptSchema, msg::UserMessage) = "user"
 role4render(schema::AbstractPromptSchema, msg::UserMessageWithImages) = "user"
 role4render(schema::AbstractPromptSchema, msg::AIMessage) = "assistant"
+role4render(schema::AbstractPromptSchema, msg::ToolMessage) = "tool"
 
 """
     render(schema::NoSchema,
@@ -40,7 +41,7 @@ function render(schema::NoSchema,
 
     # replace any handlebar variables in the messages
     for msg in messages
-        if msg isa Union{SystemMessage, UserMessage, UserMessageWithImages}
+        if issystemmessage(msg) || isusermessage(msg) || isusermessagewithimages(msg)
             replacements = ["{{$(key)}}" => value
                             for (key, value) in pairs(replacement_kwargs)
                             if key in msg.variables]
@@ -51,14 +52,14 @@ function render(schema::NoSchema,
                 # unpack the type to replace only the content field
                 [(field, getfield(msg, field)) for field in fieldnames(typeof(msg))]...,
                 content = replace(msg.content, replacements...))
-            if msg isa SystemMessage
+            if issystemmessage(msg)
                 count_system_msg += 1
                 # move to the front
                 pushfirst!(conversation, new_msg)
             else
                 push!(conversation, new_msg)
             end
-        elseif msg isa AIMessage
+        elseif isaimessage(msg)
             # no replacements
             push!(conversation, msg)
         elseif istracermessage(msg) && issystemmessage(msg.object)

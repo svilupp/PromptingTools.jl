@@ -129,6 +129,12 @@ Base.@kwdef struct DataMessage{T <: Any} <: AbstractDataMessage
     _type::Symbol = :datamessage
 end
 
+Base.@kwdef struct ToolMessage{T <: AbstractString} <: AbstractChatMessage
+    content::T
+    tool_call_id::String
+    _type::Symbol = :toolmessage
+end
+
 ### Other Message methods
 # content-only constructor
 function (MSG::Type{<:AbstractChatMessage})(prompt::AbstractString)
@@ -143,14 +149,18 @@ end
 
 ## It checks types so it should be defined for all inputs
 isusermessage(m::Any) = m isa UserMessage
+isusermessagewithimages(m::Any) = m isa UserMessageWithImages
 issystemmessage(m::Any) = m isa SystemMessage
 isdatamessage(m::Any) = m isa DataMessage
 isaimessage(m::Any) = m isa AIMessage
+istoolmessage(m::Any) = m isa ToolMessage
 istracermessage(m::Any) = m isa AbstractTracerMessage
 isusermessage(m::AbstractTracerMessage) = isusermessage(m.object)
+isusermessagewithimages(m::AbstractTracerMessage) = isusermessagewithimages(m.object)
 issystemmessage(m::AbstractTracerMessage) = issystemmessage(m.object)
 isdatamessage(m::AbstractTracerMessage) = isdatamessage(m.object)
 isaimessage(m::AbstractTracerMessage) = isaimessage(m.object)
+istoolmessage(m::AbstractTracerMessage) = istoolmessage(m.object)
 
 # equality check for testing, only equal if all fields are equal and type is the same
 Base.var"=="(m1::AbstractMessage, m2::AbstractMessage) = false
@@ -451,7 +461,8 @@ function StructTypes.subtypes(::Type{AbstractChatMessage})
         usermessagewithimages = UserMessageWithImages,
         aimessage = AIMessage,
         systemmessage = SystemMessage,
-        metadatamessage = MetadataMessage)
+        metadatamessage = MetadataMessage,
+        toolmessage = ToolMessage)
 end
 
 StructTypes.StructType(::Type{AbstractTracerMessage}) = StructTypes.AbstractType()
@@ -470,6 +481,7 @@ StructTypes.StructType(::Type{MetadataMessage}) = StructTypes.Struct()
 StructTypes.StructType(::Type{SystemMessage}) = StructTypes.Struct()
 StructTypes.StructType(::Type{UserMessage}) = StructTypes.Struct()
 StructTypes.StructType(::Type{UserMessageWithImages}) = StructTypes.Struct()
+StructTypes.StructType(::Type{ToolMessage}) = StructTypes.Struct()
 StructTypes.StructType(::Type{AIMessage}) = StructTypes.Struct()
 StructTypes.StructType(::Type{DataMessage}) = StructTypes.Struct()
 StructTypes.StructType(::Type{TracerMessage}) = StructTypes.Struct() # Ignore mutability once we serialize
@@ -493,6 +505,8 @@ function pprint(io::IO, msg::AbstractMessage; text_width::Int = displaysize(io)[
         "System Message"
     elseif msg isa AIMessage
         "AI Message"
+    elseif msg isa ToolMessage
+        "Tool Message"
     else
         "Unknown Message"
     end
