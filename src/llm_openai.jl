@@ -1161,18 +1161,40 @@ function response_to_message(schema::AbstractOpenAISchema,
     tokens_completion = get(resp.response, :usage, Dict(:completion_tokens => 0))[:completion_tokens]
     cost = call_cost(tokens_prompt, tokens_completion, model_id)
     # "Safe" parsing of the response - it still fails if JSON is invalid
-    args = if json_mode == true
-        choice[:message][:content]
+    is_single_tool = json_mode == true || (haskey(choice[:message], :tool_calls) &&
+                      length(choice[:message][:tool_calls]) == 1)
+    if is_single_tool
+        args, datatype = if json_mode == true
+            choice[:message][:content], only(values(return_type))
+        elseif length(choice[:message][:tool_calls]) == 1
+            name = choice[:message][:tool_calls][1][:function][:name]
+            args = choice[:message][:tool_calls][1][:function][:arguments]
+            args, return_type[name]
+        end
+        content = try
+            ## Must invoke latest because we might have generated the struct
+            Base.invokelatest(JSON3.read, args, datatype)::datatype
+        catch e
+            @warn "There was an error parsing the response: $e. Using the raw response instead."
+            JSON3.read(args) |> copy
+        end
     else
-        choice[:message][:tool_calls][1][:function][:arguments]
+        @warn "Number of tools: $(length(choice[:message][:tool_calls]))"
+        content = []
+        for tool_call in choice[:message][:tool_calls]
+            args = tool_call[:function][:arguments]
+            datatype = type_map[tool_call[:function][:name]]
+            content_ = try
+                ## Must invoke latest because we might have generated the struct
+                Base.invokelatest(JSON3.read, args, datatype)::datatype
+            catch e
+                @warn "There was an error parsing the response: $e. Using the raw response instead."
+                JSON3.read(args) |> copy
+            end
+            push!(content, content_)
+        end
     end
-    content = try
-        ## Must invoke latest because we might have generated the struct
-        Base.invokelatest(JSON3.read, args, return_type)::return_type
-    catch e
-        @warn "There was an error parsing the response: $e. Using the raw response instead."
-        JSON3.read(args) |> copy
-    end
+
     ## build DataMessage object
     msg = MSG(;
         content = content,
@@ -1385,11 +1407,11 @@ function aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_T
     ## Function calling specifics
     ## Set strict mode on for JSON mode
     strict_ = json_mode == true ? true : strict
-    schema, datastructtype = function_call_signature(return_type; strict = strict_)
+    schemas, type_map = function_call_signature(return_type; strict = strict_)
     tools = [Dict(
-        :type => "function", :function => schema)]
+                 :type => "function", :function => schema) for schema in schemas]
     ## force our function to be used
-    tool_choice_ = get(api_kwargs, :tool_choice, "exact")
+    tool_choice_ = length(tools) == 1 ? get(api_kwargs, :tool_choice, "exact") : "auto"
     tool_choice = if tool_choice_ == "exact"
         ## Standard for OpenAI API
         Dict(:type => "function",
@@ -1424,7 +1446,7 @@ function aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_T
             run_id = Int(rand(Int32)) # remember one run ID
             ## extract all message
             msgs = [response_to_message(prompt_schema, DataMessage, choice, r;
-                        return_type = datastructtype, time, model_id, run_id, sample_id = i, json_mode)
+                        return_type = type_map, time, model_id, run_id, sample_id = i, json_mode)
                     for (i, choice) in enumerate(r.response[:choices])]
             ## Order by log probability if available
             ## bigger is better, keep it last
@@ -1437,7 +1459,7 @@ function aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_T
             ## only 1 sample / 1 completion
             choice = r.response[:choices][begin]
             response_to_message(prompt_schema, DataMessage, choice, r;
-                return_type = datastructtype, time, model_id, json_mode)
+                return_type = type_map, time, model_id, json_mode)
         end
         ## Reporting
         verbose && @info _report_stats(msg, model_id)

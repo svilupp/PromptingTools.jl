@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.59.0-DEV]
+
+### Added
+- Extends support for structured extraction with multiple "tools" definitions (see `?aiextract`).
+
 ## [0.58.0]
 
 ### Added
