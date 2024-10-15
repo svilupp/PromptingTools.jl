@@ -40,7 +40,7 @@ const RESERVED_KWARGS = [
 # export pprint
 include("utils.jl")
 
-export aigenerate, aiembed, aiclassify, aiextract, aiscan, aiimage
+export aigenerate, aiembed, aiclassify, aiextract, aitools, aiscan, aiimage
 # export render # for debugging only
 include("llm_interface.jl")
 

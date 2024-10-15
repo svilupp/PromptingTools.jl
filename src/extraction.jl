@@ -6,6 +6,48 @@
 # There are potential formats: 1) JSON-based for OpenAI compatible APIs, 2) XML-based for Anthropic compatible APIs (used also by Hermes-2-Pro model). 
 #
 
+#### Core Types
+# Alias for backwards compatibility
+function tool_call_signature end
+const function_call_signature = tool_call_signature
+
+"""
+    AbstractTool
+
+Abstract type for all tool types.
+
+Required fields:
+- `name::String`: The name of the tool.
+- `parameters::Dict`: The parameters of the tool.
+- `description::Union{String, Nothing}`: The description of the tool.
+- `callable::Any`: The callable object of the tool, eg, a type or a function.
+"""
+abstract type AbstractTool end
+isabstracttool(x) = x isa AbstractTool
+
+"""
+    Tool
+
+A tool that can be sent to an LLM for execution ("function calling").
+
+# Arguments
+- `name::String`: The name of the tool.
+- `parameters::Dict`: The parameters of the tool.
+- `description::Union{String, Nothing}`: The description of the tool.
+- `strict::Union{Bool, Nothing}`: Whether to enforce strict mode for the tool.
+- `callable::Any`: The callable object of the tool, eg, a type or a function.
+
+See also: [`AbstractTool`](@ref), [`tool_call_signature`](@ref)
+"""
+Base.@kwdef struct Tool <: AbstractTool
+    name::String
+    parameters::Dict = Dict()
+    description::Union{String, Nothing} = nothing
+    strict::Union{Bool, Nothing} = nothing
+    callable::Any
+end
+Base.show(io::IO, t::AbstractTool) = dump(io, t; maxdepth = 1)
+
 ######################
 # 1) OpenAI / JSON format
 ######################
@@ -38,16 +80,48 @@ function remove_null_types(T::Type)
     T isa Union ? Union{filter(!has_null_type, Base.uniontypes(T))...} : T
 end
 
-function extract_docstring(type::Type; max_description_length::Int = 100)
+### Experimental Support for methods/functions
+function get_method(f::Function)
+    @assert length(methods(f))==1 "Function must have only one method for automatic signature generation"
+    return only(methods(f))
+end
+function get_function(m::Method)
+    return getfield(parentmodule(m), m.name)
+end
+"Get the argument names from a method, ignores keyword arguments!!"
+function get_arg_names(method::Method)
+    names_ = Base.method_argnames(method)
+    if length(names_) == 1
+        return Symbol[]
+    else
+        return names_[2:end]
+    end
+end
+"Get the argument types from a method, ignores keyword arguments!!"
+function get_arg_types(method::Method)
+    return [t for t in method.sig.parameters[2:end]]   # Skip first type (typeof(f))
+end
+"Get the argument names from a function, ignores keyword arguments!!"
+get_arg_names(f::Function) = get_arg_names(get_method(f))
+"Get the argument types from a function, ignores keyword arguments!!"
+get_arg_types(f::Function) = get_arg_types(get_method(f))
+
+"Extract the docstring from a type or function."
+function extract_docstring(
+        type::Union{Type, Function}; max_description_length::Int = 100)
     ## plain struct has supertype Any
     ## we ignore the ones that are subtypes for now (to prevent picking up Dicts, etc.)
-    if supertype(type) == Any
+    if (type isa Type && (supertype(type) == Any)) || (type isa Function)
         docs = Docs.doc(type) |> string
         if !occursin("No documentation found.\n\n", docs)
             return first(docs, max_description_length)
         end
     end
     return ""
+end
+function extract_docstring(m::Method; max_description_length::Int = 100)
+    ## Recover the method's originalfunction
+    return extract_docstring(get_function(m); max_description_length)
 end
 
 function to_json_schema(orig_type; max_description_length::Int = 100)
@@ -88,6 +162,31 @@ function to_json_schema(type::Type{<:Enum}; max_description_length::Int = 100)
     enum_options = Base.Enums.namemap(type) |> values .|> string
     return Dict{String, Any}("type" => "string",
         "enum" => enum_options)
+end
+## Dispatch for method of a function -- grabs only arguments!! Not kwargs!!
+function to_json_schema(m::Method; max_description_length::Int = 100)
+    ## Warning: We cannot extract keyword arguments from the method signature
+    kwargs = Base.kwarg_decl(m)
+    !isempty(kwargs) &&
+        @warn "Detected keyword arguments in $(m.name): $("\"".*join(kwargs, ", ").*"\""). They are not supported in tool encoding and will be ignored."
+
+    schema = Dict{String, Any}()
+    schema["type"] = "object"
+    schema["properties"] = Dict{String, Any}()
+    ## extract the field names and types
+    required_types = String[]
+    for (field_name, field_type) in zip(get_arg_names(m), get_arg_types(m))
+        schema["properties"][string(field_name)] = to_json_schema(
+            remove_null_types(field_type);
+            max_description_length)
+        ## Hack: no null type (Nothing, Missing) implies it it is a required field
+        is_required_field(field_type) && push!(required_types, string(field_name))
+    end
+    !isempty(required_types) && (schema["required"] = required_types)
+    ## docstrings
+    docs = extract_docstring(m; max_description_length)
+    !isempty(docs) && (schema["description"] = docs)
+    return schema
 end
 function to_json_schema(type::Type{<:AbstractDict}; max_description_length::Int = 100)
     throw(ArgumentError("Dicts are not supported yet as we cannot analyze their keys/values on a type-level. Use a nested Struct instead!"))
@@ -150,8 +249,8 @@ function generate_struct(fields::Vector)
 end
 
 """
-    update_schema_descriptions!(
-        schema::Dict{String, <:Any}, descriptions::Dict{Symbol, <:AbstractString};
+    update_field_descriptions!(
+        parameters::Dict{String, <:Any}, descriptions::Dict{Symbol, <:AbstractString};
         max_description_length::Int = 200)
 
 Update the given JSON schema with descriptions from the `descriptions` dictionary.
@@ -163,35 +262,32 @@ Note: It modifies the schema in place. Only the top-level "properties" are updat
 Returns: The modified schema dictionary.
 
 # Arguments
-- `schema`: A dictionary representing the JSON schema to be updated.
+- `parameters`: A dictionary representing the JSON schema to be updated.
 - `descriptions`: A dictionary mapping field names (as symbols) to their descriptions.
 - `max_description_length::Int`: Maximum length for descriptions. Defaults to 200.
 
 # Examples
 ```julia
-    schema = Dict{String, Any}(
-        "name" => "varExtractedData235_extractor",
-        "parameters" => Dict{String, Any}(
-            "properties" => Dict{String, Any}(
-                "location" => Dict{String, Any}("type" => "string"),
-                "condition" => Dict{String, Any}("type" => "string"),
-                "temperature" => Dict{String, Any}("type" => "number")
-            ),
-            "required" => ["location", "temperature", "condition"],
-            "type" => "object"
-        )
+    parameters = Dict{String, Any}(
+        "properties" => Dict{String, Any}(
+            "location" => Dict{String, Any}("type" => "string"),
+            "condition" => Dict{String, Any}("type" => "string"),
+            "temperature" => Dict{String, Any}("type" => "number")
+        ),
+        "required" => ["location", "temperature", "condition"],
+        "type" => "object"
     )
     descriptions = Dict{Symbol, String}(
         :temperature => "Temperature in degrees Fahrenheit",
         :condition => "Current weather condition (e.g., sunny, rainy, cloudy)"
     )
-    update_schema_descriptions!(schema, descriptions)
+    update_field_descriptions!(parameters, descriptions)
 ```
 """
-function update_schema_descriptions!(
-        schema::Dict{String, <:Any}, descriptions::Dict{Symbol, <:AbstractString};
+function update_field_descriptions!(
+        parameters::Dict{String, <:Any}, descriptions::Dict{Symbol, <:AbstractString};
         max_description_length::Int = 200)
-    properties = get(get(schema, "parameters", Dict()), "properties", Dict())
+    properties = get(parameters, "properties", Dict())
 
     for (field, field_schema) in properties
         field_sym = Symbol(field)
@@ -201,7 +297,7 @@ function update_schema_descriptions!(
         end
     end
 
-    return schema
+    return parameters
 end
 
 """
@@ -243,9 +339,10 @@ function set_properties_strict!(parameters::AbstractDict)
 end
 
 """
-    function_call_signature(
+    tool_call_signature(
         datastructtype::Type; strict::Union{Nothing, Bool} = nothing,
-        max_description_length::Int = 200, name::Union{Nothing, String} = nothing)
+        max_description_length::Int = 200, name::Union{Nothing, String} = nothing,
+        docs::Union{Nothing, String} = nothing)
 
 Extract the argument names, types and docstrings from a struct to create the function call signature in JSON schema.
 
@@ -269,7 +366,7 @@ struct MyMeasurement
     height::Union{Int,Nothing}
     weight::Union{Nothing,Float64}
 end
-signature, t = function_call_signature(MyMeasurement)
+signature, t = tool_call_signature(MyMeasurement)
 #
 # Dict{String, Any} with 3 entries:
 #   "name"        => "MyMeasurement_extractor"
@@ -313,21 +410,28 @@ msg = aiextract("Extract measurements from the text: I am giraffe", type)
 ```
 That way, you can handle the error gracefully and get a reason why extraction failed.
 """
-function function_call_signature(
-        datastructtype::Type; strict::Union{Nothing, Bool} = nothing,
-        max_description_length::Int = 200, name::Union{Nothing, String} = nothing)
-    !isstructtype(datastructtype) &&
-        error("Only Structs are supported (provided type: $datastructtype")
+function tool_call_signature(
+        type_or_method::Union{Type, Method}; strict::Union{Nothing, Bool} = nothing,
+        max_description_length::Int = 200, name::Union{Nothing, String} = nothing,
+        docs::Union{Nothing, String} = nothing)
+    ## Asserts
+    if type_or_method isa Type && !isstructtype(type_or_method)
+        error("Only Structs are supported (provided type: $type_or_method)")
+    end
     ## Standardize the name
-    name = if isnothing(name)
-        replace(string(datastructtype), r"[^0-9A-Za-z_-]" => "") |> x -> first(x, 64)
+    name = if isnothing(name) && type_or_method isa Type
+        replace(string(nameof(type_or_method)), "PromptingTools." => "") |>
+        x -> replace(x, r"[^0-9A-Za-z_-]" => "") |> x -> first(x, 64)
+    elseif isnothing(name) && type_or_method isa Method
+        string(type_or_method.name)
     else
         name
     end
     schema = Dict{String, Any}("name" => name,
-        "parameters" => to_json_schema(datastructtype; max_description_length))
+        "parameters" => to_json_schema(type_or_method; max_description_length))
     ## docstrings
-    docs = extract_docstring(datastructtype; max_description_length)
+    docs = isnothing(docs) ? extract_docstring(type_or_method; max_description_length) :
+           docs
     !isempty(docs) && (schema["description"] = docs)
     ## remove duplicated Struct docstring in schema
     if haskey(schema["parameters"], "description") &&
@@ -343,24 +447,51 @@ function function_call_signature(
             set_properties_strict!(schema["parameters"])
         end
     end
-    return [schema], Dict(schema["name"] => datastructtype)
+    call_type = type_or_method isa Type ? type_or_method : get_function(type_or_method)
+    tool = Tool(; name = schema["name"], parameters = schema["parameters"],
+        description = haskey(schema, "description") ? schema["description"] : nothing,
+        strict = haskey(schema, "strict") ? schema["strict"] : nothing,
+        callable = call_type)
+    return Dict(schema["name"] => tool)
 end
 
-function function_call_signature(types::Vector{<:Type}; kwargs...)
-    schemas = []
-    type_map = Dict{String, Type}()
-    for datatype in types
-        schema, datatype_map = function_call_signature(datatype; kwargs...)
-        name = only(schema)["name"]
-        @assert !haskey(type_map, name) "Duplicate tool name: $name. Please provide unique names for each tool."
-        append!(schemas, schema)
-        merge!(type_map, datatype_map)
+## Only thing you can change is the "strict" setting
+function tool_call_signature(
+        tool::AbstractTool; strict::Union{Nothing, Bool} = nothing, kwargs...)
+    if tool.strict != strict
+        tool = Tool(;
+            [k => getfield(tool, k) for k in fieldnames(Tool) if k != :strict]...,
+            strict = strict)
+        if strict == true
+            if haskey(tool.parameters, "properties")
+                set_properties_strict!(tool.parameters)
+            end
+        end
     end
-    return schemas, type_map
+    return Dict(tool.name => tool)
+end
+
+## Add support for function signatures
+function tool_call_signature(f::Function; kwargs...)
+    return tool_call_signature(get_method(f); kwargs...)
+end
+
+function tool_call_signature(
+        tools::Vector{<:T}; kwargs...) where {T <:
+                                              Union{Type, Function, Method, AbstractTool}}
+    tool_map = Dict{String, Tool}()
+    for tool in tools
+        temp_map = tool_call_signature(tool; kwargs...)
+        for (name, tool) in temp_map
+            @assert !haskey(tool_map, name) "Duplicate tool name: $name. Please provide unique names for each tool."
+            tool_map[name] = tool
+        end
+    end
+    return tool_map
 end
 
 """
-    function_call_signature(fields::Vector; strict::Union{Nothing, Bool} = nothing, max_description_length::Int = 200)
+    tool_call_signature(fields::Vector; strict::Union{Nothing, Bool} = nothing, max_description_length::Int = 200)
 
 Generate a function call signature schema for a dynamically generated struct based on the provided fields.
 
@@ -373,37 +504,42 @@ Generate a function call signature schema for a dynamically generated struct bas
 - `Dict{String, Any}`: A dictionary representing the function call signature schema.
 - `Type`: The struct type to create instance of the result.
 
-See also `generate_struct`, `aiextract`, `update_schema_descriptions!`.
+See also `generate_struct`, `aiextract`, `update_field_descriptions!`.
 
 # Examples
 ```julia
-schema, return_type = function_call_signature([:field1, :field2, :field3])
+tool_map = tool_call_signature([:field1, :field2, :field3])
 ```
 
 With the field types:
 ```julia
-schema, return_type = function_call_signature([:field1 => String, :field2 => Int, :field3 => Float64])
+tool_map = tool_call_signature([:field1 => String, :field2 => Int, :field3 => Float64])
 ```
 
 And with the field descriptions:
 ```julia
-schema, return_type = function_call_signature([:field1 => String, :field1__description => "Field 1 has the name"])
+tool_map = tool_call_signature([:field1 => String, :field1__description => "Field 1 has the name"])
 ```
 """
-function function_call_signature(fields::Vector;
-        strict::Union{Nothing, Bool} = nothing, max_description_length::Int = 200)
+function tool_call_signature(fields::Vector;
+        strict::Union{Nothing, Bool} = nothing, max_description_length::Int = 200, name::Union{
+            Nothing, String} = nothing,
+        docs::Union{Nothing, String} = nothing)
     @assert all(x -> x isa Symbol || x isa Pair, fields) "Invalid return types provided. All fields must be either Symbols or Pairs of Symbol and Type or String"
     # Generate the struct and descriptions
     datastructtype, descriptions = generate_struct(fields)
 
     # Create the schema
-    schemas, _ = function_call_signature(
-        datastructtype; strict, max_description_length)
-
+    tool_map = tool_call_signature(
+        datastructtype; strict, max_description_length, name, docs)
+    name, tool = only(tool_map)
     # Update the schema with descriptions
-    update_schema_descriptions!(schema, descriptions; max_description_length)
+    update_field_descriptions!(tool.parameters, descriptions; max_description_length)
+    tool_map[name] = Tool(;
+        [k => getfield(tool, k) for k in fieldnames(Tool) if k != :callable]...,
+        callable = datastructtype)
 
-    return schemas, Dict(only(schemas)["name"] => datastructtype)
+    return tool_map
 end
 
 ######################
@@ -461,4 +597,75 @@ Extract zero, one or more specified items from the provided data.
 """
 struct ItemsExtract{T <: Any}
     items::Vector{T}
+end
+
+### Processing utilities
+
+"""
+    tool_parse(blob::AbstractString, datatype::Type)
+
+Parse the JSON blob into the specified datatype in try-catch mode.
+
+If parsing fails, it tries to return the untyped JSON blob in a dictionary.
+"""
+function parse_tool(blob::AbstractString, datatype::Type)
+    try
+        return if blob == "{}"
+            ## If empty, return empty datatype
+            ## a shortcut for function calls without defining the JSON3 StructType
+            datatype()
+        else
+            Base.invokelatest(JSON3.read, blob, datatype)::datatype
+        end
+    catch e
+        @warn "There was an error parsing the response: $e. Using the raw response instead."
+        return JSON3.read(blob) |> copy
+    end
+end
+
+## Utility for Anthropic - it returns a parsed dict and we need text for deserialization into an object
+function parse_tool(blob::AbstractDict, datatype::Type)
+    isempty(blob) ? datatype() : parse_tool(JSON3.write(blob), datatype)
+end
+
+"""
+    execute_tool(f::Function, args::AbstractDict)
+
+Executes a function with the provided arguments.
+
+Dictionary is un-ordered, so we need to sort the arguments first and then pass them to the function.
+"""
+function execute_tool(f::Function, args::AbstractDict)
+    args_sorted = [args[arg]
+                   for arg in get_arg_names(f) if haskey(args, arg)]
+    return f(args_sorted...)
+end
+function execute_tool(tool::AbstractTool, args::AbstractDict)
+    return execute_tool(tool.callable, args)
+end
+
+"""
+    Tool(callable::Union{Function, Type, Method}; kwargs...)
+
+Create a `Tool` from a callable object (function, type, or method).
+
+# Arguments
+- `callable::Union{Function, Type, Method}`: The callable object to convert to a tool.
+
+# Returns
+- `Tool`: A tool object that can be used for function calling.
+
+# Examples
+```julia
+# Create a tool from a function
+tool = Tool(my_function)
+
+# Create a tool from a type
+tool = Tool(MyStruct)
+```
+"""
+function Tool(callable::Union{Function, Type, Method}; kwargs...)
+    tool_map = tool_call_signature(callable; kwargs...)
+    name, tool = only(tool_map)
+    return tool
 end

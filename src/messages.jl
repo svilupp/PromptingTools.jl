@@ -129,10 +129,29 @@ Base.@kwdef struct DataMessage{T <: Any} <: AbstractDataMessage
     _type::Symbol = :datamessage
 end
 
-Base.@kwdef struct ToolMessage{T <: AbstractString} <: AbstractChatMessage
-    content::T
+Base.@kwdef mutable struct ToolMessage <: AbstractDataMessage
+    content::Any = nothing
+    req_id::Union{Nothing, Int} = nothing
     tool_call_id::String
+    raw::AbstractString
+    args::Union{Nothing, Dict{Symbol, Any}} = nothing
+    name::Union{Nothing, String} = nothing
     _type::Symbol = :toolmessage
+end
+
+Base.@kwdef struct AIToolRequest{T <: Union{AbstractString, Nothing}} <: AbstractDataMessage
+    content::T = nothing
+    tool_calls::Vector{ToolMessage} = ToolMessage[]
+    status::Union{Int, Nothing} = nothing
+    tokens::Tuple{Int, Int} = (-1, -1)
+    elapsed::Float64 = -1.0
+    cost::Union{Nothing, Float64} = nothing
+    log_prob::Union{Nothing, Float64} = nothing
+    extras::Union{Nothing, Dict{Symbol, Any}} = nothing
+    finish_reason::Union{Nothing, String} = nothing
+    run_id::Union{Nothing, Int} = Int(rand(Int16))
+    sample_id::Union{Nothing, Int} = nothing
+    _type::Symbol = :aitoolrequest
 end
 
 ### Other Message methods
@@ -154,6 +173,7 @@ issystemmessage(m::Any) = m isa SystemMessage
 isdatamessage(m::Any) = m isa DataMessage
 isaimessage(m::Any) = m isa AIMessage
 istoolmessage(m::Any) = m isa ToolMessage
+isaitoolrequest(m::Any) = m isa AIToolRequest
 istracermessage(m::Any) = m isa AbstractTracerMessage
 isusermessage(m::AbstractTracerMessage) = isusermessage(m.object)
 isusermessagewithimages(m::AbstractTracerMessage) = isusermessagewithimages(m.object)
@@ -161,6 +181,7 @@ issystemmessage(m::AbstractTracerMessage) = issystemmessage(m.object)
 isdatamessage(m::AbstractTracerMessage) = isdatamessage(m.object)
 isaimessage(m::AbstractTracerMessage) = isaimessage(m.object)
 istoolmessage(m::AbstractTracerMessage) = istoolmessage(m.object)
+isaitoolrequest(m::AbstractTracerMessage) = isaitoolrequest(m.object)
 
 # equality check for testing, only equal if all fields are equal and type is the same
 Base.var"=="(m1::AbstractMessage, m2::AbstractMessage) = false
@@ -414,6 +435,12 @@ function Base.show(io::IO, ::MIME"text/plain", m::AbstractDataMessage)
         # for any non-types extraction messages
     elseif m.content isa Dict{Symbol, <:Any}
         print(io, "(Dict with keys: ", join(keys(m.content), ", "), ")")
+    elseif isaitoolrequest(m)
+        content_str = m.content isa AbstractString ? m.content : "-"
+        print(io, "(\"", content_str, "\"; Tool Requests: ", length(m.tool_calls), ")")
+    elseif istoolmessage(m)
+        content_str = m.content isa AbstractString ? m.content : "-"
+        print(io, "(\"", content_str, "\")")
     else
         print(io, "(", typeof(m.content), ")")
     end
@@ -462,7 +489,8 @@ function StructTypes.subtypes(::Type{AbstractChatMessage})
         aimessage = AIMessage,
         systemmessage = SystemMessage,
         metadatamessage = MetadataMessage,
-        toolmessage = ToolMessage)
+        toolmessage = ToolMessage,
+        aitoolrequest = AIToolRequest)
 end
 
 StructTypes.StructType(::Type{AbstractTracerMessage}) = StructTypes.AbstractType()
@@ -482,6 +510,7 @@ StructTypes.StructType(::Type{SystemMessage}) = StructTypes.Struct()
 StructTypes.StructType(::Type{UserMessage}) = StructTypes.Struct()
 StructTypes.StructType(::Type{UserMessageWithImages}) = StructTypes.Struct()
 StructTypes.StructType(::Type{ToolMessage}) = StructTypes.Struct()
+StructTypes.StructType(::Type{AIToolRequest}) = StructTypes.Struct()
 StructTypes.StructType(::Type{AIMessage}) = StructTypes.Struct()
 StructTypes.StructType(::Type{DataMessage}) = StructTypes.Struct()
 StructTypes.StructType(::Type{TracerMessage}) = StructTypes.Struct() # Ignore mutability once we serialize
@@ -505,6 +534,8 @@ function pprint(io::IO, msg::AbstractMessage; text_width::Int = displaysize(io)[
         "System Message"
     elseif msg isa AIMessage
         "AI Message"
+    elseif msg isa AIToolRequest
+        "AI Tool Request"
     elseif msg isa ToolMessage
         "Tool Message"
     else
@@ -513,6 +544,17 @@ function pprint(io::IO, msg::AbstractMessage; text_width::Int = displaysize(io)[
     content = if msg isa DataMessage
         length_ = msg.content isa AbstractArray ? " (Size: $(size(msg.content)))" : ""
         "Data: $(typeof(msg.content))$(length_)"
+    elseif msg isa AIToolRequest
+        if isnothing(msg.content)
+            join(
+                ["Tool Request: $(tool.name), args: $(tool.args)"
+                 for (tool) in msg.tool_calls],
+                "\n")
+        else
+            wrap_string(msg.content, text_width)
+        end
+    elseif istoolmessage(msg)
+        string(msg.content)
     else
         wrap_string(msg.content, text_width)
     end

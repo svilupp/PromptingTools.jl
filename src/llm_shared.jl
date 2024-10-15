@@ -6,8 +6,8 @@ role4render(schema::AbstractPromptSchema, msg::SystemMessage) = "system"
 role4render(schema::AbstractPromptSchema, msg::UserMessage) = "user"
 role4render(schema::AbstractPromptSchema, msg::UserMessageWithImages) = "user"
 role4render(schema::AbstractPromptSchema, msg::AIMessage) = "assistant"
+role4render(schema::AbstractPromptSchema, msg::AIToolRequest) = "assistant"
 role4render(schema::AbstractPromptSchema, msg::ToolMessage) = "tool"
-
 """
     render(schema::NoSchema,
         messages::Vector{<:AbstractMessage};
@@ -59,7 +59,7 @@ function render(schema::NoSchema,
             else
                 push!(conversation, new_msg)
             end
-        elseif isaimessage(msg)
+        elseif isaimessage(msg) || isaitoolrequest(msg) || istoolmessage(msg)
             # no replacements
             push!(conversation, msg)
         elseif istracermessage(msg) && issystemmessage(msg.object)
@@ -81,6 +81,17 @@ function render(schema::NoSchema,
     end
 
     return conversation
+end
+
+function render(schema::AbstractPromptSchema,
+        tools::AbstractVector{<:AbstractTool};
+        kwargs...)
+    throw(ArgumentError("Function `render` is not implemented for the provided schema ($(typeof(schema))) and $(typeof(tools))."))
+end
+function render(schema::AbstractPromptSchema,
+        tools::AbstractDict{String, <:AbstractTool};
+        kwargs...)
+    render(schema, collect(values(tools)); kwargs...)
 end
 
 """

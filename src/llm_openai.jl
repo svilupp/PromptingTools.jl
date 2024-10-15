@@ -32,7 +32,7 @@ function render(schema::AbstractOpenAISchema,
     # replace any handlebar variables in the messages
     for msg in messages_replaced
         ## Special case for images
-        if msg isa UserMessageWithImages
+        new_msg = if isusermessagewithimages(msg)
             # Build message content
             content = Dict{String, Any}[Dict("type" => "text",
                 "text" => msg.content)]
@@ -43,13 +43,56 @@ function render(schema::AbstractOpenAISchema,
                         "image_url" => Dict("url" => img,
                             "detail" => image_detail)))
             end
+            Dict("role" => role4render(schema, msg), "content" => content)
+        elseif isaitoolrequest(msg)
+            Dict("role" => role4render(schema, msg), "content" => msg.content,
+                "tool_calls" => [Dict("id" => tool.tool_call_id, "type" => "function",
+                                     "function" => Dict("name" => tool.name,
+                                         "arguments" => tool.raw))
+                                 for tool in msg.tool_calls])
+        elseif istoolmessage(msg)
+            content = msg.content isa AbstractString ? msg.content : string(msg.content)
+            Dict("role" => role4render(schema, msg), "content" => content,
+                "tool_call_id" => msg.tool_call_id)
         else
-            content = msg.content
+            ## Vanilla assistant message
+            Dict("role" => role4render(schema, msg), "content" => msg.content)
         end
-        push!(conversation, Dict("role" => role4render(schema, msg), "content" => content))
+        push!(conversation, new_msg)
     end
 
     return conversation
+end
+
+"""
+    render(schema::AbstractOpenAISchema,
+        tools::Vector{<:AbstractTool};
+        json_mode::Union{Nothing, Bool} = nothing,
+        kwargs...)
+
+Renders the tool signatures into the OpenAI format.
+"""
+function render(schema::AbstractOpenAISchema,
+        tools::Vector{<:AbstractTool};
+        json_mode::Union{Nothing, Bool} = nothing,
+        kwargs...)
+    output = Dict{Symbol, Any}[]
+    for tool in tools
+        rendered = Dict(:type => "function",
+            :function => Dict(
+                :parameters => tool.parameters, :name => tool.name))
+        ## Add strict flag
+        tool.strict == true && (rendered[:function][:strict] = tool.strict)
+        if json_mode == true
+            rendered[:function][:schema] = pop!(rendered[:function], :parameters)
+        else
+            ## Add description if not in JSON mode
+            !isnothing(tool.description) &&
+                (rendered[:function][:description] = tool.description)
+        end
+        push!(output, rendered)
+    end
+    return output
 end
 
 ## OpenAI.jl back-end
@@ -1139,13 +1182,13 @@ function response_to_message(schema::AbstractOpenAISchema,
         MSG::Type{DataMessage},
         choice,
         resp;
-        return_type = nothing,
+        tool_map = nothing,
         model_id::AbstractString = "",
         time::Float64 = 0.0,
         run_id::Int = Int(rand(Int32)),
         sample_id::Union{Nothing, Integer} = nothing,
         json_mode::Union{Nothing, Bool} = nothing)
-    @assert !isnothing(return_type) "You must provide a return_type for DataMessage construction"
+    @assert !isnothing(tool_map) "You must provide a tool_map for DataMessage construction"
     ## extract sum log probability
     has_log_prob = haskey(choice, :logprobs) &&
                    !isnothing(get(choice, :logprobs, nothing)) &&
@@ -1161,43 +1204,24 @@ function response_to_message(schema::AbstractOpenAISchema,
     tokens_completion = get(resp.response, :usage, Dict(:completion_tokens => 0))[:completion_tokens]
     cost = call_cost(tokens_prompt, tokens_completion, model_id)
     # "Safe" parsing of the response - it still fails if JSON is invalid
-    is_single_tool = json_mode == true || (haskey(choice[:message], :tool_calls) &&
-                      length(choice[:message][:tool_calls]) == 1)
-    if is_single_tool
-        args, datatype = if json_mode == true
-            choice[:message][:content], only(values(return_type))
-        elseif length(choice[:message][:tool_calls]) == 1
-            name = choice[:message][:tool_calls][1][:function][:name]
-            args = choice[:message][:tool_calls][1][:function][:arguments]
-            args, return_type[name]
-        end
-        content = try
-            ## Must invoke latest because we might have generated the struct
-            Base.invokelatest(JSON3.read, args, datatype)::datatype
-        catch e
-            @warn "There was an error parsing the response: $e. Using the raw response instead."
-            JSON3.read(args) |> copy
-        end
+    tools_array = if json_mode == true
+        name, tool = only(tool_map)
+        [parse_tool(
+            choice[:message][:content], tool.callable)]
     else
-        @warn "Number of tools: $(length(choice[:message][:tool_calls]))"
-        content = []
-        for tool_call in choice[:message][:tool_calls]
-            args = tool_call[:function][:arguments]
-            datatype = type_map[tool_call[:function][:name]]
-            content_ = try
-                ## Must invoke latest because we might have generated the struct
-                Base.invokelatest(JSON3.read, args, datatype)::datatype
-            catch e
-                @warn "There was an error parsing the response: $e. Using the raw response instead."
-                JSON3.read(args) |> copy
-            end
-            push!(content, content_)
-        end
+        [parse_tool(tool_call[:function][:arguments],
+             tool_map[tool_call[:function][:name]].callable)
+         for tool_call in choice[:message][:tool_calls]]
+    end
+    ## Remember the tools
+    extras = Dict{Symbol, Any}()
+    if haskey(choice[:message], :tool_calls) && !isempty(choice[:message][:tool_calls])
+        extras[:tool_calls] = choice[:message][:tool_calls]
     end
 
     ## build DataMessage object
     msg = MSG(;
-        content = content,
+        content = length(tools_array) == 1 ? only(tools_array) : tools_array,
         status = Int(resp.status),
         cost,
         run_id,
@@ -1206,7 +1230,8 @@ function response_to_message(schema::AbstractOpenAISchema,
         finish_reason = get(choice, :finish_reason, nothing),
         tokens = (tokens_prompt,
             tokens_completion),
-        elapsed = time)
+        elapsed = time,
+        extras)
 end
 
 """
@@ -1220,7 +1245,7 @@ end
         http_kwargs::NamedTuple = (retry_non_idempotent = true,
             retries = 5,
             readtimeout = 120), api_kwargs::NamedTuple = (;
-            tool_choice = "exact"),
+            tool_choice = nothing),
         strict::Union{Nothing, Bool} = nothing,
         kwargs...)
 
@@ -1234,7 +1259,7 @@ It's effectively a light wrapper around `aigenerate` call, which requires additi
 # Arguments
 - `prompt_schema`: An optional object to specify which prompt template should be applied (Default to `PROMPT_SCHEMA = OpenAISchema`)
 - `prompt`: Can be a string representing the prompt for the AI conversation, a `UserMessage`, a vector of `AbstractMessage` or an `AITemplate`
-- `return_type`: A **struct** TYPE representing the the information we want to extract. Do not provide a struct instance, only the type. Alternatively, you can provide a vector of field names and their types (see `?generate_struct` function for the syntax).
+- `return_type`: A **struct** TYPE (or vector of Types) representing the the information we want to extract. Do not provide a struct instance, only the type. Alternatively, you can provide a vector of field names and their types (see `?generate_struct` function for the syntax).
   If the struct has a docstring, it will be provided to the model as well. It's used to enforce structured model outputs or provide more information.
 - `verbose`: A boolean indicating whether to print additional information.
 - `api_key`: A string representing the API key for accessing the OpenAI API.
@@ -1244,8 +1269,8 @@ It's effectively a light wrapper around `aigenerate` call, which requires additi
 - `conversation`: An optional vector of `AbstractMessage` objects representing the conversation history. If not provided, it is initialized as an empty vector.
 - `http_kwargs`: A named tuple of HTTP keyword arguments.
 - `api_kwargs`: A named tuple of API keyword arguments. 
-  - `tool_choice`: A string representing the tool choice to use for the API call. Usually, one of "auto","any","exact". 
-    Defaults to `"exact"`, which is a made-up value to enforce the OpenAI requirements if we want one exact function.
+  - `tool_choice`: Specifies which tool to use for the API call. Usually, one of "auto","any","exact" // `nothing` will pick a default. 
+    Defaults to `"exact"` for 1 tool and `"auto"` for many tools, which is a made-up value to enforce the OpenAI requirements if we want one exact function.
     Providers like Mistral, Together, etc. use `"any"` instead.
 - `strict::Union{Nothing, Bool} = nothing`: A boolean indicating whether to enforce strict generation of the response (supported only for OpenAI models). It has additional latency for the first request. If `nothing`, standard function calling is used.
 - `json_mode::Union{Nothing, Bool} = nothing`: If `json_mode = true`, we use JSON mode for the response (supported only for OpenAI models). If `nothing`, standard function calling is used.
@@ -1261,6 +1286,7 @@ If `return_all=false` (default):
 If `return_all=true`:
 - `conversation`: A vector of `AbstractMessage` objects representing the full conversation history, including the response from the AI model (`DataMessage`).
 
+Note: `msg.content` can be a single object (if a single tool is used) or a vector of objects (if multiple tools are used)!
 
 See also: `function_call_signature`, `MaybeExtract`, `ItemsExtract`, `aigenerate`, `generate_struct`
 
@@ -1389,7 +1415,7 @@ msg = aiextract("James is 30, weighs 80kg. He's 180cm tall."; return_type=MyMeas
 ```
 """
 function aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE;
-        return_type::Union{Type, Vector},
+        return_type::Union{Type, AbstractTool, Vector},
         verbose::Bool = true,
         api_key::String = OPENAI_API_KEY,
         model::String = MODEL_CHAT,
@@ -1398,35 +1424,40 @@ function aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_T
         http_kwargs::NamedTuple = (retry_non_idempotent = true,
             retries = 5,
             readtimeout = 120), api_kwargs::NamedTuple = (;
-            tool_choice = "exact"),
+            tool_choice = nothing),
         strict::Union{Nothing, Bool} = nothing,
         json_mode::Union{Nothing, Bool} = nothing,
         kwargs...)
     ##
     global MODEL_ALIASES
     ## Function calling specifics
+    ## Check that no functions or methods are provided, that is not supported
+    @assert !(return_type isa Vector)||!any(x -> x isa Union{Function, Method}, return_type) "Functions and Methods are not supported in `aiextract`!"
     ## Set strict mode on for JSON mode
     strict_ = json_mode == true ? true : strict
-    schemas, type_map = function_call_signature(return_type; strict = strict_)
-    tools = [Dict(
-                 :type => "function", :function => schema) for schema in schemas]
+    tool_map = function_call_signature(return_type; strict = strict_)
+    tools = render(prompt_schema, tool_map; json_mode)
     ## force our function to be used
-    tool_choice_ = length(tools) == 1 ? get(api_kwargs, :tool_choice, "exact") : "auto"
-    tool_choice = if tool_choice_ == "exact"
+    tool_choice_ = get(api_kwargs, :tool_choice, nothing)
+    tool_choice = if tool_choice_ == "exact" ||
+                     (isnothing(tool_choice_) && length(tools) == 1)
         ## Standard for OpenAI API
         Dict(:type => "function",
-            :function => Dict(:name => only(tools)[:function]["name"]))
-    else
+            :function => Dict(:name => only(tools)[:function][:name]))
+    elseif tool_choice_ == "auto" || (isnothing(tool_choice_) && length(tools) > 1)
         # User provided value, eg, "auto", "any" for various providers like Mistral, Together, etc.
+        "auto"
+    else
+        # User provided value
         tool_choice_
     end
 
     ## Build the API kwargs
     api_kwargs = if json_mode == true
-        json_schema = Dict(
-            :schema => schema["parameters"], :strict => true, :name => schema["name"])
+        @assert length(tools)==1 "Only 1 tool definition is allowed in JSON mode."
         (; [k => v for (k, v) in pairs(api_kwargs) if k != :tool_choice]...,
-            response_format = (; type = "json_schema", json_schema))
+            response_format = (;
+                type = "json_schema", json_schema = only(tools)[:function]))
     else
         merge(api_kwargs, (; tools, tool_choice))
     end
@@ -1442,25 +1473,24 @@ function aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_T
             http_kwargs,
             api_kwargs...)
         ## Process one of more samples returned
-        msg = if length(r.response[:choices]) > 1
-            run_id = Int(rand(Int32)) # remember one run ID
-            ## extract all message
-            msgs = [response_to_message(prompt_schema, DataMessage, choice, r;
-                        return_type = type_map, time, model_id, run_id, sample_id = i, json_mode)
-                    for (i, choice) in enumerate(r.response[:choices])]
-            ## Order by log probability if available
-            ## bigger is better, keep it last
-            if all(x -> !isnothing(x.log_prob), msgs)
-                sort(msgs, by = x -> x.log_prob)
-            else
-                msgs
-            end
+        has_many_samples = length(r.response[:choices]) > 1
+        run_id = Int(rand(Int32)) # remember one run ID
+        msg = [response_to_message(prompt_schema, DataMessage, choice, r;
+                   tool_map = tool_map, time, model_id, run_id, json_mode,
+                   sample_id = has_many_samples ? i : nothing)
+               for (i, choice) in enumerate(r.response[:choices])]
+        ## extract all message
+        msg = [response_to_message(prompt_schema, DataMessage, choice, r;
+                   tool_map = tool_map, time, model_id, run_id, sample_id = i, json_mode)
+               for (i, choice) in enumerate(r.response[:choices])]
+        ## Order by log probability if available
+        ## bigger is better, keep it last
+        if has_many_samples && all(x -> !isnothing(x.log_prob), msg)
+            sort(msg, by = x -> x.log_prob)
         else
-            ## only 1 sample / 1 completion
-            choice = r.response[:choices][begin]
-            response_to_message(prompt_schema, DataMessage, choice, r;
-                return_type = type_map, time, model_id, json_mode)
+            msg
         end
+
         ## Reporting
         verbose && @info _report_stats(msg, model_id)
     else
@@ -1771,6 +1801,163 @@ function aiimage(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYP
     end
 
     ## Select what to return // input `msgs` to preserve the image attachments
+    output = finalize_outputs(prompt,
+        conv_rendered,
+        msg;
+        conversation,
+        return_all,
+        dry_run,
+        kwargs...)
+
+    return output
+end
+
+function response_to_message(schema::AbstractOpenAISchema,
+        MSG::Type{AIToolRequest},
+        choice,
+        resp;
+        tool_map = nothing,
+        model_id::AbstractString = "",
+        time::Float64 = 0.0,
+        run_id::Int = Int(rand(Int32)),
+        sample_id::Union{Nothing, Integer} = nothing,
+        json_mode::Union{Nothing, Bool} = nothing)
+    @assert !isnothing(tool_map) "You must provide a tool_map for AIToolRequest construction"
+    ## extract sum log probability
+    has_log_prob = haskey(choice, :logprobs) &&
+                   !isnothing(get(choice, :logprobs, nothing)) &&
+                   haskey(choice[:logprobs], :content) &&
+                   !isnothing(choice[:logprobs][:content])
+    log_prob = if has_log_prob
+        sum([get(c, :logprob, 0.0) for c in choice[:logprobs][:content]])
+    else
+        nothing
+    end
+    ## calculate cost
+    tokens_prompt = get(resp.response, :usage, Dict(:prompt_tokens => 0))[:prompt_tokens]
+    tokens_completion = get(resp.response, :usage, Dict(:completion_tokens => 0))[:completion_tokens]
+    cost = call_cost(tokens_prompt, tokens_completion, model_id)
+    # "Safe" parsing of the response - it still fails if JSON is invalid
+    has_tools = haskey(choice[:message], :tool_calls) &&
+                !isempty(choice[:message][:tool_calls])
+    tools_array = if json_mode == true
+        name, tool = only(tool_map)
+        [ToolMessage(;
+            content = nothing, req_id = run_id, tool_call_id = choice[:id],
+            raw = JSON3.write(choice[:message][:content]),
+            args = choice[:message][:content], name = name)]
+    elseif has_tools
+        [ToolMessage(; raw = tool_call[:function][:arguments],
+             args = JSON3.read(tool_call[:function][:arguments]),
+             name = tool_call[:function][:name],
+             content = nothing,
+             req_id = run_id,
+             tool_call_id = tool_call[:id]
+         )
+         for tool_call in choice[:message][:tool_calls]]
+    else
+        ToolMessage[]
+    end
+    content = json_mode != true ? choice[:message][:content] : nothing
+    ## Remember the tools
+    extras = Dict{Symbol, Any}()
+    if has_tools
+        extras[:tool_calls] = choice[:message][:tool_calls]
+    end
+
+    ## build DataMessage object
+    msg = MSG(;
+        content = content,
+        tool_calls = tools_array,
+        status = Int(resp.status),
+        cost,
+        run_id,
+        sample_id,
+        log_prob,
+        finish_reason = get(choice, :finish_reason, nothing),
+        tokens = (tokens_prompt,
+            tokens_completion),
+        elapsed = time,
+        extras)
+end
+
+function aitools(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE;
+        tools::Union{Type, AbstractTool, Vector},
+        verbose::Bool = true,
+        api_key::String = OPENAI_API_KEY,
+        model::String = MODEL_CHAT,
+        return_all::Bool = false, dry_run::Bool = false,
+        conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
+        http_kwargs::NamedTuple = (retry_non_idempotent = true,
+            retries = 5,
+            readtimeout = 120), api_kwargs::NamedTuple = (;
+            tool_choice = nothing),
+        strict::Union{Nothing, Bool} = nothing,
+        json_mode::Union{Nothing, Bool} = nothing,
+        kwargs...)
+    ##
+    global MODEL_ALIASES
+    ## Function calling specifics
+    ## Set strict mode on for JSON mode
+    strict_ = json_mode == true ? true : strict
+    tool_map = function_call_signature(tools; strict = strict_)
+    tools = render(prompt_schema, tool_map; json_mode)
+    ## force our function to be used
+    tool_choice_ = get(api_kwargs, :tool_choice, nothing)
+    tool_choice = if tool_choice_ == "exact" ||
+                     (isnothing(tool_choice_) && length(tools) == 1)
+        ## Standard for OpenAI API
+        Dict(:type => "function",
+            :function => Dict(:name => only(tools)[:function][:name]))
+    elseif tool_choice_ == "auto" || (isnothing(tool_choice_) && length(tools) > 1)
+        # User provided value, eg, "auto", "any" for various providers like Mistral, Together, etc.
+        "auto"
+    else
+        # User provided value
+        tool_choice_
+    end
+
+    ## Build the API kwargs
+    api_kwargs = if json_mode == true
+        @assert length(tools)==1 "Only 1 tool definition is allowed in JSON mode."
+        (; [k => v for (k, v) in pairs(api_kwargs) if k != :tool_choice]...,
+            response_format = (;
+                type = "json_schema", json_schema = only(tools)))
+    else
+        merge(api_kwargs, (; tools, tool_choice))
+    end
+
+    ## Find the unique ID for the model alias provided
+    model_id = get(MODEL_ALIASES, model, model)
+    conv_rendered = render(prompt_schema, prompt; conversation, kwargs...)
+
+    if !dry_run
+        time = @elapsed r = create_chat(prompt_schema, api_key,
+            model_id,
+            conv_rendered;
+            http_kwargs,
+            api_kwargs...)
+        ## Process one of more samples returned
+        has_many_samples = length(r.response[:choices]) > 1
+        run_id = Int(rand(Int32)) # remember one run ID
+        ## extract all message
+        msg = [response_to_message(prompt_schema, AIToolRequest, choice, r;
+                   tool_map = tool_map, time, model_id, run_id, json_mode,
+                   sample_id = has_many_samples ? i : nothing)
+               for (i, choice) in enumerate(r.response[:choices])]
+        ## Order by log probability if available
+        ## bigger is better, keep it last
+        if has_many_samples && all(x -> !isnothing(x.log_prob), msg)
+            sort(msg, by = x -> x.log_prob)
+        else
+            msg
+        end
+        ## Reporting
+        verbose && @info _report_stats(msg, model_id)
+    else
+        msg = nothing
+    end
+    ## Select what to return
     output = finalize_outputs(prompt,
         conv_rendered,
         msg;
