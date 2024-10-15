@@ -60,7 +60,6 @@ function render(schema::AbstractAnthropicSchema,
 
     ## Add Tool definitions to the System Prompt
     if !isempty(tools)
-        length(tools) > 1 && @warn "Multiple tools provided. Using the first one only."
         ANTHROPIC_TOOL_SUFFIX = "Use the $(tools[1]["name"]) tool in your response."
         ## Add to system message
         if isnothing(system)
@@ -94,6 +93,37 @@ function render(schema::AbstractAnthropicSchema,
                 "content" => [Dict{String, Any}("type" => "text", "text" => aiprefill)]))
     end
     return (; system, conversation)
+end
+
+"""
+    render(schema::AbstractAnthropicSchema,
+        tools::Vector{<:AbstractTool};
+        json_mode::Union{Nothing, Bool} = nothing,
+        kwargs...)
+
+Renders the tool signatures into the Anthropic format.
+"""
+function render(schema::AbstractAnthropicSchema,
+        tools::Vector{<:AbstractTool};
+        kwargs...)
+    @assert false "TODO: must update this implementation"
+    output = Dict{Symbol, Any}[]
+    for tool in tools
+        rendered = Dict(:type => "function",
+            :function => Dict(
+                :parameters => tool.parameters, :name => tool.name))
+        ## Add strict flag
+        tool.strict == true && (rendered[:function][:strict] = tool.strict)
+        if json_mode == true
+            rendered[:function][:schema] = pop!(rendered[:function], :parameters)
+        else
+            ## Add description if not in JSON mode
+            !isnothing(tool.description) &&
+                (rendered[:function][:description] = tool.description)
+        end
+        push!(output, rendered)
+    end
+    return output
 end
 
 """
@@ -573,9 +603,10 @@ function aiextract(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMP
     model_id = get(MODEL_ALIASES, model, model)
 
     ## Tools definition
-    sig, datastructtype = function_call_signature(return_type; max_description_length = 100)
+    schemas, type_map = function_call_signature(
+        return_type; max_description_length = 100)
     tools = [Dict("name" => sig["name"], "description" => get(sig, "description", ""),
-        "input_schema" => sig["parameters"])]
+                 "input_schema" => sig["parameters"]) for sig in schemas]
     ## update tools to use caching
     (cache == :tools || cache == :all) &&
         (tools[end]["cache_control"] = Dict("type" => "ephemeral"))
@@ -595,17 +626,11 @@ function aiextract(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMP
         tokens_completion = get(resp.response[:usage], :output_tokens, 0)
         finish_reason = get(resp.response, :stop_reason, nothing)
         content = if finish_reason == "tool_use"
-            contents = filter(x -> x[:type] == "tool_use", resp.response[:content])
-            length(contents) > 1 &&
-                @warn "Multiple tool_use found in the response. Using the first one."
-            ## parse it into object
-            arguments = JSON3.write(contents[1][:input])
-            try
-                Base.invokelatest(JSON3.read, arguments, datastructtype)
-            catch e
-                @warn "There was an error parsing the response: $e. Using the raw response instead."
-                JSON3.read(arguments) |> copy
-            end
+            tool_array = [tool_parse(tool_use[:input], type_map[tool_use[:name]])
+                          for tool_use in resp.response[:content]
+                          if tool_use[:type] == "tool_use"]
+            ## If a single tool was used, return it directly
+            length(tool_array) == 1 ? only(tool_array) : tool_array
         else
             ## fallback, return text
             @warn "No tool_use found in the response. Returning the raw text instead."
@@ -643,6 +668,10 @@ function aiextract(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMP
     return output
 end
 
+function aitools(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMPT_TYPE;
+        kwargs...)
+    error("Anthropic schema does not yet support aitools. Please use OpenAISchema instead.")
+end
 function aiembed(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMPT_TYPE;
         kwargs...)
     error("Anthropic schema does not yet support aiembed. Please use OpenAISchema instead.")
