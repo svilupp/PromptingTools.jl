@@ -348,6 +348,9 @@ end
 function aiextract(schema::AbstractPromptSchema, template::AITemplate; kwargs...)
     aiextract(schema, render(schema, template); kwargs...)
 end
+function aitools(schema::AbstractPromptSchema, template::AITemplate; kwargs...)
+    aitools(schema, render(schema, template); kwargs...)
+end
 function aiscan(schema::AbstractPromptSchema, template::AITemplate; kwargs...)
     aiscan(schema, render(schema, template); kwargs...)
 end
@@ -364,6 +367,9 @@ function aiclassify(schema::AbstractPromptSchema, template::Symbol; kwargs...)
 end
 function aiextract(schema::AbstractPromptSchema, template::Symbol; kwargs...)
     aiextract(schema, AITemplate(template); kwargs...)
+end
+function aitools(schema::AbstractPromptSchema, template::Symbol; kwargs...)
+    aitools(schema, AITemplate(template); kwargs...)
 end
 function aiscan(schema::AbstractPromptSchema, template::Symbol; kwargs...)
     aiscan(schema, AITemplate(template); kwargs...)
@@ -389,6 +395,11 @@ end
 function aiextract(schema::AbstractTracerSchema, template::Symbol; kwargs...)
     tpl = AITemplate(template)
     aiextract(schema, render(schema, tpl);
+        _tracer_template = tpl, kwargs...)
+end
+function aitools(schema::AbstractTracerSchema, template::Symbol; kwargs...)
+    tpl = AITemplate(template)
+    aitools(schema, render(schema, tpl);
         _tracer_template = tpl, kwargs...)
 end
 function aiscan(schema::AbstractTracerSchema, template::Symbol; kwargs...)

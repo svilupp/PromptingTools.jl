@@ -44,7 +44,9 @@ using PromptingTools: response_to_message, AbstractPromptSchema
         :choices => [
             Dict(
             :message => Dict(:tool_calls => [
-                Dict(:function => Dict(:arguments => "{\"content\": \"x\"}"))
+                Dict(:function => Dict(
+                :arguments => "{\"content\": \"x\"}", :name => "MyType"),
+            )
             ]),
             :finish_reason => "stop")],
         :usage => Dict(:total_tokens => 3, :prompt_tokens => 2, :completion_tokens => 1))
@@ -62,6 +64,8 @@ using PromptingTools: response_to_message, AbstractPromptSchema
         run_id = msg.run_id,
         cost = 0.0,
         finish_reason = "stop",
+        extras = Dict{Symbol, Any}(:tool_calls => [Dict(:function => Dict(
+            :name => "MyType", :arguments => "{\"content\": \"x\"}"))]),
         elapsed = msg.elapsed)
     @test msg == expected_output
 

@@ -1,9 +1,58 @@
 using PromptingTools: MaybeExtract, extract_docstring, ItemsExtract
 using PromptingTools: has_null_type, is_required_field, remove_null_types, to_json_schema
-using PromptingTools: function_call_signature, set_properties_strict!,
-                      update_schema_descriptions!, generate_struct
+using PromptingTools: tool_call_signature, set_properties_strict!,
+                      update_field_descriptions!, generate_struct
+using PromptingTools: Tool, isabstracttool, execute_tool, parse_tool, get_arg_names,
+                      get_arg_types, get_method, get_function
 
 # TODO: check more edge cases like empty structs
+
+"This is a test function."
+function my_test_function(x::Int, y::String)
+    return "Test function: $x, $y"
+end
+
+@testset "Tool-constructor" begin
+    tool = Tool(my_test_function)
+
+    @test tool isa Tool
+    @test tool.name == "my_test_function"
+    @test haskey(tool.parameters, "properties")
+    @test haskey(tool.parameters["properties"], "x")
+    @test haskey(tool.parameters["properties"], "y")
+    @test tool.callable == my_test_function
+
+    # Test Tool constructor with a struct
+    struct MyTestStruct
+        field1::Int
+        field2::String
+    end
+
+    tool_struct = Tool(MyTestStruct)
+
+    @test tool_struct isa Tool
+    @test tool_struct.name == "MyTestStruct"
+    @test haskey(tool_struct.parameters, "properties")
+    @test haskey(tool_struct.parameters["properties"], "field1")
+    @test haskey(tool_struct.parameters["properties"], "field2")
+    @test tool_struct.callable == MyTestStruct
+
+    # Test show method
+    io = IOBuffer()
+    show(io, tool)
+    output = String(take!(io))
+
+    @test occursin("Tool", output)
+    @test occursin("name", output)
+    @test occursin("parameters", output)
+    @test occursin("description", output)
+    @test occursin("strict", output)
+    @test occursin("callable", output)
+
+    @test isabstracttool(tool) == true
+    @test isabstracttool(tool_struct) == true
+    @test isabstracttool(my_test_function) == false
+end
 
 @testset "has_null_type" begin
     @test has_null_type(Number) == false
@@ -58,6 +107,11 @@ end
     end
     docstring = extract_docstring(MyStructWithSuper2)
     @test_broken haskey(schema, "description")
+
+    # Test extraction of docstring from a method
+    method = methods(my_test_function) |> first
+    docstring = extract_docstring(method)
+    @test docstring == "This is a test function.\n"
 end
 
 @testset "to_json_schema" begin
@@ -168,6 +222,16 @@ end
     @test schema["properties"]["field2"]["type"] == "string"
     @test schema["required"] == ["field1", "field2"]
     @test_broken haskey(schema, "description")
+
+    ## Method
+    method = methods(my_test_function) |> first
+    schema = to_json_schema(method)
+    @test schema["type"] == "object"
+    @test schema["properties"]["x"]["type"] == "integer"
+    @test schema["properties"]["y"]["type"] == "string"
+    @test schema["required"] == ["x", "y"]
+    @test haskey(schema, "description")
+    @test schema["description"] == "This is a test function.\n"
 end
 
 @testset "to_json_schema-MaybeExtract" begin
@@ -340,73 +404,82 @@ end
     @test_throws ErrorException generate_struct(fields)
 end
 
-@testset "update_schema_descriptions!" begin
+@testset "update_field_descriptions!" begin
     # Test with empty descriptions
-    schema = Dict("parameters" => Dict("properties" => Dict("field1" => Dict("type" => "string"))))
+    parameters = Dict("properties" => Dict("field1" => Dict("type" => "string")))
     descriptions = Dict{Symbol, String}()
-    updated_schema = update_schema_descriptions!(schema, descriptions)
-    @test !haskey(updated_schema["parameters"]["properties"]["field1"], "description")
+    updated_schema = update_field_descriptions!(parameters, descriptions)
+    @test !haskey(updated_schema["properties"]["field1"], "description")
 
     # Test with descriptions provided
-    schema = Dict("parameters" => Dict("properties" => Dict("field1" => Dict("type" => "string"))))
+    parameters = Dict("properties" => Dict("field1" => Dict("type" => "string")))
     descriptions = Dict(:field1 => "Field 1 description")
-    updated_schema = update_schema_descriptions!(schema, descriptions)
-    @test updated_schema["parameters"]["properties"]["field1"]["description"] ==
+    updated_schema = update_field_descriptions!(parameters, descriptions)
+    @test updated_schema["properties"]["field1"]["description"] ==
           "Field 1 description"
 
     # Test with max_description_length
-    schema = Dict("parameters" => Dict("properties" => Dict("field1" => Dict("type" => "string"))))
+    parameters = Dict("properties" => Dict("field1" => Dict("type" => "string")))
     descriptions = Dict(:field1 => "Field 1 description is very long and should be truncated")
-    updated_schema = update_schema_descriptions!(
-        schema, descriptions; max_description_length = 10)
-    @test updated_schema["parameters"]["properties"]["field1"]["description"] ==
+    updated_schema = update_field_descriptions!(
+        parameters, descriptions; max_description_length = 10)
+    @test updated_schema["properties"]["field1"]["description"] ==
           "Field 1 de"
 
     # Test with multiple fields
-    schema = Dict("parameters" => Dict("properties" => Dict(
-        "field1" => Dict("type" => "string"), "field2" => Dict("type" => "integer"))))
+    parameters = Dict("properties" => Dict(
+        "field1" => Dict("type" => "string"), "field2" => Dict("type" => "integer")))
     descriptions = Dict(:field1 => "Field 1 description", :field2 => "Field 2 description")
-    updated_schema = update_schema_descriptions!(schema, descriptions)
-    @test updated_schema["parameters"]["properties"]["field1"]["description"] ==
+    updated_schema = update_field_descriptions!(parameters, descriptions)
+    @test updated_schema["properties"]["field1"]["description"] ==
           "Field 1 description"
-    @test updated_schema["parameters"]["properties"]["field2"]["description"] ==
+    @test updated_schema["properties"]["field2"]["description"] ==
           "Field 2 description"
 
     # Test with missing field in descriptions
-    schema = Dict("parameters" => Dict("properties" => Dict(
-        "field1" => Dict("type" => "string"), "field2" => Dict("type" => "integer"))))
+    parameters = Dict("properties" => Dict(
+        "field1" => Dict("type" => "string"), "field2" => Dict("type" => "integer")))
     descriptions = Dict(:field1 => "Field 1 description")
-    updated_schema = update_schema_descriptions!(schema, descriptions)
-    @test updated_schema["parameters"]["properties"]["field1"]["description"] ==
+    updated_schema = update_field_descriptions!(parameters, descriptions)
+    @test updated_schema["properties"]["field1"]["description"] ==
           "Field 1 description"
-    @test !haskey(updated_schema["parameters"]["properties"]["field2"], "description")
+    @test !haskey(updated_schema["properties"]["field2"], "description")
 end
 
-@testset "function_call_signature" begin
+@testset "tool_call_signature" begin
     "Some docstring"
     struct MyMeasurement2
         age::Int
         height::Union{Int, Nothing}
         weight::Union{Nothing, Float64}
     end
-    output, t = function_call_signature(MyMeasurement2)#|> JSON3.pretty
-    expected_output = Dict{String, Any}("name" => "MyMeasurement2_extractor",
-        "parameters" => Dict{String, Any}(
-            "properties" => Dict{String, Any}(
-                "height" => Dict{
-                    String,
-                    Any
-                }("type" => "integer"),
-                "weight" => Dict{String, Any}("type" => "number"),
-                "age" => Dict{String, Any}("type" => "integer")),
-            "required" => ["age"],
-            "type" => "object"),
-        "description" => "Some docstring\n")
-    @test output == expected_output
+    tool_map = tool_call_signature(MyMeasurement2)#|> JSON3.pretty
+    name, tool = only(tool_map)
+    parameters = Dict{String, Any}(
+        "properties" => Dict{String, Any}(
+            "height" => Dict{
+                String,
+                Any
+            }("type" => "integer"),
+            "weight" => Dict{String, Any}("type" => "number"),
+            "age" => Dict{String, Any}("type" => "integer")),
+        "required" => ["age"],
+        "type" => "object")
+    @test tool.parameters == parameters
+    @test tool.name == "MyMeasurement2"
+    @test tool.description == "Some docstring\n"
+    @test tool.strict == nothing
+    @test tool.callable == MyMeasurement2
 
     ## MaybeWraper name cleanup
-    schema, t = function_call_signature(MaybeExtract{MyMeasurement2})
-    @test schema["name"] == "MaybeExtractMyMeasurement2_extractor"
+    tool_map = tool_call_signature(MaybeExtract{MyMeasurement2})
+    name, tool = only(tool_map)
+    @test name == "MaybeExtract"
+    @test tool.parameters["properties"]["result"]["properties"] == parameters["properties"]
+    @test tool.name == "MaybeExtract"
+    @test tool.strict == nothing
+    @test tool.description isa String
+    @test tool.callable == MaybeExtract{MyMeasurement2}
 
     ## Test with strict = true
 
@@ -417,87 +490,211 @@ end
         weight::Union{Nothing, Float64}
     end
 
-    # Test with strict = nothing (default behavior)
-    output_default, t = function_call_signature(MyMeasurement3)
-    @test !haskey(output_default, "strict")
-    @test output_default["name"] == "MyMeasurement3_extractor"
-    @test output_default["parameters"]["type"] == "object"
-    @test output_default["parameters"]["required"] == ["age"]
-    @test !haskey(output_default["parameters"], "additionalProperties")
+    # Test with strict = nothing  (default behavior)
+    tool_map = tool_call_signature(MyMeasurement3)
+    name, tool = only(tool_map)
+    @test tool.strict == nothing
+    @test name == "MyMeasurement3"
+    @test tool.parameters["properties"]["height"]["type"] == "integer"
+    @test tool.parameters["properties"]["weight"]["type"] == "number"
+    @test tool.parameters["properties"]["age"]["type"] == "integer"
+    @test Set(tool.parameters["required"]) == Set(["age"])
+    @test !haskey(tool.parameters, "additionalProperties")
 
     # Test with strict =false
-    output_not_strict, t = function_call_signature(MyMeasurement3; strict = false)
-    @test haskey(output_not_strict, "strict")
-    @test output_not_strict["strict"] == false
-    @test output_not_strict["name"] == "MyMeasurement3_extractor"
-    @test output_not_strict["parameters"]["type"] == "object"
-    @test output_not_strict["parameters"]["required"] == ["age"]
-    @test !haskey(output_default["parameters"], "additionalProperties")
+    tool_map = tool_call_signature(MyMeasurement3; strict = false)
+    name, tool = only(tool_map)
+    @test tool.strict == false
+    @test name == "MyMeasurement3"
+    @test tool.parameters["properties"]["height"]["type"] == "integer"
+    @test tool.parameters["properties"]["weight"]["type"] == "number"
+    @test tool.parameters["properties"]["age"]["type"] == "integer"
+    @test Set(tool.parameters["required"]) == Set(["age"])
+    @test !haskey(tool.parameters, "additionalProperties")
 
     # Test with strict = true
-    output_strict, t = function_call_signature(MyMeasurement3; strict = true)
-    @test output_strict["strict"] == true
-    @test output_strict["name"] == "MyMeasurement3_extractor"
-    @test output_strict["parameters"]["type"] == "object"
-    @test Set(output_strict["parameters"]["required"]) == Set(["age", "height", "weight"])
-    @test output_strict["parameters"]["additionalProperties"] == false
-    @test output_strict["parameters"]["properties"]["height"]["type"] == ["integer", "null"]
-    @test output_strict["parameters"]["properties"]["weight"]["type"] == ["number", "null"]
-    @test output_strict["parameters"]["properties"]["age"]["type"] == "integer"
+    tool_map = tool_call_signature(MyMeasurement3; strict = true)
+    name, tool = only(tool_map)
+    @test tool.strict == true
+    @test name == "MyMeasurement3"
+    @test tool.parameters["properties"]["height"]["type"] == ["integer", "null"]
+    @test tool.parameters["properties"]["weight"]["type"] == ["number", "null"]
+    @test tool.parameters["properties"]["age"]["type"] == "integer"
+    @test Set(tool.parameters["required"]) == Set(["age", "height", "weight"])
+    @test haskey(tool.parameters, "additionalProperties")
 
     # Test with MaybeExtract wrapper
-    output_maybe, t = function_call_signature(MaybeExtract{MyMeasurement3}; strict = true)
-    @test output_maybe["name"] == "MaybeExtractMyMeasurement3_extractor"
-    @test output_maybe["parameters"]["properties"]["result"]["type"] == ["object", "null"]
-    @test output_maybe["parameters"]["properties"]["error"]["type"] == "boolean"
-    @test output_maybe["parameters"]["properties"]["message"]["type"] == ["string", "null"]
-    @test Set(output_maybe["parameters"]["required"]) == Set(["result", "error", "message"])
+    tool_map = tool_call_signature(MaybeExtract{MyMeasurement3}; strict = true)
+    name, tool_maybe = only(tool_map)
+    @test name == "MaybeExtract"
+    @test tool_maybe.parameters["properties"]["result"]["properties"] ==
+          tool.parameters["properties"]
+    @test tool_maybe.name == "MaybeExtract"
+    @test tool_maybe.strict == true
+    @test tool_maybe.description isa String
+    @test tool_maybe.callable == MaybeExtract{MyMeasurement3}
 
     #### Test with generated structs and with descriptions
     # Test with simple fields
     fields = [:field1 => Int, :field2 => String]
-    schema, datastructtype = function_call_signature(fields)
-    @test haskey(schema, "name")
-    @test haskey(schema, "parameters")
-    @test haskey(schema["parameters"], "properties")
-    @test haskey(schema["parameters"]["properties"], "field1")
-    @test haskey(schema["parameters"]["properties"], "field2")
-    @test schema["parameters"]["properties"]["field1"]["type"] == "integer"
-    @test schema["parameters"]["properties"]["field2"]["type"] == "string"
+    tool_map = tool_call_signature(fields)
+    name, tool = only(tool_map)
+    @test haskey(tool.parameters, "properties")
+    @test haskey(tool.parameters["properties"], "field1")
+    @test haskey(tool.parameters["properties"], "field2")
+    @test tool.parameters["properties"]["field1"]["type"] == "integer"
+    @test tool.parameters["properties"]["field2"]["type"] == "string"
 
     # Test with strict mode
     fields = [:field1 => Int, :field2 => String]
-    schema, datastructtype = function_call_signature(fields; strict = true)
-    @test schema["strict"] == true
+    tool_map = tool_call_signature(fields; strict = true)
+    name, tool = only(tool_map)
+    @test tool.strict == true
 
     # Test with descriptions and max_description_length
     fields = [
         :field1 => Int, :field2 => String, :field1__description => "Field 1 description",
         :field2__description => "Field 2 description"]
-    schema, datastructtype = function_call_signature(fields; max_description_length = 7)
-    @test haskey(schema, "name")
-    @test haskey(schema, "parameters")
-    @test haskey(schema["parameters"], "properties")
-    @test haskey(schema["parameters"]["properties"], "field1")
-    @test haskey(schema["parameters"]["properties"], "field2")
-    @test schema["parameters"]["properties"]["field1"]["type"] == "integer"
-    @test schema["parameters"]["properties"]["field2"]["type"] == "string"
-    @test schema["parameters"]["properties"]["field1"]["description"] == "Field 1"
-    @test schema["parameters"]["properties"]["field2"]["description"] == "Field 2"
+    tool_map = tool_call_signature(fields; max_description_length = 7)
+    name, tool = only(tool_map)
+    @test haskey(tool.parameters, "properties")
+    @test haskey(tool.parameters["properties"], "field1")
+    @test haskey(tool.parameters["properties"], "field2")
+    @test tool.parameters["properties"]["field1"]["type"] == "integer"
+    @test tool.parameters["properties"]["field2"]["type"] == "string"
+    @test tool.parameters["properties"]["field1"]["description"] == "Field 1"
+    @test tool.parameters["properties"]["field2"]["description"] == "Field 2"
 
     # Test with empty fields
     fields = []
-    schema, datastructtype = function_call_signature(fields)
-    @test haskey(schema, "name")
-    @test haskey(schema, "parameters")
-    @test haskey(schema["parameters"], "properties")
-    @test isempty(schema["parameters"]["properties"])
+    tool_map = tool_call_signature(fields)
+    name, tool = only(tool_map)
+    @test haskey(tool.parameters, "properties")
+    @test isempty(tool.parameters["properties"])
 
     # Test with invalid field specification
     fields = [:field1 => Int, :field2 => :InvalidType]
-    @test_throws ErrorException function_call_signature(fields)
+    @test_throws ErrorException tool_call_signature(fields)
     fields = ["field1" => Int]
-    @test_throws ErrorException function_call_signature(fields)
+    @test_throws ErrorException tool_call_signature(fields)
     fields = ["field1", "field2"] # caught earlier as an error so assertion error
-    @test_throws AssertionError function_call_signature(fields)
+    @test_throws AssertionError tool_call_signature(fields)
+
+    ## TODO: add Tool passthrough, functions, methods
+    # Test with a function
+    tool_map = tool_call_signature(my_test_function)
+    name, tool = only(tool_map)
+    @test name == "my_test_function"
+    @test tool.name == "my_test_function"
+    @test tool.description == "This is a test function.\n"
+    @test tool.callable == my_test_function
+    @test tool.strict == nothing
+    @test tool.parameters["properties"]["x"]["type"] == "integer"
+    @test tool.parameters["properties"]["y"]["type"] == "string"
+    @test Set(tool.parameters["required"]) == Set(["x", "y"])
+
+    # Test with a method
+    method = first(methods(my_test_function))
+    tool_map = tool_call_signature(method)
+    name, tool = only(tool_map)
+    @test name == "my_test_function"
+    @test tool.name == "my_test_function"
+    @test tool.description == "This is a test function.\n"
+    @test tool.callable == my_test_function
+    @test tool.strict == nothing
+    @test tool.parameters["properties"]["x"]["type"] == "integer"
+
+    # Test with a tool
+    tool_map = tool_call_signature(method)
+    name, tool = only(tool_map)
+    tool_map2 = tool_call_signature(tool)
+    name2, tool2 = only(tool_map2)
+    @test name == name2
+    @test tool.name == tool2.name
+    @test tool.description == tool2.description
+    @test tool.callable == tool2.callable
+    @test tool.strict == tool2.strict
+    @test tool.parameters == tool2.parameters
+
+    # Test with a vector of tools
+    tools = Union{Function, Type}[my_test_function, MyMeasurement3]
+    tool_map = tool_call_signature(tools)
+    @test length(tool_map) == 2
+    for (name, tool) in tool_map
+        @test name isa String
+        @test tool isa Tool
+    end
+    tool1 = tool_map["my_test_function"]
+    @test tool1.name == "my_test_function"
+    @test tool1.description == "This is a test function.\n"
+    @test tool1.callable == my_test_function
+    @test tool1.strict == nothing
+    @test tool1.parameters["properties"]["x"]["type"] == "integer"
+    @test tool1.parameters["properties"]["y"]["type"] == "string"
+    @test Set(tool1.parameters["required"]) == Set(["x", "y"])
+
+    tool2 = tool_map["MyMeasurement3"]
+    @test tool2.name == "MyMeasurement3"
+    @test tool2.description == "Person's age, height, and weight.\n"
+    @test tool2.callable == MyMeasurement3
+    @test tool2.strict == nothing
+    @test tool2.parameters["properties"]["age"]["type"] == "integer"
+    @test tool2.parameters["properties"]["height"]["type"] == "integer"
+    @test tool2.parameters["properties"]["weight"]["type"] == "number"
+end
+
+@testset "parse_tool" begin
+    # Test parsing a valid JSON string into a struct
+    struct MyStruct1233
+        x::Int
+        y::String
+    end
+    result = parse_tool("{\"x\": 1, \"y\": \"test\"}", MyStruct1233)
+    @test result.x == 1
+    @test result.y == "test"
+
+    # Test parsing an empty JSON string
+    struct EmptyStruct end
+    @test parse_tool("{}", EmptyStruct) isa EmptyStruct
+
+    # Test parsing a valid JSON string with missing fields
+    @kwdef struct PartialStruct
+        x::Int
+        y::Union{String, Nothing} = nothing
+    end
+    result = parse_tool("{\"x\": 1}", PartialStruct)
+    @test result.x == 1
+    @test result.y === nothing
+
+    # Test parsing an invalid JSON string
+    @test_logs (:warn, r"There was an error parsing the response:.*") parse_tool(
+        "{\"a\": 1}", Tuple)
+
+    # Test parsing a valid JSON string into a Dict
+    result = parse_tool("{\"x\": 1, \"y\": \"test\"}", Dict)
+    @test result isa Dict
+    @test result["x"] == 1
+    @test result["y"] == "test"
+
+    # Test parsing an empty dict
+    @test parse_tool(Dict(), EmptyStruct) isa EmptyStruct
+
+    # Test parsing a non-empty dict
+    result = parse_tool(
+        Dict("x" => 1, "y" => "test"), NamedTuple{(:x, :y), Tuple{Int, String}})
+    @test result.x == 1
+    @test result.y == "test"
+end
+
+@testset "execute_tool" begin
+    # Test executing a function with ordered arguments
+    args = Dict(:x => 5, :y => "hello")
+    @test execute_tool(my_test_function, args) == "Test function: 5, hello"
+
+    # Test executing a function with unordered arguments
+    args_unordered = Dict(:y => "world", :x => 10)
+    @test execute_tool(my_test_function, args_unordered) == "Test function: 10, world"
+
+    tool = Tool(my_test_function)
+    @test execute_tool(tool, args) == "Test function: 5, hello"
 end
