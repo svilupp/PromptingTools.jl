@@ -32,7 +32,9 @@ const RESERVED_KWARGS = [
     :strict,
     :json_mode,
     :no_system_message,
-    :aiprefill
+    :aiprefill,
+    :name_user,
+    :name_assistant
 ]
 
 # export replace_words, recursive_splitter, split_by_length, call_cost, auth_header # for debugging only
