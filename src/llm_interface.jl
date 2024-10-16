@@ -482,7 +482,7 @@ function response_to_message(schema::AbstractPromptSchema,
         model_id::AbstractString = "",
         time::Float64 = 0.0,
         run_id::Integer = rand(Int16),
-        sample_id::Union{Nothing, Integer} = nothing) where {T}
+        sample_id::Union{Nothing, Integer} = nothing, kwargs...) where {T}
     throw(ArgumentError("Response unwrapping not implemented for $(typeof(schema)) and $MSG"))
 end
 

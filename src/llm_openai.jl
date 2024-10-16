@@ -5,6 +5,7 @@
         image_detail::AbstractString = "auto",
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         no_system_message::Bool = false,
+        name_user::Union{Nothing, String} = nothing,
         kwargs...)
 
 Builds a history of the conversation to provide the prompt to the API. All unspecified kwargs are passed as replacements such that `{{key}}=>value` in the template.
@@ -13,12 +14,14 @@ Builds a history of the conversation to provide the prompt to the API. All unspe
 - `image_detail`: Only for `UserMessageWithImages`. It represents the level of detail to include for images. Can be `"auto"`, `"high"`, or `"low"`.
 - `conversation`: An optional vector of `AbstractMessage` objects representing the conversation history. If not provided, it is initialized as an empty vector.
 - `no_system_message`: If `true`, do not include the default system message in the conversation history OR convert any provided system message to a user message.
+- `name_user`: No-op for consistency.
 """
 function render(schema::AbstractOpenAISchema,
         messages::Vector{<:AbstractMessage};
         image_detail::AbstractString = "auto",
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         no_system_message::Bool = false,
+        name_user::Union{Nothing, String} = nothing,
         kwargs...)
     ##
     @assert image_detail in ["auto", "high", "low"] "Image detail must be one of: auto, high, low"
@@ -56,7 +59,12 @@ function render(schema::AbstractOpenAISchema,
                 "tool_call_id" => msg.tool_call_id)
         else
             ## Vanilla assistant message
-            Dict("role" => role4render(schema, msg), "content" => msg.content)
+            Dict("role" => role4render(schema, msg),
+                "content" => msg.content)
+        end
+        ## Add name if it exists
+        if hasproperty(msg, :name) && !isnothing(msg.name)
+            new_msg["name"] = msg.name
         end
         push!(conversation, new_msg)
     end
@@ -514,8 +522,9 @@ end
         resp;
         model_id::AbstractString = "",
         time::Float64 = 0.0,
-        run_id::Integer = rand(Int16),
-        sample_id::Union{Nothing, Integer} = nothing)
+        run_id::Int = Int(rand(Int32)),
+        sample_id::Union{Nothing, Integer} = nothing,
+        name_assistant::Union{Nothing, String} = nothing)
 
 Utility to facilitate unwrapping of HTTP response to a message type `MSG` provided for OpenAI-like responses
 
@@ -530,6 +539,7 @@ Note: Extracts `finish_reason` and `log_prob` if available in the response.
 - `time::Float64`: The elapsed time for the response. Defaults to `0.0`.
 - `run_id::Integer`: The run ID for the response. Defaults to a random integer.
 - `sample_id::Union{Nothing, Integer}`: The sample ID for the response (if there are multiple completions). Defaults to `nothing`.
+- `name_assistant::Union{Nothing, String}`: The name to use for the assistant in the conversation history. Defaults to `nothing`.
 """
 function response_to_message(schema::AbstractOpenAISchema,
         MSG::Type{AIMessage},
@@ -538,7 +548,8 @@ function response_to_message(schema::AbstractOpenAISchema,
         model_id::AbstractString = "",
         time::Float64 = 0.0,
         run_id::Int = Int(rand(Int32)),
-        sample_id::Union{Nothing, Integer} = nothing)
+        sample_id::Union{Nothing, Integer} = nothing,
+        name_assistant::Union{Nothing, String} = nothing)
     ## extract sum log probability
     has_log_prob = haskey(choice, :logprobs) &&
                    !isnothing(get(choice, :logprobs, nothing)) &&
@@ -557,6 +568,7 @@ function response_to_message(schema::AbstractOpenAISchema,
     msg = MSG(;
         content = choice[:message][:content] |> strip,
         status = Int(resp.status),
+        name = name_assistant,
         cost,
         run_id,
         sample_id,
@@ -673,6 +685,8 @@ function aigenerate(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         streamcallback::Any = nothing,
         no_system_message::Bool = false,
+        name_user::Union{Nothing, String} = nothing,
+        name_assistant::Union{Nothing, String} = nothing,
         http_kwargs::NamedTuple = (retry_non_idempotent = true,
             retries = 5,
             readtimeout = 120), api_kwargs::NamedTuple = NamedTuple(),
@@ -682,7 +696,7 @@ function aigenerate(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_
     ## Find the unique ID for the model alias provided
     model_id = get(MODEL_ALIASES, model, model)
     conv_rendered = render(
-        prompt_schema, prompt; conversation, no_system_message, kwargs...)
+        prompt_schema, prompt; conversation, no_system_message, name_user, kwargs...)
 
     if !dry_run
         time = @elapsed r = create_chat(prompt_schema, api_key,
@@ -692,24 +706,21 @@ function aigenerate(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_
             http_kwargs,
             api_kwargs...)
         ## Process one of more samples returned
-        msg = if length(r.response[:choices]) > 1
-            run_id = Int(rand(Int32)) # remember one run ID
-            ## extract all message
-            msgs = [response_to_message(prompt_schema, AIMessage, choice, r;
-                        time, model_id, run_id, sample_id = i)
-                    for (i, choice) in enumerate(r.response[:choices])]
-            ## Order by log probability if available
-            ## bigger is better, keep it last
-            if all(x -> !isnothing(x.log_prob), msgs)
-                sort(msgs, by = x -> x.log_prob)
-            else
-                msgs
-            end
+        has_many_samples = length(r.response[:choices]) > 1
+        run_id = Int(rand(Int32)) # remember one run ID
+        ## extract all message
+        msg = [response_to_message(prompt_schema, AIMessage, choice, r;
+                   time, model_id, run_id, name_assistant,
+                   sample_id = has_many_samples ? i : nothing)
+               for (i, choice) in enumerate(r.response[:choices])]
+        ## Order by log probability if available
+        ## bigger is better, keep it last
+        msg = if has_many_samples && all(x -> !isnothing(x.log_prob), msg)
+            sort(msg, by = x -> x.log_prob)
+        elseif has_many_samples
+            msg
         else
-            ## only 1 sample / 1 completion
-            choice = r.response[:choices][begin]
-            response_to_message(prompt_schema, AIMessage, choice, r;
-                time, model_id)
+            only(msg)
         end
         ## Reporting
         verbose && @info _report_stats(msg, model_id)
@@ -1027,18 +1038,22 @@ function decode_choices(schema::OpenAISchema, choices, conv::AbstractVector;
         model::AbstractString,
         token_ids_map::Union{Nothing, Dict{<:AbstractString, <:Integer}} = nothing,
         kwargs...)
-    if length(conv) > 0 && last(conv) isa AIMessage && hasproperty(last(conv), :run_id)
+    conv_output = if length(conv) > 0 && last(conv) isa AIMessage &&
+                     hasproperty(last(conv), :run_id)
         ## if it is a multi-sample response, 
         ## Remember its run ID and convert all samples in that run
         run_id = last(conv).run_id
-        for i in eachindex(conv)
-            msg = conv[i]
-            if isaimessage(msg) && msg.run_id == run_id
-                conv[i] = decode_choices(schema, choices, msg; model, token_ids_map)
-            end
-        end
+        ## Need to re-render the conversation history if the types changed
+        [if isaimessage(conv[i]) && conv[i].run_id == run_id
+             decode_choices(schema, choices, conv[i]; model, token_ids_map)
+         else
+             conv[i]
+         end
+         for i in eachindex(conv)]
+    else
+        conv
     end
-    return conv
+    return conv_output
 end
 
 """
@@ -1479,16 +1494,14 @@ function aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_T
                    tool_map = tool_map, time, model_id, run_id, json_mode,
                    sample_id = has_many_samples ? i : nothing)
                for (i, choice) in enumerate(r.response[:choices])]
-        ## extract all message
-        msg = [response_to_message(prompt_schema, DataMessage, choice, r;
-                   tool_map = tool_map, time, model_id, run_id, sample_id = i, json_mode)
-               for (i, choice) in enumerate(r.response[:choices])]
         ## Order by log probability if available
         ## bigger is better, keep it last
-        if has_many_samples && all(x -> !isnothing(x.log_prob), msg)
+        msg = if has_many_samples && all(x -> !isnothing(x.log_prob), msg)
             sort(msg, by = x -> x.log_prob)
-        else
+        elseif has_many_samples
             msg
+        else
+            only(msg)
         end
 
         ## Reporting
@@ -1821,7 +1834,9 @@ function response_to_message(schema::AbstractOpenAISchema,
         time::Float64 = 0.0,
         run_id::Int = Int(rand(Int32)),
         sample_id::Union{Nothing, Integer} = nothing,
-        json_mode::Union{Nothing, Bool} = nothing)
+        json_mode::Union{Nothing, Bool} = nothing,
+        name_user::Union{Nothing, String} = nothing,
+        name_assistant::Union{Nothing, String} = nothing)
     @assert !isnothing(tool_map) "You must provide a tool_map for AIToolRequest construction"
     ## extract sum log probability
     has_log_prob = haskey(choice, :logprobs) &&
@@ -1841,11 +1856,11 @@ function response_to_message(schema::AbstractOpenAISchema,
     has_tools = haskey(choice[:message], :tool_calls) &&
                 !isempty(choice[:message][:tool_calls])
     tools_array = if json_mode == true
-        name, tool = only(tool_map)
+        tool_name, tool = only(tool_map)
         [ToolMessage(;
             content = nothing, req_id = run_id, tool_call_id = choice[:id],
             raw = JSON3.write(choice[:message][:content]),
-            args = choice[:message][:content], name = name)]
+            args = choice[:message][:content], name = tool_name)]
     elseif has_tools
         [ToolMessage(; raw = tool_call[:function][:arguments],
              args = JSON3.read(tool_call[:function][:arguments]),
@@ -1868,6 +1883,7 @@ function response_to_message(schema::AbstractOpenAISchema,
     ## build DataMessage object
     msg = MSG(;
         content = content,
+        name = name_assistant,
         tool_calls = tools_array,
         status = Int(resp.status),
         cost,
@@ -1882,7 +1898,7 @@ function response_to_message(schema::AbstractOpenAISchema,
 end
 
 function aitools(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE;
-        tools::Union{Type, AbstractTool, Vector},
+        tools::Union{Type, AbstractTool, Vector} = Tool[],
         verbose::Bool = true,
         api_key::String = OPENAI_API_KEY,
         model::String = MODEL_CHAT,
@@ -1894,6 +1910,8 @@ function aitools(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYP
             tool_choice = nothing),
         strict::Union{Nothing, Bool} = nothing,
         json_mode::Union{Nothing, Bool} = nothing,
+        name_user::Union{Nothing, String} = nothing,
+        name_assistant::Union{Nothing, String} = nothing,
         kwargs...)
     ##
     global MODEL_ALIASES
@@ -1904,12 +1922,11 @@ function aitools(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYP
     tools = render(prompt_schema, tool_map; json_mode)
     ## force our function to be used
     tool_choice_ = get(api_kwargs, :tool_choice, nothing)
-    tool_choice = if tool_choice_ == "exact" ||
-                     (isnothing(tool_choice_) && length(tools) == 1)
+    tool_choice = if tool_choice_ == "exact"
         ## Standard for OpenAI API
         Dict(:type => "function",
             :function => Dict(:name => only(tools)[:function][:name]))
-    elseif tool_choice_ == "auto" || (isnothing(tool_choice_) && length(tools) > 1)
+    elseif tool_choice_ == "auto" || isnothing(tool_choice_)
         # User provided value, eg, "auto", "any" for various providers like Mistral, Together, etc.
         "auto"
     else
@@ -1923,13 +1940,16 @@ function aitools(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYP
         (; [k => v for (k, v) in pairs(api_kwargs) if k != :tool_choice]...,
             response_format = (;
                 type = "json_schema", json_schema = only(tools)))
+    elseif isempty(tools)
+        api_kwargs
     else
         merge(api_kwargs, (; tools, tool_choice))
     end
 
     ## Find the unique ID for the model alias provided
     model_id = get(MODEL_ALIASES, model, model)
-    conv_rendered = render(prompt_schema, prompt; conversation, kwargs...)
+    conv_rendered = render(
+        prompt_schema, prompt; conversation, name_user, kwargs...)
 
     if !dry_run
         time = @elapsed r = create_chat(prompt_schema, api_key,
@@ -1943,14 +1963,16 @@ function aitools(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYP
         ## extract all message
         msg = [response_to_message(prompt_schema, AIToolRequest, choice, r;
                    tool_map = tool_map, time, model_id, run_id, json_mode,
-                   sample_id = has_many_samples ? i : nothing)
+                   sample_id = has_many_samples ? i : nothing, name_assistant)
                for (i, choice) in enumerate(r.response[:choices])]
         ## Order by log probability if available
         ## bigger is better, keep it last
-        if has_many_samples && all(x -> !isnothing(x.log_prob), msg)
+        msg = if has_many_samples && all(x -> !isnothing(x.log_prob), msg)
             sort(msg, by = x -> x.log_prob)
-        else
+        elseif has_many_samples
             msg
+        else
+            only(msg)
         end
         ## Reporting
         verbose && @info _report_stats(msg, model_id)
