@@ -1,5 +1,6 @@
 using PromptingTools: AIMessage, SystemMessage, MetadataMessage, AbstractMessage
-using PromptingTools: UserMessage, UserMessageWithImages, DataMessage
+using PromptingTools: UserMessage, UserMessageWithImages, DataMessage, AIToolRequest,
+                      ToolMessage
 using PromptingTools: _encode_local_image, attach_images_to_user_message, last_message,
                       last_output
 using PromptingTools: isusermessage, issystemmessage, isdatamessage, isaimessage,

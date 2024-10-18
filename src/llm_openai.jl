@@ -825,12 +825,13 @@ function response_to_message(schema::AbstractOpenAISchema,
     tools_array = if json_mode == true
         name, tool = only(tool_map)
         [parse_tool(
-            choice[:message][:content], tool.callable)]
+            tool.callable, choice[:message][:content])]
     else
         ## If name does not match, we use the callable from the tool_map 
         ## Can happen only in testing with auto-generated struct
-        [parse_tool(tool_call[:function][:arguments],
-             get(tool_map, tool_call[:function][:name], (; callable = Dict)).callable)
+        [parse_tool(
+             get(tool_map, tool_call[:function][:name], (; callable = Dict)).callable,
+             tool_call[:function][:arguments])
          for tool_call in choice[:message][:tool_calls]]
     end
     ## Remember the tools

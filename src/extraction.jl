@@ -616,13 +616,13 @@ end
 ### Processing utilities
 
 """
-    tool_parse(blob::AbstractString, datatype::Type)
+    parse_tool(datatype::Type, blob::AbstractString)
 
 Parse the JSON blob into the specified datatype in try-catch mode.
 
 If parsing fails, it tries to return the untyped JSON blob in a dictionary.
 """
-function parse_tool(blob::AbstractString, datatype::Type)
+function parse_tool(datatype::Type, blob::AbstractString)
     try
         return if blob == "{}"
             ## If empty, return empty datatype
@@ -638,8 +638,11 @@ function parse_tool(blob::AbstractString, datatype::Type)
 end
 
 ## Utility for Anthropic - it returns a parsed dict and we need text for deserialization into an object
-function parse_tool(blob::AbstractDict, datatype::Type)
-    isempty(blob) ? datatype() : parse_tool(JSON3.write(blob), datatype)
+function parse_tool(datatype::Type, blob::AbstractDict)
+    isempty(blob) ? datatype() : parse_tool(datatype, JSON3.write(blob))
+end
+function parse_tool(tool::AbstractTool, input::Union{AbstractString, AbstractDict})
+    return parse_tool(tool.callable, input)
 end
 
 """

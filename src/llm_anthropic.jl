@@ -603,10 +603,11 @@ function aiextract(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMP
     model_id = get(MODEL_ALIASES, model, model)
 
     ## Tools definition
-    schemas, type_map = function_call_signature(
+    tool_map = tool_call_signature(
         return_type; max_description_length = 100)
-    tools = [Dict("name" => sig["name"], "description" => get(sig, "description", ""),
-                 "input_schema" => sig["parameters"]) for sig in schemas]
+    tools = [Dict("name" => name,
+                 "description" => isnothing(tool.description) ? "" : tool.description,
+                 "input_schema" => tool.parameters) for (name, tool) in pairs(tool_map)]
     ## update tools to use caching
     (cache == :tools || cache == :all) &&
         (tools[end]["cache_control"] = Dict("type" => "ephemeral"))
@@ -626,7 +627,7 @@ function aiextract(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMP
         tokens_completion = get(resp.response[:usage], :output_tokens, 0)
         finish_reason = get(resp.response, :stop_reason, nothing)
         content = if finish_reason == "tool_use"
-            tool_array = [tool_parse(tool_use[:input], type_map[tool_use[:name]])
+            tool_array = [parse_tool(tool_map[tool_use[:name]], tool_use[:input])
                           for tool_use in resp.response[:content]
                           if tool_use[:type] == "tool_use"]
             ## If a single tool was used, return it directly
@@ -670,6 +671,7 @@ end
 
 function aitools(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMPT_TYPE;
         kwargs...)
+    ## TODO: implement aitools for Anthropic
     error("Anthropic schema does not yet support aitools. Please use OpenAISchema instead.")
 end
 function aiembed(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMPT_TYPE;
