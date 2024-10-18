@@ -1,4 +1,5 @@
 using PromptingTools: TestEchoOpenAISchema
+using PromptingTools.Experimental.RAGTools: ChunkIndex
 using PromptingTools.Experimental.RAGTools: ContextEnumerator, NoRephraser, SimpleRephraser,
                                             HyDERephraser,
                                             CosineSimilarity, BinaryCosineSimilarity,
@@ -611,10 +612,13 @@ end
             response = Dict(
                 :choices => [
                     Dict(:finish_reason => "stop",
-                    :message => Dict(:tool_calls => [
-                        Dict(:function => Dict(:arguments => JSON3.write(MaybeTags([
-                        Tag("yes", "category")
-                    ]))))]))],
+                    :message => Dict(
+                        :tool_calls => [
+                            Dict(:id => "1",
+                            :function => Dict(:arguments => JSON3.write(MaybeTags([
+                                Tag("yes", "category")
+                            ]))))],
+                        :name => "MaybeTags"))],
                 :model => content[:model],
                 :usage => Dict(:total_tokens => length(user_msg[:content]),
                     :prompt_tokens => length(user_msg[:content]),
