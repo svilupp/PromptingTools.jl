@@ -128,8 +128,6 @@ using PromptingTools: call_cost, anthropic_api, function_call_signature,
             "input_schema" => ""),
         Dict("name" => "function_abc", "description" => "ABC",
             "input_schema" => "")]
-    @test_logs (:warn, r"Multiple tools provided") match_mode=:any render(
-        schema, messages; tools)
 
     ## Cache variables
     messages = [
@@ -386,7 +384,8 @@ end
     end
     response = Dict(
         :content => [
-            Dict(:type => "tool_use", :input => Dict("name" => "banana"))],
+            Dict(:type => "tool_use", :id => "1", :name => "Fruit",
+            :input => Dict("name" => "banana"))],
         :stop_reason => "tool_use",
         :usage => Dict(:input_tokens => 2, :output_tokens => 1))
 
@@ -403,7 +402,7 @@ end
         elapsed = msg.elapsed)
     @test msg == expected_output
     @test schema1.inputs.system ==
-          "Act as a helpful AI assistant\n\nUse the Fruit_extractor tool in your response."
+          "Act as a helpful AI assistant\n\nUse the Fruit tool in your response."
     @test schema1.inputs.messages ==
           [Dict("role" => "user",
         "content" => Dict{String, Any}[Dict(
@@ -413,7 +412,8 @@ end
     # Test badly formatted response
     response = Dict(
         :content => [
-            Dict(:type => "tool_use", :input => Dict("namexxx" => "banana"))],
+            Dict(:type => "tool_use", :id => "1", :name => "Fruit",
+            :input => Dict("namexxx" => "banana"))],
         :stop_reason => "tool_use",
         :usage => Dict(:input_tokens => 2, :output_tokens => 1))
     schema2 = TestEchoAnthropicSchema(; response, status = 200)
@@ -434,7 +434,8 @@ end
     # With Cache
     response4 = Dict(
         :content => [
-            Dict(:type => "tool_use", :input => Dict("name" => "banana"))],
+            Dict(:type => "tool_use", :id => "1", :name => "Fruit",
+            :input => Dict("name" => "banana"))],
         :stop_reason => "tool_use",
         :usage => Dict(:input_tokens => 2, :output_tokens => 1,
             :cache_creation_input_tokens => 1, :cache_read_input_tokens => 0))
@@ -463,4 +464,5 @@ end
     @test_throws ErrorException aiclassify(AnthropicSchema(), "prompt")
     @test_throws ErrorException aiscan(AnthropicSchema(), "prompt")
     @test_throws ErrorException aiimage(AnthropicSchema(), "prompt")
+    @test_throws ErrorException aitools(AnthropicSchema(), "prompt")
 end

@@ -650,39 +650,39 @@ end
         x::Int
         y::String
     end
-    result = parse_tool("{\"x\": 1, \"y\": \"test\"}", MyStruct1233)
+    result = parse_tool(MyStruct1233, "{\"x\": 1, \"y\": \"test\"}")
     @test result.x == 1
     @test result.y == "test"
 
     # Test parsing an empty JSON string
     struct EmptyStruct end
-    @test parse_tool("{}", EmptyStruct) isa EmptyStruct
+    @test parse_tool(EmptyStruct, "{}") isa EmptyStruct
 
     # Test parsing a valid JSON string with missing fields
     @kwdef struct PartialStruct
         x::Int
         y::Union{String, Nothing} = nothing
     end
-    result = parse_tool("{\"x\": 1}", PartialStruct)
+    result = parse_tool(PartialStruct, "{\"x\": 1}")
     @test result.x == 1
     @test result.y === nothing
 
     # Test parsing an invalid JSON string
     @test_logs (:warn, r"There was an error parsing the response:.*") parse_tool(
-        "{\"a\": 1}", Tuple)
+        Tuple, "{\"a\": 1}")
 
     # Test parsing a valid JSON string into a Dict
-    result = parse_tool("{\"x\": 1, \"y\": \"test\"}", Dict)
+    result = parse_tool(Dict, "{\"x\": 1, \"y\": \"test\"}")
     @test result isa Dict
     @test result["x"] == 1
     @test result["y"] == "test"
 
     # Test parsing an empty dict
-    @test parse_tool(Dict(), EmptyStruct) isa EmptyStruct
+    @test parse_tool(Dict, "{}") isa Dict
 
     # Test parsing a non-empty dict
     result = parse_tool(
-        Dict("x" => 1, "y" => "test"), NamedTuple{(:x, :y), Tuple{Int, String}})
+        NamedTuple{(:x, :y), Tuple{Int, String}}, "{\"x\": 1, \"y\": \"test\"}")
     @test result.x == 1
     @test result.y == "test"
 end

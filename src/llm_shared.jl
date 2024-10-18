@@ -46,12 +46,18 @@ function render(schema::NoSchema,
                             for (key, value) in pairs(replacement_kwargs)
                             if key in msg.variables]
             ## Force System message to UserMessage if no_system_message=true
+            ## TODO: fix to support TracerMessage -- it would temporarily drop the tracing
             MSGTYPE = no_system_message && issystemmessage(msg) ? UserMessage : typeof(msg)
             # Rebuild the message with the replaced content
-            new_msg = MSGTYPE(;
-                # unpack the type to replace only the content field
-                [(field, getfield(msg, field)) for field in fieldnames(typeof(msg))]...,
-                content = replace(msg.content, replacements...))
+            new_msg = if istracermessage(msg)
+                ## No updating if it's already traced (=past message)
+                msg
+            else
+                MSGTYPE(;
+                    # unpack the type to replace only the content field
+                    [(field, getfield(msg, field)) for field in fieldnames(typeof(msg))]...,
+                    content = replace(msg.content, replacements...))
+            end
             if issystemmessage(msg)
                 count_system_msg += 1
                 # move to the front
