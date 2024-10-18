@@ -470,6 +470,7 @@ end
     @test tool.description == "Some docstring\n"
     @test tool.strict == nothing
     @test tool.callable == MyMeasurement2
+    @test isabstracttool(tool)
 
     ## MaybeWraper name cleanup
     tool_map = tool_call_signature(MaybeExtract{MyMeasurement2})

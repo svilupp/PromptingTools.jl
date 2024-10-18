@@ -79,6 +79,7 @@ include("streaming.jl")
 
 ## Individual interfaces
 include("llm_shared.jl")
+include("llm_openai_schema_defs.jl")
 include("llm_openai.jl")
 include("llm_ollama_managed.jl")
 include("llm_ollama.jl")

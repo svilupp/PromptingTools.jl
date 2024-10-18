@@ -340,7 +340,7 @@ end
 
 """
     tool_call_signature(
-        datastructtype::Type; strict::Union{Nothing, Bool} = nothing,
+        type_or_method::Union{Type, Method}; strict::Union{Nothing, Bool} = nothing,
         max_description_length::Int = 200, name::Union{Nothing, String} = nothing,
         docs::Union{Nothing, String} = nothing)
 
@@ -349,6 +349,16 @@ Extract the argument names, types and docstrings from a struct to create the fun
 You must provide a Struct type (not an instance of it) with some fields.
 
 Note: Fairly experimental, but works for combination of structs, arrays, strings and singletons.
+
+# Arguments
+- `type_or_method::Union{Type, Method}`: The struct type or method to extract the signature from.
+- `strict::Union{Nothing, Bool}`: Whether to enforce strict mode for the schema. Defaults to `nothing`.
+- `max_description_length::Int`: Maximum length for descriptions. Defaults to 200.
+- `name::Union{Nothing, String}`: The name of the tool. Defaults to the name of the struct.
+- `docs::Union{Nothing, String}`: The description of the tool. Defaults to the docstring of the struct/overall function.
+
+# Returns
+- `Dict{String, Any}`: A dictionary representing the function call signature schema.
 
 # Tips
 - You can improve the quality of the extraction by writing a helpful docstring for your struct (or any nested struct). It will be provided as a description. 
@@ -366,19 +376,21 @@ struct MyMeasurement
     height::Union{Int,Nothing}
     weight::Union{Nothing,Float64}
 end
-signature, t = tool_call_signature(MyMeasurement)
+tool_map = tool_call_signature(MyMeasurement)
 #
-# Dict{String, Any} with 3 entries:
-#   "name"        => "MyMeasurement_extractor"
-#   "parameters"  => Dict{String, Any}("properties"=>Dict{String, Any}("height"=>Dict{String, Any}("type"=>"integer"), "weight"=>Dic…
-#   "description" => "Represents person's age, height, and weight
+# Dict{String, PromptingTools.Tool}("MyMeasurement" => PromptingTools.Tool
+#   name: String "MyMeasurement"
+#   parameters: Dict{String, Any}
+#   description: Nothing nothing
+#   strict: Nothing nothing
+#   callable: MyMeasurement <: Any
 "
 ```
 
 You can see that only the field `age` does not allow null values, hence, it's "required".
 While `height` and `weight` are optional.
 ```
-signature["parameters"]["required"]
+tool_map["MyMeasurement"].parameters["required"]
 # ["age"]
 ```
 
@@ -491,7 +503,10 @@ function tool_call_signature(
 end
 
 """
-    tool_call_signature(fields::Vector; strict::Union{Nothing, Bool} = nothing, max_description_length::Int = 200)
+    tool_call_signature(fields::Vector;
+        strict::Union{Nothing, Bool} = nothing, max_description_length::Int = 200, name::Union{
+            Nothing, String} = nothing,
+        docs::Union{Nothing, String} = nothing)
 
 Generate a function call signature schema for a dynamically generated struct based on the provided fields.
 
@@ -499,10 +514,10 @@ Generate a function call signature schema for a dynamically generated struct bas
 - `fields::Vector{Union{Symbol, Pair{Symbol, Type}, Pair{Symbol, String}}}`: A vector of field names or pairs of field name and type or string description, eg, `[:field1, :field2, :field3]` or `[:field1 => String, :field2 => Int, :field3 => Float64]` or `[:field1 => String, :field1__description => "Field 1 has the name"]`.
 - `strict::Union{Nothing, Bool}`: Whether to enforce strict mode for the schema. Defaults to `nothing`.
 - `max_description_length::Int`: Maximum length for descriptions. Defaults to 200.
+- `name::Union{Nothing, String}`: The name of the tool. Defaults to the name of the struct.
+- `docs::Union{Nothing, String}`: The description of the tool. Defaults to the docstring of the struct/overall function.
 
-# Returns a tuple of (schema, struct type)
-- `Dict{String, Any}`: A dictionary representing the function call signature schema.
-- `Type`: The struct type to create instance of the result.
+# Returns a `tool_map` with the tool name as the key and the tool object as the value.
 
 See also `generate_struct`, `aiextract`, `update_field_descriptions!`.
 
@@ -538,7 +553,6 @@ function tool_call_signature(fields::Vector;
     tool_map[name] = Tool(;
         [k => getfield(tool, k) for k in fieldnames(Tool) if k != :callable]...,
         callable = datastructtype)
-
     return tool_map
 end
 

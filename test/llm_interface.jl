@@ -1,7 +1,8 @@
 using PromptingTools: TestEchoOpenAISchema, render, OpenAISchema
 using PromptingTools: AIMessage, SystemMessage, AbstractMessage
 using PromptingTools: UserMessage, UserMessageWithImages, DataMessage
-using PromptingTools: response_to_message, AbstractPromptSchema
+using PromptingTools: response_to_message, AbstractPromptSchema, isextracted,
+                      AbstractExtractedData
 
 @testset "ai* default schema" begin
     OLD_PROMPT_SCHEMA = PromptingTools.PROMPT_SCHEMA
@@ -95,4 +96,11 @@ using PromptingTools: response_to_message, AbstractPromptSchema
         AIMessage,
         nothing,
         nothing)
+end
+
+@testset "isextracted" begin
+    struct Xdata123 <: AbstractExtractedData end
+    @test !isextracted(Dict("x" => 1))
+    @test !isextracted(1)
+    @test isextracted(Xdata123())
 end
