@@ -230,11 +230,13 @@ end
             Dict(:finish_reason => "stop",
             :message => Dict(
                 :tool_calls => [
-                    Dict(:id => "1",
-                    :function => Dict(:arguments => JSON3.write(MaybeTags([
+                Dict(:id => "1",
+                :function => Dict(
+                    :arguments => JSON3.write(MaybeTags([
                         Tag("yes", "categoryx")
-                    ]))))],
-                :name => "MaybeTags"))],
+                    ])),
+                    :name => "MaybeTags"))]
+            ))],
         :usage => Dict(:total_tokens => 3, :prompt_tokens => 2, :completion_tokens => 1))
     schema = TestEchoOpenAISchema(; response = response, status = 200)
     PT.register_model!(; name = "mock-meta", schema)
@@ -316,11 +318,12 @@ end
                     Dict(:finish_reason => "stop",
                     :message => Dict(
                         :tool_calls => [
-                            Dict(:id => "1",
-                            :function => Dict(:arguments => JSON3.write(MaybeTags([
+                        Dict(:id => "1",
+                        :function => Dict(
+                            :arguments => JSON3.write(MaybeTags([
                                 Tag("yes", "category")
-                            ]))))],
-                        :name => "MaybeTags"))],
+                            ])),
+                            :name => "MaybeTags"))]))],
                 :model => content[:model],
                 :usage => Dict(:total_tokens => length(user_msg[:content]),
                     :prompt_tokens => length(user_msg[:content]),
