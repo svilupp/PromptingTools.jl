@@ -15,6 +15,7 @@ function aiclassify end
 function aiextract end
 function aiscan end
 function aiimage end
+function aitools end
 # Re-usable blocks are defined in src/llm_shared.jl
 
 ## Prompt Schema
@@ -459,6 +460,10 @@ function aiextract(prompt; model = MODEL_CHAT, kwargs...)
     schema = get(MODEL_REGISTRY, model, (; schema = PROMPT_SCHEMA)).schema
     aiextract(schema, prompt; model, kwargs...)
 end
+function aitools(prompt; model = MODEL_CHAT, kwargs...)
+    schema = get(MODEL_REGISTRY, model, (; schema = PROMPT_SCHEMA)).schema
+    aitools(schema, prompt; model, kwargs...)
+end
 function aiscan(prompt; model = MODEL_CHAT, kwargs...)
     schema = get(MODEL_REGISTRY, model, (; schema = PROMPT_SCHEMA)).schema
     aiscan(schema, prompt; model, kwargs...)
@@ -467,6 +472,7 @@ function aiimage(prompt; model = MODEL_IMAGE_GENERATION, kwargs...)
     schema = get(MODEL_REGISTRY, model, (; schema = PROMPT_SCHEMA)).schema
     aiimage(schema, prompt; model, kwargs...)
 end
+
 "Utility to facilitate unwrapping of HTTP response to a message type `MSG` provided. Designed to handle multi-sample completions."
 function response_to_message(schema::AbstractPromptSchema,
         MSG::Type{T},
@@ -476,7 +482,7 @@ function response_to_message(schema::AbstractPromptSchema,
         model_id::AbstractString = "",
         time::Float64 = 0.0,
         run_id::Integer = rand(Int16),
-        sample_id::Union{Nothing, Integer} = nothing) where {T}
+        sample_id::Union{Nothing, Integer} = nothing, kwargs...) where {T}
     throw(ArgumentError("Response unwrapping not implemented for $(typeof(schema)) and $MSG"))
 end
 

@@ -150,4 +150,5 @@ end
 @testset "not implemented ai* functions" begin
     @test_throws ErrorException aiextract(OllamaSchema(), "prompt")
     @test_throws ErrorException aiclassify(OllamaSchema(), "prompt")
+    @test_throws ErrorException aitools(OllamaSchema(), "prompt")
 end

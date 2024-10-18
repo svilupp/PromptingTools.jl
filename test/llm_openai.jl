@@ -1,20 +1,24 @@
-using PromptingTools: TestEchoOpenAISchema, render, OpenAISchema
+using PromptingTools: TestEchoOpenAISchema, render, OpenAISchema, role4render
 using PromptingTools: AIMessage, SystemMessage, AbstractMessage
-using PromptingTools: UserMessage, UserMessageWithImages, DataMessage
+using PromptingTools: UserMessage, UserMessageWithImages, DataMessage, AIToolRequest,
+                      ToolMessage, Tool
 using PromptingTools: CustomProvider,
                       CustomOpenAISchema, MistralOpenAISchema, MODEL_EMBEDDING,
                       MODEL_IMAGE_GENERATION
 using PromptingTools: encode_choices, decode_choices, response_to_message, call_cost,
-                      isextracted
+                      isextracted, isaitoolrequest, istoolmessage
 using PromptingTools: pick_tokenizer, OPENAI_TOKEN_IDS_GPT35_GPT4, OPENAI_TOKEN_IDS_GPT4O
 
 @testset "render-OpenAI" begin
     schema = OpenAISchema()
 
-    role4render(schema, SystemMessage("System message 1")) == "system"
-    role4render(schema, UserMessage("User message 1")) == "user"
-    role4render(schema, UserMessageWithImages("User message 1"; image_url = "")) == "user"
-    role4render(schema, AIMessage("AI message 1")) == "assistant"
+    @test role4render(schema, SystemMessage("System message 1")) == "system"
+    @test role4render(schema, UserMessage("User message 1")) == "user"
+    @test role4render(schema, UserMessageWithImages("User message 1"; image_url = "")) ==
+          "user"
+    @test role4render(schema, AIMessage("AI message 1")) == "assistant"
+    @test role4render(schema, AIToolRequest()) == "assistant"
+    @test role4render(schema, ToolMessage(; tool_call_id = "x", raw = "")) == "tool"
 
     # Given a schema and a vector of messages with handlebar variables, it should replace the variables with the correct values in the conversation dictionary.
     messages = [
@@ -78,14 +82,14 @@ using PromptingTools: pick_tokenizer, OPENAI_TOKEN_IDS_GPT35_GPT4, OPENAI_TOKEN_
 
     # Given a schema and a vector of messages with a system message, it should move the system message to the front of the conversation dictionary.
     messages = [
-        UserMessage("Hello"),
-        AIMessage("Hi there"),
+        UserMessage(; content = "Hello", name = "John"),
+        AIMessage(; content = "Hi there", name = "AI"),
         SystemMessage("This is a system message")
     ]
     expected_output = [
         Dict("role" => "system", "content" => "This is a system message"),
-        Dict("role" => "user", "content" => "Hello"),
-        Dict("role" => "assistant", "content" => "Hi there")
+        Dict("role" => "user", "content" => "Hello", "name" => "John"),
+        Dict("role" => "assistant", "content" => "Hi there", "name" => "AI")
     ]
     conversation = render(schema, messages)
     @test conversation == expected_output
@@ -143,6 +147,55 @@ using PromptingTools: pick_tokenizer, OPENAI_TOKEN_IDS_GPT35_GPT4, OPENAI_TOKEN_
                     "type" => "image_url")])]
     @test conversation == expected_output
 
+    # Test with ToolMessage
+    messages = [
+        SystemMessage("System message"),
+        UserMessage("User message"),
+        ToolMessage(;
+            tool_call_id = "tool1", raw = "", name = "calculator", args = Dict(), content = "4+4=8")
+    ]
+    conversation = render(schema, messages)
+    expected_output = Dict{String, Any}[
+        Dict("role" => "system", "content" => "System message"),
+        Dict("role" => "user", "content" => "User message"),
+        Dict("role" => "tool", "tool_call_id" => "tool1",
+            "name" => "calculator", "content" => "4+4=8")
+    ]
+    @test conversation == expected_output
+
+    # Test with AIToolRequest
+    args = Dict(
+        :location => "London",
+        :unit => "celsius"
+    )
+    messages = [
+        SystemMessage("System message"),
+        UserMessage("User message"),
+        AIToolRequest(;
+            tool_calls = [ToolMessage(;
+                tool_call_id = "call_123",
+                raw = JSON3.write(args),
+                name = "get_weather",
+                args)
+            ])
+    ]
+    conversation = render(schema, messages)
+    expected_output = Dict{String, Any}[
+        Dict("role" => "system", "content" => "System message"),
+        Dict("role" => "user", "content" => "User message"),
+        Dict("role" => "assistant",
+            "content" => nothing,
+            "tool_calls" => [
+                Dict("id" => "call_123",
+                "type" => "function",
+                "function" => Dict(
+                    "name" => "get_weather",
+                    "arguments" => "{\"location\":\"London\",\"unit\":\"celsius\"}"
+                ))
+            ])
+    ]
+    @test conversation == expected_output
+
     # With a list of images and detail="low"
     messages = [
         SystemMessage("System message 2"),
@@ -186,6 +239,76 @@ using PromptingTools: pick_tokenizer, OPENAI_TOKEN_IDS_GPT35_GPT4, OPENAI_TOKEN_
         image_url,
         dry_run = true) ==
           nothing
+end
+
+@testset "render for tools" begin
+    schema = CustomOpenAISchema()
+
+    # Test rendering a single tool
+    tool = PromptingTools.Tool(
+        name = "get_weather",
+        description = "Get the current weather in a given location",
+        parameters = Dict(
+            "type" => "object",
+            "properties" => Dict(
+                "location" => Dict("type" => "string"),
+                "unit" => Dict("type" => "string", "enum" => ["celsius", "fahrenheit"])
+            ),
+            "required" => ["location"]
+        ),
+        callable = identity
+    )
+
+    rendered = render(schema, [tool])
+    @test length(rendered) == 1
+    @test rendered[1][:type] == "function"
+    @test rendered[1][:function][:name] == "get_weather"
+    @test rendered[1][:function][:description] ==
+          "Get the current weather in a given location"
+    @test rendered[1][:function][:parameters] == tool.parameters
+
+    # Test rendering multiple tools
+    tool2 = PromptingTools.Tool(
+        name = "get_time",
+        description = "Get the current time in a given timezone",
+        parameters = Dict(
+            "type" => "object",
+            "properties" => Dict(
+                "timezone" => Dict("type" => "string")
+            ),
+            "required" => ["timezone"]
+        ),
+        callable = identity
+    )
+
+    rendered = render(schema, [tool, tool2])
+    @test length(rendered) == 2
+    @test rendered[1][:function][:name] == "get_weather"
+    @test rendered[2][:function][:name] == "get_time"
+
+    # Test rendering with json_mode=true
+    rendered = render(schema, [tool]; json_mode = true)
+    @test haskey(rendered[1][:function], :schema)
+    @test !haskey(rendered[1][:function], :parameters)
+    @test !haskey(rendered[1][:function], :description)
+
+    # Test rendering with strict=true
+    strict_tool = PromptingTools.Tool(
+        name = "strict_function",
+        description = "A function with strict input validation",
+        parameters = Dict(
+            "type" => "object",
+            "properties" => Dict(
+                "input" => Dict("type" => "string")
+            ),
+            "required" => ["input"]
+        ),
+        callable = identity,
+        strict = true
+    )
+
+    rendered = render(schema, [strict_tool])
+    @test rendered[1][:function][:strict] == true
 end
 
 @testset "OpenAI.build_url,OpenAI.auth_header" begin
@@ -306,7 +429,8 @@ end
     mock_choice = Dict(
         :message => Dict(:content => "Hello!",
             :tool_calls => [
-                Dict(:function => Dict(:arguments => JSON3.write(Dict(:x => 1))))
+                Dict(:function => Dict(
+                :arguments => JSON3.write(Dict(:x => 1)), :name => "RandomType1235"))
             ]),
         :logprobs => Dict(:content => [Dict(:logprob => -0.5), Dict(:logprob => -0.4)]),
         :finish_reason => "stop")
@@ -318,6 +442,7 @@ end
         x::Int
     end
     return_type = RandomType1235
+    tool_map = Dict("RandomType1235" => Tool(; name = "x", callable = return_type))
     # Catch missing return_type
     @test_throws AssertionError response_to_message(OpenAISchema(),
         DataMessage,
@@ -330,7 +455,7 @@ end
         DataMessage,
         mock_choice,
         mock_response;
-        return_type,
+        tool_map,
         model_id = "gpt4t")
     @test msg isa DataMessage
     @test msg.content == RandomType1235(1)
@@ -347,7 +472,7 @@ end
         DataMessage,
         choice,
         mock_response;
-        return_type)
+        tool_map)
     @test isnothing(msg.log_prob)
 
     # with sample_id and run_id
@@ -355,13 +480,112 @@ end
         DataMessage,
         mock_choice,
         mock_response;
-        return_type,
+        tool_map,
         run_id = 1,
         sample_id = 2,
         time = 2.0)
     @test msg.run_id == 1
     @test msg.sample_id == 2
     @test msg.elapsed == 2.0
+
+    ## for AIToolRequest
+    # Mock data
+    mock_choice = Dict(
+        :message => Dict(
+            :content => "This is a tool request",
+            :tool_calls => [
+                Dict(
+                :id => "call_abc123",
+                :type => "function",
+                :function => Dict(
+                    :name => "get_weather",
+                    :arguments => "{\"location\":\"New York\"}"
+                )
+            )
+            ]
+        ),
+        :finish_reason => "tool_calls",
+        :logprobs => Dict(:content => [Dict(:logprob => -0.5), Dict(:logprob => -0.3)])
+    )
+
+    mock_response = (
+        status = 200,
+        response = Dict(
+            :usage => Dict(:prompt_tokens => 10, :completion_tokens => 15)
+        )
+    )
+
+    get_weather(location) = "The weather in $location is nice"
+    tool_map = Dict("get_weather" => Tool(; name = "get_weather", callable = get_weather))
+
+    # Test basic functionality
+    msg = response_to_message(OpenAISchema(),
+        AIToolRequest,
+        mock_choice,
+        mock_response;
+        tool_map,
+        model_id = "gpt-4")
+
+    @test msg isa AIToolRequest
+    @test msg.content == "This is a tool request"
+    @test msg.status == 200
+    @test msg.tokens == (10, 15)
+    @test msg.log_prob ≈ -0.8
+    @test msg.finish_reason == "tool_calls"
+    @test msg.cost == call_cost(10, 15, "gpt-4")
+    @test length(msg.tool_calls) == 1
+    @test msg.tool_calls[1].tool_call_id == "call_abc123"
+    @test msg.tool_calls[1].name == "get_weather"
+    @test msg.tool_calls[1].args == Dict(:location => "New York")
+
+    # Test without logprobs
+    choice_no_logprobs = deepcopy(mock_choice)
+    delete!(choice_no_logprobs, :logprobs)
+    msg_no_logprobs = response_to_message(OpenAISchema(),
+        AIToolRequest,
+        choice_no_logprobs,
+        mock_response;
+        tool_map)
+    @test isnothing(msg_no_logprobs.log_prob)
+
+    # Test with sample_id and run_id
+    msg_with_ids = response_to_message(OpenAISchema(),
+        AIToolRequest,
+        mock_choice,
+        mock_response;
+        tool_map,
+        run_id = 42,
+        sample_id = 7,
+        time = 1.5)
+    @test msg_with_ids.run_id == 42
+    @test msg_with_ids.sample_id == 7
+    @test msg_with_ids.elapsed == 1.5
+
+    # Test with multiple tool calls
+    mock_choice_multi = deepcopy(mock_choice)
+    push!(mock_choice_multi[:message][:tool_calls],
+        Dict(
+            :id => "call_def456",
+            :type => "function",
+            :function => Dict(
+                :name => "get_time",
+                :arguments => "{\"timezone\":\"UTC\"}"
+            )
+        )
+    )
+    tool_map_multi = Dict(
+        "get_weather" => Tool(; name = "get_weather", callable = identity),
+        "get_time" => Tool(; name = "get_time", callable = identity)
+    )
+    msg_multi = response_to_message(OpenAISchema(),
+        AIToolRequest,
+        mock_choice_multi,
+        mock_response;
+        tool_map = tool_map_multi)
+    @test length(msg_multi.tool_calls) == 2
+    @test msg_multi.tool_calls[2].tool_call_id == "call_def456"
+    @test msg_multi.tool_calls[2].name == "get_time"
+    @test msg_multi.tool_calls[2].args == Dict(:timezone => "UTC")
 end
 
 @testset "aigenerate-OpenAI" begin
@@ -659,7 +883,9 @@ end
     mock_choice = Dict(
         :message => Dict(:content => "Hello!",
             :tool_calls => [
-                Dict(:function => Dict(:arguments => JSON3.write(Dict(:x => 1))))
+                Dict(:function => Dict(
+                :arguments => JSON3.write(Dict(:x => 1)),
+                :name => "RandomType1235"))
             ]),
         :logprobs => Dict(:content => [Dict(:logprob => -0.5), Dict(:logprob => -0.4)]),
         :finish_reason => "stop")
@@ -678,14 +904,15 @@ end
     msg = aiextract(schema1, "Extract number 1"; return_type = fields,
         model = "gpt4",
         api_kwargs = (; temperature = 0, n = 2))
-    @test isextracted(msg.content)
-    @test msg.content.x == 1
+    @test msg.content == Dict("x" => 1)
 
     ## Test multiple samples -- mock_choice is less probable
     mock_choice2 = Dict(
         :message => Dict(:content => "Hello!",
             :tool_calls => [
-                Dict(:function => Dict(:arguments => JSON3.write(Dict(:x => 1))))
+                Dict(:function => Dict(
+                :arguments => JSON3.write(Dict(:x => 1)),
+                :name => "RandomType1235"))
             ]),
         :logprobs => Dict(:content => [Dict(:logprob => -1.2), Dict(:logprob => -0.4)]),
         :finish_reason => "stop")
@@ -795,6 +1022,144 @@ end
     @test msg_partial.content.height === nothing
     @test msg_partial.content.weight === nothing
     @test msg_partial.tokens == (15, 3)
+end
+
+@testset "aitools-OpenAI" begin
+    # Define a test tool
+    struct WeatherTool
+        location::String
+        date::String
+    end
+
+    # Mock response for a single tool call
+    single_tool_response = Dict(
+        :id => "123",
+        :choices => [
+            Dict(
+            :message => Dict(:content => "",
+                :tool_calls => [
+                    Dict(:id => "123",
+                    :function => Dict(
+                        :name => "get_weather",
+                        :arguments => JSON3.write(Dict(
+                            :location => "New York", :date => "2023-05-01"))
+                    ))
+                ]),
+            :finish_reason => "tool_calls")
+        ],
+        :usage => Dict(:total_tokens => 20, :prompt_tokens => 15, :completion_tokens => 5)
+    )
+
+    schema_single = TestEchoOpenAISchema(; response = single_tool_response, status = 200)
+
+    msg_single = aitools(schema_single, "What's the weather in New York on May 1st, 2023?";
+        tools = [Tool(; name = "get_weather", callable = WeatherTool)],
+        model = "gpt4",
+        api_kwargs = (; temperature = 0))
+
+    @test isaitoolrequest(msg_single)
+    @test msg_single.tool_calls[1].tool_call_id == "123"
+    @test msg_single.tool_calls[1].name == "get_weather"
+    @test msg_single.tool_calls[1].args[:location] == "New York"
+    @test msg_single.tool_calls[1].args[:date] == "2023-05-01"
+    @test msg_single.tokens == (15, 5)
+
+    # Mock response for multiple tool calls
+    multi_tool_response = Dict(
+        :choices => [
+            Dict(
+            :message => Dict(:content => "",
+                :tool_calls => [
+                    Dict(:id => "123",
+                        :function => Dict(
+                            :name => "get_weatherUS",
+                            :arguments => JSON3.write(Dict(
+                                :location => "New York", :date => "2023-05-01"))
+                        )),
+                    Dict(:id => "456",
+                        :function => Dict(
+                            :name => "get_weatherUK",
+                            :arguments => JSON3.write(Dict(
+                                :location => "London", :date => "2023-05-02"))
+                        ))
+                ]),
+            :finish_reason => "tool_calls")
+        ],
+        :usage => Dict(:total_tokens => 30, :prompt_tokens => 20, :completion_tokens => 10)
+    )
+
+    schema_multi = TestEchoOpenAISchema(; response = multi_tool_response, status = 200)
+
+    msg_multi = aitools(
+        schema_multi, "Compare the weather in New York on May 1st and London on May 2nd, 2023.";
+        tools = [Tool(; name = "get_weatherUS", callable = WeatherTool),
+            Tool(; name = "get_weatherUK", callable = WeatherTool)],
+        model = "gpt4",
+        api_kwargs = (; temperature = 0))
+
+    @test isaitoolrequest(msg_multi)
+    @test length(msg_multi.tool_calls) == 2
+    @test msg_multi.tool_calls[1].tool_call_id == "123"
+    @test msg_multi.tool_calls[1].name == "get_weatherUS"
+    @test msg_multi.tool_calls[1].args[:location] == "New York"
+    @test msg_multi.tool_calls[1].args[:date] == "2023-05-01"
+    @test msg_multi.tool_calls[2].tool_call_id == "456"
+    @test msg_multi.tool_calls[2].name == "get_weatherUK"
+    @test msg_multi.tool_calls[2].args[:location] == "London"
+    @test msg_multi.tool_calls[2].args[:date] == "2023-05-02"
+    @test msg_multi.tokens == (20, 10)
+
+    # Test with JSON mode
+    json_mode_response = Dict(
+        :choices => [
+            Dict(
+            :id => "123",
+            :message => Dict(
+                :content => Dict(:location => "Tokyo", :date => "2023-05-03")
+            ),
+            :finish_reason => "stop")
+        ],
+        :usage => Dict(:total_tokens => 25, :prompt_tokens => 18, :completion_tokens => 7)
+    )
+
+    schema_json = TestEchoOpenAISchema(; response = json_mode_response, status = 200)
+
+    msg_json = aitools(schema_json, "What's the weather in Tokyo on May 3rd, 2023?";
+        tools = [Tool(; name = "get_weather", callable = WeatherTool)],
+        model = "gpt4",
+        json_mode = true,
+        api_kwargs = (; temperature = 0))
+
+    @test msg_json.tool_calls[1].tool_call_id == "123"
+    @test msg_json.tool_calls[1].name == "get_weather"
+    @test msg_json.tool_calls[1].args[:location] == "Tokyo"
+    @test msg_json.tool_calls[1].args[:date] == "2023-05-03"
+    @test msg_json.tokens == (18, 7)
+
+    # Test with dry_run
+    msg_dry_run = aitools(schema_single, "What's the weather in Paris tomorrow?";
+        tools = [Tool(; name = "get_weather", callable = WeatherTool)],
+        model = "gpt4",
+        dry_run = true)
+
+    @test msg_dry_run === nothing
+
+    # Test with return_all
+    msg_return_all = aitools(
+        schema_single, "What's the weather in New York on May 1st, 2023?";
+        tools = [Tool(; name = "get_weather", callable = WeatherTool)],
+        model = "gpt4",
+        return_all = true,
+        api_kwargs = (; temperature = 0))
+
+    @test msg_return_all isa Vector
+    @test length(msg_return_all) == 3
+    @test msg_return_all[1] isa SystemMessage
+    @test msg_return_all[2] isa UserMessage
+    @test isaitoolrequest(msg_return_all[3])
+    @test msg_return_all[end].tool_calls[1].name == "get_weather"
+    @test msg_return_all[end].tool_calls[1].args[:location] == "New York"
+    @test msg_return_all[end].tool_calls[1].args[:date] == "2023-05-01"
 end
 
 @testset "aiscan-OpenAI" begin

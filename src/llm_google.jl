@@ -209,6 +209,10 @@ function aigenerate(prompt_schema::AbstractGoogleSchema, prompt::ALLOWED_PROMPT_
     return output
 end
 
+function aitools(prompt_schema::AbstractGoogleSchema, prompt::ALLOWED_PROMPT_TYPE;
+        kwargs...)
+    error("Google schema does not yet support aitools. Please use OpenAISchema instead.")
+end
 function aiembed(prompt_schema::AbstractGoogleSchema, prompt::ALLOWED_PROMPT_TYPE;
         kwargs...)
     error("Google schema does not yet support aiembed. Please use OpenAISchema instead.")

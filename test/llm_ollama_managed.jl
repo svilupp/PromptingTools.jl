@@ -196,4 +196,5 @@ end
     @test_throws ErrorException aiextract(OllamaManagedSchema(), "prompt")
     @test_throws ErrorException aiclassify(OllamaManagedSchema(), "prompt")
     @test_throws ErrorException aiscan(OllamaManagedSchema(), "prompt")
+    @test_throws ErrorException aitools(OllamaManagedSchema(), "prompt")
 end

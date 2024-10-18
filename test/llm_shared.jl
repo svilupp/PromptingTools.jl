@@ -1,6 +1,7 @@
 using PromptingTools: render, NoSchema
 using PromptingTools: AIMessage, SystemMessage, AbstractMessage, AbstractChatMessage
-using PromptingTools: UserMessage, UserMessageWithImages, DataMessage
+using PromptingTools: UserMessage, UserMessageWithImages, DataMessage, AIToolRequest,
+                      ToolMessage
 using PromptingTools: finalize_outputs, role4render
 
 @testset "render-NoSchema" begin
@@ -11,6 +12,8 @@ using PromptingTools: finalize_outputs, role4render
     @test role4render(schema, UserMessageWithImages("User message 1"; image_url = "")) ==
           "user"
     @test role4render(schema, AIMessage("AI message 1")) == "assistant"
+    @test role4render(schema, AIToolRequest()) == "assistant"
+    @test role4render(schema, ToolMessage(; tool_call_id = "x", raw = "")) == "tool"
     @test_throws ArgumentError role4render(schema, DataMessage(; content = ones(3, 3)))
 
     # Given a schema and a vector of messages with handlebar variables, it should replace the variables with the correct values in the conversation dictionary.
@@ -89,7 +92,7 @@ using PromptingTools: finalize_outputs, role4render
         SystemMessage("System message 1"),
         UserMessage("Hello {{name}}"),
         AIMessage("Hi there"),
-        UserMessage("How are you, John?", [:name], :usermessage),
+        UserMessage("How are you, John?", [:name], nothing, :usermessage),
         AIMessage("I'm doing well, thank you!")
     ]
     conversation = render(schema, messages; conversation, name = "John")
@@ -289,7 +292,7 @@ end
         SystemMessage("System message 1"),
         UserMessage("User message {{name}}"),
         AIMessage("AI message"),
-        UserMessage("User message John", [:name], :usermessage),
+        UserMessage("User message John", [:name], nothing, :usermessage),
         AIMessage("AI message 2"),
         msg
     ]
@@ -316,7 +319,7 @@ end
         SystemMessage("System message 1"),
         UserMessage("User message {{name}}"),
         AIMessage("AI message"),
-        UserMessage("User message John", [:name], :usermessage),
+        UserMessage("User message John", [:name], nothing, :usermessage),
         AIMessage("AI message 2"),
         msg,
         msg

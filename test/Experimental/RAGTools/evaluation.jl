@@ -108,9 +108,12 @@ end
                 :choices => [
                     Dict(:finish_reason => "stop",
                     :message => Dict(:tool_calls => [
-                        Dict(:function => Dict(:arguments => JSON3.write(MaybeTags([
-                        Tag("yes", "category")
-                    ]))))]))],
+                        Dict(:id => "1",
+                        :function => Dict(
+                            :arguments => JSON3.write(MaybeTags([
+                                Tag("yes", "category")
+                            ])),
+                            :name => "MaybeTags"))]))],
                 :model => content[:model],
                 :usage => Dict(:total_tokens => length(user_msg[:content]),
                     :prompt_tokens => length(user_msg[:content]),
@@ -121,8 +124,11 @@ end
                 :choices => [
                     Dict(:finish_reason => "stop",
                     :message => Dict(:tool_calls => [
-                        Dict(:function => Dict(:arguments => JSON3.write(QAItem("Question",
-                        "Answer"))))]))],
+                        Dict(:id => "1",
+                        :function => Dict(
+                            :arguments => JSON3.write(QAItem("Question",
+                                "Answer")),
+                            :name => "QAItem"))]))],
                 :model => content[:model],
                 :usage => Dict(:total_tokens => length(user_msg[:content]),
                     :prompt_tokens => length(user_msg[:content]),
@@ -132,13 +138,16 @@ end
             response = Dict(
                 :choices => [
                     Dict(:message => Dict(:tool_calls => [
-                    Dict(:function => Dict(:arguments => JSON3.write(JudgeAllScores(5,
-                    5,
-                    5,
-                    5,
-                    5,
-                    "Some reasons",
-                    5.0))))]))],
+                    Dict(:id => "1",
+                    :function => Dict(
+                        :arguments => JSON3.write(JudgeAllScores(5,
+                            5,
+                            5,
+                            5,
+                            5,
+                            "Some reasons",
+                            5.0)),
+                        :name => "JudgeAllScores"))]))],
                 :model => content[:model],
                 :usage => Dict(:total_tokens => length(user_msg[:content]),
                     :prompt_tokens => length(user_msg[:content]),

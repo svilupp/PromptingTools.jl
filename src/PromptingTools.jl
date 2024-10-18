@@ -32,7 +32,9 @@ const RESERVED_KWARGS = [
     :strict,
     :json_mode,
     :no_system_message,
-    :aiprefill
+    :aiprefill,
+    :name_user,
+    :name_assistant
 ]
 
 # export replace_words, recursive_splitter, split_by_length, call_cost, auth_header # for debugging only
@@ -40,7 +42,7 @@ const RESERVED_KWARGS = [
 # export pprint
 include("utils.jl")
 
-export aigenerate, aiembed, aiclassify, aiextract, aiscan, aiimage
+export aigenerate, aiembed, aiclassify, aiextract, aitools, aiscan, aiimage
 # export render # for debugging only
 include("llm_interface.jl")
 
@@ -77,6 +79,7 @@ include("streaming.jl")
 
 ## Individual interfaces
 include("llm_shared.jl")
+include("llm_openai_schema_defs.jl")
 include("llm_openai.jl")
 include("llm_ollama_managed.jl")
 include("llm_ollama.jl")
