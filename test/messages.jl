@@ -3,7 +3,7 @@ using PromptingTools: UserMessage, UserMessageWithImages, DataMessage
 using PromptingTools: _encode_local_image, attach_images_to_user_message, last_message,
                       last_output
 using PromptingTools: isusermessage, issystemmessage, isdatamessage, isaimessage,
-                      istracermessage
+                      istracermessage, isaitoolrequest, istoolmessage
 using PromptingTools: TracerMessageLike, TracerMessage, align_tracer!, unwrap,
                       AbstractTracerMessage, AbstractTracer, pprint
 using PromptingTools: TracerSchema, SaverSchema
@@ -37,6 +37,8 @@ using PromptingTools: TracerSchema, SaverSchema
     @test AIMessage(; content) |> isaimessage
     @test UserMessage(content) |> AIMessage |> isaimessage
     @test UserMessage(content) != AIMessage(content)
+    @test AIToolRequest() |> isaitoolrequest
+    @test ToolMessage(; tool_call_id = "x", raw = "") |> istoolmessage
     ## check handling other types
     @test isusermessage(1) == false
     @test issystemmessage(nothing) == false
