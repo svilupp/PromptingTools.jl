@@ -382,3 +382,7 @@ function aiscan(prompt_schema::AbstractManagedSchema, prompt::ALLOWED_PROMPT_TYP
         kwargs...)
     error("Managed schema does not support aiscan. Please use OpenAISchema instead.")
 end
+function aitools(prompt_schema::AbstractManagedSchema, prompt::ALLOWED_PROMPT_TYPE;
+        kwargs...)
+    error("Managed schema does not support aitools. Please use OpenAISchema instead.")
+end

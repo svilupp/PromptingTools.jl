@@ -6,7 +6,8 @@ role4render(schema::AbstractPromptSchema, msg::SystemMessage) = "system"
 role4render(schema::AbstractPromptSchema, msg::UserMessage) = "user"
 role4render(schema::AbstractPromptSchema, msg::UserMessageWithImages) = "user"
 role4render(schema::AbstractPromptSchema, msg::AIMessage) = "assistant"
-
+role4render(schema::AbstractPromptSchema, msg::AIToolRequest) = "assistant"
+role4render(schema::AbstractPromptSchema, msg::ToolMessage) = "tool"
 """
     render(schema::NoSchema,
         messages::Vector{<:AbstractMessage};
@@ -40,25 +41,31 @@ function render(schema::NoSchema,
 
     # replace any handlebar variables in the messages
     for msg in messages
-        if msg isa Union{SystemMessage, UserMessage, UserMessageWithImages}
+        if issystemmessage(msg) || isusermessage(msg) || isusermessagewithimages(msg)
             replacements = ["{{$(key)}}" => value
                             for (key, value) in pairs(replacement_kwargs)
                             if key in msg.variables]
             ## Force System message to UserMessage if no_system_message=true
+            ## TODO: fix to support TracerMessage -- it would temporarily drop the tracing
             MSGTYPE = no_system_message && issystemmessage(msg) ? UserMessage : typeof(msg)
             # Rebuild the message with the replaced content
-            new_msg = MSGTYPE(;
-                # unpack the type to replace only the content field
-                [(field, getfield(msg, field)) for field in fieldnames(typeof(msg))]...,
-                content = replace(msg.content, replacements...))
-            if msg isa SystemMessage
+            new_msg = if istracermessage(msg)
+                ## No updating if it's already traced (=past message)
+                msg
+            else
+                MSGTYPE(;
+                    # unpack the type to replace only the content field
+                    [(field, getfield(msg, field)) for field in fieldnames(typeof(msg))]...,
+                    content = replace(msg.content, replacements...))
+            end
+            if issystemmessage(msg)
                 count_system_msg += 1
                 # move to the front
                 pushfirst!(conversation, new_msg)
             else
                 push!(conversation, new_msg)
             end
-        elseif msg isa AIMessage
+        elseif isaimessage(msg) || isaitoolrequest(msg) || istoolmessage(msg)
             # no replacements
             push!(conversation, msg)
         elseif istracermessage(msg) && issystemmessage(msg.object)
@@ -80,6 +87,17 @@ function render(schema::NoSchema,
     end
 
     return conversation
+end
+
+function render(schema::AbstractPromptSchema,
+        tools::AbstractVector{<:AbstractTool};
+        kwargs...)
+    throw(ArgumentError("Function `render` is not implemented for the provided schema ($(typeof(schema))) and $(typeof(tools))."))
+end
+function render(schema::AbstractPromptSchema,
+        tools::AbstractDict{String, <:AbstractTool};
+        kwargs...)
+    render(schema, collect(values(tools)); kwargs...)
 end
 
 """

@@ -1,3 +1,11 @@
+# OpenAI user-facing functions (mostly)
+#
+# All ai* functions that interface with OpenAI-compatible APIs are defined here
+#
+# For custom schemas/providers, see llm_openai_schema_defs.jl
+#
+#
+
 ## Rendering of converation history for the OpenAI API
 """
     render(schema::AbstractOpenAISchema,
@@ -5,6 +13,7 @@
         image_detail::AbstractString = "auto",
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         no_system_message::Bool = false,
+        name_user::Union{Nothing, String} = nothing,
         kwargs...)
 
 Builds a history of the conversation to provide the prompt to the API. All unspecified kwargs are passed as replacements such that `{{key}}=>value` in the template.
@@ -13,12 +22,14 @@ Builds a history of the conversation to provide the prompt to the API. All unspe
 - `image_detail`: Only for `UserMessageWithImages`. It represents the level of detail to include for images. Can be `"auto"`, `"high"`, or `"low"`.
 - `conversation`: An optional vector of `AbstractMessage` objects representing the conversation history. If not provided, it is initialized as an empty vector.
 - `no_system_message`: If `true`, do not include the default system message in the conversation history OR convert any provided system message to a user message.
+- `name_user`: No-op for consistency.
 """
 function render(schema::AbstractOpenAISchema,
         messages::Vector{<:AbstractMessage};
         image_detail::AbstractString = "auto",
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         no_system_message::Bool = false,
+        name_user::Union{Nothing, String} = nothing,
         kwargs...)
     ##
     @assert image_detail in ["auto", "high", "low"] "Image detail must be one of: auto, high, low"
@@ -32,7 +43,7 @@ function render(schema::AbstractOpenAISchema,
     # replace any handlebar variables in the messages
     for msg in messages_replaced
         ## Special case for images
-        if msg isa UserMessageWithImages
+        new_msg = if isusermessagewithimages(msg)
             # Build message content
             content = Dict{String, Any}[Dict("type" => "text",
                 "text" => msg.content)]
@@ -43,425 +54,61 @@ function render(schema::AbstractOpenAISchema,
                         "image_url" => Dict("url" => img,
                             "detail" => image_detail)))
             end
+            Dict("role" => role4render(schema, msg), "content" => content)
+        elseif isaitoolrequest(msg)
+            Dict("role" => role4render(schema, msg), "content" => msg.content,
+                "tool_calls" => [Dict("id" => tool.tool_call_id, "type" => "function",
+                                     "function" => Dict("name" => tool.name,
+                                         "arguments" => tool.raw))
+                                 for tool in msg.tool_calls])
+        elseif istoolmessage(msg)
+            content = msg.content isa AbstractString ? msg.content : string(msg.content)
+            Dict("role" => role4render(schema, msg), "content" => content,
+                "tool_call_id" => msg.tool_call_id)
         else
-            content = msg.content
+            ## Vanilla assistant message
+            Dict("role" => role4render(schema, msg),
+                "content" => msg.content)
         end
-        push!(conversation, Dict("role" => role4render(schema, msg), "content" => content))
+        ## Add name if it exists
+        if hasproperty(msg, :name) && !isnothing(msg.name)
+            new_msg["name"] = msg.name
+        end
+        push!(conversation, new_msg)
     end
 
     return conversation
 end
 
-## OpenAI.jl back-end
-## Types
-# "Providers" are a way to use other APIs that are compatible with OpenAI API specs, eg, Azure and mamy more
-# Define our sub-type to distinguish it from other OpenAI.jl providers
-abstract type AbstractCustomProvider <: OpenAI.AbstractOpenAIProvider end
-Base.@kwdef struct CustomProvider <: AbstractCustomProvider
-    api_key::String = ""
-    base_url::String = "http://localhost:8080"
-    api_version::String = ""
-end
-function OpenAI.build_url(provider::AbstractCustomProvider, api::AbstractString)
-    string(provider.base_url, "/", api)
-end
-function OpenAI.auth_header(provider::AbstractCustomProvider, api_key::AbstractString)
-    OpenAI.auth_header(
-        OpenAI.OpenAIProvider(provider.api_key,
-            provider.base_url,
-            provider.api_version),
-        api_key)
-end
-## Extend OpenAI create_chat to allow for testing/debugging
-# Default passthrough
-function OpenAI.create_chat(schema::AbstractOpenAISchema,
-        api_key::AbstractString,
-        model::AbstractString,
-        conversation;
-        http_kwargs::NamedTuple = NamedTuple(),
-        streamcallback::Any = nothing,
+"""
+    render(schema::AbstractOpenAISchema,
+        tools::Vector{<:AbstractTool};
+        json_mode::Union{Nothing, Bool} = nothing,
         kwargs...)
-    if !isnothing(streamcallback)
-        ## Take over from OpenAI.jl
-        url = OpenAI.build_url(OpenAI.DEFAULT_PROVIDER, "chat/completions")
-        headers = OpenAI.auth_header(OpenAI.DEFAULT_PROVIDER, api_key)
-        streamcallback, new_kwargs = configure_callback!(
-            streamcallback, schema; kwargs...)
-        input = OpenAI.build_params((; messages = conversation, model, new_kwargs...))
-        ## Use the streaming callback
-        resp = streamed_request!(streamcallback, url, headers, input; http_kwargs...)
-        OpenAI.OpenAIResponse(resp.status, JSON3.read(resp.body))
-    else
-        ## Use OpenAI.jl default
-        OpenAI.create_chat(api_key, model, conversation; http_kwargs, kwargs...)
+
+Renders the tool signatures into the OpenAI format.
+"""
+function render(schema::AbstractOpenAISchema,
+        tools::Vector{<:AbstractTool};
+        json_mode::Union{Nothing, Bool} = nothing,
+        kwargs...)
+    output = Dict{Symbol, Any}[]
+    for tool in tools
+        rendered = Dict(:type => "function",
+            :function => Dict(
+                :parameters => tool.parameters, :name => tool.name))
+        ## Add strict flag
+        tool.strict == true && (rendered[:function][:strict] = tool.strict)
+        if json_mode == true
+            rendered[:function][:schema] = pop!(rendered[:function], :parameters)
+        else
+            ## Add description if not in JSON mode
+            !isnothing(tool.description) &&
+                (rendered[:function][:description] = tool.description)
+        end
+        push!(output, rendered)
     end
-end
-
-# Overload for testing/debugging
-function OpenAI.create_chat(schema::TestEchoOpenAISchema, api_key::AbstractString,
-        model::AbstractString,
-        conversation; kwargs...)
-    schema.model_id = model
-    schema.inputs = conversation
-    return schema
-end
-
-"""
-    OpenAI.create_chat(schema::CustomOpenAISchema,
-        api_key::AbstractString,
-        model::AbstractString,
-        conversation;
-        http_kwargs::NamedTuple = NamedTuple(),
-        streamcallback::Any = nothing,
-        url::String = "http://localhost:8080",
-        kwargs...)
-
-Dispatch to the OpenAI.create_chat function, for any OpenAI-compatible API. 
-
-It expects `url` keyword argument. Provide it to the `aigenerate` function via `api_kwargs=(; url="my-url")`
-
-It will forward your query to the "chat/completions" endpoint of the base URL that you provided (=`url`).
-"""
-function OpenAI.create_chat(schema::CustomOpenAISchema,
-        api_key::AbstractString,
-        model::AbstractString,
-        conversation;
-        http_kwargs::NamedTuple = NamedTuple(),
-        streamcallback::Any = nothing,
-        url::String = "http://localhost:8080",
-        kwargs...)
-    # Build the corresponding provider object
-    # Create chat will automatically pass our data to endpoint `/chat/completions`
-    provider = CustomProvider(; api_key, base_url = url)
-    if !isnothing(streamcallback)
-        ## Take over from OpenAI.jl
-        url = OpenAI.build_url(provider, "chat/completions")
-        headers = OpenAI.auth_header(provider, api_key)
-        streamcallback, new_kwargs = configure_callback!(
-            streamcallback, schema; kwargs...)
-        input = OpenAI.build_params((; messages = conversation, model, new_kwargs...))
-        ## Use the streaming callback
-        resp = streamed_request!(streamcallback, url, headers, input; http_kwargs...)
-        OpenAI.OpenAIResponse(resp.status, JSON3.read(resp.body))
-    else
-        ## Use OpenAI.jl default
-        OpenAI.create_chat(provider, model, conversation; http_kwargs, kwargs...)
-    end
-end
-
-"""
-    OpenAI.create_chat(schema::LocalServerOpenAISchema,
-        api_key::AbstractString,
-        model::AbstractString,
-        conversation;
-        url::String = "http://localhost:8080",
-        kwargs...)
-
-Dispatch to the OpenAI.create_chat function, but with the LocalServer API parameters, ie, defaults to `url` specified by the `LOCAL_SERVER` preference. See `?PREFERENCES`
-
-"""
-function OpenAI.create_chat(schema::LocalServerOpenAISchema,
-        api_key::AbstractString,
-        model::AbstractString,
-        conversation;
-        url::String = LOCAL_SERVER,
-        kwargs...)
-    OpenAI.create_chat(CustomOpenAISchema(), api_key, model, conversation; url, kwargs...)
-end
-
-"""
-    OpenAI.create_chat(schema::MistralOpenAISchema,
-  api_key::AbstractString,
-  model::AbstractString,
-  conversation;
-  url::String="https://api.mistral.ai/v1",
-  kwargs...)
-
-Dispatch to the OpenAI.create_chat function, but with the MistralAI API parameters. 
-
-It tries to access the `MISTRALAI_API_KEY` ENV variable, but you can also provide it via the `api_key` keyword argument.
-"""
-function OpenAI.create_chat(schema::MistralOpenAISchema,
-        api_key::AbstractString,
-        model::AbstractString,
-        conversation;
-        url::String = "https://api.mistral.ai/v1",
-        kwargs...)
-    # try to override provided api_key because the default is OpenAI key
-    api_key = isempty(MISTRALAI_API_KEY) ? api_key : MISTRALAI_API_KEY
-    OpenAI.create_chat(CustomOpenAISchema(), api_key, model, conversation; url, kwargs...)
-end
-function OpenAI.create_chat(schema::FireworksOpenAISchema,
-        api_key::AbstractString,
-        model::AbstractString,
-        conversation;
-        url::String = "https://api.fireworks.ai/inference/v1",
-        kwargs...)
-    # try to override provided api_key because the default is OpenAI key
-    api_key = isempty(FIREWORKS_API_KEY) ? api_key : FIREWORKS_API_KEY
-    OpenAI.create_chat(CustomOpenAISchema(), api_key, model, conversation; url, kwargs...)
-end
-function OpenAI.create_chat(schema::TogetherOpenAISchema,
-        api_key::AbstractString,
-        model::AbstractString,
-        conversation;
-        url::String = "https://api.together.xyz/v1",
-        kwargs...)
-    api_key = isempty(TOGETHER_API_KEY) ? api_key : TOGETHER_API_KEY
-    OpenAI.create_chat(CustomOpenAISchema(), api_key, model, conversation; url, kwargs...)
-end
-function OpenAI.create_chat(schema::GroqOpenAISchema,
-        api_key::AbstractString,
-        model::AbstractString,
-        conversation;
-        url::String = "https://api.groq.com/openai/v1",
-        kwargs...)
-    api_key = isempty(GROQ_API_KEY) ? api_key : GROQ_API_KEY
-    OpenAI.create_chat(CustomOpenAISchema(), api_key, model, conversation; url, kwargs...)
-end
-function OpenAI.create_chat(schema::DeepSeekOpenAISchema,
-        api_key::AbstractString,
-        model::AbstractString,
-        conversation;
-        url::String = "https://api.deepseek.com/v1",
-        kwargs...)
-    api_key = isempty(DEEPSEEK_API_KEY) ? api_key : DEEPSEEK_API_KEY
-    OpenAI.create_chat(CustomOpenAISchema(), api_key, model, conversation; url, kwargs...)
-end
-function OpenAI.create_chat(schema::OpenRouterOpenAISchema,
-        api_key::AbstractString,
-        model::AbstractString,
-        conversation;
-        url::String = "https://openrouter.ai/api/v1",
-        kwargs...)
-    api_key = isempty(OPENROUTER_API_KEY) ? api_key : OPENROUTER_API_KEY
-    OpenAI.create_chat(CustomOpenAISchema(), api_key, model, conversation; url, kwargs...)
-end
-function OpenAI.create_chat(schema::CerebrasOpenAISchema,
-        api_key::AbstractString,
-        model::AbstractString,
-        conversation;
-        url::String = "https://api.cerebras.ai/v1",
-        kwargs...)
-    api_key = isempty(CEREBRAS_API_KEY) ? api_key : CEREBRAS_API_KEY
-    OpenAI.create_chat(CustomOpenAISchema(), api_key, model, conversation; url, kwargs...)
-end
-function OpenAI.create_chat(schema::DatabricksOpenAISchema,
-        api_key::AbstractString,
-        model::AbstractString,
-        conversation;
-        http_kwargs::NamedTuple = NamedTuple(),
-        streamcallback::Any = nothing,
-        url::String = "https://<workspace_host>.databricks.com",
-        kwargs...)
-    # Build the corresponding provider object
-    provider = CustomProvider(;
-        api_key = isempty(DATABRICKS_API_KEY) ? api_key : DATABRICKS_API_KEY,
-        base_url = isempty(DATABRICKS_HOST) ? url : DATABRICKS_HOST)
-    if !isnothing(streamcallback)
-        throw(ArgumentError("Streaming is not supported for Databricks models yet!"))
-        ## Take over from OpenAI.jl
-        # url = OpenAI.build_url(provider, "serving-endpoints/$model/invocations")
-        # headers = OpenAI.auth_header(provider, api_key)
-        # streamcallback, new_kwargs = configure_callback!(
-        #     streamcallback, schema; kwargs...)
-        # input = OpenAI.build_params((; messages = conversation, model, new_kwargs...))
-        # ## Use the streaming callback
-        # resp = streamed_request!(streamcallback, url, headers, input; http_kwargs...)
-        # OpenAI.OpenAIResponse(resp.status, JSON3.read(resp.body))
-    else
-        # Override standard OpenAI request endpoint
-        OpenAI.openai_request("serving-endpoints/$model/invocations",
-            provider;
-            method = "POST",
-            model,
-            messages = conversation,
-            http_kwargs,
-            kwargs...)
-    end
-end
-function OpenAI.create_chat(schema::AzureOpenAISchema,
-        api_key::AbstractString,
-        model::AbstractString,
-        conversation;
-        api_version::String = "2023-03-15-preview",
-        http_kwargs::NamedTuple = NamedTuple(),
-        streamcallback::Any = nothing,
-        url::String = "https://<resource-name>.openai.azure.com",
-        kwargs...)
-
-    # Build the corresponding provider object
-    provider = OpenAI.AzureProvider(;
-        api_key = isempty(AZURE_OPENAI_API_KEY) ? api_key : AZURE_OPENAI_API_KEY,
-        base_url = (isempty(AZURE_OPENAI_HOST) ? url : AZURE_OPENAI_HOST) *
-                   "/openai/deployments/$model",
-        api_version = api_version
-    )
-    # Override standard OpenAI request endpoint
-    OpenAI.openai_request(
-        "chat/completions",
-        provider;
-        method = "POST",
-        http_kwargs = http_kwargs,
-        messages = conversation,
-        query = Dict("api-version" => provider.api_version),
-        streamcallback = streamcallback,
-        kwargs...
-    )
-end
-
-# Extend OpenAI create_embeddings to allow for testing
-function OpenAI.create_embeddings(schema::AbstractOpenAISchema,
-        api_key::AbstractString,
-        docs,
-        model::AbstractString;
-        kwargs...)
-    OpenAI.create_embeddings(api_key, docs, model; kwargs...)
-end
-function OpenAI.create_embeddings(schema::TestEchoOpenAISchema, api_key::AbstractString,
-        docs,
-        model::AbstractString; kwargs...)
-    schema.model_id = model
-    schema.inputs = docs
-    return schema
-end
-function OpenAI.create_embeddings(schema::CustomOpenAISchema,
-        api_key::AbstractString,
-        docs,
-        model::AbstractString;
-        url::String = "http://localhost:8080",
-        kwargs...)
-    # Build the corresponding provider object
-    # Create chat will automatically pass our data to endpoint `/embeddings`
-    provider = CustomProvider(; api_key, base_url = url)
-    OpenAI.create_embeddings(provider, docs, model; kwargs...)
-end
-# Set url and just forward to CustomOpenAISchema otherwise
-# Note: Llama.cpp and hence Llama.jl DO NOT support the embeddings endpoint !! (they use `/embedding`)
-function OpenAI.create_embeddings(schema::LocalServerOpenAISchema,
-        api_key::AbstractString,
-        docs,
-        model::AbstractString;
-        ## Strip the "v1" from the end of the url
-        url::String = LOCAL_SERVER,
-        kwargs...)
-    OpenAI.create_embeddings(CustomOpenAISchema(),
-        api_key,
-        docs,
-        model;
-        url,
-        kwargs...)
-end
-function OpenAI.create_embeddings(schema::MistralOpenAISchema,
-        api_key::AbstractString,
-        docs,
-        model::AbstractString;
-        url::String = "https://api.mistral.ai/v1",
-        kwargs...)
-    # Build the corresponding provider object
-    # try to override provided api_key because the default is OpenAI key
-    provider = CustomProvider(;
-        api_key = isempty(MISTRALAI_API_KEY) ? api_key : MISTRALAI_API_KEY,
-        base_url = url)
-    OpenAI.create_embeddings(provider, docs, model; kwargs...)
-end
-function OpenAI.create_embeddings(schema::DatabricksOpenAISchema,
-        api_key::AbstractString,
-        docs,
-        model::AbstractString;
-        url::String = "https://<workspace_host>.databricks.com",
-        kwargs...)
-    # Build the corresponding provider object
-    provider = CustomProvider(;
-        api_key = isempty(DATABRICKS_API_KEY) ? api_key : DATABRICKS_API_KEY,
-        base_url = isempty(DATABRICKS_HOST) ? url : DATABRICKS_HOST)
-    # Override standard OpenAI request endpoint
-    OpenAI.openai_request("serving-endpoints/$model/invocations",
-        provider;
-        method = "POST",
-        model,
-        input = docs,
-        kwargs...)
-end
-function OpenAI.create_embeddings(schema::TogetherOpenAISchema,
-        api_key::AbstractString,
-        docs,
-        model::AbstractString;
-        url::String = "https://api.together.xyz/v1",
-        kwargs...)
-    provider = CustomProvider(;
-        api_key = isempty(TOGETHER_API_KEY) ? api_key : TOGETHER_API_KEY,
-        base_url = url)
-    OpenAI.create_embeddings(provider, docs, model; kwargs...)
-end
-function OpenAI.create_embeddings(schema::FireworksOpenAISchema,
-        api_key::AbstractString,
-        docs,
-        model::AbstractString;
-        url::String = "https://api.fireworks.ai/inference/v1",
-        kwargs...)
-    provider = CustomProvider(;
-        api_key = isempty(FIREWORKS_API_KEY) ? api_key : FIREWORKS_API_KEY,
-        base_url = url)
-    OpenAI.create_embeddings(provider, docs, model; kwargs...)
-end
-function OpenAI.create_embeddings(schema::AzureOpenAISchema,
-        api_key::AbstractString,
-        docs,
-        model::AbstractString;
-        api_version::String = "2023-03-15-preview",
-        url::String = "https://<resource-name>.openai.azure.com",
-        kwargs...)
-
-    # Build the corresponding provider object
-    provider = OpenAI.AzureProvider(;
-        api_key = isempty(AZURE_OPENAI_API_KEY) ? api_key : AZURE_OPENAI_API_KEY,
-        base_url = (isempty(AZURE_OPENAI_HOST) ? url : AZURE_OPENAI_HOST) *
-                   "/openai/deployments/$model",
-        api_version = api_version)
-    # Override standard OpenAI request endpoint
-    OpenAI.openai_request(
-        "embeddings",
-        provider;
-        method = "POST",
-        input = docs,
-        query = Dict("api-version" => provider.api_version),
-        kwargs...
-    )
-end
-
-## Temporary fix -- it will be moved upstream
-function OpenAI.create_embeddings(provider::AbstractCustomProvider,
-        input,
-        model_id::String = OpenAI.DEFAULT_EMBEDDING_MODEL_ID;
-        http_kwargs::NamedTuple = NamedTuple(),
-        kwargs...)
-    return OpenAI.openai_request("embeddings",
-        provider;
-        method = "POST",
-        http_kwargs = http_kwargs,
-        model = model_id,
-        input,
-        kwargs...)
-end
-
-## Wrap create_images for testing and routing
-## Note: Careful, API is non-standard compared to other OAI functions
-function OpenAI.create_images(schema::AbstractOpenAISchema,
-        api_key::AbstractString,
-        prompt,
-        args...;
-        kwargs...)
-    OpenAI.create_images(api_key, prompt, args...; kwargs...)
-end
-function OpenAI.create_images(schema::TestEchoOpenAISchema,
-        api_key::AbstractString,
-        prompt,
-        args...;
-        kwargs...)
-    schema.model_id = get(kwargs, :model, "")
-    schema.inputs = prompt
-    return schema
+    return output
 end
 
 """
@@ -471,8 +118,9 @@ end
         resp;
         model_id::AbstractString = "",
         time::Float64 = 0.0,
-        run_id::Integer = rand(Int16),
-        sample_id::Union{Nothing, Integer} = nothing)
+        run_id::Int = Int(rand(Int32)),
+        sample_id::Union{Nothing, Integer} = nothing,
+        name_assistant::Union{Nothing, String} = nothing)
 
 Utility to facilitate unwrapping of HTTP response to a message type `MSG` provided for OpenAI-like responses
 
@@ -487,6 +135,7 @@ Note: Extracts `finish_reason` and `log_prob` if available in the response.
 - `time::Float64`: The elapsed time for the response. Defaults to `0.0`.
 - `run_id::Integer`: The run ID for the response. Defaults to a random integer.
 - `sample_id::Union{Nothing, Integer}`: The sample ID for the response (if there are multiple completions). Defaults to `nothing`.
+- `name_assistant::Union{Nothing, String}`: The name to use for the assistant in the conversation history. Defaults to `nothing`.
 """
 function response_to_message(schema::AbstractOpenAISchema,
         MSG::Type{AIMessage},
@@ -495,7 +144,8 @@ function response_to_message(schema::AbstractOpenAISchema,
         model_id::AbstractString = "",
         time::Float64 = 0.0,
         run_id::Int = Int(rand(Int32)),
-        sample_id::Union{Nothing, Integer} = nothing)
+        sample_id::Union{Nothing, Integer} = nothing,
+        name_assistant::Union{Nothing, String} = nothing)
     ## extract sum log probability
     has_log_prob = haskey(choice, :logprobs) &&
                    !isnothing(get(choice, :logprobs, nothing)) &&
@@ -510,10 +160,15 @@ function response_to_message(schema::AbstractOpenAISchema,
     tokens_prompt = get(resp.response, :usage, Dict(:prompt_tokens => 0))[:prompt_tokens]
     tokens_completion = get(resp.response, :usage, Dict(:completion_tokens => 0))[:completion_tokens]
     cost = call_cost(tokens_prompt, tokens_completion, model_id)
+    extras = Dict{Symbol, Any}()
+    if has_log_prob
+        extras[:log_prob] = choice[:logprobs]
+    end
     ## build AIMessage object
     msg = MSG(;
         content = choice[:message][:content] |> strip,
         status = Int(resp.status),
+        name = name_assistant,
         cost,
         run_id,
         sample_id,
@@ -521,7 +176,8 @@ function response_to_message(schema::AbstractOpenAISchema,
         finish_reason = get(choice, :finish_reason, nothing),
         tokens = (tokens_prompt,
             tokens_completion),
-        elapsed = time)
+        elapsed = time,
+        extras)
 end
 
 ## User-Facing API
@@ -533,6 +189,8 @@ end
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         streamcallback::Any = nothing,
         no_system_message::Bool = false,
+        name_user::Union{Nothing, String} = nothing,
+        name_assistant::Union{Nothing, String} = nothing,
         http_kwargs::NamedTuple = (retry_non_idempotent = true,
             retries = 5,
             readtimeout = 120), api_kwargs::NamedTuple = NamedTuple(),
@@ -552,6 +210,8 @@ Generate an AI response based on a given prompt using the OpenAI API.
 - `streamcallback`: A callback function to handle streaming responses. Can be simply `stdout` or a `StreamCallback` object. See `?StreamCallback` for details.
   Note: We configure the `StreamCallback` (and necessary `api_kwargs`) for you, unless you specify the `flavor`. See `?configure_callback!` for details.
 - `no_system_message::Bool=false`: If `true`, the default system message is not included in the conversation history. Any existing system message is converted to a `UserMessage`.
+- `name_user::Union{Nothing, String} = nothing`: The name to use for the user in the conversation history. Defaults to `nothing`.
+- `name_assistant::Union{Nothing, String} = nothing`: The name to use for the assistant in the conversation history. Defaults to `nothing`.
 - `http_kwargs`: A named tuple of HTTP keyword arguments.
 - `api_kwargs`: A named tuple of API keyword arguments. Useful parameters include:
     - `temperature`: A float representing the temperature for sampling (ie, the amount of "creativity"). Often defaults to `0.7`.
@@ -630,6 +290,8 @@ function aigenerate(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         streamcallback::Any = nothing,
         no_system_message::Bool = false,
+        name_user::Union{Nothing, String} = nothing,
+        name_assistant::Union{Nothing, String} = nothing,
         http_kwargs::NamedTuple = (retry_non_idempotent = true,
             retries = 5,
             readtimeout = 120), api_kwargs::NamedTuple = NamedTuple(),
@@ -639,7 +301,7 @@ function aigenerate(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_
     ## Find the unique ID for the model alias provided
     model_id = get(MODEL_ALIASES, model, model)
     conv_rendered = render(
-        prompt_schema, prompt; conversation, no_system_message, kwargs...)
+        prompt_schema, prompt; conversation, no_system_message, name_user, kwargs...)
 
     if !dry_run
         time = @elapsed r = create_chat(prompt_schema, api_key,
@@ -649,24 +311,21 @@ function aigenerate(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_
             http_kwargs,
             api_kwargs...)
         ## Process one of more samples returned
-        msg = if length(r.response[:choices]) > 1
-            run_id = Int(rand(Int32)) # remember one run ID
-            ## extract all message
-            msgs = [response_to_message(prompt_schema, AIMessage, choice, r;
-                        time, model_id, run_id, sample_id = i)
-                    for (i, choice) in enumerate(r.response[:choices])]
-            ## Order by log probability if available
-            ## bigger is better, keep it last
-            if all(x -> !isnothing(x.log_prob), msgs)
-                sort(msgs, by = x -> x.log_prob)
-            else
-                msgs
-            end
+        has_many_samples = length(r.response[:choices]) > 1
+        run_id = Int(rand(Int32)) # remember one run ID
+        ## extract all message
+        msg = [response_to_message(prompt_schema, AIMessage, choice, r;
+                   time, model_id, run_id, name_assistant,
+                   sample_id = has_many_samples ? i : nothing)
+               for (i, choice) in enumerate(r.response[:choices])]
+        ## Order by log probability if available
+        ## bigger is better, keep it last
+        msg = if has_many_samples && all(x -> !isnothing(x.log_prob), msg)
+            sort(msg, by = x -> x.log_prob)
+        elseif has_many_samples
+            msg
         else
-            ## only 1 sample / 1 completion
-            choice = r.response[:choices][begin]
-            response_to_message(prompt_schema, AIMessage, choice, r;
-                time, model_id)
+            only(msg)
         end
         ## Reporting
         verbose && @info _report_stats(msg, model_id)
@@ -769,6 +428,9 @@ function aiembed(prompt_schema::AbstractOpenAISchema,
 
     return msg
 end
+
+### Tokenization
+# The following files are to support logit bias in aiclassify function
 
 "Token IDs for GPT3.5 and GPT4 from https://platform.openai.com/tokenizer"
 const OPENAI_TOKEN_IDS_GPT35_GPT4 = Dict("true" => 837,
@@ -984,18 +646,22 @@ function decode_choices(schema::OpenAISchema, choices, conv::AbstractVector;
         model::AbstractString,
         token_ids_map::Union{Nothing, Dict{<:AbstractString, <:Integer}} = nothing,
         kwargs...)
-    if length(conv) > 0 && last(conv) isa AIMessage && hasproperty(last(conv), :run_id)
+    conv_output = if length(conv) > 0 && last(conv) isa AIMessage &&
+                     hasproperty(last(conv), :run_id)
         ## if it is a multi-sample response, 
         ## Remember its run ID and convert all samples in that run
         run_id = last(conv).run_id
-        for i in eachindex(conv)
-            msg = conv[i]
-            if isaimessage(msg) && msg.run_id == run_id
-                conv[i] = decode_choices(schema, choices, msg; model, token_ids_map)
-            end
-        end
+        ## Need to re-render the conversation history if the types changed
+        [if isaimessage(conv[i]) && conv[i].run_id == run_id
+             decode_choices(schema, choices, conv[i]; model, token_ids_map)
+         else
+             conv[i]
+         end
+         for i in eachindex(conv)]
+    else
+        conv
     end
-    return conv
+    return conv_output
 end
 
 """
@@ -1139,13 +805,13 @@ function response_to_message(schema::AbstractOpenAISchema,
         MSG::Type{DataMessage},
         choice,
         resp;
-        return_type = nothing,
+        tool_map = nothing,
         model_id::AbstractString = "",
         time::Float64 = 0.0,
         run_id::Int = Int(rand(Int32)),
         sample_id::Union{Nothing, Integer} = nothing,
         json_mode::Union{Nothing, Bool} = nothing)
-    @assert !isnothing(return_type) "You must provide a return_type for DataMessage construction"
+    @assert !isnothing(tool_map) "You must provide a tool_map for DataMessage construction"
     ## extract sum log probability
     has_log_prob = haskey(choice, :logprobs) &&
                    !isnothing(get(choice, :logprobs, nothing)) &&
@@ -1161,21 +827,30 @@ function response_to_message(schema::AbstractOpenAISchema,
     tokens_completion = get(resp.response, :usage, Dict(:completion_tokens => 0))[:completion_tokens]
     cost = call_cost(tokens_prompt, tokens_completion, model_id)
     # "Safe" parsing of the response - it still fails if JSON is invalid
-    args = if json_mode == true
-        choice[:message][:content]
+    tools_array = if json_mode == true
+        name, tool = only(tool_map)
+        [parse_tool(
+            tool.callable, choice[:message][:content])]
     else
-        choice[:message][:tool_calls][1][:function][:arguments]
+        ## If name does not match, we use the callable from the tool_map 
+        ## Can happen only in testing with auto-generated struct
+        [parse_tool(
+             get(tool_map, tool_call[:function][:name], (; callable = Dict)).callable,
+             tool_call[:function][:arguments])
+         for tool_call in choice[:message][:tool_calls]]
     end
-    content = try
-        ## Must invoke latest because we might have generated the struct
-        Base.invokelatest(JSON3.read, args, return_type)::return_type
-    catch e
-        @warn "There was an error parsing the response: $e. Using the raw response instead."
-        JSON3.read(args) |> copy
+    ## Remember the tools
+    extras = Dict{Symbol, Any}()
+    if haskey(choice[:message], :tool_calls) && !isempty(choice[:message][:tool_calls])
+        extras[:tool_calls] = choice[:message][:tool_calls]
     end
+    if has_log_prob
+        extras[:log_prob] = choice[:logprobs]
+    end
+
     ## build DataMessage object
     msg = MSG(;
-        content = content,
+        content = length(tools_array) == 1 ? only(tools_array) : tools_array,
         status = Int(resp.status),
         cost,
         run_id,
@@ -1184,12 +859,13 @@ function response_to_message(schema::AbstractOpenAISchema,
         finish_reason = get(choice, :finish_reason, nothing),
         tokens = (tokens_prompt,
             tokens_completion),
-        elapsed = time)
+        elapsed = time,
+        extras)
 end
 
 """
     aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE;
-        return_type::Union{Type, Vector},
+        return_type::Union{Type, AbstractTool, Vector},
         verbose::Bool = true,
         api_key::String = OPENAI_API_KEY,
         model::String = MODEL_CHAT,
@@ -1198,7 +874,7 @@ end
         http_kwargs::NamedTuple = (retry_non_idempotent = true,
             retries = 5,
             readtimeout = 120), api_kwargs::NamedTuple = (;
-            tool_choice = "exact"),
+            tool_choice = nothing),
         strict::Union{Nothing, Bool} = nothing,
         kwargs...)
 
@@ -1212,7 +888,7 @@ It's effectively a light wrapper around `aigenerate` call, which requires additi
 # Arguments
 - `prompt_schema`: An optional object to specify which prompt template should be applied (Default to `PROMPT_SCHEMA = OpenAISchema`)
 - `prompt`: Can be a string representing the prompt for the AI conversation, a `UserMessage`, a vector of `AbstractMessage` or an `AITemplate`
-- `return_type`: A **struct** TYPE representing the the information we want to extract. Do not provide a struct instance, only the type. Alternatively, you can provide a vector of field names and their types (see `?generate_struct` function for the syntax).
+- `return_type`: A **struct** TYPE (or a Tool, vector of Types) representing the the information we want to extract. Do not provide a struct instance, only the type. Alternatively, you can provide a vector of field names and their types (see `?generate_struct` function for the syntax).
   If the struct has a docstring, it will be provided to the model as well. It's used to enforce structured model outputs or provide more information.
 - `verbose`: A boolean indicating whether to print additional information.
 - `api_key`: A string representing the API key for accessing the OpenAI API.
@@ -1222,8 +898,8 @@ It's effectively a light wrapper around `aigenerate` call, which requires additi
 - `conversation`: An optional vector of `AbstractMessage` objects representing the conversation history. If not provided, it is initialized as an empty vector.
 - `http_kwargs`: A named tuple of HTTP keyword arguments.
 - `api_kwargs`: A named tuple of API keyword arguments. 
-  - `tool_choice`: A string representing the tool choice to use for the API call. Usually, one of "auto","any","exact". 
-    Defaults to `"exact"`, which is a made-up value to enforce the OpenAI requirements if we want one exact function.
+  - `tool_choice`: Specifies which tool to use for the API call. Usually, one of "auto","any","exact" // `nothing` will pick a default. 
+    Defaults to `"exact"` for 1 tool and `"auto"` for many tools, which is a made-up value to enforce the OpenAI requirements if we want one exact function.
     Providers like Mistral, Together, etc. use `"any"` instead.
 - `strict::Union{Nothing, Bool} = nothing`: A boolean indicating whether to enforce strict generation of the response (supported only for OpenAI models). It has additional latency for the first request. If `nothing`, standard function calling is used.
 - `json_mode::Union{Nothing, Bool} = nothing`: If `json_mode = true`, we use JSON mode for the response (supported only for OpenAI models). If `nothing`, standard function calling is used.
@@ -1239,8 +915,9 @@ If `return_all=false` (default):
 If `return_all=true`:
 - `conversation`: A vector of `AbstractMessage` objects representing the full conversation history, including the response from the AI model (`DataMessage`).
 
+Note: `msg.content` can be a single object (if a single tool is used) or a vector of objects (if multiple tools are used)!
 
-See also: `function_call_signature`, `MaybeExtract`, `ItemsExtract`, `aigenerate`, `generate_struct`
+See also: `tool_call_signature`, `MaybeExtract`, `ItemsExtract`, `aigenerate`, `generate_struct`
 
 # Example
 
@@ -1367,7 +1044,7 @@ msg = aiextract("James is 30, weighs 80kg. He's 180cm tall."; return_type=MyMeas
 ```
 """
 function aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE;
-        return_type::Union{Type, Vector},
+        return_type::Union{Type, AbstractTool, Vector},
         verbose::Bool = true,
         api_key::String = OPENAI_API_KEY,
         model::String = MODEL_CHAT,
@@ -1376,35 +1053,40 @@ function aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_T
         http_kwargs::NamedTuple = (retry_non_idempotent = true,
             retries = 5,
             readtimeout = 120), api_kwargs::NamedTuple = (;
-            tool_choice = "exact"),
+            tool_choice = nothing),
         strict::Union{Nothing, Bool} = nothing,
         json_mode::Union{Nothing, Bool} = nothing,
         kwargs...)
     ##
     global MODEL_ALIASES
     ## Function calling specifics
+    ## Check that no functions or methods are provided, that is not supported
+    @assert !(return_type isa Vector)||!any(x -> x isa Union{Function, Method}, return_type) "Functions and Methods are not supported in `aiextract`!"
     ## Set strict mode on for JSON mode
     strict_ = json_mode == true ? true : strict
-    schema, datastructtype = function_call_signature(return_type; strict = strict_)
-    tools = [Dict(
-        :type => "function", :function => schema)]
+    tool_map = tool_call_signature(return_type; strict = strict_)
+    tools = render(prompt_schema, tool_map; json_mode)
     ## force our function to be used
-    tool_choice_ = get(api_kwargs, :tool_choice, "exact")
-    tool_choice = if tool_choice_ == "exact"
+    tool_choice_ = get(api_kwargs, :tool_choice, nothing)
+    tool_choice = if tool_choice_ == "exact" ||
+                     (isnothing(tool_choice_) && length(tools) == 1)
         ## Standard for OpenAI API
         Dict(:type => "function",
-            :function => Dict(:name => only(tools)[:function]["name"]))
-    else
+            :function => Dict(:name => only(tools)[:function][:name]))
+    elseif tool_choice_ == "auto" || (isnothing(tool_choice_) && length(tools) > 1)
         # User provided value, eg, "auto", "any" for various providers like Mistral, Together, etc.
+        "auto"
+    else
+        # User provided value
         tool_choice_
     end
 
     ## Build the API kwargs
     api_kwargs = if json_mode == true
-        json_schema = Dict(
-            :schema => schema["parameters"], :strict => true, :name => schema["name"])
+        @assert length(tools)==1 "Only 1 tool definition is allowed in JSON mode."
         (; [k => v for (k, v) in pairs(api_kwargs) if k != :tool_choice]...,
-            response_format = (; type = "json_schema", json_schema))
+            response_format = (;
+                type = "json_schema", json_schema = only(tools)[:function]))
     else
         merge(api_kwargs, (; tools, tool_choice))
     end
@@ -1420,25 +1102,22 @@ function aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_T
             http_kwargs,
             api_kwargs...)
         ## Process one of more samples returned
-        msg = if length(r.response[:choices]) > 1
-            run_id = Int(rand(Int32)) # remember one run ID
-            ## extract all message
-            msgs = [response_to_message(prompt_schema, DataMessage, choice, r;
-                        return_type = datastructtype, time, model_id, run_id, sample_id = i, json_mode)
-                    for (i, choice) in enumerate(r.response[:choices])]
-            ## Order by log probability if available
-            ## bigger is better, keep it last
-            if all(x -> !isnothing(x.log_prob), msgs)
-                sort(msgs, by = x -> x.log_prob)
-            else
-                msgs
-            end
+        has_many_samples = length(r.response[:choices]) > 1
+        run_id = Int(rand(Int32)) # remember one run ID
+        msg = [response_to_message(prompt_schema, DataMessage, choice, r;
+                   tool_map = tool_map, time, model_id, run_id, json_mode,
+                   sample_id = has_many_samples ? i : nothing)
+               for (i, choice) in enumerate(r.response[:choices])]
+        ## Order by log probability if available
+        ## bigger is better, keep it last
+        msg = if has_many_samples && all(x -> !isnothing(x.log_prob), msg)
+            sort(msg, by = x -> x.log_prob)
+        elseif has_many_samples
+            msg
         else
-            ## only 1 sample / 1 completion
-            choice = r.response[:choices][begin]
-            response_to_message(prompt_schema, DataMessage, choice, r;
-                return_type = datastructtype, time, model_id, json_mode)
+            only(msg)
         end
+
         ## Reporting
         verbose && @info _report_stats(msg, model_id)
     else
@@ -1754,6 +1433,274 @@ function aiimage(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYP
         msg;
         conversation,
         return_all,
+        dry_run,
+        kwargs...)
+
+    return output
+end
+
+## Standardizes parsing of 1 or more samples returned from OpenAI-compatible APIs into AIToolRequest objects
+function response_to_message(schema::AbstractOpenAISchema,
+        MSG::Type{AIToolRequest},
+        choice,
+        resp;
+        tool_map = nothing,
+        model_id::AbstractString = "",
+        time::Float64 = 0.0,
+        run_id::Int = Int(rand(Int32)),
+        sample_id::Union{Nothing, Integer} = nothing,
+        json_mode::Union{Nothing, Bool} = nothing,
+        name_user::Union{Nothing, String} = nothing,
+        name_assistant::Union{Nothing, String} = nothing)
+    @assert !isnothing(tool_map) "You must provide a tool_map for AIToolRequest construction"
+    ## extract sum log probability
+    has_log_prob = haskey(choice, :logprobs) &&
+                   !isnothing(get(choice, :logprobs, nothing)) &&
+                   haskey(choice[:logprobs], :content) &&
+                   !isnothing(choice[:logprobs][:content])
+    log_prob = if has_log_prob
+        sum([get(c, :logprob, 0.0) for c in choice[:logprobs][:content]])
+    else
+        nothing
+    end
+    ## calculate cost
+    tokens_prompt = get(resp.response, :usage, Dict(:prompt_tokens => 0))[:prompt_tokens]
+    tokens_completion = get(resp.response, :usage, Dict(:completion_tokens => 0))[:completion_tokens]
+    cost = call_cost(tokens_prompt, tokens_completion, model_id)
+    # "Safe" parsing of the response - it still fails if JSON is invalid
+    has_tools = haskey(choice[:message], :tool_calls) &&
+                !isempty(choice[:message][:tool_calls])
+    tools_array = if json_mode == true
+        tool_name, tool = only(tool_map)
+        [ToolMessage(;
+            content = nothing, req_id = run_id, tool_call_id = choice[:id],
+            raw = JSON3.write(choice[:message][:content]),
+            args = choice[:message][:content], name = tool_name)]
+    elseif has_tools
+        [ToolMessage(; raw = tool_call[:function][:arguments],
+             args = JSON3.read(tool_call[:function][:arguments]),
+             name = tool_call[:function][:name],
+             content = nothing,
+             req_id = run_id,
+             tool_call_id = tool_call[:id]
+         )
+         for tool_call in choice[:message][:tool_calls]]
+    else
+        ToolMessage[]
+    end
+    content = json_mode != true ? choice[:message][:content] : nothing
+    ## Remember the tools
+    extras = Dict{Symbol, Any}()
+    if has_tools
+        extras[:tool_calls] = choice[:message][:tool_calls]
+    end
+    if has_log_prob
+        extras[:log_prob] = choice[:logprobs]
+    end
+
+    ## build AIToolRequest object
+    msg = MSG(;
+        content = content,
+        name = name_assistant,
+        tool_calls = tools_array,
+        status = Int(resp.status),
+        cost,
+        run_id,
+        sample_id,
+        log_prob,
+        finish_reason = get(choice, :finish_reason, nothing),
+        tokens = (tokens_prompt,
+            tokens_completion),
+        elapsed = time,
+        extras)
+end
+
+"""
+    aitools(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE;
+        tools::Union{Type, Function, Method, AbstractTool, Vector} = Tool[],
+        verbose::Bool = true,
+        api_key::String = OPENAI_API_KEY,
+        model::String = MODEL_CHAT,
+        return_all::Bool = false, dry_run::Bool = false,
+        conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
+        no_system_message::Bool = false,
+        http_kwargs::NamedTuple = (retry_non_idempotent = true,
+            retries = 5,
+            readtimeout = 120), api_kwargs::NamedTuple = (;
+            tool_choice = nothing),
+        strict::Union{Nothing, Bool} = nothing,
+        json_mode::Union{Nothing, Bool} = nothing,
+        name_user::Union{Nothing, String} = nothing,
+        name_assistant::Union{Nothing, String} = nothing,
+        kwargs...)
+
+Calls chat completion API with an optional tool call signature. It can receive both `tools` and standard string-based content.
+Ideal for agentic workflows with more complex cognitive architectures.
+
+Difference to `aigenerate`: Response can be a tool call (structured)
+
+Differences to `aiextract`: Can provide infinitely many tools (including Functions!) and then respond with the tool call's output.
+
+# Arguments
+- `prompt_schema`: An optional object to specify which prompt template should be applied (Default to `PROMPT_SCHEMA = OpenAISchema`)
+- `prompt`: Can be a string representing the prompt for the AI conversation, a `UserMessage`, a vector of `AbstractMessage` or an `AITemplate`
+- `tools`: A vector of tools to be used in the conversation. Can be a vector of types, instances of `AbstractTool`, or a mix of both.
+- `verbose`: A boolean indicating whether to print additional information.
+- `api_key`: A string representing the API key for accessing the OpenAI API.
+- `model`: A string representing the model to use for generating the response. Can be an alias corresponding to a model ID defined in `MODEL_CHAT`.
+- `return_all`: If `true`, returns the entire conversation history, otherwise returns only the last message (the `AIMessage`).
+- `dry_run`: If `true`, skips sending the messages to the model (for debugging, often used with `return_all=true`).
+- `conversation`: An optional vector of `AbstractMessage` objects representing the conversation history.
+- `no_system_message::Bool = false`: Whether to exclude the system message from the conversation history.
+- `name_user`: The name of the user in the conversation history. Defaults to "User".
+- `name_assistant`: The name of the assistant in the conversation history. Defaults to "Assistant".
+- `http_kwargs`: A named tuple of HTTP keyword arguments.
+- `api_kwargs`: A named tuple of API keyword arguments. Several important arguments are highlighted below:
+    - `tool_choice`: The choice of tool mode. Can be "auto", "exact", or can depend on the provided.. Defaults to `nothing`, which translates to "auto".
+    - `response_format`: The format of the response. Can be "json_schema" for JSON mode, or "text" for standard text output. Defaults to "text".
+- `strict`: Whether to enforce strict mode for the schema. Defaults to `nothing`.
+- `json_mode`: Whether to enforce JSON mode for the schema. Defaults to `nothing`.
+
+# Example
+
+```julia
+## Let's define a tool
+get_weather(location, date) = "The weather in \$location on \$date is 70 degrees."
+
+## JSON mode request
+msg = aitools("What's the weather in Tokyo on May 3rd, 2023?";
+    tools = get_weather,
+    json_mode = true)
+PT.execute_tool(get_weather, msg.tool_calls[1].args)
+# "The weather in Tokyo on 2023-05-03 is 70 degrees."
+
+# Function calling request
+msg = aitools("What's the weather in Tokyo on May 3rd, 2023?";
+    tools = get_weather)
+PT.execute_tool(get_weather, msg.tool_calls[1].args)
+# "The weather in Tokyo on 2023-05-03 is 70 degrees."
+
+# Ignores the tool
+msg = aitools("What's your name?";
+    tools = get_weather)
+# I don't have a personal name, but you can call me your AI assistant!
+```
+
+How to have a multi-turn conversation with tools:
+```julia
+conv = aitools("What's the weather in Tokyo on May 3rd, 2023?";
+    tools = get_weather, return_all = true)
+
+tool_msg = conv[end].tool_calls[1] # there can be multiple tool calls requested!!
+
+# Execute the output to the tool message content
+tool_msg.content = PT.execute_tool(get_weather, tool_msg.args)
+
+# Add the tool message to the conversation
+push!(conv, tool_msg)
+
+# Call LLM again with the updated conversation
+conv = aitools(
+    "And in New York?"; tools = get_weather, return_all = true, conversation = conv)
+# 6-element Vector{AbstractMessage}:
+# SystemMessage("Act as a helpful AI assistant")
+# UserMessage("What's the weather in Tokyo on May 3rd, 2023?")
+# AIToolRequest("-"; Tool Requests: 1)
+# ToolMessage("The weather in Tokyo on 2023-05-03 is 70 degrees.")
+# UserMessage("And in New York?")
+# AIToolRequest("-"; Tool Requests: 1)
+```
+"""
+function aitools(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE;
+        tools::Union{Type, Function, Method, AbstractTool, Vector} = Tool[],
+        verbose::Bool = true,
+        api_key::String = OPENAI_API_KEY,
+        model::String = MODEL_CHAT,
+        return_all::Bool = false, dry_run::Bool = false,
+        conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
+        no_system_message::Bool = false,
+        name_user::Union{Nothing, String} = nothing,
+        name_assistant::Union{Nothing, String} = nothing,
+        http_kwargs::NamedTuple = (retry_non_idempotent = true,
+            retries = 5,
+            readtimeout = 120), api_kwargs::NamedTuple = (;
+            tool_choice = nothing),
+        strict::Union{Nothing, Bool} = nothing,
+        json_mode::Union{Nothing, Bool} = nothing,
+        kwargs...)
+    ##
+    global MODEL_ALIASES
+    ## Function calling specifics // get the tool map (signatures)
+    ## Set strict mode on for JSON mode
+    strict_ = json_mode == true ? true : strict
+    tool_map = tool_call_signature(tools; strict = strict_)
+    tools = render(prompt_schema, tool_map; json_mode)
+    ## force our function to be used
+    tool_choice_ = get(api_kwargs, :tool_choice, nothing)
+    tool_choice = if tool_choice_ == "exact"
+        ## Standard for OpenAI API
+        Dict(:type => "function",
+            :function => Dict(:name => only(tools)[:function][:name]))
+    elseif isnothing(tool_choice_)
+        "auto"
+    else
+        # User provided value, eg, "auto", "any" for various providers like Mistral, Together, etc.
+        tool_choice_
+    end
+
+    ## Build the API kwargs
+    api_kwargs = if json_mode == true
+        @assert length(tools)==1 "Only 1 tool definition is allowed in JSON mode."
+        (; [k => v for (k, v) in pairs(api_kwargs) if k != :tool_choice]...,
+            response_format = (;
+                type = "json_schema", json_schema = only(tools)))
+    elseif isempty(tools)
+        api_kwargs
+    else
+        merge(api_kwargs, (; tools, tool_choice))
+    end
+
+    ## Find the unique ID for the model alias provided
+    model_id = get(MODEL_ALIASES, model, model)
+    ## Render the conversation history from messages
+    conv_rendered = render(
+        prompt_schema, prompt; conversation, no_system_message, name_user, kwargs...)
+
+    if !dry_run
+        time = @elapsed r = create_chat(prompt_schema, api_key,
+            model_id,
+            conv_rendered;
+            http_kwargs,
+            api_kwargs...)
+        ## Process one of more samples returned
+        has_many_samples = length(r.response[:choices]) > 1
+        run_id = Int(rand(Int32)) # remember one run ID
+        ## extract all message
+        msg = [response_to_message(prompt_schema, AIToolRequest, choice, r;
+                   tool_map = tool_map, time, model_id, run_id, json_mode,
+                   sample_id = has_many_samples ? i : nothing, name_assistant)
+               for (i, choice) in enumerate(r.response[:choices])]
+        ## Order by log probability if available
+        ## bigger is better, keep it last
+        msg = if has_many_samples && all(x -> !isnothing(x.log_prob), msg)
+            sort(msg, by = x -> x.log_prob)
+        elseif has_many_samples
+            msg
+        else
+            only(msg)
+        end
+        ## Reporting
+        verbose && @info _report_stats(msg, model_id)
+    else
+        msg = nothing
+    end
+    ## Select what to return
+    output = finalize_outputs(prompt,
+        conv_rendered,
+        msg;
+        conversation,
+        return_all,
+        no_system_message,
         dry_run,
         kwargs...)
 

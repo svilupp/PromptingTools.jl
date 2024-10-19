@@ -1,9 +1,10 @@
 using PromptingTools: AIMessage, SystemMessage, MetadataMessage, AbstractMessage
-using PromptingTools: UserMessage, UserMessageWithImages, DataMessage
+using PromptingTools: UserMessage, UserMessageWithImages, DataMessage, AIToolRequest,
+                      ToolMessage
 using PromptingTools: _encode_local_image, attach_images_to_user_message, last_message,
                       last_output
 using PromptingTools: isusermessage, issystemmessage, isdatamessage, isaimessage,
-                      istracermessage
+                      istracermessage, isaitoolrequest, istoolmessage
 using PromptingTools: TracerMessageLike, TracerMessage, align_tracer!, unwrap,
                       AbstractTracerMessage, AbstractTracer, pprint
 using PromptingTools: TracerSchema, SaverSchema
@@ -37,6 +38,8 @@ using PromptingTools: TracerSchema, SaverSchema
     @test AIMessage(; content) |> isaimessage
     @test UserMessage(content) |> AIMessage |> isaimessage
     @test UserMessage(content) != AIMessage(content)
+    @test AIToolRequest() |> isaitoolrequest
+    @test ToolMessage(; tool_call_id = "x", raw = "") |> istoolmessage
     ## check handling other types
     @test isusermessage(1) == false
     @test issystemmessage(nothing) == false
@@ -122,6 +125,130 @@ end
     msg = UserMessage("Hello, world 2!")
     @test last_message(msg) == msg
     @test last_output(msg) == "Hello, world 2!"
+end
+
+@testset "show,pprint" begin
+    io = IOBuffer()
+
+    # AIMessage
+    m = AIMessage("Hello, AI!")
+    show(io, MIME("text/plain"), m)
+    @test occursin("AIMessage(\"Hello, AI!\")", String(take!(io)))
+    pprint(io, m)
+    output = String(take!(io))
+    @test occursin("AI Message", output)
+    @test occursin("Hello, AI!", output)
+
+    # SystemMessage
+    take!(io)
+    m = SystemMessage("System instruction")
+    show(io, MIME("text/plain"), m)
+    @test occursin("SystemMessage(\"System instruction\")", String(take!(io)))
+    pprint(io, m)
+    output = String(take!(io))
+    @test occursin("System Message", output)
+    @test occursin("System instruction", output)
+
+    # UserMessage
+    take!(io)
+    m = UserMessage("User input")
+    show(io, MIME("text/plain"), m)
+    @test occursin("UserMessage(\"User input\")", String(take!(io)))
+    pprint(io, m)
+    output = String(take!(io))
+    @test occursin("User Message", output)
+    @test occursin("User input", output)
+
+    # UserMessageWithImages
+    take!(io)
+    m = UserMessageWithImages(
+        "User input with image", image_url = ["http://example.com/image.jpg"])
+    show(io, MIME("text/plain"), m)
+    @test occursin("UserMessageWithImages(\"User input with image\")", String(take!(io)))
+    pprint(io, m)
+    output = String(take!(io))
+    @test occursin("User Message", output)
+    @test occursin("User input with image", output)
+
+    # MetadataMessage
+    take!(io)
+    m = MetadataMessage("Metadata info")
+    show(io, MIME("text/plain"), m)
+    @test occursin("MetadataMessage(\"Metadata info\")", String(take!(io)))
+    pprint(io, m)
+    output = String(take!(io))
+    @test occursin("Unknown Message", output)
+    @test occursin("Metadata info", output)
+
+    # DataMessage with Array
+    take!(io)
+    m = DataMessage(content = rand(3, 3))
+    show(io, MIME("text/plain"), m)
+    output = String(take!(io))
+    @test occursin("DataMessage", output)
+    @test occursin("Matrix{Float64}", output)
+    @test occursin("size (3, 3))", output)
+    pprint(io, m)
+    output = String(take!(io))
+    @test occursin("Data Message", output)
+    @test occursin("Data: Matrix{Float64}", output)
+
+    # DataMessage with Dict
+    take!(io)
+    m = DataMessage(content = Dict(:key1 => "value1", :key2 => "value2"))
+    show(io, MIME("text/plain"), m)
+    output = String(take!(io))
+    @test occursin("DataMessage", output)
+    @test occursin("Dict", output)
+    @test occursin("key1", output)
+    @test occursin("key2", output)
+    pprint(io, m)
+    output = String(take!(io))
+    @test occursin("Data Message", output)
+    @test occursin("Data: Dict{Symbol, String}", output)
+
+    # AIToolRequest
+    take!(io)
+    m = AIToolRequest(content = "Tool request",
+        tool_calls = [ToolMessage(
+            tool_call_id = "1", name = "tool1", raw = "", content = "content1")])
+    show(io, MIME("text/plain"), m)
+    output = String(take!(io))
+    @test occursin("AIToolRequest", output)
+    @test occursin("Tool request", output)
+    @test occursin("Tool Requests: 1", output)
+    pprint(io, m)
+    output = String(take!(io))
+    @test occursin("AI Tool Request", output)
+    @test occursin("Tool request", output)
+
+    # ToolMessage
+    take!(io)
+    m = ToolMessage(tool_call_id = "1", name = "tool1", raw = "", content = "Tool output")
+    show(io, MIME("text/plain"), m)
+    output = String(take!(io))
+    @test occursin("ToolMessage", output)
+    @test occursin("Tool output", output)
+    pprint(io, m)
+    output = String(take!(io))
+    @test occursin("Tool Message", output)
+    @test occursin("Tool output", output)
+
+    m = ToolMessage(
+        tool_call_id = "1", name = "tool1", raw = "{args: 1}", content = nothing)
+    pprint(io, m)
+    output = String(take!(io))
+    @test occursin("Tool Message", output)
+    @test occursin("Name: tool1", output)
+    @test occursin("Args: {args: 1}", output)
+
+    # Other DataMessage types
+    take!(io)
+    m = DataMessage(content = 42)
+    show(io, MIME("text/plain"), m)
+    output = String(take!(io))
+    @test occursin("DataMessage", output)
+    @test occursin("Int64", output)
 end
 
 @testset "TracerMessage,TracerMessageLike" begin

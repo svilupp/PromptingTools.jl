@@ -1,7 +1,8 @@
 using PromptingTools: TestEchoOpenAISchema, render, OpenAISchema
 using PromptingTools: AIMessage, SystemMessage, AbstractMessage
 using PromptingTools: UserMessage, UserMessageWithImages, DataMessage
-using PromptingTools: response_to_message, AbstractPromptSchema
+using PromptingTools: response_to_message, AbstractPromptSchema, isextracted,
+                      AbstractExtractedData
 
 @testset "ai* default schema" begin
     OLD_PROMPT_SCHEMA = PromptingTools.PROMPT_SCHEMA
@@ -22,6 +23,7 @@ using PromptingTools: response_to_message, AbstractPromptSchema
         tokens = (2, 1),
         run_id = msg.run_id,
         finish_reason = "stop",
+        extras = Dict{Symbol, Any}(),
         cost = 0.0,
         elapsed = msg.elapsed)
     @test msg == expected_output
@@ -35,6 +37,7 @@ using PromptingTools: response_to_message, AbstractPromptSchema
         tokens = (2, 1),
         run_id = msg.run_id,
         cost = 0.0,
+        extras = Dict{Symbol, Any}(),
         finish_reason = "stop",
         elapsed = msg.elapsed)
     @test msg == expected_output
@@ -43,9 +46,14 @@ using PromptingTools: response_to_message, AbstractPromptSchema
     response1 = Dict(
         :choices => [
             Dict(
-            :message => Dict(:tool_calls => [
-                Dict(:function => Dict(:arguments => "{\"content\": \"x\"}"))
-            ]),
+            :message => Dict(
+                :content => nothing,
+                :tool_calls => [
+                    Dict(:id => "1",
+                    :function => Dict(
+                        :arguments => "{\"content\": \"x\"}", :name => "MyType")
+                )
+                ]),
             :finish_reason => "stop")],
         :usage => Dict(:total_tokens => 3, :prompt_tokens => 2, :completion_tokens => 1))
 
@@ -62,8 +70,18 @@ using PromptingTools: response_to_message, AbstractPromptSchema
         run_id = msg.run_id,
         cost = 0.0,
         finish_reason = "stop",
+        extras = Dict{Symbol, Any}(:tool_calls => [Dict(:id => "1",
+            :function => Dict(
+                :name => "MyType", :arguments => "{\"content\": \"x\"}"))]),
         elapsed = msg.elapsed)
     @test msg == expected_output
+
+    ## AITools
+    msg = aitools("Hello World"; model = "xyz", return_type = MyType)
+    @test isaitoolrequest(msg)
+    @test msg.tool_calls[1].name == "MyType"
+    @test msg.tool_calls[1].args == Dict(:content => "x")
+    @test msg.tool_calls[1].tool_call_id == "1"
 
     # corresponds to OpenAI API v1
     response2 = Dict(:data => [Dict(:embedding => ones(128))],
@@ -91,4 +109,11 @@ using PromptingTools: response_to_message, AbstractPromptSchema
         AIMessage,
         nothing,
         nothing)
+end
+
+@testset "isextracted" begin
+    struct Xdata123 <: AbstractExtractedData end
+    @test !isextracted(Dict("x" => 1))
+    @test !isextracted(1)
+    @test isextracted(Xdata123())
 end

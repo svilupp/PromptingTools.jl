@@ -64,4 +64,15 @@ For more information, see the [Getting Started](@ref) section.
 <br>
 Ready to simplify your GenerativeAI tasks? Dive into PromptingTools.jl now and unlock your productivity.
 
+<h2> Building a More Advanced Workflow? </h2>
+
+PromptingTools offers many advanced features:
+- Easy prompt templating and automatic serialization and tracing of your AI conversations for great observability
+- Ability to export into a ShareGPT-compatible format for easy fine-tuning
+- Code evaluation and automatic error localization for better LLM debugging
+- RAGTools module: from simple to advanced RAG implementations (hybrid index, rephrasing, reranking, etc.)
+- AgentTools module: lazy ai* calls with states, automatic code feedback, Monte-Carlo tree search-based auto-fixing of your workflows (ie, not just retrying in a loop)
+
+and more!
+
 </div>
