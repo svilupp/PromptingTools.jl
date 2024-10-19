@@ -12,12 +12,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.59.0-DEV]
 
+### Breaking Changes
+- New field `name` introduced in `AbstractChatMessage` and `AIToolRequest` messages to enable role-based workflows. It initializes to `nothing`, so it is backward compatible.
+
 ### Added
 - Extends support for structured extraction with multiple "tools" definitions (see `?aiextract`).
 - Added new primitives `Tool` (to re-use tool definitions) and a function `aitools` to support mixed structured and non-structured workflows, eg, agentic workflows (see `?aitools`).
+- Added a field `name` to `AbstractChatMessage` and `AIToolRequest` messages to enable role-based workflows.
 
 ### Updated
 - Renamed `function_call_signature` to `tool_call_signature` to better reflect that it's used for tools, but kept a link to the old name for back-compatibility.
+- Improves structured extraction for Anthropic models (now you can use `tool_choice` keyword argument to specify which tool to use or re-use your parsed tools).
+- When log probs are requested, we will now also log the raw information in `AIMessage.extras[:log_prob]` field (previously we logged only the full sum). This enables more nuanced log-probability calculations for individual tokens.
 
 ## [0.58.0]
 

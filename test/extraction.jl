@@ -114,6 +114,38 @@ end
     @test docstring == "This is a test function.\n"
 end
 
+@testset "get_arg_names,get_arg_types" begin
+    # Test a function with no arguments
+    f1() = nothing
+    @test get_arg_names(first(methods(f1))) == Symbol[]
+    @test get_arg_types(first(methods(f1))) == []
+
+    # Test a function with one argument
+    f2(x) = x
+    @test get_arg_names(first(methods(f2))) == [:x]
+    @test get_arg_types(first(methods(f2))) == [Any]
+
+    # Test a function with multiple arguments
+    f3(x, y, z) = x + y + z
+    @test get_arg_names(first(methods(f3))) == [:x, :y, :z]
+    @test get_arg_types(first(methods(f3))) == [Any, Any, Any]
+
+    # Test a function with keyword arguments
+    f4(x; y = 1, z = 2) = x + y + z
+    @test get_arg_names(first(methods(f4))) == [:x]
+    @test get_arg_types(first(methods(f4))) == [Any]
+
+    # Test a function with varargs
+    f5(x, y, z...) = x + y + sum(z)
+    @test get_arg_names(first(methods(f5))) == [:x, :y, :z]
+    @test get_arg_types(first(methods(f5))) == [Any, Any, Vararg{Any}]
+
+    # Test a function with type annotations
+    f6(x::Int, y::String) = "$x$y"
+    @test get_arg_names(first(methods(f6))) == [:x, :y]
+    @test get_arg_types(first(methods(f6))) == [Int, String]
+end
+
 @testset "to_json_schema" begin
     struct MyStruct
         field1::Int

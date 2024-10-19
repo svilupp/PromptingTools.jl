@@ -1,4 +1,4 @@
-using PromptingTools: render, NoSchema
+using PromptingTools: render, NoSchema, AbstractPromptSchema
 using PromptingTools: AIMessage, SystemMessage, AbstractMessage, AbstractChatMessage
 using PromptingTools: UserMessage, UserMessageWithImages, DataMessage, AIToolRequest,
                       ToolMessage
@@ -208,6 +208,17 @@ using PromptingTools: finalize_outputs, role4render
     conversation = render(schema, messages; no_system_message = true)
     @test conversation[1] isa UserMessage
     @test conversation[1].content == "User message"
+
+    struct WeirdSchema <: AbstractPromptSchema end
+    @test_throws ArgumentError render(WeirdSchema(),
+        [Tool(; name = "f", description = "f", callable = () -> nothing)])
+
+    ## different ways to enter tools for rendering
+    opt1=render(OpenAISchema(),
+    [Tool(; name = "f", description = "f", callable = () -> nothing)])
+    opt2=render(OpenAISchema(),
+    Dict("f" => Tool(; name = "f", description = "f", callable = () -> nothing)))
+    @test opt1 == opt2
 end
 
 @testset "finalize_outputs" begin
