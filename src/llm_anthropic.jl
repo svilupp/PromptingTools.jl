@@ -10,7 +10,6 @@
         aiprefill::Union{Nothing, AbstractString} = nothing,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         no_system_message::Bool = false,
-        tools::Vector{<:Dict{String, <:Any}} = Dict{String, Any}[],
         cache::Union{Nothing, Symbol} = nothing,
         kwargs...)
 
@@ -20,7 +19,6 @@ Builds a history of the conversation to provide the prompt to the API. All unspe
 - `aiprefill`: A string to be used as a prefill for the AI response. This steer the AI response in a certain direction (and potentially save output tokens).
 - `conversation`: Past conversation to be included in the beginning of the prompt (for continued conversations).
 - `no_system_message`: If `true`, do not include the default system message in the conversation history OR convert any provided system message to a user message.
-- `tools`: A list of tools to be used in the conversation. Added to the end of the system prompt to enforce its use.
 - `cache`: A symbol representing the caching strategy to be used. Currently only `nothing` (no caching), `:system`, `:tools`,`:last` and `:all` are supported.
 """
 function render(schema::AbstractAnthropicSchema,
@@ -28,7 +26,6 @@ function render(schema::AbstractAnthropicSchema,
         aiprefill::Union{Nothing, AbstractString} = nothing,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         no_system_message::Bool = false,
-        tools::Vector{<:Dict{String, <:Any}} = Dict{String, Any}[],
         cache::Union{Nothing, Symbol} = nothing,
         kwargs...)
     ## 
@@ -59,16 +56,15 @@ function render(schema::AbstractAnthropicSchema,
     end
 
     ## Add Tool definitions to the System Prompt
-    if !isempty(tools)
-        length(tools) > 1 && @warn "Multiple tools provided. Using the first one only."
-        ANTHROPIC_TOOL_SUFFIX = "Use the $(tools[1]["name"]) tool in your response."
-        ## Add to system message
-        if isnothing(system)
-            system = ANTHROPIC_TOOL_SUFFIX
-        else
-            system *= "\n\n" * ANTHROPIC_TOOL_SUFFIX
-        end
-    end
+    # if !isempty(tools)
+    #     ANTHROPIC_TOOL_SUFFIX = "Use the $(tools[1][:name]) tool in your response."
+    #     ## Add to system message
+    #     if isnothing(system)
+    #         system = ANTHROPIC_TOOL_SUFFIX
+    #     else
+    #         system *= "\n\n" * ANTHROPIC_TOOL_SUFFIX
+    #     end
+    # end
 
     ## Apply cache for last message
     is_valid_conversation = length(conversation) > 0 &&
@@ -94,6 +90,22 @@ function render(schema::AbstractAnthropicSchema,
                 "content" => [Dict{String, Any}("type" => "text", "text" => aiprefill)]))
     end
     return (; system, conversation)
+end
+
+"""
+    render(schema::AbstractAnthropicSchema,
+        tools::Vector{<:AbstractTool};
+        kwargs...)
+
+Renders the tool signatures into the Anthropic format.
+"""
+function render(schema::AbstractAnthropicSchema,
+        tools::Vector{<:AbstractTool};
+        kwargs...)
+    tools = [Dict(:name => tool.name,
+                 :description => isnothing(tool.description) ? "" : tool.description,
+                 :input_schema => tool.parameters) for tool in tools]
+    return tools
 end
 
 """
@@ -397,12 +409,13 @@ end
 
 """
     aiextract(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMPT_TYPE;
-        return_type::Union{Type, Vector},
+        return_type::Union{Type, AbstractTool, Vector},
         verbose::Bool = true,
         api_key::String = ANTHROPIC_API_KEY,
         model::String = MODEL_CHAT,
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
+        no_system_message::Bool = false,
         http_kwargs::NamedTuple = (retry_non_idempotent = true,
             retries = 5,
             readtimeout = 120), api_kwargs::NamedTuple = NamedTuple(),
@@ -430,8 +443,10 @@ It's effectively a light wrapper around `aigenerate` call, which requires additi
 - `return_all::Bool=false`: If `true`, returns the entire conversation history, otherwise returns only the last message (the `AIMessage`).
 - `dry_run::Bool=false`: If `true`, skips sending the messages to the model (for debugging, often used with `return_all=true`).
 - `conversation`: An optional vector of `AbstractMessage` objects representing the conversation history. If not provided, it is initialized as an empty vector.
+- `no_system_message::Bool = false`: If `true`, skips the system message in the conversation history.
 - `http_kwargs`: A named tuple of HTTP keyword arguments.
 - `api_kwargs`: A named tuple of API keyword arguments. 
+    - `:tool_choice`: A string indicating which tool to use. Supported values are `nothing`, `"auto"`, `"any"` and `"exact"`. `nothing` will use the default tool choice.
 - `cache`: A symbol indicating whether to use caching for the prompt. Supported values are `nothing` (no caching), `:system`, `:tools`, `:last` and `:all`. Note that COST estimate will be wrong (ignores the caching).
     - `:system`: Caches the system message
     - `:tools`: Caches the tool definitions (and everything before them)
@@ -450,7 +465,7 @@ If `return_all=true`:
 - `conversation`: A vector of `AbstractMessage` objects representing the full conversation history, including the response from the AI model (`DataMessage`).
 
 
-See also: `function_call_signature`, `MaybeExtract`, `ItemsExtract`, `aigenerate`
+See also: `tool_call_signature`, `MaybeExtract`, `ItemsExtract`, `aigenerate`
 
 # Example
 
@@ -554,37 +569,55 @@ msg = aiextract("The weather in New York is sunny and 72.5 degrees Fahrenheit.";
 ```
 """
 function aiextract(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMPT_TYPE;
-        return_type::Union{Type, Vector},
+        return_type::Union{Type, AbstractTool, Vector},
         verbose::Bool = true,
         api_key::String = ANTHROPIC_API_KEY,
         model::String = MODEL_CHAT,
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
+        no_system_message::Bool = false,
         http_kwargs::NamedTuple = (retry_non_idempotent = true,
             retries = 5,
-            readtimeout = 120), api_kwargs::NamedTuple = NamedTuple(),
+            readtimeout = 120), api_kwargs::NamedTuple = (; tool_choice = nothing),
         cache::Union{Nothing, Symbol} = nothing,
         kwargs...)
     ##
     global MODEL_ALIASES
     @assert (isnothing(cache)||cache in [:system, :tools, :last, :all]) "Currently only `:system`, `:tools`, `:last` and `:all` are supported for Anthropic Prompt Caching"
 
+    ## Check that no functions or methods are provided, that is not supported
+    @assert !(return_type isa Vector)||!any(x -> x isa Union{Function, Method}, return_type) "Functions and Methods are not supported in `aiextract`!"
+
     ## Find the unique ID for the model alias provided
     model_id = get(MODEL_ALIASES, model, model)
 
     ## Tools definition
-    sig, datastructtype = function_call_signature(return_type; max_description_length = 100)
-    tools = [Dict("name" => sig["name"], "description" => get(sig, "description", ""),
-        "input_schema" => sig["parameters"])]
+    tool_map = tool_call_signature(
+        return_type; max_description_length = 100)
+    tools = render(prompt_schema, tool_map)
+    @assert length(tools)>0 "No tools found for extraction! Please provide in keyword argument `return_type`."
+    ## force our function to be used
+    tool_choice_ = get(api_kwargs, :tool_choice, nothing)
+    tool_choice = if tool_choice_ == "exact" ||
+                     (isnothing(tool_choice_) && length(tools) == 1)
+        Dict(:type => "tool", :name => only(tools)[:name])
+    elseif tool_choice_ == "any" || (isnothing(tool_choice_) && length(tools) > 1)
+        # User provided value, eg, "auto", "any" for various providers like Mistral, Together, etc.
+        Dict(:type => "any")
+    else
+        # User provided value, eg, "auto"
+        Dict(:type => tool_choice_)
+    end
     ## update tools to use caching
     (cache == :tools || cache == :all) &&
-        (tools[end]["cache_control"] = Dict("type" => "ephemeral"))
+        (tools[end][:cache_control] = Dict("type" => "ephemeral"))
 
     ## Add the function call stopping sequence to the api_kwargs
-    api_kwargs = merge(api_kwargs, (; tools))
+    api_kwargs = merge(api_kwargs, (; tools, tool_choice))
 
     ## We provide the tool description to the rendering engine
-    conv_rendered = render(prompt_schema, prompt; tools, conversation, cache, kwargs...)
+    conv_rendered = render(
+        prompt_schema, prompt; tools, conversation, no_system_message, cache, kwargs...)
 
     if !dry_run
         time = @elapsed resp = anthropic_api(
@@ -595,17 +628,11 @@ function aiextract(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMP
         tokens_completion = get(resp.response[:usage], :output_tokens, 0)
         finish_reason = get(resp.response, :stop_reason, nothing)
         content = if finish_reason == "tool_use"
-            contents = filter(x -> x[:type] == "tool_use", resp.response[:content])
-            length(contents) > 1 &&
-                @warn "Multiple tool_use found in the response. Using the first one."
-            ## parse it into object
-            arguments = JSON3.write(contents[1][:input])
-            try
-                Base.invokelatest(JSON3.read, arguments, datastructtype)
-            catch e
-                @warn "There was an error parsing the response: $e. Using the raw response instead."
-                JSON3.read(arguments) |> copy
-            end
+            tool_array = [parse_tool(tool_map[tool_use[:name]], tool_use[:input])
+                          for tool_use in resp.response[:content]
+                          if tool_use[:type] == "tool_use"]
+            ## If a single tool was used, return it directly
+            length(tool_array) == 1 ? only(tool_array) : tool_array
         else
             ## fallback, return text
             @warn "No tool_use found in the response. Returning the raw text instead."
@@ -643,6 +670,191 @@ function aiextract(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMP
     return output
 end
 
+"""
+    aitools(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMPT_TYPE;
+        kwargs...)
+        tools::Union{Type, Function, Method, AbstractTool, Vector} = Tool[],
+        verbose::Bool = true,
+        api_key::String = ANTHROPIC_API_KEY,
+        model::String = MODEL_CHAT,
+        return_all::Bool = false, dry_run::Bool = false,
+        conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
+        no_system_message::Bool = false,
+        cache::Union{Nothing, Symbol} = nothing,
+        http_kwargs::NamedTuple = (retry_non_idempotent = true,
+            retries = 5,
+            readtimeout = 120), api_kwargs::NamedTuple = (;
+            tool_choice = nothing),
+        kwargs...)
+
+Calls chat completion API with an optional tool call signature. It can receive both `tools` and standard string-based content.
+Ideal for agentic workflows with more complex cognitive architectures.
+
+Difference to `aigenerate`: Response can be a tool call (structured)
+
+Differences to `aiextract`: Can provide infinitely many tools (including Functions!) and then respond with the tool call's output.
+
+# Arguments
+- `prompt_schema`: An optional object to specify which prompt template should be applied (Default to `PROMPT_SCHEMA = OpenAISchema`)
+- `prompt`: Can be a string representing the prompt for the AI conversation, a `UserMessage`, a vector of `AbstractMessage` or an `AITemplate`
+- `tools`: A vector of tools to be used in the conversation. Can be a vector of types, instances of `AbstractTool`, or a mix of both.
+- `verbose`: A boolean indicating whether to print additional information.
+- `api_key`: A string representing the API key for accessing the Anthropic API.
+- `model`: A string representing the model to use for generating the response. Can be an alias corresponding to a model ID defined in `MODEL_CHAT`.
+- `return_all`: If `true`, returns the entire conversation history, otherwise returns only the last message (the `AIMessage`).
+- `dry_run`: If `true`, skips sending the messages to the model (for debugging, often used with `return_all=true`).
+- `conversation`: An optional vector of `AbstractMessage` objects representing the conversation history.
+- `no_system_message::Bool = false`: Whether to exclude the system message from the conversation history.
+- `cache::Union{Nothing, Symbol} = nothing`: Whether to cache the prompt. Defaults to `nothing`.
+- `http_kwargs`: A named tuple of HTTP keyword arguments.
+- `api_kwargs`: A named tuple of API keyword arguments. Several important arguments are highlighted below:
+    - `tool_choice`: The choice of tool mode. Can be "auto", "exact", or can depend on the provided.. Defaults to `nothing`, which translates to "auto".
+
+# Example
+
+```julia
+## Let's define a tool
+get_weather(location, date) = "The weather in \$location on \$date is 70 degrees."
+
+msg = aitools("What's the weather in Tokyo on May 3rd, 2023?";
+    tools = get_weather, model = "claudeh")
+PT.execute_tool(get_weather, msg.tool_calls[1].args)
+# "The weather in Tokyo on 2023-05-03 is 70 degrees."
+
+# Ignores the tool
+msg = aitools("What's your name?";
+    tools = get_weather, model = "claudeh")
+# I don't have a personal name, but you can call me your AI assistant!
+```
+
+How to have a multi-turn conversation with tools:
+```julia
+conv = aitools("What's the weather in Tokyo on May 3rd, 2023?";
+    tools = get_weather, return_all = true, model = "claudeh")
+
+tool_msg = conv[end].tool_calls[1] # there can be multiple tool calls requested!!
+
+# Execute the output to the tool message content
+tool_msg.content = PT.execute_tool(get_weather, tool_msg.args)
+
+# Add the tool message to the conversation
+push!(conv, tool_msg)
+
+# Call LLM again with the updated conversation
+conv = aitools(
+    "And in New York?"; tools = get_weather, return_all = true, conversation = conv, model = "claudeh")
+# 6-element Vector{AbstractMessage}:
+# SystemMessage("Act as a helpful AI assistant")
+# UserMessage("What's the weather in Tokyo on May 3rd, 2023?")
+# AIToolRequest("-"; Tool Requests: 1)
+# ToolMessage("The weather in Tokyo on 2023-05-03 is 70 degrees.")
+# UserMessage("And in New York?")
+# AIToolRequest("-"; Tool Requests: 1)
+```
+"""
+function aitools(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMPT_TYPE;
+        tools::Union{Type, Function, Method, AbstractTool, Vector} = Tool[],
+        verbose::Bool = true,
+        api_key::String = ANTHROPIC_API_KEY,
+        model::String = MODEL_CHAT,
+        return_all::Bool = false, dry_run::Bool = false,
+        conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
+        no_system_message::Bool = false,
+        cache::Union{Nothing, Symbol} = nothing,
+        http_kwargs::NamedTuple = (retry_non_idempotent = true,
+            retries = 5,
+            readtimeout = 120), api_kwargs::NamedTuple = (;
+            tool_choice = nothing),
+        kwargs...)
+    global MODEL_ALIASES
+    @assert (isnothing(cache)||cache in [:system, :tools, :last, :all]) "Currently only `:system`, `:tools`, `:last` and `:all` are supported for Anthropic Prompt Caching"
+
+    ## Find the unique ID for the model alias provided
+    model_id = get(MODEL_ALIASES, model, model)
+
+    ## Tools definition
+    tool_map = tool_call_signature(
+        tools; max_description_length = 100)
+    tools = render(prompt_schema, tool_map)
+    ## force our function to be used
+    tool_choice_ = get(api_kwargs, :tool_choice, nothing)
+    tool_choice = if tool_choice_ == "exact"
+        Dict(:type => "tool", :name => only(tools)[:name])
+    elseif isnothing(tool_choice_)
+        Dict(:type => "auto")
+    else
+        # User provided value, eg, "auto", "any"
+        Dict(:type => tool_choice_)
+    end
+    ## update tools to use caching
+    (cache == :tools || cache == :all) && length(tools) > 0 &&
+        (tools[end][:cache_control] = Dict("type" => "ephemeral"))
+
+    ## Add the function call stopping sequence to the api_kwargs
+    api_kwargs = merge(api_kwargs, (; tools, tool_choice))
+
+    ## We provide the tool description to the rendering engine
+    conv_rendered = render(
+        prompt_schema, prompt; tools, conversation, no_system_message, cache, kwargs...)
+
+    if !dry_run
+        time = @elapsed resp = anthropic_api(
+            prompt_schema, conv_rendered.conversation; api_key,
+            conv_rendered.system, endpoint = "messages", model = model_id, cache, http_kwargs,
+            api_kwargs...)
+        tokens_prompt = get(resp.response[:usage], :input_tokens, 0)
+        tokens_completion = get(resp.response[:usage], :output_tokens, 0)
+        finish_reason = get(resp.response, :stop_reason, nothing)
+        content_str = mapreduce(x -> get(x, :text, ""), *,
+            filter(x -> x[:type] != "tool_use", resp.response[:content]), init = "") |>
+                      strip
+        tools_array = [ToolMessage(;
+                           content = nothing, tool_call_id = tool_call[:id],
+                           raw = JSON3.write(tool_call[:input]),
+                           args = tool_call[:input], name = tool_call[:name])
+                       for tool_call in resp.response[:content]
+                       if tool_call[:type] == "tool_use"]
+        if finish_reason == "tool_use"
+            content = nothing
+        else
+            content = content_str
+        end
+        ## Build metadata
+        extras = Dict{Symbol, Any}()
+        haskey(resp.response[:usage], :cache_creation_input_tokens) &&
+            (extras[:cache_creation_input_tokens] = resp.response[:usage][:cache_creation_input_tokens])
+        haskey(resp.response[:usage], :cache_read_input_tokens) &&
+            (extras[:cache_read_input_tokens] = resp.response[:usage][:cache_read_input_tokens])
+        length(tools_array) > 0 && (extras[:tool_calls] = tools_array)
+        extras[:content] = content_str
+        ## Build  message
+        msg = AIToolRequest(;
+            content,
+            tool_calls = tools_array,
+            status = Int(resp.status),
+            cost = call_cost(tokens_prompt, tokens_completion, model_id),
+            finish_reason,
+            tokens = (tokens_prompt,
+                tokens_completion),
+            elapsed = time,
+            extras)
+
+        ## Reporting
+        verbose && @info _report_stats(msg, model_id)
+    else
+        msg = nothing
+    end
+    ## Select what to return
+    output = finalize_outputs(prompt,
+        conv_rendered,
+        msg;
+        conversation,
+        return_all,
+        dry_run,
+        kwargs...)
+
+    return output
+end
 function aiembed(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMPT_TYPE;
         kwargs...)
     error("Anthropic schema does not yet support aiembed. Please use OpenAISchema instead.")

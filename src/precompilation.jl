@@ -11,7 +11,8 @@ mock_response = Dict(
         Dict(
         :message => Dict(:content => "Hello!",
             :tool_calls => [
-                Dict(:function => Dict(:arguments => JSON3.write(Dict(:x => 1))))
+                Dict(:function => Dict(
+                :name => "X123", :arguments => JSON3.write(Dict(:x => 1))))
             ]),
         :finish_reason => "stop")
     ],

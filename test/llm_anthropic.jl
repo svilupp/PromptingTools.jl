@@ -1,6 +1,7 @@
 using PromptingTools: TestEchoAnthropicSchema, render, AnthropicSchema
 using PromptingTools: AIMessage, SystemMessage, AbstractMessage
-using PromptingTools: UserMessage, UserMessageWithImages, DataMessage
+using PromptingTools: UserMessage, UserMessageWithImages, DataMessage, AIToolRequest,
+                      ToolMessage, Tool
 using PromptingTools: call_cost, anthropic_api, function_call_signature,
                       anthropic_extra_headers
 
@@ -121,15 +122,12 @@ using PromptingTools: call_cost, anthropic_api, function_call_signature,
         SystemMessage("Act as a helpful AI assistant"),
         UserMessage("Hello, my name is {{name}}")
     ]
-    conversation = render(schema, messages; tools, name = "John")
-    @test occursin("Use the function_xyz tool in your response.", conversation.system)
+    conversation = render(schema, messages; name = "John")
 
     tools = [Dict("name" => "function_xyz", "description" => "ABC",
             "input_schema" => ""),
         Dict("name" => "function_abc", "description" => "ABC",
             "input_schema" => "")]
-    @test_logs (:warn, r"Multiple tools provided") match_mode=:any render(
-        schema, messages; tools)
 
     ## Cache variables
     messages = [
@@ -207,6 +205,72 @@ using PromptingTools: call_cost, anthropic_api, function_call_signature,
                 "content" => [Dict("type" => "text", "text" => "My name is Claude")])
         ])
     @test conversation_with_cache == expected_output_with_cache
+end
+
+@testset "render-tools for Anthropic" begin
+    schema = AnthropicSchema()
+
+    # Test rendering a single tool
+    tool = Tool(
+        name = "get_weather",
+        description = "Get the current weather in a given location",
+        parameters = Dict(
+            "type" => "object",
+            "properties" => Dict(
+                "location" => Dict("type" => "string"),
+                "unit" => Dict("type" => "string", "enum" => ["celsius", "fahrenheit"])
+            ),
+            "required" => ["location"]
+        ),
+        callable = identity
+    )
+
+    rendered = render(schema, [tool])
+    @test length(rendered) == 1
+    @test rendered[1][:name] == "get_weather"
+    @test rendered[1][:description] == "Get the current weather in a given location"
+    @test rendered[1][:input_schema] == tool.parameters
+
+    # Test rendering multiple tools
+    tool2 = Tool(
+        name = "get_time",
+        description = "Get the current time in a given timezone",
+        parameters = Dict(
+            "type" => "object",
+            "properties" => Dict(
+                "timezone" => Dict("type" => "string")
+            ),
+            "required" => ["timezone"]
+        ),
+        callable = identity
+    )
+
+    rendered = render(schema, [tool, tool2])
+    @test length(rendered) == 2
+    @test rendered[1][:name] == "get_weather"
+    @test rendered[2][:name] == "get_time"
+
+    # Test rendering with no description
+    tool_no_desc = PromptingTools.Tool(
+        name = "no_description_tool",
+        parameters = Dict(
+            "type" => "object",
+            "properties" => Dict(
+                "input" => Dict("type" => "string")
+            ),
+            "required" => ["input"]
+        ),
+        callable = identity
+    )
+
+    rendered = render(schema, [tool_no_desc])
+    @test rendered[1][:description] == ""
+
+    # From from dictionary of tools
+    tool_map = Dict("get_weather" => tool, "get_time" => tool2)
+    rendered = render(schema, tool_map)
+    @test length(rendered) == 2
+    @test Set(t[:name] for t in rendered) == Set(["get_weather", "get_time"])
 end
 
 @testset "anthropic_extra_headers" begin
@@ -386,7 +450,8 @@ end
     end
     response = Dict(
         :content => [
-            Dict(:type => "tool_use", :input => Dict("name" => "banana"))],
+            Dict(:type => "tool_use", :id => "1", :name => "Fruit",
+            :input => Dict("name" => "banana"))],
         :stop_reason => "tool_use",
         :usage => Dict(:input_tokens => 2, :output_tokens => 1))
 
@@ -403,7 +468,7 @@ end
         elapsed = msg.elapsed)
     @test msg == expected_output
     @test schema1.inputs.system ==
-          "Act as a helpful AI assistant\n\nUse the Fruit_extractor tool in your response."
+          "Act as a helpful AI assistant"
     @test schema1.inputs.messages ==
           [Dict("role" => "user",
         "content" => Dict{String, Any}[Dict(
@@ -413,7 +478,8 @@ end
     # Test badly formatted response
     response = Dict(
         :content => [
-            Dict(:type => "tool_use", :input => Dict("namexxx" => "banana"))],
+            Dict(:type => "tool_use", :id => "1", :name => "Fruit",
+            :input => Dict("namexxx" => "banana"))],
         :stop_reason => "tool_use",
         :usage => Dict(:input_tokens => 2, :output_tokens => 1))
     schema2 = TestEchoAnthropicSchema(; response, status = 200)
@@ -434,7 +500,8 @@ end
     # With Cache
     response4 = Dict(
         :content => [
-            Dict(:type => "tool_use", :input => Dict("name" => "banana"))],
+            Dict(:type => "tool_use", :id => "1", :name => "Fruit",
+            :input => Dict("name" => "banana"))],
         :stop_reason => "tool_use",
         :usage => Dict(:input_tokens => 2, :output_tokens => 1,
             :cache_creation_input_tokens => 1, :cache_read_input_tokens => 0))
@@ -456,6 +523,129 @@ end
     @test_throws AssertionError aiextract(
         schema4, "Hello World! Banana"; model = "claudeo",
         return_type = Fruit, cache = :bad)
+end
+
+@testset "aitools-Anthropic" begin
+    # Define a test tool
+    struct WeatherTool
+        location::String
+        date::String
+    end
+
+    # Mock response for a single tool call
+    single_tool_response = Dict(
+        :content => [
+            Dict(:type => "tool_use", :id => "123", :name => "get_weather",
+            :input => Dict(:location => "New York", :date => "2023-05-01"))
+        ],
+        :stop_reason => "tool_use",
+        :usage => Dict(:input_tokens => 15, :output_tokens => 5)
+    )
+
+    schema_single = TestEchoAnthropicSchema(; response = single_tool_response, status = 200)
+
+    msg_single = aitools(schema_single, "What's the weather in New York on May 1st, 2023?";
+        tools = [Tool(; name = "get_weather", callable = WeatherTool)],
+        model = "claudeh",
+        api_kwargs = (; temperature = 0))
+
+    @test isaitoolrequest(msg_single)
+    @test msg_single.tool_calls[1].tool_call_id == "123"
+    @test msg_single.tool_calls[1].name == "get_weather"
+    @test msg_single.tool_calls[1].args[:location] == "New York"
+    @test msg_single.tool_calls[1].args[:date] == "2023-05-01"
+    @test msg_single.tokens == (15, 5)
+
+    # Mock response for multiple tool calls
+    multi_tool_response = Dict(
+        :content => [
+            Dict(:type => "tool_use", :id => "123", :name => "get_weatherUS",
+                :input => Dict(:location => "New York", :date => "2023-05-01")),
+            Dict(:type => "tool_use", :id => "456", :name => "get_weatherUK",
+                :input => Dict(:location => "London", :date => "2023-05-02"))
+        ],
+        :stop_reason => "tool_use",
+        :usage => Dict(:input_tokens => 20, :output_tokens => 10)
+    )
+
+    schema_multi = TestEchoAnthropicSchema(; response = multi_tool_response, status = 200)
+
+    msg_multi = aitools(
+        schema_multi, "Compare the weather in New York on May 1st and London on May 2nd, 2023.";
+        tools = [Tool(; name = "get_weatherUS", callable = WeatherTool),
+            Tool(; name = "get_weatherUK", callable = WeatherTool)],
+        model = "claudeh",
+        api_kwargs = (; temperature = 0))
+
+    @test isaitoolrequest(msg_multi)
+    @test length(msg_multi.tool_calls) == 2
+    @test msg_multi.tool_calls[1].tool_call_id == "123"
+    @test msg_multi.tool_calls[1].name == "get_weatherUS"
+    @test msg_multi.tool_calls[1].args[:location] == "New York"
+    @test msg_multi.tool_calls[1].args[:date] == "2023-05-01"
+    @test msg_multi.tool_calls[2].tool_call_id == "456"
+    @test msg_multi.tool_calls[2].name == "get_weatherUK"
+    @test msg_multi.tool_calls[2].args[:location] == "London"
+    @test msg_multi.tool_calls[2].args[:date] == "2023-05-02"
+    @test msg_multi.tokens == (20, 10)
+
+    # Test with dry_run
+    msg_dry_run = aitools(schema_single, "What's the weather in Paris tomorrow?";
+        tools = [Tool(; name = "get_weather", callable = WeatherTool)],
+        model = "claudeh",
+        dry_run = true)
+
+    @test msg_dry_run === nothing
+
+    # Test with return_all
+    msg_return_all = aitools(
+        schema_single, "What's the weather in New York on May 1st, 2023?";
+        tools = [Tool(; name = "get_weather", callable = WeatherTool)],
+        model = "claudeh",
+        return_all = true,
+        api_kwargs = (; temperature = 0))
+
+    @test msg_return_all isa Vector
+    @test length(msg_return_all) == 3
+    @test msg_return_all[1] isa SystemMessage
+    @test msg_return_all[2] isa UserMessage
+    @test isaitoolrequest(msg_return_all[3])
+    @test msg_return_all[end].tool_calls[1].name == "get_weather"
+    @test msg_return_all[end].tool_calls[1].args[:location] == "New York"
+    @test msg_return_all[end].tool_calls[1].args[:date] == "2023-05-01"
+
+    # Test with cache
+    cache_response = Dict(
+        :content => [
+            Dict(:type => "tool_use", :id => "123", :name => "get_weather",
+            :input => Dict(:location => "Tokyo", :date => "2023-05-03"))
+        ],
+        :stop_reason => "tool_use",
+        :usage => Dict(:input_tokens => 18, :output_tokens => 7,
+            :cache_creation_input_tokens => 1, :cache_read_input_tokens => 0)
+    )
+
+    schema_cache = TestEchoAnthropicSchema(; response = cache_response, status = 200)
+
+    msg_cache = aitools(schema_cache, "What's the weather in Tokyo on May 3rd, 2023?";
+        tools = [Tool(; name = "get_weather", callable = WeatherTool)],
+        model = "claudeh",
+        cache = :all,
+        api_kwargs = (; temperature = 0))
+
+    @test msg_cache.tool_calls[1].tool_call_id == "123"
+    @test msg_cache.tool_calls[1].name == "get_weather"
+    @test msg_cache.tool_calls[1].args[:location] == "Tokyo"
+    @test msg_cache.tool_calls[1].args[:date] == "2023-05-03"
+    @test msg_cache.tokens == (18, 7)
+    @test msg_cache.extras[:cache_creation_input_tokens] == 1
+    @test msg_cache.extras[:cache_read_input_tokens] == 0
+
+    # Test with invalid cache
+    @test_throws AssertionError aitools(schema_cache, "What's the weather in Tokyo?";
+        tools = [Tool(; name = "get_weather", callable = WeatherTool)],
+        model = "claudeh",
+        cache = :invalid)
 end
 
 @testset "not implemented ai* functions" begin

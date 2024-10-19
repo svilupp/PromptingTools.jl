@@ -276,6 +276,26 @@ function aiextract(tracer_schema::AbstractTracerSchema, prompt::ALLOWED_PROMPT_T
 end
 
 """
+    aitools(tracer_schema::AbstractTracerSchema, prompt::ALLOWED_PROMPT_TYPE;
+        tracer_kwargs = NamedTuple(), model = "", kwargs...)
+
+Wraps the normal `aitools` call in a tracing/callback system. Use `tracer_kwargs` to provide any information necessary to the tracer/callback system only (eg, `parent_id`, `thread_id`, `run_id`).
+
+Logic:
+- calls `initialize_tracer`
+- calls `aiextract` (with the `tracer_schema.schema`)
+- calls `finalize_tracer`
+"""
+function aitools(tracer_schema::AbstractTracerSchema, prompt::ALLOWED_PROMPT_TYPE;
+        tracer_kwargs = NamedTuple(), model = "", kwargs...)
+    tracer = initialize_tracer(tracer_schema; model, prompt, tracer_kwargs..., kwargs...)
+    merged_kwargs = isempty(model) ? kwargs : (; model, kwargs...) # to not override default model for each schema if not provided
+    extract_or_conv = aitools(tracer_schema.schema, prompt; merged_kwargs...)
+    return finalize_tracer(
+        tracer_schema, tracer, extract_or_conv; model, tracer_kwargs..., kwargs...)
+end
+
+"""
     aiscan(tracer_schema::AbstractTracerSchema, prompt::ALLOWED_PROMPT_TYPE;
         tracer_kwargs = NamedTuple(), model = "", kwargs...)
 

@@ -1,6 +1,6 @@
 using PromptingTools: AIMessage,
                       SystemMessage, UserMessage, UserMessageWithImages, AbstractMessage,
-                      DataMessage, ShareGPTSchema
+                      DataMessage, ShareGPTSchema, Tool, ToolMessage, AIToolRequest
 using PromptingTools: save_conversation, load_conversation, save_conversations
 using PromptingTools: save_template, load_template
 
@@ -11,7 +11,12 @@ using PromptingTools: save_template, load_template
         AIMessage("AI message"),
         UserMessageWithImages(; content = "a", image_url = String["b", "c"]),
         DataMessage(;
-            content = "Data message")]
+            content = "Data message"),
+        AIToolRequest(;
+            tool_calls = [ToolMessage(;
+                tool_call_id = "1", name = "MyType", raw = "", args = Dict(:content => "x"))]),
+        ToolMessage(;
+            tool_call_id = "1", name = "MyType", content = "x", raw = "", args = Dict(:content => 1))]
     tmp, _ = mktemp()
     save_conversation(tmp, messages)
     # Test load_conversation
@@ -42,13 +47,18 @@ end
     # Test save_conversations
     messages = AbstractMessage[SystemMessage("System message 1"),
         UserMessage("User message"),
-        AIMessage("AI message")]
+        AIMessage("AI message"),
+        AIToolRequest(;
+            tool_calls = [ToolMessage(;
+                tool_call_id = "1", name = "MyType", raw = "", args = Dict(:content => "x"))]),
+        ToolMessage(;
+            tool_call_id = "1", name = "MyType", content = "x", raw = "", args = Dict(:content => 1))]
     dir = tempdir()
     fn = joinpath(dir, "conversations.jsonl")
     save_conversations(fn, [messages])
     s = read(fn, String)
     @test s ==
-          """{"conversations":[{"value":"System message 1","from":"system"},{"value":"User message","from":"human"},{"value":"AI message","from":"gpt"}]}"""
+          "{\"conversations\":[{\"value\":\"System message 1\",\"from\":\"system\"},{\"value\":\"User message\",\"from\":\"human\"},{\"value\":\"AI message\",\"from\":\"gpt\"},{\"value\":null,\"from\":\"assistant\"},{\"value\":\"x\",\"from\":\"tool\"}]}"
 end
 
 @testset "Serialization - TracerMessage" begin
