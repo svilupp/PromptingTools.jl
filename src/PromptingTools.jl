@@ -17,12 +17,12 @@ using Test, Pkg
 using REPL
 
 ## Fix for Julia v1.9 with missing methods
-@static if VERSION>=v"1.9" && VERSION<=v"1.10"
+@static if VERSION >= v"1.9" && VERSION <= v"1.10"
     ## This definition is missing in Julia v1.9
-    method_missing = try 
+    method_missing = try
         which(parentmodule, (Method,))
         false
-    catch e 
+    catch e
         true
     end
     if method_missing
