@@ -1,6 +1,7 @@
 using PromptingTools: TestEchoOpenAISchema, render, OpenAISchema, TracerSchema, SaverSchema
 using PromptingTools: AIMessage, SystemMessage, AbstractMessage
-using PromptingTools: UserMessage, UserMessageWithImages, DataMessage, TracerMessage
+using PromptingTools: UserMessage, UserMessageWithImages, DataMessage, TracerMessage,
+                      AIToolRequest, ToolMessage
 using PromptingTools: CustomProvider,
                       CustomOpenAISchema, MistralOpenAISchema, MODEL_EMBEDDING,
                       MODEL_IMAGE_GENERATION
@@ -24,6 +25,10 @@ using PromptingTools: initialize_tracer, finalize_tracer, isaimessage, istracerm
         OpenAISchema(), TracerMessage(UserMessageWithImages("Abc123"; image_url = ""))) ==
           "user"
     @test role4render(OpenAISchema(), TracerMessage(AIMessage("Abc123"))) == "assistant"
+    @test role4render(OpenAISchema(), TracerMessage(AIToolRequest())) == "assistant"
+    @test role4render(OpenAISchema(),
+        TracerMessage(ToolMessage(; tool_call_id = "Fruit", raw = "", args = Dict()))) ==
+          "tool"
 end
 @testset "render-Tracer" begin
     schema = TracerSchema(OpenAISchema())
@@ -243,7 +248,8 @@ end
     mock_choice = Dict(
         :message => Dict(:content => "Hello!",
             :tool_calls => [
-                Dict(:function => Dict(:arguments => JSON3.write(Dict(:x => 1))))
+                Dict(:function => Dict(
+                :arguments => JSON3.write(Dict(:x => 1)), :name => "RandomType1235"))
             ]),
         :logprobs => Dict(:content => [Dict(:logprob => -0.5), Dict(:logprob => -0.4)]),
         :finish_reason => "stop")
@@ -261,6 +267,54 @@ end
 
     msg = aiextract(schema1, :BlankSystemUser; return_type)
     @test istracermessage(msg)
+end
+
+# TODO: add aitools tracer tests
+function calculator(x::Number, y::Number; operation::String = "add")
+    operation == "add" ?
+    x + y :
+    throw(ArgumentError("Unsupported operation"))
+end
+@testset "aitools-Tracer" begin
+
+    # Mock response for aitools
+    mock_choice = Dict(
+        :message => Dict(:content => "I'll use the calculator tool to add 2 and 3.",
+            :tool_calls => [
+                Dict(:id => "1",
+                :function => Dict(
+                    :name => "calculator",
+                    :arguments => JSON3.write(Dict(:x => 2, :y => 3, :operation => "add"))
+                ))
+            ]),
+        :logprobs => Dict(:content => [Dict(:logprob => -0.3), Dict(:logprob => -0.2)]),
+        :finish_reason => "stop")
+
+    response = Dict(:choices => [mock_choice],
+        :usage => Dict(:total_tokens => 10, :prompt_tokens => 5, :completion_tokens => 5))
+
+    schema = TestEchoOpenAISchema(; response, status = 200) |> TracerSchema
+
+    # Define a simple calculator tool
+
+    msg = aitools(schema, "What is 2 + 3?";
+        tools = [calculator],
+        model = "gpt-4",
+        api_kwargs = (; temperature = 0))
+
+    @test istracermessage(msg)
+    @test unwrap(msg) isa AIToolRequest
+    @test msg.content == "I'll use the calculator tool to add 2 and 3."
+    @test msg.log_prob ≈ -0.5
+    @test length(msg.tool_calls) == 1
+    @test msg.tool_calls[1].tool_call_id == "1"
+    @test msg.tool_calls[1].name == "calculator"
+    @test msg.tool_calls[1].args == Dict(:x => 2, :y => 3, :operation => "add")
+
+    # Test with AITemplate
+    msg = aitools(schema, :BlankSystemUser; tools = [calculator])
+    @test istracermessage(msg)
+    @test unwrap(msg) isa AIToolRequest
 end
 
 @testset "aiscan-Tracer" begin

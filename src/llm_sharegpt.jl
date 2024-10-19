@@ -29,6 +29,10 @@ function aiextract(prompt_schema::AbstractShareGPTSchema, prompt::ALLOWED_PROMPT
         kwargs...)
     error("ShareGPT schema does not support aiextract. Please use OpenAISchema instead.")
 end
+function aitools(prompt_schema::AbstractShareGPTSchema, prompt::ALLOWED_PROMPT_TYPE;
+        kwargs...)
+    error("ShareGPT schema does not support aitools. Please use OpenAISchema instead.")
+end
 function aiscan(prompt_schema::AbstractShareGPTSchema, prompt::ALLOWED_PROMPT_TYPE;
         kwargs...)
     error("ShareGPT schema does not support aiscan. Please use OpenAISchema instead.")

@@ -16,8 +16,20 @@ using Test, Pkg
 ## Added REPL because it extends methods in Base.docs for extraction of docstrings
 using REPL
 
+## Fix for Julia v1.9 with missing methods
+@static if VERSION >= v"1.9" && VERSION <= v"1.10"
+    ## This definition is missing in Julia v1.9
+    method_missing = try
+        which(parentmodule, (Method,))
+        false
+    catch e
+        true
+    end
+    if method_missing
+        Base.parentmodule(m::Method) = m.module
+    end
+end
 # GLOBALS and Preferences are managed by Preferences.jl - see src/preferences.jl for details
-
 "The following keywords are reserved for internal use in the `ai*` functions and cannot be used as placeholders in the Messages"
 const RESERVED_KWARGS = [
     :http_kwargs,
@@ -32,7 +44,9 @@ const RESERVED_KWARGS = [
     :strict,
     :json_mode,
     :no_system_message,
-    :aiprefill
+    :aiprefill,
+    :name_user,
+    :name_assistant
 ]
 
 # export replace_words, recursive_splitter, split_by_length, call_cost, auth_header # for debugging only
@@ -40,7 +54,7 @@ const RESERVED_KWARGS = [
 # export pprint
 include("utils.jl")
 
-export aigenerate, aiembed, aiclassify, aiextract, aiscan, aiimage
+export aigenerate, aiembed, aiclassify, aiextract, aitools, aiscan, aiimage
 # export render # for debugging only
 include("llm_interface.jl")
 
@@ -77,6 +91,7 @@ include("streaming.jl")
 
 ## Individual interfaces
 include("llm_shared.jl")
+include("llm_openai_schema_defs.jl")
 include("llm_openai.jl")
 include("llm_ollama_managed.jl")
 include("llm_ollama.jl")

@@ -37,32 +37,61 @@ function SystemMessage(content::T,
     @assert length(not_allowed_kwargs)==0 "Error: Some placeholders are invalid, as they are reserved for `ai*` functions. Change: $(join(not_allowed_kwargs,","))"
     return SystemMessage{T}(content, variables, type)
 end
+
+"""
+    UserMessage
+
+A message type for user-generated text-based responses. 
+Consumed by `ai*` functions to generate responses.
+    
+# Fields
+- `content::T`: The content of the message.
+- `variables::Vector{Symbol}`: The variables in the message.
+- `name::Union{Nothing, String}`: The name of the `role` in the conversation.
+"""
 Base.@kwdef struct UserMessage{T <: AbstractString} <: AbstractChatMessage
     content::T
     variables::Vector{Symbol} = _extract_handlebar_variables(content)
+    name::Union{Nothing, String} = nothing
     _type::Symbol = :usermessage
-    UserMessage{T}(c, v, t) where {T <: AbstractString} = new(c, v, t)
+    UserMessage{T}(c, v, n, t) where {T <: AbstractString} = new(c, v, n, t)
 end
 function UserMessage(content::T,
         variables::Vector{Symbol},
+        name::Union{Nothing, String},
         type::Symbol) where {T <: AbstractString}
     not_allowed_kwargs = intersect(variables, RESERVED_KWARGS)
     @assert length(not_allowed_kwargs)==0 "Error: Some placeholders are invalid, as they are reserved for `ai*` functions. Change: $(join(not_allowed_kwargs,","))"
-    return UserMessage{T}(content, variables, type)
+    return UserMessage{T}(content, variables, name, type)
 end
+
+"""
+    UserMessageWithImages
+
+A message type for user-generated text-based responses with images. 
+Consumed by `ai*` functions to generate responses.
+    
+# Fields
+- `content::T`: The content of the message.
+- `image_url::Vector{String}`: The URLs of the images.
+- `variables::Vector{Symbol}`: The variables in the message.
+- `name::Union{Nothing, String}`: The name of the `role` in the conversation.
+"""
 Base.@kwdef struct UserMessageWithImages{T <: AbstractString} <: AbstractChatMessage
     content::T
     image_url::Vector{String} # no default! fail when not provided
     variables::Vector{Symbol} = _extract_handlebar_variables(content)
+    name::Union{Nothing, String} = nothing
     _type::Symbol = :usermessagewithimages
-    UserMessageWithImages{T}(c, i, v, t) where {T <: AbstractString} = new(c, i, v, t)
+    UserMessageWithImages{T}(c, i, v, n, t) where {T <: AbstractString} = new(c, i, v, n, t)
 end
 function UserMessageWithImages(content::T, image_url::Vector{<:AbstractString},
         variables::Vector{Symbol},
+        name::Union{Nothing, String},
         type::Symbol) where {T <: AbstractString}
     not_allowed_kwargs = intersect(variables, RESERVED_KWARGS)
     @assert length(not_allowed_kwargs)==0 "Error: Some placeholders are invalid, as they are reserved for `ai*` functions. Change: $(join(not_allowed_kwargs,","))"
-    return UserMessageWithImages{T}(content, string.(image_url), variables, type)
+    return UserMessageWithImages{T}(content, string.(image_url), variables, name, type)
 end
 
 """
@@ -74,6 +103,7 @@ Returned by `aigenerate`, `aiclassify`, and `aiscan` functions.
 # Fields
 - `content::Union{AbstractString, Nothing}`: The content of the message.
 - `status::Union{Int, Nothing}`: The status of the message from the API.
+- `name::Union{Nothing, String}`: The name of the `role` in the conversation.
 - `tokens::Tuple{Int, Int}`: The number of tokens used (prompt,completion).
 - `elapsed::Float64`: The time taken to generate the response in seconds.
 - `cost::Union{Nothing, Float64}`: The cost of the API call (calculated with information from `MODEL_REGISTRY`).
@@ -86,6 +116,7 @@ Returned by `aigenerate`, `aiclassify`, and `aiscan` functions.
 Base.@kwdef struct AIMessage{T <: Union{AbstractString, Nothing}} <: AbstractChatMessage
     content::T = nothing
     status::Union{Int, Nothing} = nothing
+    name::Union{Nothing, String} = nothing
     tokens::Tuple{Int, Int} = (-1, -1)
     elapsed::Float64 = -1.0
     cost::Union{Nothing, Float64} = nothing
@@ -129,6 +160,32 @@ Base.@kwdef struct DataMessage{T <: Any} <: AbstractDataMessage
     _type::Symbol = :datamessage
 end
 
+Base.@kwdef mutable struct ToolMessage <: AbstractDataMessage
+    content::Any = nothing
+    req_id::Union{Nothing, Int} = nothing
+    tool_call_id::String
+    raw::AbstractString
+    args::Union{Nothing, Dict{Symbol, Any}} = nothing
+    name::Union{Nothing, String} = nothing
+    _type::Symbol = :toolmessage
+end
+
+Base.@kwdef struct AIToolRequest{T <: Union{AbstractString, Nothing}} <: AbstractDataMessage
+    content::T = nothing
+    tool_calls::Vector{ToolMessage} = ToolMessage[]
+    name::Union{Nothing, String} = nothing
+    status::Union{Int, Nothing} = nothing
+    tokens::Tuple{Int, Int} = (-1, -1)
+    elapsed::Float64 = -1.0
+    cost::Union{Nothing, Float64} = nothing
+    log_prob::Union{Nothing, Float64} = nothing
+    extras::Union{Nothing, Dict{Symbol, Any}} = nothing
+    finish_reason::Union{Nothing, String} = nothing
+    run_id::Union{Nothing, Int} = Int(rand(Int16))
+    sample_id::Union{Nothing, Int} = nothing
+    _type::Symbol = :aitoolrequest
+end
+
 ### Other Message methods
 # content-only constructor
 function (MSG::Type{<:AbstractChatMessage})(prompt::AbstractString)
@@ -143,14 +200,20 @@ end
 
 ## It checks types so it should be defined for all inputs
 isusermessage(m::Any) = m isa UserMessage
+isusermessagewithimages(m::Any) = m isa UserMessageWithImages
 issystemmessage(m::Any) = m isa SystemMessage
 isdatamessage(m::Any) = m isa DataMessage
 isaimessage(m::Any) = m isa AIMessage
+istoolmessage(m::Any) = m isa ToolMessage
+isaitoolrequest(m::Any) = m isa AIToolRequest
 istracermessage(m::Any) = m isa AbstractTracerMessage
 isusermessage(m::AbstractTracerMessage) = isusermessage(m.object)
+isusermessagewithimages(m::AbstractTracerMessage) = isusermessagewithimages(m.object)
 issystemmessage(m::AbstractTracerMessage) = issystemmessage(m.object)
 isdatamessage(m::AbstractTracerMessage) = isdatamessage(m.object)
 isaimessage(m::AbstractTracerMessage) = isaimessage(m.object)
+istoolmessage(m::AbstractTracerMessage) = istoolmessage(m.object)
+isaitoolrequest(m::AbstractTracerMessage) = isaitoolrequest(m.object)
 
 # equality check for testing, only equal if all fields are equal and type is the same
 Base.var"=="(m1::AbstractMessage, m2::AbstractMessage) = false
@@ -404,6 +467,12 @@ function Base.show(io::IO, ::MIME"text/plain", m::AbstractDataMessage)
         # for any non-types extraction messages
     elseif m.content isa Dict{Symbol, <:Any}
         print(io, "(Dict with keys: ", join(keys(m.content), ", "), ")")
+    elseif isaitoolrequest(m)
+        content_str = m.content isa AbstractString ? m.content : "-"
+        print(io, "(\"", content_str, "\"; Tool Requests: ", length(m.tool_calls), ")")
+    elseif istoolmessage(m)
+        content_str = m.content isa AbstractString ? m.content : "-"
+        print(io, "(\"", content_str, "\")")
     else
         print(io, "(", typeof(m.content), ")")
     end
@@ -427,8 +496,9 @@ end
 function render(schema::AbstractPromptSchema, msg::AbstractMessage; kwargs...)
     render(schema, [msg]; kwargs...)
 end
-function render(schema::AbstractPromptSchema, msg::AbstractString; kwargs...)
-    render(schema, [UserMessage(; content = msg)]; kwargs...)
+function render(schema::AbstractPromptSchema, msg::AbstractString;
+        name_user::Union{Nothing, String} = nothing, kwargs...)
+    render(schema, [UserMessage(; content = msg, name = name_user)]; kwargs...)
 end
 
 ## Serialization via JSON3
@@ -438,6 +508,8 @@ function StructTypes.subtypes(::Type{AbstractMessage})
     (usermessage = UserMessage,
         usermessagewithimages = UserMessageWithImages,
         aimessage = AIMessage,
+        toolmessage = ToolMessage,
+        aitoolrequest = AIToolRequest,
         systemmessage = SystemMessage,
         metadatamessage = MetadataMessage,
         datamessage = DataMessage,
@@ -470,6 +542,8 @@ StructTypes.StructType(::Type{MetadataMessage}) = StructTypes.Struct()
 StructTypes.StructType(::Type{SystemMessage}) = StructTypes.Struct()
 StructTypes.StructType(::Type{UserMessage}) = StructTypes.Struct()
 StructTypes.StructType(::Type{UserMessageWithImages}) = StructTypes.Struct()
+StructTypes.StructType(::Type{ToolMessage}) = StructTypes.Struct()
+StructTypes.StructType(::Type{AIToolRequest}) = StructTypes.Struct()
 StructTypes.StructType(::Type{AIMessage}) = StructTypes.Struct()
 StructTypes.StructType(::Type{DataMessage}) = StructTypes.Struct()
 StructTypes.StructType(::Type{TracerMessage}) = StructTypes.Struct() # Ignore mutability once we serialize
@@ -493,12 +567,28 @@ function pprint(io::IO, msg::AbstractMessage; text_width::Int = displaysize(io)[
         "System Message"
     elseif msg isa AIMessage
         "AI Message"
+    elseif msg isa AIToolRequest
+        "AI Tool Request"
+    elseif msg isa ToolMessage
+        "Tool Message"
     else
         "Unknown Message"
     end
     content = if msg isa DataMessage
         length_ = msg.content isa AbstractArray ? " (Size: $(size(msg.content)))" : ""
         "Data: $(typeof(msg.content))$(length_)"
+    elseif isaitoolrequest(msg)
+        if isnothing(msg.content)
+            join(
+                ["Tool Request: $(tool.name), args: $(tool.args)"
+                 for (tool) in msg.tool_calls],
+                "\n")
+        else
+            wrap_string(msg.content, text_width)
+        end
+    elseif istoolmessage(msg)
+        isnothing(msg.content) ? string("Name: ", msg.name, ", Args: ", msg.raw) :
+        string(msg.content)
     else
         wrap_string(msg.content, text_width)
     end

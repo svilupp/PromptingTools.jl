@@ -41,6 +41,7 @@ end
     @test_throws ErrorException aigenerate(ShareGPTSchema(), "prompt")
     @test_throws ErrorException aiembed(ShareGPTSchema(), "prompt")
     @test_throws ErrorException aiextract(ShareGPTSchema(), "prompt")
+    @test_throws ErrorException aitools(ShareGPTSchema(), "prompt")
     @test_throws ErrorException aiclassify(ShareGPTSchema(), "prompt")
     @test_throws ErrorException aiscan(ShareGPTSchema(), "prompt")
     @test_throws ErrorException aiimage(ShareGPTSchema(), "prompt")

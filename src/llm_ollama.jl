@@ -354,3 +354,7 @@ function aiextract(prompt_schema::AbstractOllamaSchema, prompt::ALLOWED_PROMPT_T
         kwargs...)
     error("Managed schema does not support aiextract. Please use OpenAISchema instead.")
 end
+function aitools(prompt_schema::AbstractOllamaSchema, prompt::ALLOWED_PROMPT_TYPE;
+        kwargs...)
+    error("Managed schema does not support aitools. Please use OpenAISchema instead.")
+end
