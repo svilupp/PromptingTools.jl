@@ -577,7 +577,7 @@ function pprint(io::IO, msg::AbstractMessage; text_width::Int = displaysize(io)[
     content = if msg isa DataMessage
         length_ = msg.content isa AbstractArray ? " (Size: $(size(msg.content)))" : ""
         "Data: $(typeof(msg.content))$(length_)"
-    elseif msg isa AIToolRequest
+    elseif isaitoolrequest(msg)
         if isnothing(msg.content)
             join(
                 ["Tool Request: $(tool.name), args: $(tool.args)"
@@ -587,6 +587,7 @@ function pprint(io::IO, msg::AbstractMessage; text_width::Int = displaysize(io)[
             wrap_string(msg.content, text_width)
         end
     elseif istoolmessage(msg)
+        isnothing(msg.content) ? string("Name: ", msg.name, ", Args: ", msg.raw) :
         string(msg.content)
     else
         wrap_string(msg.content, text_width)

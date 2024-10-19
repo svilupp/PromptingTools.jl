@@ -179,6 +179,7 @@ end
 @testset "not implemented ai* functions" begin
     @test_throws ErrorException aiembed(GoogleSchema(), "prompt")
     @test_throws ErrorException aiextract(GoogleSchema(), "prompt")
+    @test_throws ErrorException aitools(GoogleSchema(), "prompt")
     @test_throws ErrorException aiclassify(GoogleSchema(), "prompt")
     @test_throws ErrorException aiscan(GoogleSchema(), "prompt")
     @test_throws ErrorException aiimage(GoogleSchema(), "prompt")

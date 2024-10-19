@@ -160,6 +160,10 @@ function response_to_message(schema::AbstractOpenAISchema,
     tokens_prompt = get(resp.response, :usage, Dict(:prompt_tokens => 0))[:prompt_tokens]
     tokens_completion = get(resp.response, :usage, Dict(:completion_tokens => 0))[:completion_tokens]
     cost = call_cost(tokens_prompt, tokens_completion, model_id)
+    extras = Dict{Symbol, Any}()
+    if has_log_prob
+        extras[:log_prob] = choice[:logprobs]
+    end
     ## build AIMessage object
     msg = MSG(;
         content = choice[:message][:content] |> strip,
@@ -172,7 +176,8 @@ function response_to_message(schema::AbstractOpenAISchema,
         finish_reason = get(choice, :finish_reason, nothing),
         tokens = (tokens_prompt,
             tokens_completion),
-        elapsed = time)
+        elapsed = time,
+        extras)
 end
 
 ## User-Facing API
@@ -839,6 +844,9 @@ function response_to_message(schema::AbstractOpenAISchema,
     if haskey(choice[:message], :tool_calls) && !isempty(choice[:message][:tool_calls])
         extras[:tool_calls] = choice[:message][:tool_calls]
     end
+    if has_log_prob
+        extras[:log_prob] = choice[:logprobs]
+    end
 
     ## build DataMessage object
     msg = MSG(;
@@ -909,7 +917,7 @@ If `return_all=true`:
 
 Note: `msg.content` can be a single object (if a single tool is used) or a vector of objects (if multiple tools are used)!
 
-See also: `function_call_signature`, `MaybeExtract`, `ItemsExtract`, `aigenerate`, `generate_struct`
+See also: `tool_call_signature`, `MaybeExtract`, `ItemsExtract`, `aigenerate`, `generate_struct`
 
 # Example
 
@@ -1056,7 +1064,7 @@ function aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_T
     @assert !(return_type isa Vector)||!any(x -> x isa Union{Function, Method}, return_type) "Functions and Methods are not supported in `aiextract`!"
     ## Set strict mode on for JSON mode
     strict_ = json_mode == true ? true : strict
-    tool_map = function_call_signature(return_type; strict = strict_)
+    tool_map = tool_call_signature(return_type; strict = strict_)
     tools = render(prompt_schema, tool_map; json_mode)
     ## force our function to be used
     tool_choice_ = get(api_kwargs, :tool_choice, nothing)
@@ -1486,8 +1494,11 @@ function response_to_message(schema::AbstractOpenAISchema,
     if has_tools
         extras[:tool_calls] = choice[:message][:tool_calls]
     end
+    if has_log_prob
+        extras[:log_prob] = choice[:logprobs]
+    end
 
-    ## build DataMessage object
+    ## build AIToolRequest object
     msg = MSG(;
         content = content,
         name = name_assistant,
@@ -1512,6 +1523,7 @@ end
         model::String = MODEL_CHAT,
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
+        no_system_message::Bool = false,
         http_kwargs::NamedTuple = (retry_non_idempotent = true,
             retries = 5,
             readtimeout = 120), api_kwargs::NamedTuple = (;
@@ -1551,11 +1563,53 @@ Differences to `aiextract`: Can provide infinitely many tools (including Functio
 
 # Example
 
-TODO: Add examples
 ```julia
+## Let's define a tool
+get_weather(location, date) = "The weather in \$location on \$date is 70 degrees."
 
+## JSON mode request
+msg = aitools("What's the weather in Tokyo on May 3rd, 2023?";
+    tools = get_weather,
+    json_mode = true)
+PT.execute_tool(get_weather, msg.tool_calls[1].args)
+# "The weather in Tokyo on 2023-05-03 is 70 degrees."
+
+# Function calling request
+msg = aitools("What's the weather in Tokyo on May 3rd, 2023?";
+    tools = get_weather)
+PT.execute_tool(get_weather, msg.tool_calls[1].args)
+# "The weather in Tokyo on 2023-05-03 is 70 degrees."
+
+# Ignores the tool
+msg = aitools("What's your name?";
+    tools = get_weather)
+# I don't have a personal name, but you can call me your AI assistant!
 ```
 
+How to have a multi-turn conversation with tools:
+```julia
+conv = aitools("What's the weather in Tokyo on May 3rd, 2023?";
+    tools = get_weather, return_all = true)
+
+tool_msg = conv[end].tool_calls[1] # there can be multiple tool calls requested!!
+
+# Execute the output to the tool message content
+tool_msg.content = PT.execute_tool(get_weather, tool_msg.args)
+
+# Add the tool message to the conversation
+push!(conv, tool_msg)
+
+# Call LLM again with the updated conversation
+conv = aitools(
+    "And in New York?"; tools = get_weather, return_all = true, conversation = conv)
+# 6-element Vector{AbstractMessage}:
+# SystemMessage("Act as a helpful AI assistant")
+# UserMessage("What's the weather in Tokyo on May 3rd, 2023?")
+# AIToolRequest("-"; Tool Requests: 1)
+# ToolMessage("The weather in Tokyo on 2023-05-03 is 70 degrees.")
+# UserMessage("And in New York?")
+# AIToolRequest("-"; Tool Requests: 1)
+```
 """
 function aitools(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE;
         tools::Union{Type, Function, Method, AbstractTool, Vector} = Tool[],
@@ -1579,7 +1633,7 @@ function aitools(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYP
     ## Function calling specifics // get the tool map (signatures)
     ## Set strict mode on for JSON mode
     strict_ = json_mode == true ? true : strict
-    tool_map = function_call_signature(tools; strict = strict_)
+    tool_map = tool_call_signature(tools; strict = strict_)
     tools = render(prompt_schema, tool_map; json_mode)
     ## force our function to be used
     tool_choice_ = get(api_kwargs, :tool_choice, nothing)
@@ -1587,11 +1641,10 @@ function aitools(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYP
         ## Standard for OpenAI API
         Dict(:type => "function",
             :function => Dict(:name => only(tools)[:function][:name]))
-    elseif tool_choice_ == "auto" || isnothing(tool_choice_)
-        # User provided value, eg, "auto", "any" for various providers like Mistral, Together, etc.
+    elseif isnothing(tool_choice_)
         "auto"
     else
-        # User provided value
+        # User provided value, eg, "auto", "any" for various providers like Mistral, Together, etc.
         tool_choice_
     end
 

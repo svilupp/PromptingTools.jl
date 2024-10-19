@@ -241,7 +241,7 @@ using PromptingTools: pick_tokenizer, OPENAI_TOKEN_IDS_GPT35_GPT4, OPENAI_TOKEN_
           nothing
 end
 
-@testset "render for tools" begin
+@testset "render-tools" begin
     schema = CustomOpenAISchema()
 
     # Test rendering a single tool
@@ -611,6 +611,7 @@ end
         tokens = (2, 1),
         finish_reason = "stop",
         cost = msg.cost,
+        extras = Dict{Symbol, Any}(),
         elapsed = msg.elapsed)
     @test msg == expected_output
     @test schema1.inputs ==
@@ -627,6 +628,7 @@ end
         content = "Hello!" |> strip,
         status = 200,
         tokens = (2, 1),
+        extras = Dict{Symbol, Any}(),
         finish_reason = "stop",
         cost = msg.cost,
         elapsed = msg.elapsed)
@@ -852,7 +854,8 @@ end
         tokens = (2, 1),
         finish_reason = "stop",
         cost = msg.cost,
-        elapsed = msg.elapsed)
+        elapsed = msg.elapsed,
+        extras = Dict{Symbol, Any}())
     @test msg == expected_output
     @test schema1.inputs ==
           Dict{String, Any}[
@@ -869,7 +872,8 @@ end
         tokens = (2, 1),
         finish_reason = "stop",
         cost = conv[end].cost,
-        elapsed = conv[end].elapsed)
+        elapsed = conv[end].elapsed,
+        extras = Dict{Symbol, Any}())
     @test conv[end] == expected_output
 end
 
