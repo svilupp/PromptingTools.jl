@@ -16,8 +16,20 @@ using Test, Pkg
 ## Added REPL because it extends methods in Base.docs for extraction of docstrings
 using REPL
 
+## Fix for Julia v1.9 with missing methods
+@static if VERSION>=v"1.9" && VERSION<=v"1.10"
+    ## This definition is missing in Julia v1.9
+    method_missing = try 
+        which(parentmodule, (Method,))
+        false
+    catch e 
+        true
+    end
+    if method_missing
+        Base.parentmodule(m::Method) = m.module
+    end
+end
 # GLOBALS and Preferences are managed by Preferences.jl - see src/preferences.jl for details
-
 "The following keywords are reserved for internal use in the `ai*` functions and cannot be used as placeholders in the Messages"
 const RESERVED_KWARGS = [
     :http_kwargs,
