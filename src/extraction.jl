@@ -339,10 +339,40 @@ function set_properties_strict!(parameters::AbstractDict)
 end
 
 """
+    remove_field!(parameters::AbstractDict, field::AbstractString)
+
+Utility to remove a specific top-level field from the parameters (and the `required` list if present) of the JSON schema.
+"""
+function remove_field!(parameters::AbstractDict, field::AbstractString)
+    if haskey(parameters, "properties") && haskey(parameters["properties"], field)
+        delete!(parameters["properties"], field)
+    end
+    if haskey(parameters, "required") && field in parameters["required"]
+        filter!(x -> x != field, parameters["required"])
+    end
+    return parameters
+end
+
+function remove_field!(parameters::AbstractDict, pattern::Regex)
+    if haskey(parameters, "properties")
+        for (key, value) in parameters["properties"]
+            if occursin(pattern, key)
+                delete!(parameters["properties"], key)
+            end
+        end
+    end
+    if haskey(parameters, "required")
+        filter!(x -> !occursin(pattern, x), parameters["required"])
+    end
+    return parameters
+end
+
+"""
     tool_call_signature(
         type_or_method::Union{Type, Method}; strict::Union{Nothing, Bool} = nothing,
         max_description_length::Int = 200, name::Union{Nothing, String} = nothing,
-        docs::Union{Nothing, String} = nothing)
+        docs::Union{Nothing, String} = nothing, hidden_fields::AbstractVector{<:Union{
+            AbstractString, Regex}} = String[])
 
 Extract the argument names, types and docstrings from a struct to create the function call signature in JSON schema.
 
@@ -356,9 +386,10 @@ Note: Fairly experimental, but works for combination of structs, arrays, strings
 - `max_description_length::Int`: Maximum length for descriptions. Defaults to 200.
 - `name::Union{Nothing, String}`: The name of the tool. Defaults to the name of the struct.
 - `docs::Union{Nothing, String}`: The description of the tool. Defaults to the docstring of the struct/overall function.
+- `hidden_fields::AbstractVector{<:Union{AbstractString, Regex}}`: A list of fields to hide from the LLM (eg, `["ctx_user_id"]` or `r"ctx"`).
 
 # Returns
-- `Dict{String, Any}`: A dictionary representing the function call signature schema.
+- `Dict{String, Tool}`: A dictionary representing the function call signature schema.
 
 # Tips
 - You can improve the quality of the extraction by writing a helpful docstring for your struct (or any nested struct). It will be provided as a description. 
@@ -421,11 +452,18 @@ msg = aiextract("Extract measurements from the text: I am giraffe", type)
 # :error   => true
 ```
 That way, you can handle the error gracefully and get a reason why extraction failed.
+
+You can also hide certain fields in your function call signature with Strings or Regex patterns (eg, `r"ctx"`).
+
+```
+tool_map = tool_call_signature(MyMeasurement; hidden_fields = ["ctx_user_id"])
+```
 """
 function tool_call_signature(
         type_or_method::Union{Type, Method}; strict::Union{Nothing, Bool} = nothing,
         max_description_length::Int = 200, name::Union{Nothing, String} = nothing,
-        docs::Union{Nothing, String} = nothing)
+        docs::Union{Nothing, String} = nothing, hidden_fields::AbstractVector{<:Union{
+            AbstractString, Regex}} = String[])
     ## Asserts
     if type_or_method isa Type && !isstructtype(type_or_method)
         error("Only Structs are supported (provided type: $type_or_method)")
@@ -460,6 +498,12 @@ function tool_call_signature(
         end
     end
     call_type = type_or_method isa Type ? type_or_method : get_function(type_or_method)
+    ## Remove hidden fields
+    if !isempty(hidden_fields)
+        for field in hidden_fields
+            remove_field!(schema["parameters"], field)
+        end
+    end
     tool = Tool(; name = schema["name"], parameters = schema["parameters"],
         description = haskey(schema, "description") ? schema["description"] : nothing,
         strict = haskey(schema, "strict") ? schema["strict"] : nothing,
@@ -646,19 +690,33 @@ function parse_tool(tool::AbstractTool, input::Union{AbstractString, AbstractDic
 end
 
 """
-    execute_tool(f::Function, args::AbstractDict)
+    execute_tool(f::Function, args::AbstractDict{Symbol, <:Any},
+        context::AbstractDict{Symbol, <:Any} = Dict{Symbol, Any}())
 
 Executes a function with the provided arguments.
 
 Dictionary is un-ordered, so we need to sort the arguments first and then pass them to the function.
+
+# Arguments
+- `f::Function`: The function to execute.
+- `args::AbstractDict{Symbol, <:Any}`: The arguments to pass to the function.
+- `context::AbstractDict{Symbol, <:Any}`: Optional context to pass to the function, it will prioritized to get the argument values from.
 """
-function execute_tool(f::Function, args::AbstractDict)
-    args_sorted = [args[arg]
-                   for arg in get_arg_names(f) if haskey(args, arg)]
+function execute_tool(f::Function, args::AbstractDict{Symbol, <:Any},
+        context::AbstractDict{Symbol, <:Any} = Dict{Symbol, Any}())
+    args_sorted = []
+    for arg in get_arg_names(f)
+        if haskey(context, arg)
+            push!(args_sorted, context[arg])
+        elseif haskey(args, arg)
+            push!(args_sorted, args[arg])
+        end
+    end
     return f(args_sorted...)
 end
-function execute_tool(tool::AbstractTool, args::AbstractDict)
-    return execute_tool(tool.callable, args)
+function execute_tool(tool::AbstractTool, args::AbstractDict{Symbol, <:Any},
+        context::AbstractDict{Symbol, <:Any} = Dict{Symbol, Any}())
+    return execute_tool(tool.callable, args, context)
 end
 
 """
