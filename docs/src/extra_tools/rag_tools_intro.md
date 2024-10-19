@@ -14,7 +14,7 @@ Import the module as follows:
 
 ```julia
 # required dependencies to load the necessary extensions!!!
-using LinearAlgebra, SparseArrays, Unicode 
+using LinearAlgebra, SparseArrays, Unicode, Snowball
 using PromptingTools.Experimental.RAGTools
 # to access unexported functionality
 const RT = PromptingTools.Experimental.RAGTools
