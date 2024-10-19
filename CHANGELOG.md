@@ -14,7 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Extends support for structured extraction with multiple "tools" definitions (see `?aiextract`).
-- Added new primitives `Tool` (to re-use tool definitions) and function `aitools` for tool-based workflows (beyond simple extraction).
+- Added new primitives `Tool` (to re-use tool definitions) and a function `aitools` to support mixed structured and non-structured workflows, eg, agentic workflows (see `?aitools`).
+
+### Updated
+- Renamed `function_call_signature` to `tool_call_signature` to better reflect that it's used for tools, but kept a link to the old name for back-compatibility.
 
 ## [0.58.0]
 
