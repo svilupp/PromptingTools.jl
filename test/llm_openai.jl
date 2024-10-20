@@ -196,6 +196,20 @@ using PromptingTools: pick_tokenizer, OPENAI_TOKEN_IDS_GPT35_GPT4, OPENAI_TOKEN_
     ]
     @test conversation == expected_output
 
+    # With empty tools
+    messages = [
+        SystemMessage("System message"),
+        UserMessage("User message"),
+        AIToolRequest(;content="content")
+    ]
+    conversation = render(schema, messages)
+    expected_output = Dict{String, Any}[
+        Dict("role" => "system", "content" => "System message"),
+        Dict("role" => "user", "content" => "User message"),
+        Dict("role" => "assistant", "content" => "content")
+    ]
+    @test conversation == expected_output
+
     # With a list of images and detail="low"
     messages = [
         SystemMessage("System message 2"),
