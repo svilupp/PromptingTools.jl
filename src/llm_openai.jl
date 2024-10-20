@@ -56,11 +56,17 @@ function render(schema::AbstractOpenAISchema,
             end
             Dict("role" => role4render(schema, msg), "content" => content)
         elseif isaitoolrequest(msg)
-            Dict("role" => role4render(schema, msg), "content" => msg.content,
-                "tool_calls" => [Dict("id" => tool.tool_call_id, "type" => "function",
-                                     "function" => Dict("name" => tool.name,
-                                         "arguments" => tool.raw))
-                                 for tool in msg.tool_calls])
+            output = Dict{String, Any}(
+                "role" => role4render(schema, msg),
+                "content" => msg.content)
+            if !isempty(msg.tool_calls)
+                output["tool_calls"] = [Dict("id" => tool.tool_call_id,
+                                            "type" => "function",
+                                            "function" => Dict("name" => tool.name,
+                                                "arguments" => tool.raw))
+                                        for tool in msg.tool_calls]
+            end
+            output
         elseif istoolmessage(msg)
             content = msg.content isa AbstractString ? msg.content : string(msg.content)
             Dict("role" => role4render(schema, msg), "content" => content,
