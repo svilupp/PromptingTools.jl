@@ -1,15 +1,18 @@
-using PromptingTools: MaybeExtract, extract_docstring, ItemsExtract
+using PromptingTools: MaybeExtract, extract_docstring, ItemsExtract, ToolMessage
 using PromptingTools: has_null_type, is_required_field, remove_null_types, to_json_schema
 using PromptingTools: tool_call_signature, set_properties_strict!,
                       update_field_descriptions!, generate_struct
 using PromptingTools: Tool, isabstracttool, execute_tool, parse_tool, get_arg_names,
-                      get_arg_types, get_method, get_function
+                      get_arg_types, get_method, get_function, remove_field!
 
 # TODO: check more edge cases like empty structs
 
 "This is a test function."
 function my_test_function(x::Int, y::String)
     return "Test function: $x, $y"
+end
+function context_test_function(x::Int, y::String, ctx_z::Float64)
+    return "Context test: $x, $y, $(ctx_z)"
 end
 
 @testset "Tool-constructor" begin
@@ -478,6 +481,51 @@ end
     @test !haskey(updated_schema["properties"]["field2"], "description")
 end
 
+@testset "remove_field!" begin
+    # Test removing a field by string
+    parameters = Dict(
+        "properties" => Dict(
+            "field1" => Dict("type" => "string"),
+            "field2" => Dict("type" => "integer")
+        ),
+        "required" => ["field1", "field2"]
+    )
+    remove_field!(parameters, "field1")
+    @test !haskey(parameters["properties"], "field1")
+    @test parameters["required"] == ["field2"]
+
+    # Test removing a non-existent field
+    remove_field!(parameters, "field3")
+    @test parameters["properties"] == Dict("field2" => Dict("type" => "integer"))
+    @test parameters["required"] == ["field2"]
+
+    # Test removing a field by regex
+    parameters = Dict(
+        "properties" => Dict(
+            "user_id" => Dict("type" => "string"),
+            "user_name" => Dict("type" => "string"),
+            "age" => Dict("type" => "integer")
+        ),
+        "required" => ["user_id", "user_name", "age"]
+    )
+    remove_field!(parameters, r"^user_")
+    @test !haskey(parameters["properties"], "user_id")
+    @test !haskey(parameters["properties"], "user_name")
+    @test haskey(parameters["properties"], "age")
+    @test parameters["required"] == ["age"]
+
+    # Test removing with regex that doesn't match any fields
+    remove_field!(parameters, r"^non_existent_")
+    @test parameters["properties"] == Dict("age" => Dict("type" => "integer"))
+    @test parameters["required"] == ["age"]
+
+    # Test with empty properties and required fields
+    parameters = Dict("properties" => Dict(), "required" => String[])
+    remove_field!(parameters, "field")
+    remove_field!(parameters, r"field")
+    @test parameters == Dict("properties" => Dict(), "required" => String[])
+end
+
 @testset "tool_call_signature" begin
     "Some docstring"
     struct MyMeasurement2
@@ -730,4 +778,34 @@ end
 
     tool = Tool(my_test_function)
     @test execute_tool(tool, args) == "Test function: 5, hello"
+
+    # Test executing a function with context
+    args = Dict(:x => 5, :y => "hello")
+    context = Dict(:ctx_z => 3.14)
+    @test execute_tool(context_test_function, args, context) ==
+          "Context test: 5, hello, 3.14"
+
+    # Test context overriding args
+    args_override = Dict(:x => 5, :y => "hello", :ctx_z => 2.71)
+    context_override = Dict(:y => "world", :ctx_z => 3.14)
+    @test execute_tool(context_test_function, args_override, context_override) ==
+          "Context test: 5, world, 3.14"
+
+    # Test with missing argument in both args and context
+    args_missing = Dict(:x => 5)
+    context_missing = Dict(:y => "hello")
+    @test_throws MethodError execute_tool(
+        context_test_function, args_missing, context_missing)
+
+    # Test with Tool
+    context_tool = Tool(context_test_function)
+    @test execute_tool(context_tool, args, context) == "Context test: 5, hello, 3.14"
+
+    # Test with tool_map
+    args = Dict(:x => 10, :y => "hello")
+    tool_map = PT.tool_call_signature(my_test_function; hidden_fields = [r"ctx"])
+    msg = ToolMessage(;
+        tool_call_id = "1", name = "my_test_function", raw = "", args = args)
+    output = execute_tool(tool_map, msg)
+    @test output == "Test function: 10, hello"
 end

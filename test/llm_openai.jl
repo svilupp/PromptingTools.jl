@@ -1134,7 +1134,7 @@ end
         json_mode = true,
         api_kwargs = (; temperature = 0))
 
-    @test msg_json.tool_calls[1].tool_call_id == "123"
+    @test msg_json.tool_calls[1].tool_call_id == "call_$(msg_json.run_id)"
     @test msg_json.tool_calls[1].name == "get_weather"
     @test msg_json.tool_calls[1].args[:location] == "Tokyo"
     @test msg_json.tool_calls[1].args[:date] == "2023-05-03"
