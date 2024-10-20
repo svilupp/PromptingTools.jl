@@ -196,6 +196,15 @@ function OpenAI.create_chat(schema::CerebrasOpenAISchema,
     api_key = isempty(CEREBRAS_API_KEY) ? api_key : CEREBRAS_API_KEY
     OpenAI.create_chat(CustomOpenAISchema(), api_key, model, conversation; url, kwargs...)
 end
+function OpenAI.create_chat(schema::SambaNovaOpenAISchema,
+        api_key::AbstractString,
+        model::AbstractString,
+        conversation;
+        url::String = "https://api.sambanova.ai/v1",
+        kwargs...)
+    api_key = isempty(SAMBANOVA_API_KEY) ? api_key : SAMBANOVA_API_KEY
+    OpenAI.create_chat(CustomOpenAISchema(), api_key, model, conversation; url, kwargs...)
+end
 function OpenAI.create_chat(schema::DatabricksOpenAISchema,
         api_key::AbstractString,
         model::AbstractString,

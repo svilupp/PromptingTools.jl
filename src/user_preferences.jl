@@ -25,6 +25,7 @@ Check your preferences by calling `get_preferences(key::String)`.
 - `DEEPSEEK_API_KEY`: The API key for the DeepSeek API. Get \$5 credit when you join. Get yours from [here](https://platform.deepseek.com/api_keys).
 - `OPENROUTER_API_KEY`: The API key for the OpenRouter API. Get yours from [here](https://openrouter.ai/keys).
 - `CEREBRAS_API_KEY`: The API key for the Cerebras API. Get yours from [here](https://cloud.cerebras.ai/).
+- `SAMBANOVA_API_KEY`: The API key for the Sambanova API. Get yours from [here](https://cloud.sambanova.ai/apis).
 - `MODEL_CHAT`: The default model to use for aigenerate and most ai* calls. See `MODEL_REGISTRY` for a list of available models or define your own.
 - `MODEL_EMBEDDING`: The default model to use for aiembed (embedding documents). See `MODEL_REGISTRY` for a list of available models or define your own.
 - `PROMPT_SCHEMA`: The default prompt schema to use for aigenerate and most ai* calls (if not specified in `MODEL_REGISTRY`). Set as a string, eg, `"OpenAISchema"`.
@@ -57,6 +58,7 @@ Define your `register_model!()` calls in your `startup.jl` file to make them ava
 - `DEEPSEEK_API_KEY`: The API key for the DeepSeek API. Get \$5 credit when you join. Get yours from [here](https://platform.deepseek.com/api_keys).
 - `OPENROUTER_API_KEY`: The API key for the OpenRouter API. Get yours from [here](https://openrouter.ai/keys).
 - `CEREBRAS_API_KEY`: The API key for the Cerebras API.
+- `SAMBANOVA_API_KEY`: The API key for the Sambanova API.
 - `LOG_DIR`: The directory to save the logs to, eg, when using `SaverSchema <: AbstractTracerSchema`. Defaults to `joinpath(pwd(), "log")`. Refer to `?SaverSchema` for more information on how it works and examples.
 
 Preferences.jl takes priority over ENV variables, so if you set a preference, it will take precedence over the ENV variable.
@@ -81,6 +83,7 @@ const ALLOWED_PREFERENCES = ["MISTRALAI_API_KEY",
     "DEEPSEEK_API_KEY",
     "OPENROUTER_API_KEY",  # Added OPENROUTER_API_KEY
     "CEREBRAS_API_KEY",
+    "SAMBANOVA_API_KEY",
     "MODEL_CHAT",
     "MODEL_EMBEDDING",
     "MODEL_ALIASES",
@@ -163,6 +166,7 @@ global GROQ_API_KEY::String = ""
 global DEEPSEEK_API_KEY::String = ""
 global OPENROUTER_API_KEY::String = ""
 global CEREBRAS_API_KEY::String = ""
+global SAMBANOVA_API_KEY::String = ""
 global LOCAL_SERVER::String = ""
 global LOG_DIR::String = ""
 
@@ -223,6 +227,9 @@ function load_api_keys!()
     global CEREBRAS_API_KEY
     CEREBRAS_API_KEY = @load_preference("CEREBRAS_API_KEY",
         default=get(ENV, "CEREBRAS_API_KEY", ""))
+    global SAMBANOVA_API_KEY
+    SAMBANOVA_API_KEY = @load_preference("SAMBANOVA_API_KEY",
+        default=get(ENV, "SAMBANOVA_API_KEY", ""))
     global LOCAL_SERVER
     LOCAL_SERVER = @load_preference("LOCAL_SERVER",
         default=get(ENV, "LOCAL_SERVER", ""))
@@ -358,6 +365,8 @@ aliases = merge(
         "gpt4t" => "gpt-4-turbo", # 4t is for "4 turbo"
         "gpt3t" => "gpt-3.5-turbo-0125", # 3t is for "3 turbo"
         "chatgpt" => "chatgpt-4o-latest",
+        "o1p" => "o1-preview",
+        "o1m" => "o1-mini",
         "ada" => "text-embedding-ada-002",
         "emb3small" => "text-embedding-3-small",
         "emb3large" => "text-embedding-3-large",
@@ -400,6 +409,8 @@ aliases = merge(
         "mistraln" => "open-mistral-nemo",
         "mistralc" => "codestral-latest",
         "codestral" => "codestral-latest",
+        "ministral3" => "ministral-3b-latest",
+        "ministral8" => "ministral-8b-latest",
         ## Default to Sonnet as a the medium offering
         "claude" => "claude-3-5-sonnet-20240620",
         "claudeo" => "claude-3-opus-20240229",
@@ -412,16 +423,37 @@ aliases = merge(
         "gl70" => "llama-3.1-70b-versatile",
         "gllama3405" => "llama-3.1-405b-reasoning",
         "gl405" => "llama-3.1-405b-reasoning",
+        "glxxs" => "llama-3.2-1b-preview", #xxs for extra extra small
+        "glxs" => "llama-3.2-3b-preview", #xs for extra small
         "gls" => "llama-3.1-8b-instant", #s for small
         "glm" => "llama-3.1-70b-versatile", #m for medium
         "gll" => "llama-3.1-405b-reasoning", #l for large
         "gmixtral" => "mixtral-8x7b-32768",
         "ggemma9" => "gemma2-9b-it",
+        "glst" => "llama3-groq-8b-8192-tool-use-preview",
+        "glmt" => "llama3-groq-70b-8192-tool-use-preview",
+        "glguard" => "llama-guard-3-8b",
+        "glsv" => "llama-3.2-11b-vision-preview",
+        "glmv" => "llama-3.2-90b-vision-preview",
         ## Cerebras
         "cl3" => "llama3.1-8b",
         "cllama3" => "llama3.1-8b",
         "cl70" => "llama3.1-70b",
         "cllama70" => "llama3.1-70b",
+        ## SambaNova
+        "sl3" => "Meta-Llama-3.1-8B-Instruct",
+        "sllama3" => "Meta-Llama-3.1-8B-Instruct",
+        "sl70" => "Meta-Llama-3.1-70B-Instruct",
+        "sllama70" => "Meta-Llama-3.1-70B-Instruct",
+        "sl405" => "Meta-Llama-3.1-405B-Instruct",
+        "sllama405" => "Meta-Llama-3.1-405B-Instruct",
+        "sl1" => "Meta-Llama-3.2-1B-Instruct",
+        "sl3b" => "Meta-Llama-3.2-3B-Instruct", ## deviation not to clash with Llama 3 notation
+        "slxs" => "Meta-Llama-3.2-1B-Instruct",
+        "slxxs" => "Meta-Llama-3.2-3B-Instruct",
+        "sls" => "Meta-Llama-3.1-8B-Instruct", # s for small
+        "slm" => "Meta-Llama-3.1-70B-Instruct", # m for medium
+        "sll" => "Meta-Llama-3.1-405B-Instruct", # l for large
         ## DeepSeek
         "dschat" => "deepseek-chat",
         "dscode" => "deepseek-coder",
@@ -505,6 +537,26 @@ registry = Dict{String, ModelSpec}(
         1.5e-7,
         6e-7,
         "GPT-4 Omni Mini, the smallest and fastest model based on GPT4 (and cheaper than GPT3.5Turbo). Context of 128K, knowledge until October 2023. Currently points to version gpt-4o-2024-07-18."),
+    "o1-preview" => ModelSpec("o1-preview",
+        OpenAISchema(),
+        1.5e-5,
+        6e-5,
+        "O1 Preview is the latest version of OpenAI's O1 model. 128K context. Knowledge until October 2023."),
+    "o1-preview-2024-09-12" => ModelSpec("o1-preview-2024-09-12",
+        OpenAISchema(),
+        1.5e-5,
+        6e-5,
+        "O1 Preview is the latest version of OpenAI's O1 model. 128K context. Knowledge until October 2023."),
+    "o1-mini" => ModelSpec("o1-mini",
+        OpenAISchema(),
+        3e-6,
+        1.2e-5,
+        "O1 Mini is the latest version of OpenAI's O1 model. 128K context. Knowledge until October 2023."),
+    "o1-mini-2024-09-12" => ModelSpec("o1-mini-2024-09-12",
+        OpenAISchema(),
+        3e-6,
+        1.2e-5,
+        "O1 Mini is the latest version of OpenAI's O1 model. 128K context. Knowledge until October 2023."),
     "chatgpt-4o-latest" => ModelSpec("chatgpt-4o-latest",
         OpenAISchema(),
         5e-6,
@@ -666,6 +718,26 @@ registry = Dict{String, ModelSpec}(
         3e-7,
         3e-7,
         "Mistral Nemo is a state-of-the-art 12B model developed with NVIDIA. Version 2407."),
+    "ministral-8b-latest" => ModelSpec("ministral-8b-latest",
+        MistralOpenAISchema(),
+        1e-7,
+        1e-7,
+        "Mistral AI's latest 8B model. 128K context."),
+    "ministral-8b-2410" => ModelSpec("ministral-8b-2410",
+        MistralOpenAISchema(),
+        1e-7,
+        1e-7,
+        "Mistral AI's latest 8B model. Version 2410, 128K context."),
+    "ministral-3b-latest" => ModelSpec("ministral-3b-latest",
+        MistralOpenAISchema(),
+        4e-8,
+        4e-8,
+        "Mistral AI's latest 3B model. 128K context."),
+    "ministral-3b-2410" => ModelSpec("ministral-3b-2410",
+        MistralOpenAISchema(),
+        4e-8,
+        4e-8,
+        "Mistral AI's latest 3B model. Version 2410, 128K context."),
     "mistral-embed" => ModelSpec("mistral-embed",
         MistralOpenAISchema(),
         1e-7,
@@ -842,6 +914,45 @@ registry = Dict{String, ModelSpec}(
         5.9e-7,
         7.9e-7,
         "Meta's Llama3 70b, hosted by Groq. Max output 8192 tokens, 8K context. See details [here](https://console.groq.com/docs/models)"),
+    "llama3-groq-70b-8192-tool-use-preview" => ModelSpec(
+        "llama3-groq-70b-8192-tool-use-preview",
+        GroqOpenAISchema(),
+        8.9e-7,
+        8.9e-7,
+        "Meta's Llama3 70b, hosted by Groq and finetuned for tool use. Max output 8192 tokens, 8K context. See details [here](https://console.groq.com/docs/models)"),
+    "llama3-groq-8b-8192-tool-use-preview" => ModelSpec(
+        "llama3-groq-8b-8192-tool-use-preview",
+        GroqOpenAISchema(),
+        1.9e-7,
+        1.9e-7,
+        "Meta's Llama3 8b, hosted by Groq and finetuned for tool use. Max output 8192 tokens, 8K context. See details [here](https://console.groq.com/docs/models)"),
+    "llama-3.2-1b-preview" => ModelSpec("llama-3.2-1b-preview",
+        GroqOpenAISchema(),
+        4e-8,
+        4e-8,
+        "Meta's Llama3.2 1b, hosted by Groq. See details [here](https://console.groq.com/docs/models)"),
+    "llama-3.2-3b-preview" => ModelSpec("llama-3.2-3b-preview",
+        GroqOpenAISchema(),
+        6e-8,
+        6e-8,
+        "Meta's Llama3.2 3b, hosted by Groq. See details [here](https://console.groq.com/docs/models)"),
+    ## Price guess as 11b
+    "llama-3.2-11b-vision-preview" => ModelSpec("llama-3.2-11b-vision-preview",
+        GroqOpenAISchema(),
+        5e-8,
+        8e-8,
+        "Meta's Llama3.2 11b with vision, hosted by Groq. Price unknown, using 8b price as proxy. See details [here](https://console.groq.com/docs/models)"),
+    ## Price guess as 70b
+    "llama-3.2-90b-vision-preview" => ModelSpec("llama-3.2-90b-vision-preview",
+        GroqOpenAISchema(),
+        5.9e-7,
+        7.9e-7,
+        "Meta's Llama3.2 90b with vision, hosted by Groq. Price unknown, using 70b price as proxy. See details [here](https://console.groq.com/docs/models)"),
+    "llama-guard-3-8b" => ModelSpec("llama-guard-3-8b",
+        GroqOpenAISchema(),
+        2e-7,
+        2e-7,
+        "Meta's LlamaGuard 8b, hosted by Groq. See details [here](https://console.groq.com/docs/models)"),
     "mixtral-8x7b-32768" => ModelSpec("mixtral-8x7b-32768",
         GroqOpenAISchema(),
         2.7e-7,
@@ -907,7 +1018,32 @@ registry = Dict{String, ModelSpec}(
         CerebrasOpenAISchema(),
         6e-7,
         6e-7,
-        "Meta's Llama3.1 70b, hosted by Cerebras.ai. Max 8K context.")
+        "Meta's Llama3.1 70b, hosted by Cerebras.ai. Max 8K context."),
+    "Meta-Llama-3.2-1B-Instruct" => ModelSpec("Meta-Llama-3.2-1B-Instruct",
+        SambaNovaOpenAISchema(),
+        4e-8,
+        8e-8,
+        "Meta's Llama3.2 1b, hosted by SambaNova.ai. Max 4K context."),
+    "Meta-Llama-3.2-3B-Instruct" => ModelSpec("Meta-Llama-3.2-3B-Instruct",
+        SambaNovaOpenAISchema(),
+        8e-8,
+        1.6e-7,
+        "Meta's Llama3.2 3b, hosted by SambaNova.ai. Max 4K context."),
+    "Meta-Llama-3.1-8B-Instruct" => ModelSpec("Meta-Llama-3.1-8B-Instruct",
+        SambaNovaOpenAISchema(),
+        1e-7,
+        2e-7,
+        "Meta's Llama3.1 8b, hosted by SambaNova.ai. Max 64K context."),
+    "Meta-Llama-3.1-70B-Instruct" => ModelSpec("Meta-Llama-3.1-70B-Instruct",
+        SambaNovaOpenAISchema(),
+        6e-7,
+        1.2e-6,
+        "Meta's Llama3.1 70b, hosted by SambaNova.ai. Max 64K context."),
+    "Meta-Llama-3.1-405B-Instruct" => ModelSpec("Meta-Llama-3.1-405B-Instruct",
+        SambaNovaOpenAISchema(),
+        5e-6,
+        1e-7,
+        "Meta's Llama3.1 405b, hosted by SambaNova.ai. Max 64K context.")
 )
 
 """

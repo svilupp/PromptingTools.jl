@@ -765,7 +765,7 @@ end
 end
 
 function context_test_function(x::Int, y::String, ctx_z::Float64)
-    return "Context test: $x, $y, $z"
+    return "Context test: $x, $y, $(ctx_z)"
 end
 @testset "execute_tool" begin
     # Test executing a function with ordered arguments
