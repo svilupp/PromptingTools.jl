@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.59.1]
+
+### Fixed
+- Fixed a bug in multi-turn tool calls for OpenAI models where an empty tools array could have been, which causes an API error.
+
 ## [0.59.0]
 
 ### Breaking Changes
