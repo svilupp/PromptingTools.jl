@@ -718,6 +718,15 @@ function execute_tool(tool::AbstractTool, args::AbstractDict{Symbol, <:Any},
         context::AbstractDict{Symbol, <:Any} = Dict{Symbol, Any}())
     return execute_tool(tool.callable, args, context)
 end
+function execute_tool(tool::AbstractTool, msg::ToolMessage,
+        context::AbstractDict{Symbol, <:Any} = Dict{Symbol, Any}())
+    return execute_tool(tool.callable, msg.args, context)
+end
+function execute_tool(tool_map::AbstractDict{String, <:AbstractTool}, msg::ToolMessage,
+        context::AbstractDict{Symbol, <:Any} = Dict{Symbol, Any}())
+    tool = tool_map[msg.name]
+    return execute_tool(tool, msg, context)
+end
 
 """
     Tool(callable::Union{Function, Type, Method}; kwargs...)

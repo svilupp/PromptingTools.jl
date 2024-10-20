@@ -1477,7 +1477,7 @@ function response_to_message(schema::AbstractOpenAISchema,
         ## Note, JSON mode doesn't have tool_call_id so we mock it
         content_blob = choice[:message][:content]
         [ToolMessage(;
-            content = nothing, req_id = run_id, tool_call_id = string("tool-id-", run_id),
+            content = nothing, req_id = run_id, tool_call_id = string("call_", run_id),
             raw = content_blob isa String ? content_blob : JSON3.write(content_blob),
             args = content_blob isa String ? JSON3.read(content_blob) : content_blob,
             name = tool_name)]
@@ -1493,7 +1493,9 @@ function response_to_message(schema::AbstractOpenAISchema,
     else
         ToolMessage[]
     end
-    content = json_mode != true ? choice[:message][:content] : nothing
+    ## Check if content key was provided (not required for tool calls)
+    content = json_mode != true && haskey(choice[:message], :content) ?
+              choice[:message][:content] : nothing
     ## Remember the tools
     extras = Dict{Symbol, Any}()
     if has_tools

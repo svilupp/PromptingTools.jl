@@ -1,4 +1,4 @@
-using PromptingTools: MaybeExtract, extract_docstring, ItemsExtract
+using PromptingTools: MaybeExtract, extract_docstring, ItemsExtract, ToolMessage
 using PromptingTools: has_null_type, is_required_field, remove_null_types, to_json_schema
 using PromptingTools: tool_call_signature, set_properties_strict!,
                       update_field_descriptions!, generate_struct
@@ -10,6 +10,9 @@ using PromptingTools: Tool, isabstracttool, execute_tool, parse_tool, get_arg_na
 "This is a test function."
 function my_test_function(x::Int, y::String)
     return "Test function: $x, $y"
+end
+function context_test_function(x::Int, y::String, ctx_z::Float64)
+    return "Context test: $x, $y, $(ctx_z)"
 end
 
 @testset "Tool-constructor" begin
@@ -764,9 +767,6 @@ end
     @test result.y == "test"
 end
 
-function context_test_function(x::Int, y::String, ctx_z::Float64)
-    return "Context test: $x, $y, $(ctx_z)"
-end
 @testset "execute_tool" begin
     # Test executing a function with ordered arguments
     args = Dict(:x => 5, :y => "hello")
@@ -800,4 +800,12 @@ end
     # Test with Tool
     context_tool = Tool(context_test_function)
     @test execute_tool(context_tool, args, context) == "Context test: 5, hello, 3.14"
+
+    # Test with tool_map
+    args = Dict(:x => 10, :y => "hello")
+    tool_map = PT.tool_call_signature(my_test_function; hidden_fields = [r"ctx"])
+    msg = ToolMessage(;
+        tool_call_id = "1", name = "my_test_function", raw = "", args = args)
+    output = execute_tool(tool_map, msg)
+    @test output == "Test function: 10, hello"
 end
