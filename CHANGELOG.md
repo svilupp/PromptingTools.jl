@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-## [0.59.0-DEV]
+## [0.59.0]
 
 ### Breaking Changes
 - New field `name` introduced in `AbstractChatMessage` and `AIToolRequest` messages to enable role-based workflows. It initializes to `nothing`, so it is backward compatible.
