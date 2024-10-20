@@ -248,6 +248,20 @@ Requires one environment variable to be set:
 """
 struct CerebrasOpenAISchema <: AbstractOpenAISchema end
 
+"""
+    SambaNovaOpenAISchema
+
+Schema to call the [SambaNova](https://sambanova.ai/) API.
+
+Links:
+- [Get your API key](https://cloud.sambanova.ai/apis)
+- [API Reference](https://community.sambanova.ai/c/docs)
+
+Requires one environment variable to be set:
+- `SAMBANOVA_API_KEY`: Your API key
+"""
+struct SambaNovaOpenAISchema <: AbstractOpenAISchema end
+
 abstract type AbstractOllamaSchema <: AbstractPromptSchema end
 
 """

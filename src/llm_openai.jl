@@ -829,8 +829,10 @@ function response_to_message(schema::AbstractOpenAISchema,
     # "Safe" parsing of the response - it still fails if JSON is invalid
     tools_array = if json_mode == true
         name, tool = only(tool_map)
+        content_blob = choice[:message][:content]
+        content_obj = content_blob isa String ? JSON3.read(content_blob) : content_blob
         [parse_tool(
-            tool.callable, choice[:message][:content])]
+            tool.callable, content_obj)]
     else
         ## If name does not match, we use the callable from the tool_map 
         ## Can happen only in testing with auto-generated struct
@@ -1472,10 +1474,13 @@ function response_to_message(schema::AbstractOpenAISchema,
                 !isempty(choice[:message][:tool_calls])
     tools_array = if json_mode == true
         tool_name, tool = only(tool_map)
+        ## Note, JSON mode doesn't have tool_call_id so we mock it
+        content_blob = choice[:message][:content]
         [ToolMessage(;
-            content = nothing, req_id = run_id, tool_call_id = choice[:id],
-            raw = JSON3.write(choice[:message][:content]),
-            args = choice[:message][:content], name = tool_name)]
+            content = nothing, req_id = run_id, tool_call_id = string("call_", run_id),
+            raw = content_blob isa String ? content_blob : JSON3.write(content_blob),
+            args = content_blob isa String ? JSON3.read(content_blob) : content_blob,
+            name = tool_name)]
     elseif has_tools
         [ToolMessage(; raw = tool_call[:function][:arguments],
              args = JSON3.read(tool_call[:function][:arguments]),
@@ -1488,7 +1493,9 @@ function response_to_message(schema::AbstractOpenAISchema,
     else
         ToolMessage[]
     end
-    content = json_mode != true ? choice[:message][:content] : nothing
+    ## Check if content key was provided (not required for tool calls)
+    content = json_mode != true && haskey(choice[:message], :content) ?
+              choice[:message][:content] : nothing
     ## Remember the tools
     extras = Dict{Symbol, Any}()
     if has_tools
@@ -1631,7 +1638,7 @@ function aitools(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYP
     ##
     global MODEL_ALIASES
     ## Function calling specifics // get the tool map (signatures)
-    ## Set strict mode on for JSON mode
+    ## Set strict mode on for JSON mode as Structured outputs
     strict_ = json_mode == true ? true : strict
     tool_map = tool_call_signature(tools; strict = strict_)
     tools = render(prompt_schema, tool_map; json_mode)
@@ -1653,7 +1660,7 @@ function aitools(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYP
         @assert length(tools)==1 "Only 1 tool definition is allowed in JSON mode."
         (; [k => v for (k, v) in pairs(api_kwargs) if k != :tool_choice]...,
             response_format = (;
-                type = "json_schema", json_schema = only(tools)))
+                type = "json_schema", json_schema = only(tools)[:function]))
     elseif isempty(tools)
         api_kwargs
     else
