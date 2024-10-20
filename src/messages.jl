@@ -207,7 +207,7 @@ Returned by `aitools` functions.
 
 See `ToolMessage` for the fields of the tool call requests.
 
-See also: [`tool_calls`](@ref)
+See also: [`tool_calls`](@ref), [`execute_tool`](@ref), [`parse_tool`](@ref)
 """
 Base.@kwdef struct AIToolRequest{T <: Union{AbstractString, Nothing}} <: AbstractDataMessage
     content::T = nothing
@@ -224,7 +224,7 @@ Base.@kwdef struct AIToolRequest{T <: Union{AbstractString, Nothing}} <: Abstrac
     sample_id::Union{Nothing, Int} = nothing
     _type::Symbol = :aitoolrequest
 end
-"Get the vector of tool call requests from an AIToolRequest."
+"Get the vector of tool call requests from an AIToolRequest/message."
 tool_calls(msg::AIToolRequest) = msg.tool_calls
 tool_calls(msg::AbstractMessage) = ToolMessage[]
 tool_calls(msg::ToolMessage) = [msg]

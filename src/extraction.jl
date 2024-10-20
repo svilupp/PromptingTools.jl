@@ -701,6 +701,23 @@ Dictionary is un-ordered, so we need to sort the arguments first and then pass t
 - `f::Function`: The function to execute.
 - `args::AbstractDict{Symbol, <:Any}`: The arguments to pass to the function.
 - `context::AbstractDict{Symbol, <:Any}`: Optional context to pass to the function, it will prioritized to get the argument values from.
+
+# Example
+```julia
+my_function(x, y) = x + y
+execute_tool(my_function, Dict(:x => 1, :y => 2))
+```
+
+```julia
+get_weather(date, location) = "The weather in \$location on \$date is 70 degrees."
+tool_map = PT.tool_call_signature(get_weather)
+
+msg = aitools("What's the weather in Tokyo on May 3rd, 2023?";
+    tools = collect(values(tool_map)))
+
+PT.execute_tool(tool_map, PT.tool_calls(msg)[1])
+# "The weather in Tokyo on 2023-05-03 is 70 degrees."
+```
 """
 function execute_tool(f::Function, args::AbstractDict{Symbol, <:Any},
         context::AbstractDict{Symbol, <:Any} = Dict{Symbol, Any}())
