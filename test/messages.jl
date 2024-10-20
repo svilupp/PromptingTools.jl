@@ -2,7 +2,7 @@ using PromptingTools: AIMessage, SystemMessage, MetadataMessage, AbstractMessage
 using PromptingTools: UserMessage, UserMessageWithImages, DataMessage, AIToolRequest,
                       ToolMessage
 using PromptingTools: _encode_local_image, attach_images_to_user_message, last_message,
-                      last_output
+                      last_output, tool_calls
 using PromptingTools: isusermessage, issystemmessage, isdatamessage, isaimessage,
                       istracermessage, isaitoolrequest, istoolmessage
 using PromptingTools: TracerMessageLike, TracerMessage, align_tracer!, unwrap,
@@ -110,7 +110,7 @@ end
     @test_throws AssertionError attach_images_to_user_message(msg; image_url)
 end
 
-@testset "last_message,last_output" begin
+@testset "last_message,last_output,tool_calls" begin
     # on a conversation
     msgs = [UserMessage("Hello, world 1!"), UserMessage("Hello, world 2!")]
     @test last_message(msgs) == msgs[end]
@@ -125,6 +125,16 @@ end
     msg = UserMessage("Hello, world 2!")
     @test last_message(msg) == msg
     @test last_output(msg) == "Hello, world 2!"
+    @test tool_calls(msg) == ToolMessage[]
+
+    tool_msg = ToolMessage(
+        tool_call_id = "1", name = "tool1", raw = "", content = "content1")
+    @test tool_calls(tool_msg) == [tool_msg]
+    @test last_output(tool_msg) == "content1"
+    msg = AIToolRequest(content = "Tool request",
+        tool_calls = [tool_msg])
+    @test tool_calls(msg) == [tool_msg]
+    @test last_output(msg) == "Tool request"
 end
 
 @testset "show,pprint" begin
@@ -262,6 +272,7 @@ end
     @test tr1.object == msg1
     @test tr1.from == :me
     @test tr1.to == :you
+    @test tool_calls(tr1) == ToolMessage[]
 
     # Message methods
     tr2 = TracerMessage(msg2; from = :you, to = :me)

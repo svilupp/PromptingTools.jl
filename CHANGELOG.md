@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Extends support for structured extraction with multiple "tools" definitions (see `?aiextract`).
 - Added new primitives `Tool` (to re-use tool definitions) and a function `aitools` to support mixed structured and non-structured workflows, eg, agentic workflows (see `?aitools`).
 - Added a field `name` to `AbstractChatMessage` and `AIToolRequest` messages to enable role-based workflows.
+- Added a support for partial argument execution with `execute_tool` function (provide your own context to override the arg values).
+- Added support for [SambaNova](https://sambanova.ai/) hosted models (set your ENV `SAMBANOVA_API_KEY`). 
+- Added many new models from Mistral, Groq, Sambanova, OpenAI.
 
 ### Updated
 - Renamed `function_call_signature` to `tool_call_signature` to better reflect that it's used for tools, but kept a link to the old name for back-compatibility.
