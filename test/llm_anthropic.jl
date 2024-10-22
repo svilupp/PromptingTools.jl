@@ -421,7 +421,7 @@ end
     @test schema3.inputs.messages == [Dict("role" => "user",
         "content" => Dict{String, Any}[Dict("cache_control" => Dict("type" => "ephemeral"),
             "text" => "Hello World", "type" => "text")])]
-    @test schema3.model_id == "claude-3-5-sonnet-20240620"
+    @test schema3.model_id == "claude-3-5-sonnet-latest"
 
     ## Bad cache
     @test_throws AssertionError aigenerate(
