@@ -409,23 +409,29 @@ cost1 = call_cost(msg1, "model1")
 # Using custom token costs
 cost2 = call_cost(10, 20, "model3"; cost_of_token_prompt = 0.08, cost_of_token_generation = 0.12)
 # cost2 = 10 * 0.08 + 20 * 0.12 = 3.2
+
+# Using cached tokens
+cost3 = call_cost(10, 20, "model3"; cached_tokens = 5, cost_of_token_prompt = 0.08, cost_of_token_generation = 0.12)
+# cost3 = (10 - 5) * 0.08 + 20 * 0.12 = 2.8
 ```
 """
 function call_cost(prompt_tokens::Int, completion_tokens::Int, model::String;
+        cached_tokens::Int = 0,
         cost_of_token_prompt::Number = get(MODEL_REGISTRY,
             model,
             (; cost_of_token_prompt = 0.0)).cost_of_token_prompt,
         cost_of_token_generation::Number = get(MODEL_REGISTRY, model,
             (; cost_of_token_generation = 0.0)).cost_of_token_generation)
-    cost = prompt_tokens * cost_of_token_prompt +
+    cost = (prompt_tokens - cached_tokens) * cost_of_token_prompt +
            completion_tokens * cost_of_token_generation
     return cost
 end
 function call_cost(msg, model::String)
+    cached_tokens = get(msg.extras, :cached_tokens, 0)
     cost = if !isnothing(msg.cost)
         msg.cost
     else
-        call_cost(msg.tokens[1], msg.tokens[2], model)
+        call_cost(msg.tokens[1], msg.tokens[2], model; cached_tokens = cached_tokens)
     end
     return cost
 end
