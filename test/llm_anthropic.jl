@@ -356,7 +356,7 @@ end
     @test schema2.inputs.system == "Act as a helpful AI assistant"
     @test schema2.inputs.messages == [Dict(
         "role" => "user", "content" => [Dict("type" => "text", "text" => "Hello World")])]
-    @test schema2.model_id == "claude-3-5-sonnet-20240620"
+    @test schema2.model_id == "claude-3-5-sonnet-latest"
 
     # Test aiprefill functionality
     schema2 = TestEchoAnthropicSchema(;
@@ -391,7 +391,7 @@ end
         Dict("role" => "assistant",
             "content" => [Dict("type" => "text", "text" => aiprefill)])
     ]
-    @test schema2.model_id == "claude-3-5-sonnet-20240620"
+    @test schema2.model_id == "claude-3-5-sonnet-latest"
 
     # With caching
     response3 = Dict(
