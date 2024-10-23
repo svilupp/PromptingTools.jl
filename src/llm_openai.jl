@@ -286,6 +286,8 @@ streamcallback = PT.StreamCallback(; verbose=true, throw_on_error=true)
 msg = aigenerate("Count from 1 to 10."; streamcallback)
 ```
 
+WARNING: If you provide a `StreamCallback` object, we assume you want to configure everything yourself, so you need to make sure to set `stream = true` in the `api_kwargs`!
+
 Learn more in `?StreamCallback`.
 Note: Streaming support is only for OpenAI models and it doesn't yet support tool calling and a few other features (logprobs, refusals, etc.)
 """

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Added new Claude 3.5 Sonnet model (`claude-3-5-sonnet-latest`) and updated the alias `claude` and `claudes` with it.
+- Added support for Ollama streaming with schema `OllamaSchema` (see `?StreamCallback` for more information). Schema `OllamaManaged` is NOT supported (it's legacy and will be removed in the future).
 
 ### Fixed
 

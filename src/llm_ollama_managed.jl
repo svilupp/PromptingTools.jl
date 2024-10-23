@@ -75,6 +75,7 @@ Simple wrapper for a call to Ollama API.
 - `model`: A string representing the model to use for generating the response. Can be an alias corresponding to a model ID defined in `MODEL_ALIASES`.
 - `http_kwargs::NamedTuple`: Additional keyword arguments for the HTTP request. Defaults to empty `NamedTuple`.
 - `stream`: A boolean indicating whether to stream the response. Defaults to `false`.
+- `streamcallback::Any`: A callback function to handle streaming responses. Can be simply `stdout` or a `StreamCallback` object. See `?StreamCallback` for details.
 - `url`: The URL of the Ollama API. Defaults to "localhost".
 - `port`: The port of the Ollama API. Defaults to 11434.
 - `kwargs`: Prompt variables to be used to fill the prompt/template
@@ -86,6 +87,7 @@ function ollama_api(
         messages::Vector{<:AbstractDict{String, <:Any}} = Vector{Dict{String, Any}}(),
         endpoint::String = "generate",
         model::String = "llama2", http_kwargs::NamedTuple = NamedTuple(),
+        streamcallback::Any = nothing,
         stream::Bool = false,
         url::String = "localhost", port::Int = 11434,
         kwargs...)
@@ -103,9 +105,21 @@ function ollama_api(
     end
     # eg, http://localhost:11434/api/generate
     api_url = string("http://", url, ":", port, "/api/", endpoint)
-    resp = HTTP.post(api_url,
-        [],# no headers
-        JSON3.write(body); http_kwargs...)
+    if !isnothing(streamcallback)
+        ## Note: Works only for OllamaSchema, not OllamaManagedSchema
+        streamcallback, new_kwargs = configure_callback!(
+            streamcallback, prompt_schema; kwargs...)
+        for (k, v) in pairs(new_kwargs)
+            body[string(k)] = v
+        end
+        input = IOBuffer(JSON3.write(body))
+        resp = streamed_request!(
+            streamcallback, api_url, [], input; http_kwargs...)
+    else
+        resp = HTTP.post(api_url,
+            [],# no headers
+            JSON3.write(body); http_kwargs...)
+    end
     body = JSON3.read(resp.body)
     return (; response = body, resp.status)
 end
@@ -127,6 +141,7 @@ end
         api_key::String = "", model::String = MODEL_CHAT,
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
+        streamcallback::Any = nothing,
         http_kwargs::NamedTuple = NamedTuple(), api_kwargs::NamedTuple = NamedTuple(),
         kwargs...)
 
@@ -141,6 +156,7 @@ Generate an AI response based on a given prompt using the OpenAI API.
 - `return_all::Bool=false`: If `true`, returns the entire conversation history, otherwise returns only the last message (the `AIMessage`).
 - `dry_run::Bool=false`: If `true`, skips sending the messages to the model (for debugging, often used with `return_all=true`).
 - `conversation::AbstractVector{<:AbstractMessage}=[]`: Not allowed for this schema. Provided only for compatibility.
+- `streamcallback::Any`: Just for compatibility. Not supported for this schema.
 - `http_kwargs::NamedTuple`: Additional keyword arguments for the HTTP request. Defaults to empty `NamedTuple`.
 - `api_kwargs::NamedTuple`: Additional keyword arguments for the Ollama API. Defaults to an empty `NamedTuple`.
 - `kwargs`: Prompt variables to be used to fill the prompt/template
@@ -204,6 +220,7 @@ function aigenerate(
         model::String = MODEL_CHAT,
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
+        streamcallback::Any = nothing,
         http_kwargs::NamedTuple = NamedTuple(), api_kwargs::NamedTuple = NamedTuple(),
         kwargs...)
     ##
@@ -211,11 +228,12 @@ function aigenerate(
     ## Find the unique ID for the model alias provided
     model_id = get(MODEL_ALIASES, model, model)
     conv_rendered = render(prompt_schema, prompt; conversation, kwargs...)
+    @assert isnothing(streamcallback) "streamcallback is not supported for this schema."
 
     if !dry_run
         time = @elapsed resp = ollama_api(prompt_schema, conv_rendered.prompt;
             conv_rendered.system, endpoint = "generate", model = model_id, http_kwargs,
-            api_kwargs...)
+            streamcallback, api_kwargs...)
         tokens_prompt = get(resp.response, :prompt_eval_count, 0)
         tokens_completion = get(resp.response, :eval_count, 0)
         msg = AIMessage(; content = resp.response[:response] |> strip,
