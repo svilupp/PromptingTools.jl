@@ -141,10 +141,17 @@ To add streaming, use the `streamcallback` argument.
 ```julia
 msg = aigenerate("Count from 1 to 10."; streamcallback = stdout)
 ```
-Or if you prefer to have more control, use a `StreamCallback` object:
+
+Or if you prefer to have more control, use a `StreamCallback` object. 
+```julia
+streamcallback = PT.StreamCallback()
+msg = aigenerate("Count from 1 to 10."; streamcallback)
+```
+
+WARNING: If you provide a `StreamCallback` object with a `flavor`, we assume you want to configure everything yourself, so you need to make sure to set `stream = true` in the `api_kwargs`!
 ```julia
 streamcallback = PT.StreamCallback(; flavor = PT.OllamaStream())
-msg = aigenerate("Count from 1 to 10."; streamcallback)
+msg = aigenerate("Count from 1 to 10."; streamcallback, api_kwargs = (; stream = true))
 ```
 
 """
