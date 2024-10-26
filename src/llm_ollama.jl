@@ -67,6 +67,7 @@ end
         api_key::String = "", model::String = MODEL_CHAT,
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
+        streamcallback::Any = nothing,
         http_kwargs::NamedTuple = NamedTuple(), api_kwargs::NamedTuple = NamedTuple(),
         kwargs...)
 
@@ -81,6 +82,7 @@ Generate an AI response based on a given prompt using the OpenAI API.
 - `return_all::Bool=false`: If `true`, returns the entire conversation history, otherwise returns only the last message (the `AIMessage`).
 - `dry_run::Bool=false`: If `true`, skips sending the messages to the model (for debugging, often used with `return_all=true`).
 - `conversation::AbstractVector{<:AbstractMessage}=[]`: Not allowed for this schema. Provided only for compatibility.
+- `streamcallback`: A callback function to handle streaming responses. Can be simply `stdout` or a `StreamCallback` object. See `?StreamCallback` for details.
 - `http_kwargs::NamedTuple`: Additional keyword arguments for the HTTP request. Defaults to empty `NamedTuple`.
 - `api_kwargs::NamedTuple`: Additional keyword arguments for the Ollama API. Defaults to an empty `NamedTuple`.
 - `kwargs`: Prompt variables to be used to fill the prompt/template
@@ -96,7 +98,7 @@ See also: `ai_str`, `aai_str`, `aiembed`
 Simple hello world to test the API:
 ```julia
 const PT = PromptingTools
-schema = PT.OllamaManagedSchema() # We need to explicit if we want Ollama, OpenAISchema is the default
+schema = PT.OllamaSchema() # We need to explicit if we want Ollama, OpenAISchema is the default
 
 msg = aigenerate(schema, "Say hi!"; model="openhermes2.5-mistral")
 # [ Info: Tokens: 69 in 0.9 seconds
@@ -115,7 +117,7 @@ ___
 You can use string interpolation:
 ```julia
 const PT = PromptingTools
-schema = PT.OllamaManagedSchema()
+schema = PT.OllamaSchema()
 a = 1
 msg=aigenerate(schema, "What is `\$a+\$a`?"; model="openhermes2.5-mistral")
 msg.content # "The result of `1+1` is `2`."
@@ -124,7 +126,7 @@ ___
 You can provide the whole conversation or more intricate prompts as a `Vector{AbstractMessage}`:
 ```julia
 const PT = PromptingTools
-schema = PT.OllamaManagedSchema()
+schema = PT.OllamaSchema()
 
 conversation = [
     PT.SystemMessage("You're master Yoda from Star Wars trying to help the user become a Yedi."),
@@ -135,7 +137,23 @@ msg = aigenerate(schema, conversation; model="openhermes2.5-mistral")
 # AIMessage("Strong the attachment is, it leads to suffering it may. Focus on the force within you must, ...<continues>")
 ```
 
-Note: Managed Ollama currently supports at most 1 User Message and 1 System Message given the API limitations. If you want more, you need to use the `ChatMLSchema`.
+To add streaming, use the `streamcallback` argument.
+```julia
+msg = aigenerate("Count from 1 to 10."; streamcallback = stdout)
+```
+
+Or if you prefer to have more control, use a `StreamCallback` object. 
+```julia
+streamcallback = PT.StreamCallback()
+msg = aigenerate("Count from 1 to 10."; streamcallback)
+```
+
+WARNING: If you provide a `StreamCallback` object with a `flavor`, we assume you want to configure everything yourself, so you need to make sure to set `stream = true` in the `api_kwargs`!
+```julia
+streamcallback = PT.StreamCallback(; flavor = PT.OllamaStream())
+msg = aigenerate("Count from 1 to 10."; streamcallback, api_kwargs = (; stream = true))
+```
+
 """
 function aigenerate(prompt_schema::AbstractOllamaSchema, prompt::ALLOWED_PROMPT_TYPE;
         verbose::Bool = true,
@@ -144,6 +162,7 @@ function aigenerate(prompt_schema::AbstractOllamaSchema, prompt::ALLOWED_PROMPT_
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         no_system_message::Bool = false,
+        streamcallback::Any = nothing,
         http_kwargs::NamedTuple = NamedTuple(), api_kwargs::NamedTuple = NamedTuple(),
         kwargs...)
     ##
@@ -156,7 +175,7 @@ function aigenerate(prompt_schema::AbstractOllamaSchema, prompt::ALLOWED_PROMPT_
     if !dry_run
         time = @elapsed resp = ollama_api(prompt_schema, nothing;
             system = nothing, messages = conv_rendered, endpoint = "chat", model = model_id,
-            http_kwargs,
+            http_kwargs, streamcallback,
             api_kwargs...)
 
         tokens_prompt = get(resp.response, :prompt_eval_count, 0)
