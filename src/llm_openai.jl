@@ -98,23 +98,31 @@ function render(schema::AbstractOpenAISchema,
         tools::Vector{<:AbstractTool};
         json_mode::Union{Nothing, Bool} = nothing,
         kwargs...)
-    output = Dict{Symbol, Any}[]
-    for tool in tools
-        rendered = Dict(:type => "function",
-            :function => Dict(
-                :parameters => tool.parameters, :name => tool.name))
-        ## Add strict flag
-        tool.strict == true && (rendered[:function][:strict] = tool.strict)
-        if json_mode == true
-            rendered[:function][:schema] = pop!(rendered[:function], :parameters)
-        else
-            ## Add description if not in JSON mode
-            !isnothing(tool.description) &&
-                (rendered[:function][:description] = tool.description)
-        end
-        push!(output, rendered)
+    [render(schema, tool; json_mode, kwargs...) for tool in tools]
+end
+function render(schema::AbstractOpenAISchema,
+        tool::AbstractTool;
+        json_mode::Union{Nothing, Bool} = nothing,
+        kwargs...)
+    rendered = Dict(:type => "function",
+        :function => Dict(
+            :parameters => tool.parameters, :name => tool.name))
+    ## Add strict flag
+    tool.strict == true && (rendered[:function][:strict] = tool.strict)
+    if json_mode == true
+        rendered[:function][:schema] = pop!(rendered[:function], :parameters)
+    else
+        ## Add description if not in JSON mode
+        !isnothing(tool.description) &&
+            (rendered[:function][:description] = tool.description)
     end
-    return output
+    return rendered
+end
+function render(schema::AbstractOpenAISchema,
+        tool::ToolRef;
+        json_mode::Union{Nothing, Bool} = nothing,
+        kwargs...)
+    throw(ArgumentError("Function `render` is not implemented for the provided schema ($(typeof(schema))) and $(typeof(tool))."))
 end
 
 """

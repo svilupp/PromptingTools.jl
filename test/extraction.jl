@@ -4,7 +4,7 @@ using PromptingTools: tool_call_signature, set_properties_strict!,
                       update_field_descriptions!, generate_struct
 using PromptingTools: Tool, isabstracttool, execute_tool, parse_tool, get_arg_names,
                       get_arg_types, get_method, get_function, remove_field!,
-                      tool_call_signature
+                      tool_call_signature, ToolRef
 using PromptingTools: AbstractToolError, ToolNotFoundError, ToolExecutionError,
                       ToolGenericError
 
@@ -77,6 +77,17 @@ end
     @test isabstracttool(tool) == true
     @test isabstracttool(tool_struct) == true
     @test isabstracttool(my_test_function) == false
+
+    ## ToolRef
+    tool = ToolRef(:computer, println)
+    @test tool isa ToolRef
+    @test tool.ref == :computer
+    @test tool.callable == println
+    io = IOBuffer()
+    show(io, tool)
+    output = String(take!(io))
+    @test occursin("ToolRef", output)
+    @test occursin("computer", output)
 end
 
 @testset "has_null_type" begin
@@ -744,6 +755,11 @@ end
     @test tool2.parameters["properties"]["age"]["type"] == "integer"
     @test tool2.parameters["properties"]["height"]["type"] == "integer"
     @test tool2.parameters["properties"]["weight"]["type"] == "number"
+
+    ## ToolRef
+    tool = ToolRef(:computer, println)
+    tool_map = tool_call_signature(tool)
+    @test tool_map == Dict("computer" => tool)
 end
 
 @testset "parse_tool" begin

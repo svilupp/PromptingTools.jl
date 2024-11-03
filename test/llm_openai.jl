@@ -1,7 +1,7 @@
 using PromptingTools: TestEchoOpenAISchema, render, OpenAISchema, role4render
 using PromptingTools: AIMessage, SystemMessage, AbstractMessage
 using PromptingTools: UserMessage, UserMessageWithImages, DataMessage, AIToolRequest,
-                      ToolMessage, Tool
+                      ToolMessage, Tool, ToolRef
 using PromptingTools: CustomProvider,
                       CustomOpenAISchema, MistralOpenAISchema, MODEL_EMBEDDING,
                       MODEL_IMAGE_GENERATION
@@ -200,7 +200,7 @@ using PromptingTools: pick_tokenizer, OPENAI_TOKEN_IDS_GPT35_GPT4, OPENAI_TOKEN_
     messages = [
         SystemMessage("System message"),
         UserMessage("User message"),
-        AIToolRequest(;content="content")
+        AIToolRequest(; content = "content")
     ]
     conversation = render(schema, messages)
     expected_output = Dict{String, Any}[
@@ -323,6 +323,20 @@ end
 
     rendered = render(schema, [strict_tool])
     @test rendered[1][:function][:strict] == true
+
+    ## ToolRef rendering
+    schema = OpenAISchema()
+
+    # Test that rendering ToolRef throws ArgumentError
+    tool = ToolRef(ref = :computer)
+    @test_throws ArgumentError render(schema, tool)
+
+    # Test with json_mode=true
+    @test_throws ArgumentError render(schema, tool; json_mode = true)
+
+    # Test with multiple tools
+    tools = [ToolRef(ref = :computer), ToolRef(ref = :str_replace_editor)]
+    @test_throws ArgumentError render(schema, tools)
 end
 
 @testset "OpenAI.build_url,OpenAI.auth_header" begin
