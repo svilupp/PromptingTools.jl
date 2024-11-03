@@ -3,7 +3,10 @@ using PromptingTools: has_null_type, is_required_field, remove_null_types, to_js
 using PromptingTools: tool_call_signature, set_properties_strict!,
                       update_field_descriptions!, generate_struct
 using PromptingTools: Tool, isabstracttool, execute_tool, parse_tool, get_arg_names,
-                      get_arg_types, get_method, get_function, remove_field!
+                      get_arg_types, get_method, get_function, remove_field!,
+                      tool_call_signature
+using PromptingTools: AbstractToolError, ToolNotFoundError, ToolExecutionError,
+                      ToolGenericError
 
 # TODO: check more edge cases like empty structs
 
@@ -13,6 +16,25 @@ function my_test_function(x::Int, y::String)
 end
 function context_test_function(x::Int, y::String, ctx_z::Float64)
     return "Context test: $x, $y, $(ctx_z)"
+end
+function context_test_function2(x::Int, y::String, context::Dict)
+    return "Context test: $x, $y, $(context)"
+end
+
+@testset "ToolErrors" begin
+    e = ToolNotFoundError("Tool `xyz` not found")
+    @test e isa AbstractToolError
+    @test e.msg == "Tool `xyz` not found"
+
+    e = ToolExecutionError(
+        "Tool `xyz` execution failed", MethodError(my_test_function, (1,)))
+    @test e isa AbstractToolError
+    @test e.msg == "Tool `xyz` execution failed"
+
+    e = ToolGenericError(
+        "Tool `xyz` failed with a generic error", MethodError(my_test_function, (1,)))
+    @test e isa AbstractToolError
+    @test e.msg == "Tool `xyz` failed with a generic error"
 end
 
 @testset "Tool-constructor" begin
@@ -791,11 +813,21 @@ end
     @test execute_tool(context_test_function, args_override, context_override) ==
           "Context test: 5, world, 3.14"
 
+    # with full context
+    args = Dict(:x => 5, :y => "hello")
+    context_override = Dict(:new_arg => "new_value")
+    @test execute_tool(context_test_function2, args, context_override) ==
+          "Context test: 5, hello, Dict(:new_arg => \"new_value\")"
+
     # Test with missing argument in both args and context
     args_missing = Dict(:x => 5)
     context_missing = Dict(:y => "hello")
-    @test_throws MethodError execute_tool(
+    @test_throws ToolExecutionError execute_tool(
         context_test_function, args_missing, context_missing)
+    err = execute_tool(
+        context_test_function, args_missing, context_missing; throw_on_error = false)
+    @test err isa ToolExecutionError
+    @test err.err isa MethodError
 
     # Test with Tool
     context_tool = Tool(context_test_function)
@@ -803,9 +835,13 @@ end
 
     # Test with tool_map
     args = Dict(:x => 10, :y => "hello")
-    tool_map = PT.tool_call_signature(my_test_function; hidden_fields = [r"ctx"])
+    tool_map = tool_call_signature(my_test_function; hidden_fields = [r"ctx"])
     msg = ToolMessage(;
         tool_call_id = "1", name = "my_test_function", raw = "", args = args)
     output = execute_tool(tool_map, msg)
     @test output == "Test function: 10, hello"
+    ## Call wrong tool name
+    @test_throws ToolNotFoundError execute_tool(tool_map,
+        ToolMessage(;
+            tool_call_id = "1", name = "wrong_tool_name", raw = "", args = args))
 end

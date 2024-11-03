@@ -377,6 +377,7 @@ end
     call_cost(msg, model::String)
 
 Calculate the cost of a call based on the number of tokens in the message and the cost per token.
+If the cost is already calculated (in `msg.cost`), it will not be re-calculated.
 
 # Arguments
 - `prompt_tokens::Int`: The number of tokens used in the prompt.
@@ -421,20 +422,22 @@ function call_cost(prompt_tokens::Int, completion_tokens::Int, model::String;
            completion_tokens * cost_of_token_generation
     return cost
 end
-function call_cost(msg, model::String)
+function call_cost(msg, model::String = "")
     cost = if !isnothing(msg.cost)
         msg.cost
     else
+        @assert !isempty(model) "`model` must be provided to calculate cost"
         call_cost(msg.tokens[1], msg.tokens[2], model)
     end
     return cost
 end
 ## dispatch for array -> take unique messages only (eg, for multiple samples we count only once)
-function call_cost(conv::AbstractVector, model::String)
+function call_cost(conv::AbstractVector, model::String = "")
     sum_ = 0.0
     visited_runs = Set{Int}()
     for msg in conv
-        if isnothing(msg.run_id) || (msg.run_id ∉ visited_runs)
+        if hasproperty(msg, :run_id) &&
+           (isnothing(msg.run_id) || (msg.run_id ∉ visited_runs))
             sum_ += call_cost(msg, model)
             push!(visited_runs, msg.run_id)
         end
