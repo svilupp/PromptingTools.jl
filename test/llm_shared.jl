@@ -1,7 +1,7 @@
 using PromptingTools: render, NoSchema, AbstractPromptSchema
 using PromptingTools: AIMessage, SystemMessage, AbstractMessage, AbstractChatMessage
 using PromptingTools: UserMessage, UserMessageWithImages, DataMessage, AIToolRequest,
-                      ToolMessage
+                      ToolMessage, ToolRef
 using PromptingTools: finalize_outputs, role4render
 
 @testset "render-NoSchema" begin
@@ -214,11 +214,16 @@ using PromptingTools: finalize_outputs, role4render
         [Tool(; name = "f", description = "f", callable = () -> nothing)])
 
     ## different ways to enter tools for rendering
-    opt1=render(OpenAISchema(),
-    [Tool(; name = "f", description = "f", callable = () -> nothing)])
-    opt2=render(OpenAISchema(),
-    Dict("f" => Tool(; name = "f", description = "f", callable = () -> nothing)))
+    opt1 = render(OpenAISchema(),
+        [Tool(; name = "f", description = "f", callable = () -> nothing)])
+    opt2 = render(OpenAISchema(),
+        Dict("f" => Tool(; name = "f", description = "f", callable = () -> nothing)))
     @test opt1 == opt2
+
+    ## ToolRef
+    schema = NoSchema()
+    tool = ToolRef(:computer, println)
+    @test_throws ArgumentError render(schema, tool)
 end
 
 @testset "finalize_outputs" begin

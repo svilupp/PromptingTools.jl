@@ -99,6 +99,12 @@ function render(schema::AbstractPromptSchema,
         kwargs...)
     render(schema, collect(values(tools)); kwargs...)
 end
+# For ToolRef
+function render(schema::AbstractPromptSchema,
+        tool::AbstractTool;
+        kwargs...)
+    throw(ArgumentError("Function `render` is not implemented for the provided schema ($(typeof(schema))) and $(typeof(tool))."))
+end
 
 """
     finalize_outputs(prompt::ALLOWED_PROMPT_TYPE, conv_rendered::Any,
