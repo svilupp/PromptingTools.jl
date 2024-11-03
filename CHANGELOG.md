@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added support for Ollama streaming with schema `OllamaSchema` (see `?StreamCallback` for more information). Schema `OllamaManaged` is NOT supported (it's legacy and will be removed in the future).
 - Moved the implementation of streaming callbacks to a new `StreamCallbacks` package.
 - Added new error types for tool execution to enable better error handling and reporting (see `?AbstractToolError`).
+- Added support for Anthropic's new pre-trained tools via `ToolRef` (see `?ToolRef`), to enable the feature, use the `:computer_use` beta header (eg, `aitools(..., betas = [:computer_use])`).
 
 ### Fixed
 - Fixed a bug in `call_cost` where the cost was not calculated if any non-AIMessages were provided in the conversation.
