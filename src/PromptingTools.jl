@@ -49,7 +49,8 @@ const RESERVED_KWARGS = [
     :no_system_message,
     :aiprefill,
     :name_user,
-    :name_assistant
+    :name_assistant,
+    :betas
 ]
 
 # export replace_words, recursive_splitter, split_by_length, call_cost, auth_header # for debugging only

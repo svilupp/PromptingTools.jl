@@ -3,7 +3,7 @@ using PromptingTools: AIMessage, SystemMessage, AbstractMessage
 using PromptingTools: UserMessage, UserMessageWithImages, DataMessage, AIToolRequest,
                       ToolMessage, Tool
 using PromptingTools: call_cost, anthropic_api, function_call_signature,
-                      anthropic_extra_headers
+                      anthropic_extra_headers, ToolRef, BETA_HEADERS_ANTHROPIC
 
 @testset "render-Anthropic" begin
     schema = AnthropicSchema()
@@ -271,6 +271,41 @@ end
     rendered = render(schema, tool_map)
     @test length(rendered) == 2
     @test Set(t[:name] for t in rendered) == Set(["get_weather", "get_time"])
+
+    ## ToolRef
+    schema = AnthropicSchema()
+
+    # Test computer tool rendering
+    computer_tool = ToolRef(ref = :computer)
+    rendered = render(schema, computer_tool)
+    @test rendered["type"] == "computer_20241022"
+    @test rendered["name"] == "computer"
+    @test rendered["display_width_px"] == 1024
+    @test rendered["display_height_px"] == 768
+    @test rendered["display_number"] == 1
+
+    # Test text editor tool rendering
+    editor_tool = ToolRef(ref = :str_replace_editor)
+    rendered = render(schema, editor_tool)
+    @test rendered["type"] == "text_editor_20241022"
+    @test rendered["name"] == "str_replace_editor"
+
+    # Test bash tool rendering
+    bash_tool = ToolRef(ref = :bash)
+    rendered = render(schema, bash_tool)
+    @test rendered["type"] == "bash_20241022"
+    @test rendered["name"] == "bash"
+
+    # Test invalid tool reference
+    @test_throws ArgumentError render(schema, ToolRef(ref = :invalid_tool))
+
+    # Test rendering multiple tool refs
+    tools = [computer_tool, editor_tool, bash_tool]
+    rendered = render(schema, tools)
+    @test length(rendered) == 3
+    @test rendered[1]["name"] == "computer"
+    @test rendered[2]["name"] == "str_replace_editor"
+    @test rendered[3]["name"] == "bash"
 end
 
 @testset "anthropic_extra_headers" begin
@@ -294,6 +329,48 @@ end
         has_tools = true, has_cache = true, has_long_output = true) == [
         "anthropic-version" => "2023-06-01",
         "anthropic-beta" => "tools-2024-04-04,prompt-caching-2024-07-31,max-tokens-3-5-sonnet-2024-07-15"
+    ]
+
+    # Test with betas
+    @test anthropic_extra_headers(betas = [:tools]) == [
+        "anthropic-version" => "2023-06-01",
+        "anthropic-beta" => "tools-2024-04-04"
+    ]
+
+    @test anthropic_extra_headers(betas = [:cache]) == [
+        "anthropic-version" => "2023-06-01",
+        "anthropic-beta" => "prompt-caching-2024-07-31"
+    ]
+
+    @test anthropic_extra_headers(betas = [:long_output]) == [
+        "anthropic-version" => "2023-06-01",
+        "anthropic-beta" => "max-tokens-3-5-sonnet-2024-07-15"
+    ]
+
+    @test anthropic_extra_headers(betas = [:computer_use]) == [
+        "anthropic-version" => "2023-06-01",
+        "anthropic-beta" => "computer-use-2024-10-22"
+    ]
+
+    # Test multiple betas
+    @test anthropic_extra_headers(betas = [:tools, :cache, :computer_use]) == [
+        "anthropic-version" => "2023-06-01",
+        "anthropic-beta" => "tools-2024-04-04,prompt-caching-2024-07-31,computer-use-2024-10-22"
+    ]
+
+    # Test all betas
+    @test anthropic_extra_headers(betas = BETA_HEADERS_ANTHROPIC) == [
+        "anthropic-version" => "2023-06-01",
+        "anthropic-beta" => "tools-2024-04-04,prompt-caching-2024-07-31,max-tokens-3-5-sonnet-2024-07-15,computer-use-2024-10-22"
+    ]
+
+    # Test invalid beta
+    @test_throws AssertionError anthropic_extra_headers(betas = [:invalid_beta])
+
+    # Test mixing has_* flags with betas
+    @test anthropic_extra_headers(has_tools = true, betas = [:cache]) == [
+        "anthropic-version" => "2023-06-01",
+        "anthropic-beta" => "tools-2024-04-04,prompt-caching-2024-07-31"
     ]
 end
 
