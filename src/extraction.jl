@@ -693,7 +693,12 @@ end
     execute_tool(f::Function, args::AbstractDict{Symbol, <:Any},
         context::AbstractDict{Symbol, <:Any} = Dict{Symbol, Any}())
 
-Executes a function with the provided arguments.
+Executes a function with the provided arguments. 
+
+Picks the function arguments in the following order:
+- `:context` refers to the context dictionary passed to the function.
+- Then it looks for the arguments in the `context` dictionary.
+- Then it looks for the arguments in the `args` dictionary.
 
 Dictionary is un-ordered, so we need to sort the arguments first and then pass them to the function.
 
@@ -723,7 +728,9 @@ function execute_tool(f::Function, args::AbstractDict{Symbol, <:Any},
         context::AbstractDict{Symbol, <:Any} = Dict{Symbol, Any}())
     args_sorted = []
     for arg in get_arg_names(f)
-        if haskey(context, arg)
+        if arg == :context
+            push!(args_sorted, context)
+        elseif haskey(context, arg)
             push!(args_sorted, context[arg])
         elseif haskey(args, arg)
             push!(args_sorted, args[arg])

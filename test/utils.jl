@@ -212,6 +212,15 @@ end
     msg = DataMessage(; content = nothing, tokens = (-1, -1), cost = 1.0)
     cost = call_cost(msg, "unknown_model")
     @test cost == 1.0
+
+    # Multiple messages
+    conv = [AIMessage(; content = "", tokens = (1000, 2000), cost = 1.0),
+        UserMessage(; content = "")]
+    @test call_cost(conv) == 1.0
+
+    # No model provided
+    msg = AIMessage(; content = "", tokens = (1000, 2000))
+    @test_throws AssertionError call_cost(msg, "")
 end
 
 @testset "call_cost_alternative" begin
