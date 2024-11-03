@@ -1,4 +1,4 @@
-using PromptingTools: render, NoSchema, AbstractPromptSchema
+using PromptingTools: render, NoSchema, AbstractPromptSchema, OpenAISchema
 using PromptingTools: AIMessage, SystemMessage, AbstractMessage, AbstractChatMessage
 using PromptingTools: UserMessage, UserMessageWithImages, DataMessage, AIToolRequest,
                       ToolMessage, ToolRef
@@ -222,7 +222,7 @@ using PromptingTools: finalize_outputs, role4render
 
     ## ToolRef
     schema = NoSchema()
-    tool = ToolRef(:computer, println)
+    tool = ToolRef(; ref = :computer)
     @test_throws ArgumentError render(schema, tool)
 end
 

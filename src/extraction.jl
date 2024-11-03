@@ -57,11 +57,12 @@ It can be rendered with a `render` method and a prompt schema.
 # Arguments
 - `ref::Symbol`: The symbolic name of the tool.
 - `callable::Any`: The callable object of the tool, eg, a type or a function.
+- `extras::Dict{String, Any}`: Additional parameters to be included in the tool signature.
 
 # Examples
 ```julia
 # Define a tool with a symbolic name and a callable object
-tool = ToolRef(:computer, println)
+tool = ToolRef(;ref=:computer, callable=println)
 
 # Show the rendered tool signature
 PT.render(PT.AnthropicSchema(), tool)
@@ -70,6 +71,7 @@ PT.render(PT.AnthropicSchema(), tool)
 Base.@kwdef struct ToolRef <: AbstractTool
     ref::Symbol
     callable::Any = identity
+    extras::Dict{String, Any} = Dict()
 end
 Base.show(io::IO, t::ToolRef) = print(io, "ToolRef($(t.ref))")
 
@@ -444,7 +446,7 @@ Note: Fairly experimental, but works for combination of structs, arrays, strings
 - `hidden_fields::AbstractVector{<:Union{AbstractString, Regex}}`: A list of fields to hide from the LLM (eg, `["ctx_user_id"]` or `r"ctx"`).
 
 # Returns
-- `Dict{String, Tool}`: A dictionary representing the function call signature schema.
+- `Dict{String, AbstractTool}`: A dictionary representing the function call signature schema.
 
 # Tips
 - You can improve the quality of the extraction by writing a helpful docstring for your struct (or any nested struct). It will be provided as a description. 
@@ -464,7 +466,7 @@ struct MyMeasurement
 end
 tool_map = tool_call_signature(MyMeasurement)
 #
-# Dict{String, PromptingTools.Tool}("MyMeasurement" => PromptingTools.Tool
+# Dict{String, PromptingTools.AbstractTool}("MyMeasurement" => PromptingTools.Tool
 #   name: String "MyMeasurement"
 #   parameters: Dict{String, Any}
 #   description: Nothing nothing
@@ -563,7 +565,7 @@ function tool_call_signature(
         description = haskey(schema, "description") ? schema["description"] : nothing,
         strict = haskey(schema, "strict") ? schema["strict"] : nothing,
         callable = call_type)
-    return Dict(schema["name"] => tool)
+    return Dict{String, AbstractTool}(schema["name"] => tool)
 end
 
 ## Only thing you can change is the "strict" setting
@@ -583,7 +585,7 @@ function tool_call_signature(
 end
 function tool_call_signature(
         tool::ToolRef; kwargs...)
-    Dict(string(tool.ref) => tool)
+    return Dict{String, AbstractTool}(string(tool.ref) => tool)
 end
 
 ## Add support for function signatures
@@ -594,7 +596,7 @@ end
 function tool_call_signature(
         tools::Vector{<:T}; kwargs...) where {T <:
                                               Union{Type, Function, Method, AbstractTool}}
-    tool_map = Dict{String, Tool}()
+    tool_map = Dict{String, AbstractTool}()
     for tool in tools
         temp_map = tool_call_signature(tool; kwargs...)
         for (name, tool) in temp_map

@@ -79,7 +79,7 @@ end
     @test isabstracttool(my_test_function) == false
 
     ## ToolRef
-    tool = ToolRef(:computer, println)
+    tool = ToolRef(; ref = :computer, callable = println)
     @test tool isa ToolRef
     @test tool.ref == :computer
     @test tool.callable == println
@@ -757,7 +757,7 @@ end
     @test tool2.parameters["properties"]["weight"]["type"] == "number"
 
     ## ToolRef
-    tool = ToolRef(:computer, println)
+    tool = ToolRef(; ref = :computer, callable = println)
     tool_map = tool_call_signature(tool)
     @test tool_map == Dict("computer" => tool)
 end
