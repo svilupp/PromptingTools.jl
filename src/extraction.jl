@@ -48,6 +48,36 @@ Base.@kwdef struct Tool <: AbstractTool
 end
 Base.show(io::IO, t::AbstractTool) = dump(io, t; maxdepth = 1)
 
+### Useful Error Types
+"""
+    AbstractToolError
+
+Abstract type for all tool errors.
+
+Available subtypes:
+- [`ToolNotFoundError`](@ref)
+- [`ToolExecutionError`](@ref)
+- [`ToolGenericError`](@ref)
+"""
+abstract type AbstractToolError <: Exception end
+
+"Error type for when a tool is not found. It should contain the tool name that was not found."
+struct ToolNotFoundError <: AbstractToolError
+    msg::String
+end
+
+"Error type for when a tool execution fails. It should contain the error message from the tool execution."
+struct ToolExecutionError <: AbstractToolError
+    msg::String
+    err::Exception
+end
+
+"Error type for when a tool execution fails with a generic error. It should contain the detailed error message."
+struct ToolGenericError <: AbstractToolError
+    msg::String
+    err::Exception
+end
+
 ######################
 # 1) OpenAI / JSON format
 ######################
@@ -693,7 +723,12 @@ end
     execute_tool(f::Function, args::AbstractDict{Symbol, <:Any},
         context::AbstractDict{Symbol, <:Any} = Dict{Symbol, Any}())
 
-Executes a function with the provided arguments.
+Executes a function with the provided arguments. 
+
+Picks the function arguments in the following order:
+- `:context` refers to the context dictionary passed to the function.
+- Then it looks for the arguments in the `context` dictionary.
+- Then it looks for the arguments in the `args` dictionary.
 
 Dictionary is un-ordered, so we need to sort the arguments first and then pass them to the function.
 
@@ -720,16 +755,26 @@ PT.execute_tool(tool_map, PT.tool_calls(msg)[1])
 ```
 """
 function execute_tool(f::Function, args::AbstractDict{Symbol, <:Any},
-        context::AbstractDict{Symbol, <:Any} = Dict{Symbol, Any}())
+        context::AbstractDict{Symbol, <:Any} = Dict{Symbol, Any}();
+        throw_on_error::Bool = true)
     args_sorted = []
     for arg in get_arg_names(f)
-        if haskey(context, arg)
+        if arg == :context
+            push!(args_sorted, context)
+        elseif haskey(context, arg)
             push!(args_sorted, context[arg])
         elseif haskey(args, arg)
             push!(args_sorted, args[arg])
         end
     end
-    return f(args_sorted...)
+
+    result = try
+        f(args_sorted...)
+    catch e
+        ToolExecutionError("Tool execution of `$(f)` failed", e)
+    end
+    throw_on_error && result isa AbstractToolError && throw(result)
+    return result
 end
 function execute_tool(tool::AbstractTool, args::AbstractDict{Symbol, <:Any},
         context::AbstractDict{Symbol, <:Any} = Dict{Symbol, Any}())
@@ -741,6 +786,9 @@ function execute_tool(tool::AbstractTool, msg::ToolMessage,
 end
 function execute_tool(tool_map::AbstractDict{String, <:AbstractTool}, msg::ToolMessage,
         context::AbstractDict{Symbol, <:Any} = Dict{Symbol, Any}())
+    if !haskey(tool_map, msg.name)
+        throw(ToolNotFoundError("Tool `$(msg.name)` not found"))
+    end
     tool = tool_map[msg.name]
     return execute_tool(tool, msg, context)
 end

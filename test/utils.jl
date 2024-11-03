@@ -3,7 +3,7 @@ using PromptingTools: recursive_splitter, wrap_string, replace_words,
 using PromptingTools: _extract_handlebar_variables, call_cost, call_cost_alternative,
                       _report_stats
 using PromptingTools: _string_to_vector, _encode_local_image
-using PromptingTools: DataMessage, AIMessage
+using PromptingTools: DataMessage, AIMessage, UserMessage
 using PromptingTools: push_conversation!,
                       resize_conversation!, @timeout, preview, pprint, auth_header,
                       unique_permutation
@@ -212,6 +212,15 @@ end
     msg = DataMessage(; content = nothing, tokens = (-1, -1), cost = 1.0)
     cost = call_cost(msg, "unknown_model")
     @test cost == 1.0
+
+    # Multiple messages
+    conv = [AIMessage(; content = "", tokens = (1000, 2000), cost = 1.0),
+        UserMessage(; content = "")]
+    @test call_cost(conv) == 1.0
+
+    # No model provided
+    msg = AIMessage(; content = "", tokens = (1000, 2000))
+    @test_throws AssertionError call_cost(msg, "")
 end
 
 @testset "call_cost_alternative" begin
