@@ -3,7 +3,7 @@ using PromptingTools: recursive_splitter, wrap_string, replace_words,
 using PromptingTools: _extract_handlebar_variables, call_cost, call_cost_alternative,
                       _report_stats
 using PromptingTools: _string_to_vector, _encode_local_image
-using PromptingTools: DataMessage, AIMessage
+using PromptingTools: DataMessage, AIMessage, UserMessage
 using PromptingTools: push_conversation!,
                       resize_conversation!, @timeout, preview, pprint, auth_header,
                       unique_permutation
