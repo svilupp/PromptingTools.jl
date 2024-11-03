@@ -2,8 +2,8 @@ var __defProp = Object.defineProperty;
 var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 import { V as __vitePreload, p as ref, h as computed, aj as toValue, ak as unrefElement, al as notNullish, q as watch, am as tryOnScopeDispose, d as defineComponent, D as shallowRef, an as computedAsync, ao as useSessionStorage, ap as useLocalStorage, s as watchEffect, aq as watchDebounced, v as onMounted, P as nextTick, O as onKeyStroke, ar as useRouter, as as useEventListener, W as useScrollLock, R as inBrowser, $ as onBeforeUnmount, o as openBlock, b as createBlock, j as createBaseVNode, a0 as withModifiers, k as unref, at as withDirectives, au as vModelText, av as isRef, c as createElementBlock, n as normalizeClass, e as createCommentVNode, C as renderList, F as Fragment, a as createTextVNode, t as toDisplayString, aw as Teleport, ax as markRaw, ay as createApp, a9 as dataSymbol, af as pathToFile, az as escapeRegExp, _ as _export_sfc } from "./framework.Dmu4xD1S.js";
-import { u as useData, c as createSearchTranslate } from "./theme.8o5BkSIo.js";
-const localSearchIndex = { "root": () => __vitePreload(() => import("./@localSearchIndexroot.P6hCfLEa.js"), true ? [] : void 0) };
+import { u as useData, c as createSearchTranslate } from "./theme.yev8nOZs.js";
+const localSearchIndex = { "root": () => __vitePreload(() => import("./@localSearchIndexroot.BEt9sEZx.js"), true ? [] : void 0) };
 /*!
 * tabbable 6.2.0
 * @license MIT, https://github.com/focus-trap/tabbable/blob/master/LICENSE
@@ -4607,7 +4607,7 @@ const _hoisted_8 = ["title"];
 const _hoisted_9 = ["disabled", "title"];
 const _hoisted_10 = ["id", "role", "aria-labelledby"];
 const _hoisted_11 = ["id", "aria-selected"];
-const _hoisted_12 = ["href", "aria-label", "onMouseenter", "onFocusin"];
+const _hoisted_12 = ["href", "aria-label", "onMouseenter", "onFocusin", "data-index"];
 const _hoisted_13 = { class: "titles" };
 const _hoisted_14 = ["innerHTML"];
 const _hoisted_15 = { class: "title main" };
@@ -4820,7 +4820,7 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
       }
     }
     const selectedIndex = ref(-1);
-    const disableMouseOver = ref(false);
+    const disableMouseOver = ref(true);
     watch(results, (r) => {
       selectedIndex.value = r.length ? 0 : -1;
       scrollToSelectedResult();
@@ -4912,6 +4912,16 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
         "gi"
       );
     }
+    function onMouseMove(e) {
+      var _a2;
+      if (!disableMouseOver.value) return;
+      const el2 = (_a2 = e.target) == null ? void 0 : _a2.closest(".result");
+      const index = Number.parseInt(el2 == null ? void 0 : el2.dataset.index);
+      if (index >= 0 && index !== selectedIndex.value) {
+        selectedIndex.value = index;
+      }
+      disableMouseOver.value = false;
+    }
     return (_ctx, _cache) => {
       var _a2, _b2, _c, _d, _e;
       return openBlock(), createBlock(Teleport, { to: "body" }, [
@@ -4940,7 +4950,7 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
                 title: buttonText.value,
                 id: "localsearch-label",
                 for: "localsearch-input"
-              }, _cache[8] || (_cache[8] = [
+              }, _cache[7] || (_cache[7] = [
                 createBaseVNode("span", {
                   "aria-hidden": "true",
                   class: "vpi-search search-icon local-search-icon"
@@ -4951,7 +4961,7 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
                   class: "back-button",
                   title: unref(translate)("modal.backButtonTitle"),
                   onClick: _cache[1] || (_cache[1] = ($event) => _ctx.$emit("close"))
-                }, _cache[9] || (_cache[9] = [
+                }, _cache[8] || (_cache[8] = [
                   createBaseVNode("span", { class: "vpi-arrow-left local-search-icon" }, null, -1)
                 ]), 8, _hoisted_5)
               ]),
@@ -4983,7 +4993,7 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
                   type: "button",
                   title: unref(translate)("modal.displayDetails"),
                   onClick: _cache[3] || (_cache[3] = ($event) => selectedIndex.value > -1 && (showDetailedList.value = !unref(showDetailedList)))
-                }, _cache[10] || (_cache[10] = [
+                }, _cache[9] || (_cache[9] = [
                   createBaseVNode("span", { class: "vpi-layout-list local-search-icon" }, null, -1)
                 ]), 10, _hoisted_8)) : createCommentVNode("", true),
                 createBaseVNode("button", {
@@ -4992,7 +5002,7 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
                   disabled: disableReset.value,
                   title: unref(translate)("modal.resetButtonTitle"),
                   onClick: resetSearch
-                }, _cache[11] || (_cache[11] = [
+                }, _cache[10] || (_cache[10] = [
                   createBaseVNode("span", { class: "vpi-delete local-search-icon" }, null, -1)
                 ]), 8, _hoisted_9)
               ])
@@ -5004,7 +5014,7 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
               role: ((_d = results.value) == null ? void 0 : _d.length) ? "listbox" : void 0,
               "aria-labelledby": ((_e = results.value) == null ? void 0 : _e.length) ? "localsearch-label" : void 0,
               class: "results",
-              onMousemove: _cache[7] || (_cache[7] = ($event) => disableMouseOver.value = false)
+              onMousemove: onMouseMove
             }, [
               (openBlock(true), createElementBlock(Fragment, null, renderList(results.value, (p, index) => {
                 return openBlock(), createElementBlock("li", {
@@ -5021,11 +5031,12 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
                     "aria-label": [...p.titles, p.title].join(" > "),
                     onMouseenter: ($event) => !disableMouseOver.value && (selectedIndex.value = index),
                     onFocusin: ($event) => selectedIndex.value = index,
-                    onClick: _cache[6] || (_cache[6] = ($event) => _ctx.$emit("close"))
+                    onClick: _cache[6] || (_cache[6] = ($event) => _ctx.$emit("close")),
+                    "data-index": index
                   }, [
                     createBaseVNode("div", null, [
                       createBaseVNode("div", _hoisted_13, [
-                        _cache[13] || (_cache[13] = createBaseVNode("span", { class: "title-icon" }, "#", -1)),
+                        _cache[12] || (_cache[12] = createBaseVNode("span", { class: "title-icon" }, "#", -1)),
                         (openBlock(true), createElementBlock(Fragment, null, renderList(p.titles, (t, index2) => {
                           return openBlock(), createElementBlock("span", {
                             key: index2,
@@ -5035,7 +5046,7 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
                               class: "text",
                               innerHTML: t
                             }, null, 8, _hoisted_14),
-                            _cache[12] || (_cache[12] = createBaseVNode("span", { class: "vpi-chevron-right local-search-icon" }, null, -1))
+                            _cache[11] || (_cache[11] = createBaseVNode("span", { class: "vpi-chevron-right local-search-icon" }, null, -1))
                           ]);
                         }), 128)),
                         createBaseVNode("span", _hoisted_15, [
@@ -5052,8 +5063,8 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
                             innerHTML: p.text
                           }, null, 8, _hoisted_19)
                         ])) : createCommentVNode("", true),
-                        _cache[14] || (_cache[14] = createBaseVNode("div", { class: "excerpt-gradient-bottom" }, null, -1)),
-                        _cache[15] || (_cache[15] = createBaseVNode("div", { class: "excerpt-gradient-top" }, null, -1))
+                        _cache[13] || (_cache[13] = createBaseVNode("div", { class: "excerpt-gradient-bottom" }, null, -1)),
+                        _cache[14] || (_cache[14] = createBaseVNode("div", { class: "excerpt-gradient-top" }, null, -1))
                       ])) : createCommentVNode("", true)
                     ])
                   ], 42, _hoisted_12)
@@ -5062,19 +5073,19 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
               unref(filterText) && !results.value.length && enableNoResults.value ? (openBlock(), createElementBlock("li", _hoisted_20, [
                 createTextVNode(toDisplayString(unref(translate)("modal.noResultsText")) + ' "', 1),
                 createBaseVNode("strong", null, toDisplayString(unref(filterText)), 1),
-                _cache[16] || (_cache[16] = createTextVNode('" '))
+                _cache[15] || (_cache[15] = createTextVNode('" '))
               ])) : createCommentVNode("", true)
             ], 40, _hoisted_10),
             createBaseVNode("div", _hoisted_21, [
               createBaseVNode("span", null, [
                 createBaseVNode("kbd", {
                   "aria-label": unref(translate)("modal.footer.navigateUpKeyAriaLabel")
-                }, _cache[17] || (_cache[17] = [
+                }, _cache[16] || (_cache[16] = [
                   createBaseVNode("span", { class: "vpi-arrow-up navigate-icon" }, null, -1)
                 ]), 8, _hoisted_22),
                 createBaseVNode("kbd", {
                   "aria-label": unref(translate)("modal.footer.navigateDownKeyAriaLabel")
-                }, _cache[18] || (_cache[18] = [
+                }, _cache[17] || (_cache[17] = [
                   createBaseVNode("span", { class: "vpi-arrow-down navigate-icon" }, null, -1)
                 ]), 8, _hoisted_23),
                 createTextVNode(" " + toDisplayString(unref(translate)("modal.footer.navigateText")), 1)
@@ -5082,7 +5093,7 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
               createBaseVNode("span", null, [
                 createBaseVNode("kbd", {
                   "aria-label": unref(translate)("modal.footer.selectKeyAriaLabel")
-                }, _cache[19] || (_cache[19] = [
+                }, _cache[18] || (_cache[18] = [
                   createBaseVNode("span", { class: "vpi-corner-down-left navigate-icon" }, null, -1)
                 ]), 8, _hoisted_24),
                 createTextVNode(" " + toDisplayString(unref(translate)("modal.footer.selectText")), 1)
@@ -5100,7 +5111,7 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
     };
   }
 });
-const VPLocalSearchBox = /* @__PURE__ */ _export_sfc(_sfc_main, [["__scopeId", "data-v-1783de97"]]);
+const VPLocalSearchBox = /* @__PURE__ */ _export_sfc(_sfc_main, [["__scopeId", "data-v-42e65fb9"]]);
 export {
   VPLocalSearchBox as default
 };

@@ -1,4 +1,4 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/chunks/VPLocalSearchBox.DgoDSlcj.js","assets/chunks/framework.Dmu4xD1S.js"])))=>i.map(i=>d[i]);
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/chunks/VPLocalSearchBox.BnN5bNmf.js","assets/chunks/framework.Dmu4xD1S.js"])))=>i.map(i=>d[i]);
 import { d as defineComponent, o as openBlock, c as createElementBlock, r as renderSlot, n as normalizeClass, a as createTextVNode, t as toDisplayString, b as createBlock, w as withCtx, e as createCommentVNode, T as Transition, _ as _export_sfc, u as useData$1, i as isExternal, f as treatAsHtml, g as withBase, h as computed, j as createBaseVNode, k as unref, l as isActive, m as useMediaQuery, p as ref, q as watch, s as watchEffect, v as onMounted, x as onUnmounted, y as watchPostEffect, z as onUpdated, A as getScrollOffset, B as resolveComponent, F as Fragment, C as renderList, D as shallowRef, E as onContentUpdated, G as createVNode, H as resolveDynamicComponent, I as EXTERNAL_URL_RE, J as useRoute, K as mergeProps, L as inject, M as useWindowSize, N as normalizeStyle, O as onKeyStroke, P as nextTick, Q as useWindowScroll, R as inBrowser, S as readonly, U as defineAsyncComponent, V as __vitePreload, W as useScrollLock, X as provide, Y as withKeys, Z as toHandlers, $ as onBeforeUnmount, a0 as withModifiers, a1 as useSlots, a2 as reactive, a3 as toRef, a4 as h } from "./framework.Dmu4xD1S.js";
 const _sfc_main$Z = /* @__PURE__ */ defineComponent({
   __name: "VPBadge",
@@ -2215,7 +2215,7 @@ const _hoisted_3$3 = {
 const _sfc_main$l = /* @__PURE__ */ defineComponent({
   __name: "VPNavBarSearch",
   setup(__props) {
-    const VPLocalSearchBox = defineAsyncComponent(() => __vitePreload(() => import("./VPLocalSearchBox.DgoDSlcj.js"), true ? __vite__mapDeps([0,1]) : void 0));
+    const VPLocalSearchBox = defineAsyncComponent(() => __vitePreload(() => import("./VPLocalSearchBox.BnN5bNmf.js"), true ? __vite__mapDeps([0,1]) : void 0));
     const VPAlgoliaSearchBox = () => null;
     const { theme: theme2 } = useData();
     const loaded = ref(false);
@@ -2305,7 +2305,7 @@ const _sfc_main$k = /* @__PURE__ */ defineComponent({
 });
 const VPNavBarSocialLinks = /* @__PURE__ */ _export_sfc(_sfc_main$k, [["__scopeId", "data-v-164c457f"]]);
 const _hoisted_1$f = ["href", "rel", "target"];
-const _hoisted_2$7 = { key: 1 };
+const _hoisted_2$7 = ["innerHTML"];
 const _hoisted_3$2 = { key: 2 };
 const _sfc_main$j = /* @__PURE__ */ defineComponent({
   __name: "VPNavBarTitle",
@@ -2347,14 +2347,17 @@ const _sfc_main$j = /* @__PURE__ */ defineComponent({
             class: "logo",
             image: unref(theme2).logo
           }, null, 8, ["image"])) : createCommentVNode("", true),
-          unref(theme2).siteTitle ? (openBlock(), createElementBlock("span", _hoisted_2$7, toDisplayString(unref(theme2).siteTitle), 1)) : unref(theme2).siteTitle === void 0 ? (openBlock(), createElementBlock("span", _hoisted_3$2, toDisplayString(unref(site).title), 1)) : createCommentVNode("", true),
+          unref(theme2).siteTitle ? (openBlock(), createElementBlock("span", {
+            key: 1,
+            innerHTML: unref(theme2).siteTitle
+          }, null, 8, _hoisted_2$7)) : unref(theme2).siteTitle === void 0 ? (openBlock(), createElementBlock("span", _hoisted_3$2, toDisplayString(unref(site).title), 1)) : createCommentVNode("", true),
           renderSlot(_ctx.$slots, "nav-bar-title-after", {}, void 0, true)
         ], 8, _hoisted_1$f)
       ], 2);
     };
   }
 });
-const VPNavBarTitle = /* @__PURE__ */ _export_sfc(_sfc_main$j, [["__scopeId", "data-v-28a961f9"]]);
+const VPNavBarTitle = /* @__PURE__ */ _export_sfc(_sfc_main$j, [["__scopeId", "data-v-0f4f798b"]]);
 const _hoisted_1$e = { class: "items" };
 const _hoisted_2$6 = { class: "title" };
 const _sfc_main$i = /* @__PURE__ */ defineComponent({
