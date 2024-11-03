@@ -49,9 +49,23 @@ end
 Base.show(io::IO, t::AbstractTool) = dump(io, t; maxdepth = 1)
 
 """
-    ToolRef(ref::Symbol)
+    ToolRef(ref::Symbol, callable::Any)
 
-Represents a reference to a tool with a symbolic name. It can be rendered with a `render` method and a prompt schema.
+Represents a reference to a tool with a symbolic name and a callable object (to call during tool execution).
+It can be rendered with a `render` method and a prompt schema.
+
+# Arguments
+- `ref::Symbol`: The symbolic name of the tool.
+- `callable::Any`: The callable object of the tool, eg, a type or a function.
+
+# Examples
+```julia
+# Define a tool with a symbolic name and a callable object
+tool = ToolRef(:computer, println)
+
+# Show the rendered tool signature
+PT.render(PT.AnthropicSchema(), tool)
+```
 """
 Base.@kwdef struct ToolRef <: AbstractTool
     ref::Symbol
