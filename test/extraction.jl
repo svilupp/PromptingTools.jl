@@ -21,6 +21,15 @@ function context_test_function2(x::Int, y::String, context::Dict)
     return "Context test: $x, $y, $(context)"
 end
 
+# Test function that accepts kwargs
+function kwarg_test_function(x::Int; y::Int = 0, z::Int = 0, kwargs...)
+    return x + y + z
+end
+# Test with function that has no kwargs
+function no_kwarg_function(x::Int)
+    return x
+end
+
 @testset "ToolErrors" begin
     e = ToolNotFoundError("Tool `xyz` not found")
     @test e isa AbstractToolError
@@ -860,4 +869,23 @@ end
     @test_throws ToolNotFoundError execute_tool(tool_map,
         ToolMessage(;
             tool_call_id = "1", name = "wrong_tool_name", raw = "", args = args))
+
+    # Test passing kwargs directly
+    args = Dict(:x => 1)
+    @test execute_tool(kwarg_test_function, args; y = 2, z = 3) == 6 # 1 + 2 + 3
+
+    # Test unused args passed as kwargs when unused_as_kwargs=true
+    args = Dict(:x => 1, :y => 2, :z => 3, :extra => 4)
+    @test execute_tool(kwarg_test_function, args; unused_as_kwargs = true) == 6 # 1 + 2 + 3
+
+    # Test that extra args are ignored when unused_as_kwargs=false
+    args = Dict(:x => 1, :y => 2, :z => 3, :extra => 4)
+    @test execute_tool(kwarg_test_function, args; unused_as_kwargs = false) == 1
+
+    # Test that args override kwargs when unused_as_kwargs=true
+    args = Dict(:x => 1, :y => 2, :z => 3)
+    @test execute_tool(kwarg_test_function, args; unused_as_kwargs = true, y = 5) == 6 # args
+
+    args = Dict(:x => 1, :extra => 2)
+    @test execute_tool(no_kwarg_function, args; unused_as_kwargs = false) == 1
 end
