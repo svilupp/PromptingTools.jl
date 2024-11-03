@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Added a new `extras` field to `ToolRef` to enable additional parameters in the tool signature (eg, `display_width_px`, `display_height_px` for the `:computer` tool).
+- Added a new kwarg `unused_as_kwargs` to `execute_tool` to enable passing unused args as kwargs (see `?execute_tool` for more information). Helps with using kwarg-based functions.
 
 ### Updated
 - Updated the compat bounds for `StreamCallbacks` to enable both v0.4 and v0.5 (Fixes Julia 1.9 compatibility).
