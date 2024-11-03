@@ -282,6 +282,16 @@ end
     @test rendered["name"] == "computer"
     @test rendered["display_width_px"] == 1024
     @test rendered["display_height_px"] == 768
+    @test !haskey(rendered, "display_number")
+
+    computer_tool2 = ToolRef(ref = :computer,
+        extras = Dict("display_width_px" => 1920,
+            "display_height_px" => 1080, "display_number" => 1))
+    rendered = render(schema, computer_tool2)
+    @test rendered["type"] == "computer_20241022"
+    @test rendered["name"] == "computer"
+    @test rendered["display_width_px"] == 1920
+    @test rendered["display_height_px"] == 1080
     @test rendered["display_number"] == 1
 
     # Test text editor tool rendering

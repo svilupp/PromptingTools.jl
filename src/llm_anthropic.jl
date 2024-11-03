@@ -130,13 +130,13 @@ function render(schema::AbstractAnthropicSchema,
         tool::ToolRef;
         kwargs...)
     ## WARNING: We ignore the tool name here, because the names are strict
+    (; extras) = tool
     rendered = if tool.ref == :computer
         Dict(
             "type" => "computer_20241022",
             "name" => "computer",
-            "display_width_px" => 1024,
-            "display_height_px" => 768,
-            "display_number" => 1
+            "display_width_px" => get(extras, "display_width_px", 1024),
+            "display_height_px" => get(extras, "display_height_px", 768)
         )
     elseif tool.ref == :str_replace_editor
         Dict(
@@ -150,6 +150,9 @@ function render(schema::AbstractAnthropicSchema,
         )
     else
         throw(ArgumentError("Unknown tool reference: $(tool.ref)"))
+    end
+    if !isempty(extras)
+        merge!(rendered, extras)
     end
     return rendered
 end
@@ -835,6 +838,23 @@ conv = aitools(
 # ToolMessage("The weather in Tokyo on 2023-05-03 is 70 degrees.")
 # UserMessage("And in New York?")
 # AIToolRequest("-"; Tool Requests: 1)
+```
+
+Using the the new Computer Use beta feature:
+```julia
+# Define tools (and associated functions to call)
+tool_map = Dict("bash" => PT.ToolRef(; ref=:bash, callable=bash_tool),
+    "computer" => PT.ToolRef(; ref=:computer, callable=computer_tool,
+        extras=Dict("display_width_px" => 1920, "display_height_px" => 1080)),
+    "str_replace_editor" => PT.ToolRef(; ref=:str_replace_editor, callable=edit_tool))
+
+msg = aitools(prompt; tools=collect(values(tool_map)), model="claude", betas=[:computer_use])
+
+PT.pprint(msg)
+# --------------------
+# AI Tool Request
+# --------------------
+# Tool Request: computer, args: Dict{Symbol, Any}(:action => "screenshot")
 ```
 """
 function aitools(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMPT_TYPE;
