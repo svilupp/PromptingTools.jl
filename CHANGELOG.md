@@ -8,10 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Fixed
+
+## [0.61.0]
+
+### Added
+- Added a new `extras` field to `ToolRef` to enable additional parameters in the tool signature (eg, `display_width_px`, `display_height_px` for the `:computer` tool).
+
 ### Updated
 - Updated the compat bounds for `StreamCallbacks` to enable both v0.4 and v0.5 (Fixes Julia 1.9 compatibility).
-
-### Fixed
+- Updated the return type of `tool_call_signature` to `Dict{String, AbstractTool}` to enable better interoperability with different tool types.
 
 ## [0.60.0]
 
