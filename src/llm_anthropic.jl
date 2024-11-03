@@ -839,6 +839,23 @@ conv = aitools(
 # UserMessage("And in New York?")
 # AIToolRequest("-"; Tool Requests: 1)
 ```
+
+Using the the new Computer Use beta feature:
+```julia
+# Define tools (and associated functions to call)
+tool_map = Dict("bash" => PT.ToolRef(; ref=:bash, callable=bash_tool),
+    "computer" => PT.ToolRef(; ref=:computer, callable=computer_tool,
+        extras=Dict("display_width_px" => 1920, "display_height_px" => 1080)),
+    "str_replace_editor" => PT.ToolRef(; ref=:str_replace_editor, callable=edit_tool))
+
+msg = aitools(prompt; tools=collect(values(tool_map)), model="claude", betas=[:computer_use])
+
+PT.pprint(msg)
+# --------------------
+# AI Tool Request
+# --------------------
+# Tool Request: computer, args: Dict{Symbol, Any}(:action => "screenshot")
+```
 """
 function aitools(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMPT_TYPE;
         tools::Union{Type, Function, Method, AbstractTool, Vector} = Tool[],
