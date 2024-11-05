@@ -1,4 +1,4 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/chunks/VPLocalSearchBox.BDbd204x.js","assets/chunks/framework.Dmu4xD1S.js"])))=>i.map(i=>d[i]);
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/chunks/VPLocalSearchBox.Bo3Z8Zjb.js","assets/chunks/framework.Dmu4xD1S.js"])))=>i.map(i=>d[i]);
 import { d as defineComponent, o as openBlock, c as createElementBlock, r as renderSlot, n as normalizeClass, a as createTextVNode, t as toDisplayString, b as createBlock, w as withCtx, e as createCommentVNode, T as Transition, _ as _export_sfc, u as useData$1, i as isExternal, f as treatAsHtml, g as withBase, h as computed, j as createBaseVNode, k as unref, l as isActive, m as useMediaQuery, p as ref, q as watch, s as watchEffect, v as onMounted, x as onUnmounted, y as watchPostEffect, z as onUpdated, A as getScrollOffset, B as resolveComponent, F as Fragment, C as renderList, D as shallowRef, E as onContentUpdated, G as createVNode, H as resolveDynamicComponent, I as EXTERNAL_URL_RE, J as useRoute, K as mergeProps, L as inject, M as useWindowSize, N as normalizeStyle, O as onKeyStroke, P as nextTick, Q as useWindowScroll, R as inBrowser, S as readonly, U as defineAsyncComponent, V as __vitePreload, W as useScrollLock, X as provide, Y as withKeys, Z as toHandlers, $ as onBeforeUnmount, a0 as withModifiers, a1 as useSlots, a2 as reactive, a3 as toRef, a4 as h } from "./framework.Dmu4xD1S.js";
 const _sfc_main$Z = /* @__PURE__ */ defineComponent({
   __name: "VPBadge",
@@ -1901,12 +1901,26 @@ const _sfc_main$t = /* @__PURE__ */ defineComponent({
   },
   setup(__props) {
     const props = __props;
+    const el = ref();
+    onMounted(async () => {
+      var _a;
+      await nextTick();
+      const span = (_a = el.value) == null ? void 0 : _a.children[0];
+      if (span instanceof HTMLElement && span.className.startsWith("vpi-social-") && (getComputedStyle(span).maskImage || getComputedStyle(span).webkitMaskImage) === "none") {
+        span.style.setProperty(
+          "--icon",
+          `url('https://api.iconify.design/simple-icons/${props.icon}.svg')`
+        );
+      }
+    });
     const svg = computed(() => {
       if (typeof props.icon === "object") return props.icon.svg;
-      return `<span class="vpi-social-${props.icon}" />`;
+      return `<span class="vpi-social-${props.icon}"></span>`;
     });
     return (_ctx, _cache) => {
       return openBlock(), createElementBlock("a", {
+        ref_key: "el",
+        ref: el,
         class: "VPSocialLink no-icon",
         href: _ctx.link,
         "aria-label": _ctx.ariaLabel ?? (typeof _ctx.icon === "string" ? _ctx.icon : ""),
@@ -1917,7 +1931,7 @@ const _sfc_main$t = /* @__PURE__ */ defineComponent({
     };
   }
 });
-const VPSocialLink = /* @__PURE__ */ _export_sfc(_sfc_main$t, [["__scopeId", "data-v-717b8b75"]]);
+const VPSocialLink = /* @__PURE__ */ _export_sfc(_sfc_main$t, [["__scopeId", "data-v-d26d30cb"]]);
 const _hoisted_1$m = { class: "VPSocialLinks" };
 const _sfc_main$s = /* @__PURE__ */ defineComponent({
   __name: "VPSocialLinks",
@@ -2215,7 +2229,7 @@ const _hoisted_3$3 = {
 const _sfc_main$l = /* @__PURE__ */ defineComponent({
   __name: "VPNavBarSearch",
   setup(__props) {
-    const VPLocalSearchBox = defineAsyncComponent(() => __vitePreload(() => import("./VPLocalSearchBox.BDbd204x.js"), true ? __vite__mapDeps([0,1]) : void 0));
+    const VPLocalSearchBox = defineAsyncComponent(() => __vitePreload(() => import("./VPLocalSearchBox.Bo3Z8Zjb.js"), true ? __vite__mapDeps([0,1]) : void 0));
     const VPAlgoliaSearchBox = () => null;
     const { theme: theme2 } = useData();
     const loaded = ref(false);
