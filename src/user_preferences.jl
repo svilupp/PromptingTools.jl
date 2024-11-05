@@ -879,14 +879,14 @@ registry = Dict{String, ModelSpec}(
     "Qwen/Qwen2.5-72B-Instruct-Turbo" => ModelSpec(
         "Qwen/Qwen2.5-72B-Instruct-Turbo",
         TogetherOpenAISchema(),
-        5e-6,
-        1.5e-5,
+        0.88e-6,
+        1.2e-6,
         ""),
     "Qwen/Qwen2.5-7B-Instruct-Turbo" => ModelSpec(
         "Qwen/Qwen2.5-7B-Instruct-Turbo",
         TogetherOpenAISchema(),
-        5e-6,
-        1.5e-5,
+        0.18e-6,
+        0.3e-6,
         ""),
     ### Anthropic models
     "claude-3-5-sonnet-latest" => ModelSpec("claude-3-5-sonnet-latest",
@@ -1022,12 +1022,12 @@ registry = Dict{String, ModelSpec}(
     ## OpenRouter models
     "google/gemini-flash-1.5-8b" => ModelSpec("google/gemini-flash-1.5-8b",
         OpenRouterOpenAISchema(),
-        0.0375e-6,
-        0.15e-6,
+        0e-6,
+        0e-6,
         "OpenRouter's hosted version of emini 1.5 Flash-8B is optimized for speed and efficiency, offering enhanced performance in small prompt tasks like chat, transcription, and translation."),
     "google/gemini-flash-1.5-exp" => ModelSpec("google/gemini-flash-1.5-exp",
         OpenRouterOpenAISchema(),
-        0e-6, # actually free?
+        0e-6,
         0e-6,
         "OpenRouter's hosted version of emini 1.5 Flash-8B is optimized for speed and efficiency, offering enhanced performance in small prompt tasks like chat, transcription, and translation."),
     "google/gemini-flash-1.5" => ModelSpec("google/gemini-flash-1.5",
