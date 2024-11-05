@@ -262,6 +262,18 @@ Requires one environment variable to be set:
 """
 struct SambaNovaOpenAISchema <: AbstractOpenAISchema end
 
+"""
+    XAIOpenAISchema
+
+Schema to call the XAI API. It follows OpenAI API conventions.
+
+Get your API key from [here](https://console.x.ai/).
+
+Requires one environment variable to be set:
+- `XAI_API_KEY`: Your API key
+"""
+struct XAIOpenAISchema <: AbstractOpenAISchema end
+
 abstract type AbstractOllamaSchema <: AbstractPromptSchema end
 
 """
