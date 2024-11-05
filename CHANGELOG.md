@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.62.0]
+
+### Added
+- Added a new Claude 3.5 Haiku model (`claude-3-5-haiku-latest`) and updated the alias `claudeh` with it.
+- Added support for XAI's Grok 2 beta model (`grok-beta`) and updated the alias `grok` with it. Set your ENV api key `XAI_API_KEY` to use it.
+
 ## [0.61.0]
 
 ### Added
