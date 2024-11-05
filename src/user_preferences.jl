@@ -26,6 +26,7 @@ Check your preferences by calling `get_preferences(key::String)`.
 - `OPENROUTER_API_KEY`: The API key for the OpenRouter API. Get yours from [here](https://openrouter.ai/keys).
 - `CEREBRAS_API_KEY`: The API key for the Cerebras API. Get yours from [here](https://cloud.cerebras.ai/).
 - `SAMBANOVA_API_KEY`: The API key for the Sambanova API. Get yours from [here](https://cloud.sambanova.ai/apis).
+- `XAI_API_KEY`: The API key for the XAI API. Get your key from [here](https://console.x.ai/).
 - `MODEL_CHAT`: The default model to use for aigenerate and most ai* calls. See `MODEL_REGISTRY` for a list of available models or define your own.
 - `MODEL_EMBEDDING`: The default model to use for aiembed (embedding documents). See `MODEL_REGISTRY` for a list of available models or define your own.
 - `PROMPT_SCHEMA`: The default prompt schema to use for aigenerate and most ai* calls (if not specified in `MODEL_REGISTRY`). Set as a string, eg, `"OpenAISchema"`.
@@ -60,6 +61,7 @@ Define your `register_model!()` calls in your `startup.jl` file to make them ava
 - `CEREBRAS_API_KEY`: The API key for the Cerebras API.
 - `SAMBANOVA_API_KEY`: The API key for the Sambanova API.
 - `LOG_DIR`: The directory to save the logs to, eg, when using `SaverSchema <: AbstractTracerSchema`. Defaults to `joinpath(pwd(), "log")`. Refer to `?SaverSchema` for more information on how it works and examples.
+- `XAI_API_KEY`: The API key for the XAI API. Get your key from [here](https://console.x.ai/).
 
 Preferences.jl takes priority over ENV variables, so if you set a preference, it will take precedence over the ENV variable.
 
@@ -84,6 +86,7 @@ const ALLOWED_PREFERENCES = ["MISTRALAI_API_KEY",
     "OPENROUTER_API_KEY",  # Added OPENROUTER_API_KEY
     "CEREBRAS_API_KEY",
     "SAMBANOVA_API_KEY",
+    "XAI_API_KEY",  # Added XAI_API_KEY
     "MODEL_CHAT",
     "MODEL_EMBEDDING",
     "MODEL_ALIASES",
@@ -169,6 +172,7 @@ global CEREBRAS_API_KEY::String = ""
 global SAMBANOVA_API_KEY::String = ""
 global LOCAL_SERVER::String = ""
 global LOG_DIR::String = ""
+global XAI_API_KEY::String = ""
 
 # Load them on init
 "Loads API keys from environment variables and preferences"
@@ -236,6 +240,9 @@ function load_api_keys!()
     global LOG_DIR
     LOG_DIR = @load_preference("LOG_DIR",
         default=get(ENV, "LOG_DIR", joinpath(pwd(), "log")))
+    global XAI_API_KEY
+    XAI_API_KEY = @load_preference("XAI_API_KEY",
+        default=get(ENV, "XAI_API_KEY", ""))
 
     return nothing
 end
@@ -415,7 +422,7 @@ aliases = merge(
         "claude" => "claude-3-5-sonnet-latest",
         "claudeo" => "claude-3-opus-20240229",
         "claudes" => "claude-3-5-sonnet-latest",
-        "claudeh" => "claude-3-haiku-20240307",
+        "claudeh" => "claude-3-5-haiku-latest",
         ## Groq
         "gllama3" => "llama-3.1-8b-instant",
         "gl3" => "llama-3.1-8b-instant",
@@ -454,6 +461,8 @@ aliases = merge(
         "sls" => "Meta-Llama-3.1-8B-Instruct", # s for small
         "slm" => "Meta-Llama-3.1-70B-Instruct", # m for medium
         "sll" => "Meta-Llama-3.1-405B-Instruct", # l for large
+        ## XAI's Grok
+        "grok" => "grok-beta",
         ## DeepSeek
         "dschat" => "deepseek-chat",
         "dscode" => "deepseek-coder",
@@ -888,11 +897,16 @@ registry = Dict{String, ModelSpec}(
         3e-6,
         1.5e-5,
         "Anthropic's middle model Claude 3 Sonnet. Max output 4096 tokens, 200K context. See details [here](https://docs.anthropic.com/claude/docs/models-overview)"),
-    # "claude-3-5-haiku-latest" => ModelSpec("claude-3-5-haiku-latest",
-    #     AnthropicSchema(),
-    #     2.5e-7,
-    #     1.25e-6,
-    #     "Anthropic's smallest and faster model Claude 3 Haiku. Latest version, 200K context. See details [here](https://docs.anthropic.com/claude/docs/models-overview)"),
+    "claude-3-5-haiku-latest" => ModelSpec("claude-3-5-haiku-latest",
+        AnthropicSchema(),
+        1e-6,
+        5e-6,
+        "Anthropic's smallest and faster model Claude 3 Haiku. Latest version, 200K context. See details [here](https://docs.anthropic.com/claude/docs/models-overview)"),
+    "claude-3-5-haiku-20241022" => ModelSpec("claude-3-5-haiku-20241022",
+        AnthropicSchema(),
+        1e-6,
+        5e-6,
+        "Anthropic's smallest and faster model Claude 3 Haiku. Version 2024-10-22, 200K context. See details [here](https://docs.anthropic.com/claude/docs/models-overview)"),
     "claude-3-haiku-20240307" => ModelSpec("claude-3-haiku-20240307",
         AnthropicSchema(),
         2.5e-7,
@@ -1058,7 +1072,12 @@ registry = Dict{String, ModelSpec}(
         SambaNovaOpenAISchema(),
         5e-6,
         1e-7,
-        "Meta's Llama3.1 405b, hosted by SambaNova.ai. Max 64K context.")
+        "Meta's Llama3.1 405b, hosted by SambaNova.ai. Max 64K context."),
+    "grok-beta" => ModelSpec("grok-beta",
+        XAIOpenAISchema(),
+        5e-6,
+        15e-6,
+        "XAI's Grok 2 beta model. Max 128K context.")
 )
 
 """

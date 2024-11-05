@@ -205,6 +205,15 @@ function OpenAI.create_chat(schema::SambaNovaOpenAISchema,
     api_key = isempty(SAMBANOVA_API_KEY) ? api_key : SAMBANOVA_API_KEY
     OpenAI.create_chat(CustomOpenAISchema(), api_key, model, conversation; url, kwargs...)
 end
+function OpenAI.create_chat(schema::XAIOpenAISchema,
+        api_key::AbstractString,
+        model::AbstractString,
+        conversation;
+        url::String = "https://api.x.ai/v1",
+        kwargs...)
+    api_key = isempty(XAI_API_KEY) ? api_key : XAI_API_KEY
+    OpenAI.create_chat(CustomOpenAISchema(), api_key, model, conversation; url, kwargs...)
+end
 function OpenAI.create_chat(schema::DatabricksOpenAISchema,
         api_key::AbstractString,
         model::AbstractString,
@@ -361,6 +370,17 @@ function OpenAI.create_embeddings(schema::FireworksOpenAISchema,
         kwargs...)
     provider = CustomProvider(;
         api_key = isempty(FIREWORKS_API_KEY) ? api_key : FIREWORKS_API_KEY,
+        base_url = url)
+    OpenAI.create_embeddings(provider, docs, model; kwargs...)
+end
+function OpenAI.create_embeddings(schema::XAIOpenAISchema,
+        api_key::AbstractString,
+        docs,
+        model::AbstractString;
+        url::String = "https://api.x.ai/v1",
+        kwargs...)
+    provider = CustomProvider(;
+        api_key = isempty(XAI_API_KEY) ? api_key : XAI_API_KEY,
         base_url = url)
     OpenAI.create_embeddings(provider, docs, model; kwargs...)
 end
