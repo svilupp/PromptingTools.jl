@@ -181,7 +181,17 @@ function extract_docstring(m::Method; max_description_length::Int = 100)
     return extract_docstring(get_function(m); max_description_length)
 end
 
-function to_json_schema(orig_type; max_description_length::Int = 100)
+@inline function is_hidden_field(field_name::AbstractString,
+        hidden_fields::AbstractVector{<:Union{AbstractString, Regex}})
+    any(x -> occursin(x, field_name), hidden_fields)
+end
+@inline function is_hidden_field(field_name::Symbol,
+        hidden_fields::AbstractVector{<:Union{AbstractString, Regex}})
+    is_hidden_field(string(field_name), hidden_fields)
+end
+
+function to_json_schema(orig_type; max_description_length::Int = 100,
+        hidden_fields::AbstractVector{<:Union{AbstractString, Regex}} = String[])
     schema = Dict{String, Any}()
     type = remove_null_types(orig_type)
     if isstructtype(type)
@@ -190,9 +200,12 @@ function to_json_schema(orig_type; max_description_length::Int = 100)
         ## extract the field names and types
         required_types = String[]
         for (field_name, field_type) in zip(fieldnames(type), fieldtypes(type))
+            if is_hidden_field(field_name, hidden_fields)
+                continue
+            end
             schema["properties"][string(field_name)] = to_json_schema(
                 remove_null_types(field_type);
-                max_description_length)
+                max_description_length, hidden_fields)
             ## Hack: no null type (Nothing, Missing) implies it it is a required field
             is_required_field(field_type) && push!(required_types, string(field_name))
         end
@@ -205,23 +218,29 @@ function to_json_schema(orig_type; max_description_length::Int = 100)
     end
     return schema
 end
-function to_json_schema(type::Type{<:AbstractString}; max_description_length::Int = 100)
+function to_json_schema(type::Type{<:AbstractString}; max_description_length::Int = 100,
+        hidden_fields::AbstractVector{<:Union{AbstractString, Regex}} = String[])
     Dict{String, Any}("type" => to_json_type(type))
 end
 function to_json_schema(type::Type{T};
-        max_description_length::Int = 100) where {T <:
-                                                  Union{AbstractSet, Tuple, AbstractArray}}
+        max_description_length::Int = 100,
+        hidden_fields::AbstractVector{<:Union{AbstractString, Regex}} = String[]) where {T <:
+                                                                                         Union{
+        AbstractSet, Tuple, AbstractArray}}
     element_type = eltype(type)
     return Dict{String, Any}("type" => "array",
-        "items" => to_json_schema(remove_null_types(element_type)))
+        "items" => to_json_schema(remove_null_types(element_type);
+            max_description_length, hidden_fields))
 end
-function to_json_schema(type::Type{<:Enum}; max_description_length::Int = 100)
+function to_json_schema(type::Type{<:Enum}; max_description_length::Int = 100,
+        hidden_fields::AbstractVector{<:Union{AbstractString, Regex}} = String[])
     enum_options = Base.Enums.namemap(type) |> values .|> string
     return Dict{String, Any}("type" => "string",
         "enum" => enum_options)
 end
 ## Dispatch for method of a function -- grabs only arguments!! Not kwargs!!
-function to_json_schema(m::Method; max_description_length::Int = 100)
+function to_json_schema(m::Method; max_description_length::Int = 100,
+        hidden_fields::AbstractVector{<:Union{AbstractString, Regex}} = String[])
     ## Warning: We cannot extract keyword arguments from the method signature
     kwargs = Base.kwarg_decl(m)
     !isempty(kwargs) &&
@@ -233,9 +252,12 @@ function to_json_schema(m::Method; max_description_length::Int = 100)
     ## extract the field names and types
     required_types = String[]
     for (field_name, field_type) in zip(get_arg_names(m), get_arg_types(m))
+        if is_hidden_field(field_name, hidden_fields)
+            continue
+        end
         schema["properties"][string(field_name)] = to_json_schema(
             remove_null_types(field_type);
-            max_description_length)
+            max_description_length, hidden_fields)
         ## Hack: no null type (Nothing, Missing) implies it it is a required field
         is_required_field(field_type) && push!(required_types, string(field_name))
     end
@@ -245,7 +267,8 @@ function to_json_schema(m::Method; max_description_length::Int = 100)
     !isempty(docs) && (schema["description"] = docs)
     return schema
 end
-function to_json_schema(type::Type{<:AbstractDict}; max_description_length::Int = 100)
+function to_json_schema(type::Type{<:AbstractDict}; max_description_length::Int = 100,
+        hidden_fields::AbstractVector{<:Union{AbstractString, Regex}} = String[])
     throw(ArgumentError("Dicts are not supported yet as we cannot analyze their keys/values on a type-level. Use a nested Struct instead!"))
 end
 
@@ -535,7 +558,8 @@ function tool_call_signature(
         name
     end
     schema = Dict{String, Any}("name" => name,
-        "parameters" => to_json_schema(type_or_method; max_description_length))
+        "parameters" => to_json_schema(type_or_method; max_description_length,
+            hidden_fields))
     ## docstrings
     docs = isnothing(docs) ? extract_docstring(type_or_method; max_description_length) :
            docs
