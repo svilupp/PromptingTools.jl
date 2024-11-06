@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.62.1]
+
+### Fixed
+- Fixed a bug in `tool_call_signature` where hidden fields were not hidden early enough and would fail if a Dict argument was provided. It used to do the processing after, but Dicts cannot be processed, so we're now masking the fields upfront.
+
 ## [0.62.0]
 
 ### Added

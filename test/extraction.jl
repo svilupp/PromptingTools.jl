@@ -6,7 +6,7 @@ using PromptingTools: Tool, isabstracttool, execute_tool, parse_tool, get_arg_na
                       get_arg_types, get_method, get_function, remove_field!,
                       tool_call_signature, ToolRef
 using PromptingTools: AbstractToolError, ToolNotFoundError, ToolExecutionError,
-                      ToolGenericError
+                      ToolGenericError, is_hidden_field
 
 # TODO: check more edge cases like empty structs
 
@@ -357,6 +357,36 @@ end
     ## Check that the nested docstring is extracted correctly
     @test schema_measurement["description"] ==
           "Represents person's age, height, and weight\n"
+end
+
+@testset "is_hidden_field" begin
+    # Test basic string matching
+    @test is_hidden_field("context", ["context"]) == true
+    @test is_hidden_field("data", ["context"]) == false
+
+    # Test regex matching
+    @test is_hidden_field("my_context", [r"context$"]) == true
+    @test is_hidden_field("context_var", [r"^context"]) == true
+    @test is_hidden_field("mydata", [r"context"]) == false
+
+    # Test multiple patterns
+    @test is_hidden_field("context", ["data", "context", "temp"]) == true
+    @test is_hidden_field("context", [r"^data", r"temp$", r"context"]) == true
+
+    # Test mixed string and regex patterns
+    @test is_hidden_field(
+        "my_context", Union{AbstractString, Regex}["data", r"context$"]) == true
+    @test is_hidden_field(
+        "context_var", Union{AbstractString, Regex}[r"^context", "temp"]) == true
+
+    # Test empty patterns list
+    @test is_hidden_field("context", String[]) == false
+    @test is_hidden_field("context", Regex[]) == false
+
+    # Test with Symbol input
+    @test is_hidden_field(:context, ["context"]) == true
+    @test is_hidden_field(:my_context, [r"context$"]) == true
+    @test is_hidden_field(:data, ["context"]) == false
 end
 @testset "set_properties_strict!" begin
     # Test 1: Basic functionality
@@ -769,6 +799,20 @@ end
     tool = ToolRef(; ref = :computer, callable = println)
     tool_map = tool_call_signature(tool)
     @test tool_map == Dict("computer" => tool)
+
+    ## accepting dictionary when it's hidden // it would fail otherwise
+    tool_map = tool_call_signature(context_test_function2; hidden_fields = ["context"])
+    @test tool_map isa Dict
+
+    @test_throws ArgumentError tool_call_signature(context_test_function2)
+
+    # for struct
+    mutable struct MyStruct1234
+        context::Dict{String, Any}
+    end
+    @test_throws ArgumentError tool_call_signature(MyStruct1234)
+    tool_map = tool_call_signature(MyStruct1234; hidden_fields = ["context"])
+    @test tool_map isa Dict
 end
 
 @testset "parse_tool" begin
