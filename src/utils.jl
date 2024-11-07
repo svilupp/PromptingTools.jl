@@ -386,8 +386,11 @@ If the cost is already calculated (in `msg.cost`), it will not be re-calculated.
   is not found in `MODEL_REGISTRY`, default costs are used.
 - `cost_of_token_prompt::Number`: The cost per prompt token. Defaults to the cost in `MODEL_REGISTRY`
   for the given model, or 0.0 if the model is not found.
+- `cached_cost_of_token_prompt::Number`: The cost per cached prompt token. Defaults to 50% of cost_of_token_prompt.
+  This reflects the reduced cost when using prompt caching.
 - `cost_of_token_generation::Number`: The cost per generation token. Defaults to the cost in
   `MODEL_REGISTRY` for the given model, or 0.0 if the model is not found.
+- `is_cached::Bool`: Whether to use cached prompt costs. Defaults to false.
 
 # Returns
 - `Number`: The total cost of the call.
@@ -396,9 +399,18 @@ If the cost is already calculated (in `msg.cost`), it will not be re-calculated.
 ```julia
 # Assuming MODEL_REGISTRY is set up with appropriate costs
 MODEL_REGISTRY = Dict(
-    "model1" => (cost_of_token_prompt = 0.05, cost_of_token_generation = 0.10),
-    "model2" => (cost_of_token_prompt = 0.07, cost_of_token_generation = 0.02)
+    "model1" => (cost_of_token_prompt = 0.05, cached_cost_of_token_prompt = 0.025, cost_of_token_generation = 0.10),
+    "model2" => (cost_of_token_prompt = 0.07, cached_cost_of_token_prompt = 0.035, cost_of_token_generation = 0.02)
 )
+
+# Calculate cost for normal prompt
+cost1 = call_cost(10, 20, "model1")  # Uses normal prompt cost
+# cost1 = 10 * 0.05 + 20 * 0.10 = 2.5
+
+# Calculate cost for cached prompt
+cost2 = call_cost(10, 20, "model1", is_cached=true)  # Uses cached prompt cost
+# cost2 = 10 * 0.025 + 20 * 0.10 = 2.25  (50% discount on prompt tokens)
+```
 
 cost1 = call_cost(10, 20, "model1")
 
@@ -410,15 +422,18 @@ cost1 = call_cost(msg1, "model1")
 # Using custom token costs
 cost2 = call_cost(10, 20, "model3"; cost_of_token_prompt = 0.08, cost_of_token_generation = 0.12)
 # cost2 = 10 * 0.08 + 20 * 0.12 = 3.2
-```
 """
 function call_cost(prompt_tokens::Int, completion_tokens::Int, model::String;
         cost_of_token_prompt::Number = get(MODEL_REGISTRY,
             model,
             (; cost_of_token_prompt = 0.0)).cost_of_token_prompt,
+        cached_cost_of_token_prompt::Number = get(MODEL_REGISTRY,
+            model,
+            (; cached_cost_of_token_prompt = cost_of_token_prompt * 0.5)).cached_cost_of_token_prompt,
         cost_of_token_generation::Number = get(MODEL_REGISTRY, model,
-            (; cost_of_token_generation = 0.0)).cost_of_token_generation)
-    cost = prompt_tokens * cost_of_token_prompt +
+            (; cost_of_token_generation = 0.0)).cost_of_token_generation,
+        is_cached::Bool = false)
+    cost = (is_cached ? cached_cost_of_token_prompt : cost_of_token_prompt) * prompt_tokens +
            completion_tokens * cost_of_token_generation
     return cost
 end
