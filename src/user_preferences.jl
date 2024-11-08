@@ -195,6 +195,7 @@ function load_api_keys!()
             get(ENV, "MISTRALAI_API_KEY", "")))
     if !isempty(get(ENV, "MISTRALAI_API_KEY", ""))
         @warn "The MISTRALAI_API_KEY environment variable is deprecated. Use MISTRAL_API_KEY instead."
+    end
     global COHERE_API_KEY
     COHERE_API_KEY = @load_preference("COHERE_API_KEY",
         default=get(ENV, "COHERE_API_KEY", ""))
