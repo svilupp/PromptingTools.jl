@@ -400,6 +400,8 @@ aliases = merge(
         "tllama3" => "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
         "tllama370" => "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo",
         "tllama3405" => "meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo",
+        "tqwen25b72" => "Qwen/Qwen2.5-72B-Instruct-Turbo",
+        "tqwen25b7" => "Qwen/Qwen2.5-7B-Instruct-Turbo",
         "tls" => "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo", #s for small
         "tlm" => "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo", #m for medium
         "tll" => "meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo", #l for large
@@ -467,6 +469,8 @@ aliases = merge(
         "dschat" => "deepseek-chat",
         "dscode" => "deepseek-coder",
         ## OpenRouter
+        "orgf8b" => "google/gemini-flash-1.5-8b",
+        "orgf" => "google/gemini-flash-1.5",
         "oro1" => "openai/o1-preview",
         "oro1m" => "openai/o1-mini",
         "orcop" => "cohere/command-r-plus-08-2024",
@@ -871,6 +875,18 @@ registry = Dict{String, ModelSpec}(
         5e-6,
         1.5e-5,
         "Meta Llama3.1 405b, hosted by Together.ai. For more information, see [models](https://docs.together.ai/docs/inference-models)."),
+    "Qwen/Qwen2.5-72B-Instruct-Turbo" => ModelSpec(
+        "Qwen/Qwen2.5-72B-Instruct-Turbo",
+        TogetherOpenAISchema(),
+        0.88e-6,
+        1.2e-6,
+        ""),
+    "Qwen/Qwen2.5-7B-Instruct-Turbo" => ModelSpec(
+        "Qwen/Qwen2.5-7B-Instruct-Turbo",
+        TogetherOpenAISchema(),
+        0.18e-6,
+        0.3e-6,
+        ""),
     ### Anthropic models
     "claude-3-5-sonnet-latest" => ModelSpec("claude-3-5-sonnet-latest",
         AnthropicSchema(),
@@ -1003,6 +1019,16 @@ registry = Dict{String, ModelSpec}(
         2.8e-7,
         "Deepseek.com-hosted coding model. Max 16K context. See details [here](https://platform.deepseek.com/docs)"),
     ## OpenRouter models
+    "google/gemini-flash-1.5-8b" => ModelSpec("google/gemini-flash-1.5-8b",
+        OpenRouterOpenAISchema(),
+        0.375e-7,
+        1.5e-7,
+        "OpenRouter's hosted version of emini 1.5 Flash-8B is optimized for speed and efficiency, offering enhanced performance in small prompt tasks like chat, transcription, and translation."),
+    "google/gemini-flash-1.5" => ModelSpec("google/gemini-flash-1.5",
+        OpenRouterOpenAISchema(),
+        0.75e-7,
+        3e-7,
+        "OpenRouter's hosted version of emini 1.5 Flash-8B is optimized for speed and efficiency, offering enhanced performance in small prompt tasks like chat, transcription, and translation."),
     "openai/o1-preview" => ModelSpec("openai/o1-preview",
         OpenRouterOpenAISchema(),
         15e-6,
