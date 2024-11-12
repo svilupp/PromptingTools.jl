@@ -1,8 +1,7 @@
 ## using GoogleGenAI # not needed
-using PromptingTools: TestEchoGoogleSchema, render, GoogleSchema, ggi_generate_content, GoogleOpenAISchema
+using PromptingTools: TestEchoGoogleSchema, render, GoogleSchema, ggi_generate_content
 using PromptingTools: AIMessage, SystemMessage, AbstractMessage
 using PromptingTools: UserMessage, DataMessage
-using HTTP, JSON3
 
 @testset "render-Google" begin
     schema = GoogleSchema()
@@ -184,6 +183,4 @@ end
     @test_throws ErrorException aiclassify(GoogleSchema(), "prompt")
     @test_throws ErrorException aiscan(GoogleSchema(), "prompt")
     @test_throws ErrorException aiimage(GoogleSchema(), "prompt")
-end
-
 end
