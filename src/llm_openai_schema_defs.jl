@@ -214,6 +214,18 @@ function OpenAI.create_chat(schema::XAIOpenAISchema,
     api_key = isempty(XAI_API_KEY) ? api_key : XAI_API_KEY
     OpenAI.create_chat(CustomOpenAISchema(), api_key, model, conversation; url, kwargs...)
 end
+
+# Add GoogleProvider implementation
+Base.@kwdef struct GoogleProvider <: AbstractCustomProvider
+    api_key::String = ""
+    base_url::String = "https://generativelanguage.googleapis.com/v1beta"
+    api_version::String = ""
+end
+
+function OpenAI.auth_header(provider::GoogleProvider, api_key::AbstractString)
+    Dict("Authorization" => "Bearer $(api_key)")
+end
+
 function OpenAI.create_chat(schema::GoogleOpenAISchema,
         api_key::AbstractString,
         model::AbstractString,
@@ -221,7 +233,14 @@ function OpenAI.create_chat(schema::GoogleOpenAISchema,
         url::String = "https://generativelanguage.googleapis.com/v1beta",
         kwargs...)
     api_key = isempty(GOOGLE_API_KEY) ? api_key : GOOGLE_API_KEY
-    OpenAI.create_chat(CustomOpenAISchema(), api_key, model, conversation; url, kwargs...)
+    # Use GoogleProvider instead of CustomProvider
+    provider = GoogleProvider(; api_key, base_url = url)
+    OpenAI.openai_request("chat/completions",
+        provider;
+        method = "POST",
+        messages = conversation,
+        model = model,
+        kwargs...)
 end
 function OpenAI.create_chat(schema::DatabricksOpenAISchema,
         api_key::AbstractString,
@@ -399,10 +418,14 @@ function OpenAI.create_embeddings(schema::GoogleOpenAISchema,
         model::AbstractString;
         url::String = "https://generativelanguage.googleapis.com/v1beta",
         kwargs...)
-    provider = CustomProvider(;
-        api_key = isempty(GOOGLE_API_KEY) ? api_key : GOOGLE_API_KEY,
-        base_url = url)
-    OpenAI.create_embeddings(provider, docs, model; kwargs...)
+    api_key = isempty(GOOGLE_API_KEY) ? api_key : GOOGLE_API_KEY
+    provider = GoogleProvider(; api_key, base_url = url)
+    OpenAI.openai_request("embeddings",
+        provider;
+        method = "POST",
+        input = docs,
+        model = model,
+        kwargs...)
 end
 function OpenAI.create_embeddings(schema::AzureOpenAISchema,
         api_key::AbstractString,
