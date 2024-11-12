@@ -223,7 +223,7 @@ Base.@kwdef struct GoogleProvider <: AbstractCustomProvider
 end
 
 function OpenAI.auth_header(provider::GoogleProvider, api_key::AbstractString)
-    Dict("Authorization" => "Bearer $(api_key)")
+    OpenAI.auth_header(OpenAI.OpenAIProvider(provider.api_key, provider.base_url, provider.api_version), api_key)
 end
 
 function OpenAI.create_chat(schema::GoogleOpenAISchema,
