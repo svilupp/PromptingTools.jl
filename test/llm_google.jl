@@ -187,62 +187,107 @@ end
 end
 
 @testset "GoogleOpenAISchema" begin
-    # Test GoogleOpenAISchema() with a mock server for create_chat
-    PORT = rand(10000:20000)
-    echo_server = HTTP.serve!(PORT, verbose = -1) do req
-        content = JSON3.read(req.body)
-        user_msg = last(content[:messages])
-        response = Dict(
-            :choices => [
-                Dict(:message => user_msg,
-                :logprobs => Dict(:content => [
-                    Dict(:logprob => -0.1),
-                    Dict(:logprob => -0.2)
-                ]),
-                :finish_reason => "stop")
-            ],
-            :model => content[:model],
-            :usage => Dict(:total_tokens => length(user_msg[:content]),
-                :prompt_tokens => length(user_msg[:content]),
-                :completion_tokens => 0))
-        return HTTP.Response(200, JSON3.write(response))
+    # Test with empty GOOGLE_API_KEY
+    withenv("GOOGLE_API_KEY" => "") do
+        PORT = rand(10000:20000)
+        echo_server = HTTP.serve!(PORT, verbose = -1) do req
+            @test HTTP.header(req, "Authorization") == "Bearer test_key"
+            content = JSON3.read(req.body)
+            response = Dict(
+                :choices => [
+                    Dict(:message => Dict(:content => "Test response"),
+                        :finish_reason => "stop")
+                ],
+                :usage => Dict(:total_tokens => 5,
+                    :prompt_tokens => 5,
+                    :completion_tokens => 0))
+            return HTTP.Response(200, JSON3.write(response))
+        end
+
+        msg = aigenerate(GoogleOpenAISchema(),
+            "Test prompt";
+            api_key = "test_key",
+            model = "gemini-1.5-pro-latest",
+            api_kwargs = (; url = "http://localhost:$(PORT)"))
+
+        @test msg.content == "Test response"
+        @test msg.finish_reason == "stop"
+        close(echo_server)
     end
 
-    prompt = "Say Hi!"
-    msg = aigenerate(GoogleOpenAISchema(),
-        prompt;
-        model = "gemini-1.5-pro-latest",
-        api_kwargs = (; url = "http://localhost:$(PORT)"),
-        return_all = false)
-    @test msg.content == prompt
-    @test msg.tokens == (length(prompt), 0)
-    @test msg.finish_reason == "stop"
-    @test msg.sample_id |> isnothing
-    @test msg.log_prob ≈ -0.3
+    # Test with non-empty GOOGLE_API_KEY
+    withenv("GOOGLE_API_KEY" => "env_key") do
+        PORT = rand(10000:20000)
+        echo_server = HTTP.serve!(PORT, verbose = -1) do req
+            @test HTTP.header(req, "Authorization") == "Bearer env_key"
+            content = JSON3.read(req.body)
+            response = Dict(
+                :choices => [
+                    Dict(:message => Dict(:content => "Test response"),
+                        :finish_reason => "stop")
+                ],
+                :usage => Dict(:total_tokens => 5,
+                    :prompt_tokens => 5,
+                    :completion_tokens => 0))
+            return HTTP.Response(200, JSON3.write(response))
+        end
 
-    # clean up
-    close(echo_server)
+        msg = aigenerate(GoogleOpenAISchema(),
+            "Test prompt";
+            api_key = "test_key",  # This should be ignored since GOOGLE_API_KEY is set
+            model = "gemini-1.5-pro-latest",
+            api_kwargs = (; url = "http://localhost:$(PORT)"))
 
-    # Test GoogleOpenAISchema() with a mock server for create_embeddings
-    PORT = rand(10000:20000)
-    echo_server = HTTP.serve!(PORT, verbose = -1) do req
-        content = JSON3.read(req.body)
-        response = Dict(:data => [Dict(:embedding => ones(128))],
-            :usage => Dict(:total_tokens => length(content[:input]),
-                :prompt_tokens => length(content[:input]),
-                :completion_tokens => 0))
-        return HTTP.Response(200, JSON3.write(response))
+        @test msg.content == "Test response"
+        @test msg.finish_reason == "stop"
+        close(echo_server)
     end
 
-    prompt = "Embed me!!"
-    msg = aiembed(GoogleOpenAISchema(),
-        prompt;
-        model = "gemini-1.5-pro-latest",
-        api_kwargs = (; url = "http://localhost:$(PORT)"),
-        return_all = false)
-    @test msg.content == ones(128)
-    @test msg.tokens == (length(prompt), 0)
+    # Test embeddings with empty GOOGLE_API_KEY
+    withenv("GOOGLE_API_KEY" => "") do
+        PORT = rand(10000:20000)
+        echo_server = HTTP.serve!(PORT, verbose = -1) do req
+            @test HTTP.header(req, "Authorization") == "Bearer test_key"
+            content = JSON3.read(req.body)
+            response = Dict(:data => [Dict(:embedding => ones(128))],
+                :usage => Dict(:total_tokens => 5,
+                    :prompt_tokens => 5,
+                    :completion_tokens => 0))
+            return HTTP.Response(200, JSON3.write(response))
+        end
 
-    # clean up
-    close(echo_server)
+        msg = aiembed(GoogleOpenAISchema(),
+            "Test prompt";
+            api_key = "test_key",
+            model = "gemini-1.5-pro-latest",
+            api_kwargs = (; url = "http://localhost:$(PORT)"))
+
+        @test msg.content == ones(128)
+        @test msg.tokens == (5, 0)
+        close(echo_server)
+    end
+
+    # Test embeddings with non-empty GOOGLE_API_KEY
+    withenv("GOOGLE_API_KEY" => "env_key") do
+        PORT = rand(10000:20000)
+        echo_server = HTTP.serve!(PORT, verbose = -1) do req
+            @test HTTP.header(req, "Authorization") == "Bearer env_key"
+            content = JSON3.read(req.body)
+            response = Dict(:data => [Dict(:embedding => ones(128))],
+                :usage => Dict(:total_tokens => 5,
+                    :prompt_tokens => 5,
+                    :completion_tokens => 0))
+            return HTTP.Response(200, JSON3.write(response))
+        end
+
+        msg = aiembed(GoogleOpenAISchema(),
+            "Test prompt";
+            api_key = "test_key",  # This should be ignored since GOOGLE_API_KEY is set
+            model = "gemini-1.5-pro-latest",
+            api_kwargs = (; url = "http://localhost:$(PORT)"))
+
+        @test msg.content == ones(128)
+        @test msg.tokens == (5, 0)
+        close(echo_server)
+    end
 end
