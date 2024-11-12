@@ -288,6 +288,8 @@ Requires one environment variable to be set:
 - `GOOGLE_API_KEY`: Your API key
 
 The base URL for the API is "https://generativelanguage.googleapis.com/v1beta"
+
+Warning: Token counting and cost counting have not yet been implemented by Google, so you'll not have any such metrics. If you need it, use the native GoogleSchema with the GoogleGenAI.jl library.
 """
 struct GoogleOpenAISchema <: AbstractOpenAISchema end
 
