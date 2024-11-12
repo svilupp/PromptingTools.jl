@@ -1,0 +1,54 @@
+Test Coverage Analysis for GoogleOpenAISchema
+
+Current Issues:
+- 6 uncovered lines in src/llm_openai_schema_defs.jl
+- Patch coverage at 14.29%
+
+Implementation Analysis:
+1. GoogleProvider struct (lines 219-223)
+   - Basic struct definition, likely covered
+   - auth_header method (lines 225-227) might be uncovered
+
+2. create_chat method (lines 229-244)
+   - Key lines that might be uncovered:
+     * Line 235: api_key override logic
+     * Line 237: GoogleProvider instantiation
+     * Lines 238-243: OpenAI.openai_request call
+
+3. create_embeddings method (lines 415-429)
+   - Similar pattern to create_chat
+   - Potential uncovered lines:
+     * Line 421: api_key override logic
+     * Line 422: GoogleProvider instantiation
+     * Lines 423-428: OpenAI.openai_request call
+
+Hypotheses for Coverage Issues:
+1. Streaming callback paths not tested
+   - We're using openai_request directly, which might have different behavior
+   - Solution: Add tests for streaming scenarios
+
+2. Error handling paths not tested
+   - No tests for API errors or invalid responses
+   - Solution: Add tests with mock error responses
+
+3. Provider instantiation edge cases
+   - GoogleProvider creation with different URL combinations not tested
+   - Solution: Add tests with various URL configurations
+
+4. API key override logic not fully tested
+   - Need to test all combinations of empty/non-empty GOOGLE_API_KEY
+   - Solution: Expand current tests to cover more scenarios
+
+5. Request parameter handling not fully tested
+   - Different combinations of optional parameters not tested
+   - Solution: Add tests with various kwargs combinations
+
+Most Likely Issue:
+Hypothesis #4 seems most likely - our tests don't fully exercise the API key override logic in both create_chat and create_embeddings methods. The current tests only check basic scenarios, but we need to test edge cases and different combinations of API keys.
+
+Action Plan:
+1. Add tests for API key override edge cases
+2. Add tests for different URL configurations
+3. Add tests for error scenarios
+4. Add tests for streaming callbacks
+5. Add tests for various kwargs combinations
