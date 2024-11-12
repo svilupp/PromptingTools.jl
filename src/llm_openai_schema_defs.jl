@@ -214,6 +214,15 @@ function OpenAI.create_chat(schema::XAIOpenAISchema,
     api_key = isempty(XAI_API_KEY) ? api_key : XAI_API_KEY
     OpenAI.create_chat(CustomOpenAISchema(), api_key, model, conversation; url, kwargs...)
 end
+function OpenAI.create_chat(schema::GoogleOpenAISchema,
+        api_key::AbstractString,
+        model::AbstractString,
+        conversation;
+        url::String = "https://generativelanguage.googleapis.com/v1beta",
+        kwargs...)
+    api_key = isempty(GOOGLE_API_KEY) ? api_key : GOOGLE_API_KEY
+    OpenAI.create_chat(CustomOpenAISchema(), api_key, model, conversation; url, kwargs...)
+end
 function OpenAI.create_chat(schema::DatabricksOpenAISchema,
         api_key::AbstractString,
         model::AbstractString,
@@ -381,6 +390,17 @@ function OpenAI.create_embeddings(schema::XAIOpenAISchema,
         kwargs...)
     provider = CustomProvider(;
         api_key = isempty(XAI_API_KEY) ? api_key : XAI_API_KEY,
+        base_url = url)
+    OpenAI.create_embeddings(provider, docs, model; kwargs...)
+end
+function OpenAI.create_embeddings(schema::GoogleOpenAISchema,
+        api_key::AbstractString,
+        docs,
+        model::AbstractString;
+        url::String = "https://generativelanguage.googleapis.com/v1beta",
+        kwargs...)
+    provider = CustomProvider(;
+        api_key = isempty(GOOGLE_API_KEY) ? api_key : GOOGLE_API_KEY,
         base_url = url)
     OpenAI.create_embeddings(provider, docs, model; kwargs...)
 end
