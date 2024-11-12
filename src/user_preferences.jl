@@ -1111,18 +1111,18 @@ registry = Dict{String, ModelSpec}(
     ## Gemini 1.5 Models
     "gemini-1.5-pro-latest" => ModelSpec("gemini-1.5-pro-latest",
         GoogleOpenAISchema(),
-        7.5e-8,  # $0.075/1M tokens for input
-        3.0e-7,  # $0.30/1M tokens for output
+        1e-6,
+        5e-6,
         "Gemini 1.5 Pro is Google's latest large language model with enhanced capabilities across reasoning, math, coding, and multilingual tasks. 128K context window."),
     "gemini-1.5-flash-8b-latest" => ModelSpec("gemini-1.5-flash-8b-latest",
         GoogleOpenAISchema(),
-        7.5e-8,  # $0.075/1M tokens for input
-        3.0e-7,  # $0.30/1M tokens for output
+        3.75e-8,
+        1.5e-7,
         "Gemini 1.5 Flash 8B is a smaller, faster version of Gemini 1.5 optimized for quick responses while maintaining good performance. 128K context window."),
     "gemini-1.5-flash-latest" => ModelSpec("gemini-1.5-flash-latest",
         GoogleOpenAISchema(),
-        7.5e-8,  # $0.075/1M tokens for input
-        3.0e-7,  # $0.30/1M tokens for output
+        7.5e-8,
+        3.0e-7,
         "Gemini 1.5 Flash is a high-performance model optimized for speed while maintaining strong capabilities across various tasks. 128K context window.")
 )
 
