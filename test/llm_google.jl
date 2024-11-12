@@ -1,4 +1,4 @@
-## using GoogleGenAI # not needed
+## using GoogleGenAI # not needed 
 using PromptingTools: TestEchoGoogleSchema, render, GoogleSchema, ggi_generate_content
 using PromptingTools: AIMessage, SystemMessage, AbstractMessage
 using PromptingTools: UserMessage, DataMessage
