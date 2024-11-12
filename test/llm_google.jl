@@ -1,7 +1,8 @@
-## using GoogleGenAI # not needed 
-using PromptingTools: TestEchoGoogleSchema, render, GoogleSchema, ggi_generate_content
+## using GoogleGenAI # not needed
+using PromptingTools: TestEchoGoogleSchema, render, GoogleSchema, ggi_generate_content, GoogleOpenAISchema
 using PromptingTools: AIMessage, SystemMessage, AbstractMessage
 using PromptingTools: UserMessage, DataMessage
+using HTTP, JSON3
 
 @testset "render-Google" begin
     schema = GoogleSchema()
@@ -183,4 +184,65 @@ end
     @test_throws ErrorException aiclassify(GoogleSchema(), "prompt")
     @test_throws ErrorException aiscan(GoogleSchema(), "prompt")
     @test_throws ErrorException aiimage(GoogleSchema(), "prompt")
+end
+
+@testset "GoogleOpenAISchema" begin
+    # Test GoogleOpenAISchema() with a mock server for create_chat
+    PORT = rand(10000:20000)
+    echo_server = HTTP.serve!(PORT, verbose = -1) do req
+        content = JSON3.read(req.body)
+        user_msg = last(content[:messages])
+        response = Dict(
+            :choices => [
+                Dict(:message => user_msg,
+                :logprobs => Dict(:content => [
+                    Dict(:logprob => -0.1),
+                    Dict(:logprob => -0.2)
+                ]),
+                :finish_reason => "stop")
+            ],
+            :model => content[:model],
+            :usage => Dict(:total_tokens => length(user_msg[:content]),
+                :prompt_tokens => length(user_msg[:content]),
+                :completion_tokens => 0))
+        return HTTP.Response(200, JSON3.write(response))
+    end
+
+    prompt = "Say Hi!"
+    msg = aigenerate(GoogleOpenAISchema(),
+        prompt;
+        model = "gemini-1.5-pro-latest",
+        api_kwargs = (; url = "http://localhost:$(PORT)"),
+        return_all = false)
+    @test msg.content == prompt
+    @test msg.tokens == (length(prompt), 0)
+    @test msg.finish_reason == "stop"
+    @test msg.sample_id |> isnothing
+    @test msg.log_prob ≈ -0.3
+
+    # clean up
+    close(echo_server)
+
+    # Test GoogleOpenAISchema() with a mock server for create_embeddings
+    PORT = rand(10000:20000)
+    echo_server = HTTP.serve!(PORT, verbose = -1) do req
+        content = JSON3.read(req.body)
+        response = Dict(:data => [Dict(:embedding => ones(128))],
+            :usage => Dict(:total_tokens => length(content[:input]),
+                :prompt_tokens => length(content[:input]),
+                :completion_tokens => 0))
+        return HTTP.Response(200, JSON3.write(response))
+    end
+
+    prompt = "Embed me!!"
+    msg = aiembed(GoogleOpenAISchema(),
+        prompt;
+        model = "gemini-1.5-pro-latest",
+        api_kwargs = (; url = "http://localhost:$(PORT)"),
+        return_all = false)
+    @test msg.content == ones(128)
+    @test msg.tokens == (length(prompt), 0)
+
+    # clean up
+    close(echo_server)
 end
