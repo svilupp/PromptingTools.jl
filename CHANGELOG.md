@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.63.0]
+
+### Added
+- Added support for Google's Gemini API via OpenAI compatibility mode (`GoogleOpenAISchema`). Use model aliases `gem15p` (Gemini 1.5 Pro), `gem15f` (Gemini 1.5 Flash), and `gem15f8` (Gemini 1.5 Flash 8b). Set your ENV api key `GOOGLE_API_KEY` to use it.
+- Thanks to @sixzero, added support for Google Flash via OpenRouter and Qwen 72b models.
+
 ## [0.62.1]
 
 ### Fixed
