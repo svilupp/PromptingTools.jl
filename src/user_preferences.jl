@@ -474,7 +474,11 @@ aliases = merge(
         "oro1" => "openai/o1-preview",
         "oro1m" => "openai/o1-mini",
         "orcop" => "cohere/command-r-plus-08-2024",
-        "orco" => "cohere/command-r-08-2024"
+        "orco" => "cohere/command-r-08-2024",
+        ## Gemini 1.5 Models
+        "gem15p" => "gemini-1.5-pro-latest",
+        "gem15f8" => "gemini-1.5-flash-8b-latest",
+        "gem15f" => "gemini-1.5-flash-latest"
     ),
     ## Load aliases from preferences as well
     @load_preference("MODEL_ALIASES", default=Dict{String, String}()))
@@ -509,12 +513,12 @@ registry = Dict{String, ModelSpec}(
         OpenAISchema(),
         1e-5,
         3e-5,
-        "GPT-4 Turbo is an updated version of GPT4 that is much faster and the cheaper to use. 0125 refers to the release date of January 25, 2024."),
+        "GPT-4 Turbo is an updated version of GPT4 that is much faster and the cheaper to use. This is the general name for whatever is the latest GPT4 Turbo preview release. In April-24, it points to version 2024-04-09."),
     "gpt-4-turbo" => ModelSpec("gpt-4-turbo",
         OpenAISchema(),
         1e-5,
         3e-5,
-        "GPT-4 Turbo is an updated version of GPT4 that is much faster and the cheaper to use. This is the general name for whatever is the latest GPT4 Turbo preview release. In April-24, it points to version 2024-04-09."),
+        "GPT-4 Turbo is an updated version of GPT4 that is much faster and cheaper to use. This is the general name for whatever is the latest GPT4 Turbo preview release."),
     "gpt-4-turbo-2024-04-09" => ModelSpec("gpt-4-turbo-2024-04-09",
         OpenAISchema(),
         1e-5,
@@ -1103,7 +1107,23 @@ registry = Dict{String, ModelSpec}(
         XAIOpenAISchema(),
         5e-6,
         15e-6,
-        "XAI's Grok 2 beta model. Max 128K context.")
+        "XAI's Grok 2 beta model. Max 128K context."),
+    ## Gemini 1.5 Models
+    "gemini-1.5-pro-latest" => ModelSpec("gemini-1.5-pro-latest",
+        GoogleOpenAISchema(),
+        1e-6,
+        5e-6,
+        "Gemini 1.5 Pro is Google's latest large language model with enhanced capabilities across reasoning, math, coding, and multilingual tasks. 128K context window."),
+    "gemini-1.5-flash-8b-latest" => ModelSpec("gemini-1.5-flash-8b-latest",
+        GoogleOpenAISchema(),
+        3.75e-8,
+        1.5e-7,
+        "Gemini 1.5 Flash 8B is a smaller, faster version of Gemini 1.5 optimized for quick responses while maintaining good performance. 128K context window."),
+    "gemini-1.5-flash-latest" => ModelSpec("gemini-1.5-flash-latest",
+        GoogleOpenAISchema(),
+        7.5e-8,
+        3.0e-7,
+        "Gemini 1.5 Flash is a high-performance model optimized for speed while maintaining strong capabilities across various tasks. 128K context window.")
 )
 
 """

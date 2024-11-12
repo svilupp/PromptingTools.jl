@@ -274,6 +274,25 @@ Requires one environment variable to be set:
 """
 struct XAIOpenAISchema <: AbstractOpenAISchema end
 
+"""
+    GoogleOpenAISchema
+
+Schema to call the Google's Gemini API using OpenAI compatibility mode. [API Reference](https://ai.google.dev/gemini-api/docs/openai#rest)
+
+Links:
+- [Get your API key](https://aistudio.google.com/apikey)
+- [API Reference](https://ai.google.dev/gemini-api/docs/openai#rest)
+- [Available models](https://ai.google.dev/models/gemini)
+
+Requires one environment variable to be set:
+- `GOOGLE_API_KEY`: Your API key
+
+The base URL for the API is "https://generativelanguage.googleapis.com/v1beta"
+
+Warning: Token counting and cost counting have not yet been implemented by Google, so you'll not have any such metrics. If you need it, use the native GoogleSchema with the GoogleGenAI.jl library.
+"""
+struct GoogleOpenAISchema <: AbstractOpenAISchema end
+
 abstract type AbstractOllamaSchema <: AbstractPromptSchema end
 
 """

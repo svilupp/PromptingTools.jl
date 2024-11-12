@@ -28,6 +28,7 @@ end
     include("llm_ollama_managed.jl")
     include("llm_ollama.jl")
     include("llm_google.jl")
+    include("llm_openai_schema_def.jl")
     include("llm_anthropic.jl")
     include("llm_sharegpt.jl")
     include("llm_tracer.jl")
