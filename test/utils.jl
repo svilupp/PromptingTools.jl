@@ -2,7 +2,7 @@ using PromptingTools: recursive_splitter, wrap_string, replace_words,
                       length_longest_common_subsequence, distance_longest_common_subsequence
 using PromptingTools: _extract_handlebar_variables, call_cost, call_cost_alternative,
                       _report_stats
-using PromptingTools: _string_to_vector, _encode_local_image
+using PromptingTools: _string_to_vector, _encode_local_image, extract_image_attributes
 using PromptingTools: DataMessage, AIMessage, UserMessage
 using PromptingTools: push_conversation!,
                       resize_conversation!, @timeout, preview, pprint, auth_header,
@@ -274,6 +274,25 @@ end
     @test "data:image/png;base64," * output3 == output
     # Nothing
     @test _encode_local_image(nothing) == String[]
+end
+
+@testset "extract_image_attributes" begin
+    # Test basic valid data URL
+    data_url = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABQAA"
+    data_type, data = extract_image_attributes(data_url)
+    @test data_type == "image/png"
+    @test data == "iVBORw0KGgoAAAANSUhEUgAABQAA"
+
+    # Test different image type
+    data_url = "data:image/jpeg;base64,/9j/4AAQSkZJRg"
+    data_type, data = extract_image_attributes(data_url)
+    @test data_type == "image/jpeg"
+    @test data == "/9j/4AAQSkZJRg"
+
+    # Test invalid data URL format
+    @test_throws ArgumentError extract_image_attributes("not a data url")
+    @test_throws ArgumentError extract_image_attributes("data:image/png;")
+    @test_throws ArgumentError extract_image_attributes("data:image/png;base64")
 end
 
 ### Conversation Management
