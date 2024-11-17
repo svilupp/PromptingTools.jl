@@ -103,14 +103,38 @@ using PromptingTools: call_cost, anthropic_api, function_call_signature,
     conversation = render(schema, messages)
     @test conversation == expected_output
 
+    ### IMAGES
     # Test UserMessageWithImages -- errors for now
     messages = [
         SystemMessage("System message 1"),
         UserMessageWithImages("User message"; image_url = "https://example.com/image.png")
     ]
+    ## We don't support URL format!
     @test_throws Exception render(schema, messages)
 
-    ## Tool calling
+    ## Unsupported format
+    messages = [
+        SystemMessage("System message 1"),
+        UserMessageWithImages(
+            "User message"; image_url = "data:image/svg;base64,iVBORw0KGgoAAAANSUhEUgAABQAA")
+    ]
+    @test_throws AssertionError render(schema, messages)
+
+    ## Base64 format
+    messages = [
+        SystemMessage("System message 1"),
+        UserMessageWithImages(
+            "User message"; image_url = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABQAA")
+    ]
+    rendered = render(schema, messages)
+    @test rendered.conversation[1] == Dict{String, Any}("role" => "user",
+        "content" => Dict{String, Any}[Dict("text" => "User message", "type" => "text"),
+            Dict(
+                "source" => Dict("media_type" => "image/png",
+                    "data" => "iVBORw0KGgoAAAANSUhEUgAABQAA", "type" => "base64"),
+                "type" => "image")])
+
+    ### Tool calling
     "abc"
     struct FruitCountX
         fruit::String
