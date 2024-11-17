@@ -669,3 +669,34 @@ Returns indices of unique items in a vector `inputs`. Access the unique values a
 function unique_permutation(inputs::AbstractVector)
     return unique(i -> inputs[i], eachindex(inputs))
 end
+
+"""
+    extract_image_attributes(image_url::AbstractString) -> Tuple{String, String}
+
+Extracts the data type and base64-encoded data from a data URL.
+
+# Arguments
+- `image_url::AbstractString`: The data URL to be parsed.
+
+# Returns
+`Tuple{String, String}`: A tuple containing the data type (e.g., `"image/png"`) and the base64-encoded data.
+
+# Example
+```julia
+image_url = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABQAA"
+data_type, data = extract_data_type_and_data(image_url)
+# data_type == "image/png"
+# data == "iVBORw0KGgoAAAANSUhEUgAABQAA"
+```
+"""
+function extract_image_attributes(image_url::AbstractString)::Tuple{String, String}
+    pattern = r"^data:(.*?);base64,(.*)$"
+    m = match(pattern, image_url)
+    if m !== nothing
+        data_type = m.captures[1]
+        data = m.captures[2]
+        return data_type, data
+    else
+        throw(ArgumentError("Invalid data URL format"))
+    end
+end

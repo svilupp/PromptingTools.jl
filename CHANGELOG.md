@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.64.0]
+
+### Added
+- Added support for images in `aitools` to enable passing screenshots via `image_path` argument (extended to both OpenAI and Anthropic APIs, uses `?UserMessageWithImages` internally).
+
 ## [0.63.0]
 
 ### Added

@@ -42,15 +42,31 @@ function render(schema::AbstractAnthropicSchema,
     conversation = Dict{String, Any}[]
 
     for msg in messages_replaced
-        if msg isa SystemMessage
+        if issystemmessage(msg)
             system = msg.content
-        elseif msg isa UserMessage || msg isa AIMessage
+        elseif isusermessage(msg) || isaimessage(msg)
             content = msg.content
             push!(conversation,
                 Dict("role" => role4render(schema, msg),
                     "content" => [Dict{String, Any}("type" => "text", "text" => content)]))
-        elseif msg isa UserMessageWithImages
-            error("AbstractAnthropicSchema does not yet support UserMessageWithImages. Please use OpenAISchema instead.")
+        elseif isusermessagewithimages(msg)
+            # Build message content
+            content = Dict{String, Any}[Dict("type" => "text",
+                "text" => msg.content)]
+            # Add images
+            for img in msg.image_url
+                # image_url = "data:image/$image_suffix;base64,$(base64_image)"
+                data_type, data = extract_image_attributes(img)
+                @assert data_type in ["image/jpeg", "image/png", "image/gif", "image/webp"] "Unsupported image type: $data_type"
+                push!(content,
+                    Dict("type" => "image",
+                        "source" => Dict("type" => "base64",
+                            "data" => data,
+                            ## image/jpeg, image/png, image/gif, image/webp
+                            "media_type" => data_type)))
+            end
+            push!(conversation,
+                Dict("role" => role4render(schema, msg), "content" => content))
         end
         # Note: Ignores any DataMessage or other types
     end
@@ -766,6 +782,8 @@ end
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         no_system_message::Bool = false,
+        image_path::Union{Nothing, AbstractString, Vector{<:AbstractString}} = nothing,
+        attach_to_latest::Bool = true,
         cache::Union{Nothing, Symbol} = nothing,
         betas::Union{Nothing, Vector{Symbol}} = nothing,
         http_kwargs::NamedTuple = (retry_non_idempotent = true,
@@ -792,6 +810,8 @@ Differences to `aiextract`: Can provide infinitely many tools (including Functio
 - `dry_run`: If `true`, skips sending the messages to the model (for debugging, often used with `return_all=true`).
 - `conversation`: An optional vector of `AbstractMessage` objects representing the conversation history.
 - `no_system_message::Bool = false`: Whether to exclude the system message from the conversation history.
+- `image_path::Union{Nothing, AbstractString, Vector{<:AbstractString}} = nothing`: A path to a local image file, or a vector of paths to local image files.
+- `attach_to_latest::Bool = true`: Whether to attach the images to the latest user message in the conversation.
 - `cache::Union{Nothing, Symbol} = nothing`: Whether to cache the prompt. Defaults to `nothing`.
 - `betas::Union{Nothing, Vector{Symbol}} = nothing`: A vector of symbols representing the beta features to be used. See `?anthropic_extra_headers` for details.
 - `http_kwargs`: A named tuple of HTTP keyword arguments.
@@ -865,6 +885,8 @@ function aitools(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMPT_
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         no_system_message::Bool = false,
+        image_path::Union{Nothing, AbstractString, Vector{<:AbstractString}} = nothing,
+        attach_to_latest::Bool = true,
         cache::Union{Nothing, Symbol} = nothing,
         betas::Union{Nothing, Vector{Symbol}} = nothing,
         http_kwargs::NamedTuple = (retry_non_idempotent = true,
@@ -900,8 +922,9 @@ function aitools(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMPT_
     api_kwargs = merge(api_kwargs, (; tools, tool_choice))
 
     ## We provide the tool description to the rendering engine
+    msgs = attach_images_to_user_message(prompt; image_path, attach_to_latest)
     conv_rendered = render(
-        prompt_schema, prompt; tools, conversation, no_system_message, cache, kwargs...)
+        prompt_schema, msgs; tools, conversation, no_system_message, cache, kwargs...)
 
     if !dry_run
         time = @elapsed resp = anthropic_api(
