@@ -478,7 +478,8 @@ aliases = merge(
         ## Gemini 1.5 Models
         "gem15p" => "gemini-1.5-pro-latest",
         "gem15f8" => "gemini-1.5-flash-8b-latest",
-        "gem15f" => "gemini-1.5-flash-latest"
+        "gem15f" => "gemini-1.5-flash-latest",
+        "gemexp" => "gemini-exp-1114" # latest experimental model from November 2024
     ),
     ## Load aliases from preferences as well
     @load_preference("MODEL_ALIASES", default=Dict{String, String}()))
@@ -1111,7 +1112,7 @@ registry = Dict{String, ModelSpec}(
     ## Gemini 1.5 Models
     "gemini-1.5-pro-latest" => ModelSpec("gemini-1.5-pro-latest",
         GoogleOpenAISchema(),
-        1e-6,
+        1.25e-6,
         5e-6,
         "Gemini 1.5 Pro is Google's latest large language model with enhanced capabilities across reasoning, math, coding, and multilingual tasks. 128K context window."),
     "gemini-1.5-flash-8b-latest" => ModelSpec("gemini-1.5-flash-8b-latest",
@@ -1123,7 +1124,12 @@ registry = Dict{String, ModelSpec}(
         GoogleOpenAISchema(),
         7.5e-8,
         3.0e-7,
-        "Gemini 1.5 Flash is a high-performance model optimized for speed while maintaining strong capabilities across various tasks. 128K context window.")
+        "Gemini 1.5 Flash is a high-performance model optimized for speed while maintaining strong capabilities across various tasks. 128K context window."),
+    "gemini-exp-1114" => ModelSpec("gemini-exp-1114",
+        GoogleOpenAISchema(),
+        1.25e-6,
+        5e-6,
+        "Gemini Experimental Model from November 2024. Pricing assumed as per Gemini 1.5 Pro. See details [here](https://ai.google.dev/gemini-api/docs/models/experimental-models#use-an-experimental-model).")
 )
 
 """
