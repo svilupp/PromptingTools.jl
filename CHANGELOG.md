@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Added support for images in `aitools` to enable passing screenshots via `image_path` argument (extended to both OpenAI and Anthropic APIs, uses `?UserMessageWithImages` internally).
+- Added the latest Gemini Experimental model via OpenAI compatibility mode (`gemini-exp-1114` with alias `gemexp`).
 
 ## [0.63.0]
 

@@ -1548,7 +1548,6 @@ end
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         no_system_message::Bool = false,
         image_path::Union{Nothing, AbstractString, Vector{<:AbstractString}} = nothing,
-        attach_to_latest::Bool = true,
         http_kwargs::NamedTuple = (retry_non_idempotent = true,
             retries = 5,
             readtimeout = 120), api_kwargs::NamedTuple = (;
@@ -1577,8 +1576,7 @@ Differences to `aiextract`: Can provide infinitely many tools (including Functio
 - `dry_run`: If `true`, skips sending the messages to the model (for debugging, often used with `return_all=true`).
 - `conversation`: An optional vector of `AbstractMessage` objects representing the conversation history.
 - `no_system_message::Bool = false`: Whether to exclude the system message from the conversation history.
-- `image_path`: A path to a local image file, or a vector of paths to local image files.
-- `attach_to_latest::Bool = true`: Whether to attach the images to the latest user message in the conversation.
+- `image_path`: A path to a local image file, or a vector of paths to local image files. Always attaches images to the latest user message.
 - `name_user`: The name of the user in the conversation history. Defaults to "User".
 - `name_assistant`: The name of the assistant in the conversation history. Defaults to "Assistant".
 - `http_kwargs`: A named tuple of HTTP keyword arguments.
@@ -1647,7 +1645,6 @@ function aitools(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYP
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         no_system_message::Bool = false, name_user::Union{Nothing, String} = nothing,
         image_path::Union{Nothing, AbstractString, Vector{<:AbstractString}} = nothing,
-        attach_to_latest::Bool = true,
         name_assistant::Union{Nothing, String} = nothing,
         http_kwargs::NamedTuple = (retry_non_idempotent = true,
             retries = 5,
@@ -1690,11 +1687,12 @@ function aitools(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYP
 
     ## Find the unique ID for the model alias provided
     model_id = get(MODEL_ALIASES, model, model)
-    ## Vision-specific functionality
-    msgs = attach_images_to_user_message(prompt; image_path, attach_to_latest)
+    ## Vision-specific functionality -- if `image_path` is provided, attach images to the latest user message
+    !isnothing(image_path) &&
+        (prompt = attach_images_to_user_message(prompt; image_path, attach_to_latest = true))
     ## Render the conversation history from messages
     conv_rendered = render(
-        prompt_schema, msgs; conversation, no_system_message, name_user, kwargs...)
+        prompt_schema, prompt; conversation, no_system_message, name_user, kwargs...)
 
     if !dry_run
         time = @elapsed r = create_chat(prompt_schema, api_key,
