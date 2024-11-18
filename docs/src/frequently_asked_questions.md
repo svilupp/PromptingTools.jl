@@ -148,7 +148,7 @@ msg = aigenerate("What is the meaning of life?"; model="oro1m", no_system_messag
 
 ## Configuring the Environment Variable for API Key
 
-This is a guide for OpenAI's API key, but it works for any other API key you might need (eg, `MISTRALAI_API_KEY` for MistralAI API).
+This is a guide for OpenAI's API key, but it works for any other API key you might need (eg, `MISTRAL_API_KEY` for MistralAI API).
 
 To use the OpenAI API with PromptingTools.jl, set your API key as an environment variable:
 

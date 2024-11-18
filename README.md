@@ -567,7 +567,7 @@ Under the hood, we use a dedicated schema `MistralOpenAISchema` that leverages m
 
 ```julia
 const PT = PromptingTools
-msg = aigenerate(PT.MistralOpenAISchema(), "Say Hi!"; model="mistral-tiny", api_key=ENV["MISTRALAI_API_KEY"])
+msg = aigenerate(PT.MistralOpenAISchema(), "Say Hi!"; model="mistral-tiny", api_key=ENV["MISTRAL_API_KEY"])
 ```
 As you can see, we can load your API key either from the ENV or via the Preferences.jl mechanism (see `?PREFERENCES` for more information).
 
@@ -750,7 +750,7 @@ Resources:
 
 ### Configuring the Environment Variable for API Key
 
-This is a guide for OpenAI's API key, but it works for any other API key you might need (eg, `MISTRALAI_API_KEY` for MistralAI API).
+This is a guide for OpenAI's API key, but it works for any other API key you might need (eg, `MISTRAL_API_KEY` for MistralAI API).
 
 To use the OpenAI API with PromptingTools.jl, set your API key as an environment variable:
 
