@@ -129,7 +129,7 @@ end
 
 Dispatch to the OpenAI.create_chat function, but with the MistralAI API parameters. 
 
-It tries to access the `MISTRALAI_API_KEY` ENV variable, but you can also provide it via the `api_key` keyword argument.
+It tries to access the `MISTRAL_API_KEY` ENV variable, but you can also provide it via the `api_key` keyword argument.
 """
 function OpenAI.create_chat(schema::MistralOpenAISchema,
         api_key::AbstractString,
@@ -138,7 +138,7 @@ function OpenAI.create_chat(schema::MistralOpenAISchema,
         url::String = "https://api.mistral.ai/v1",
         kwargs...)
     # try to override provided api_key because the default is OpenAI key
-    api_key = isempty(MISTRALAI_API_KEY) ? api_key : MISTRALAI_API_KEY
+    api_key = isempty(MISTRAL_API_KEY) ? api_key : MISTRAL_API_KEY
     OpenAI.create_chat(CustomOpenAISchema(), api_key, model, conversation; url, kwargs...)
 end
 function OpenAI.create_chat(schema::FireworksOpenAISchema,
@@ -357,7 +357,7 @@ function OpenAI.create_embeddings(schema::MistralOpenAISchema,
     # Build the corresponding provider object
     # try to override provided api_key because the default is OpenAI key
     provider = CustomProvider(;
-        api_key = isempty(MISTRALAI_API_KEY) ? api_key : MISTRALAI_API_KEY,
+        api_key = isempty(MISTRAL_API_KEY) ? api_key : MISTRAL_API_KEY,
         base_url = url)
     OpenAI.create_embeddings(provider, docs, model; kwargs...)
 end
