@@ -2,8 +2,8 @@ var __defProp = Object.defineProperty;
 var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 import { V as __vitePreload, p as ref, h as computed, aj as toValue, ak as unrefElement, al as notNullish, q as watch, am as tryOnScopeDispose, d as defineComponent, D as shallowRef, an as computedAsync, ao as useSessionStorage, ap as useLocalStorage, s as watchEffect, aq as watchDebounced, v as onMounted, P as nextTick, O as onKeyStroke, ar as useRouter, as as useEventListener, W as useScrollLock, R as inBrowser, $ as onBeforeUnmount, o as openBlock, b as createBlock, j as createBaseVNode, a0 as withModifiers, k as unref, at as withDirectives, au as vModelText, av as isRef, c as createElementBlock, n as normalizeClass, e as createCommentVNode, C as renderList, F as Fragment, a as createTextVNode, t as toDisplayString, aw as Teleport, ax as markRaw, ay as createApp, a9 as dataSymbol, af as pathToFile, az as escapeRegExp, _ as _export_sfc } from "./framework.icc4XaZw.js";
-import { u as useData, c as createSearchTranslate } from "./theme.DNqWhU0U.js";
-const localSearchIndex = { "root": () => __vitePreload(() => import("./@localSearchIndexroot.BNLIYKWp.js"), true ? [] : void 0) };
+import { u as useData, c as createSearchTranslate } from "./theme.D3UYl8zU.js";
+const localSearchIndex = { "root": () => __vitePreload(() => import("./@localSearchIndexroot.CB6hYkWt.js"), true ? [] : void 0) };
 /*!
 * tabbable 6.2.0
 * @license MIT, https://github.com/focus-trap/tabbable/blob/master/LICENSE
@@ -3116,7 +3116,7 @@ class SearchableMap {
    * ```
    *
    * @param key  The key to update
-   * @param defaultValue  A function that creates a new value if the key does not exist
+   * @param initial  A function that creates a new value if the key does not exist
    * @return The existing or new value at the given key
    */
   fetch(key, initial) {
@@ -3911,9 +3911,11 @@ class MiniSearch {
    * external libraries that implement a parser for custom query languages.
    *
    * @param query  Search query
-   * @param options  Search options. Each option, if not given, defaults to the corresponding value of `searchOptions` given to the constructor, or to the library default.
+   * @param searchOptions  Search options. Each option, if not given, defaults to the corresponding value of `searchOptions` given to the constructor, or to the library default.
    */
   search(query, searchOptions = {}) {
+    const { searchOptions: globalSearchOptions } = this._options;
+    const searchOptionsWithDefaults = Object.assign(Object.assign({}, globalSearchOptions), searchOptions);
     const rawResults = this.executeQuery(query, searchOptions);
     const results = [];
     for (const [docId, { score, terms, match }] of rawResults) {
@@ -3926,11 +3928,11 @@ class MiniSearch {
         match
       };
       Object.assign(result, this._storedFields.get(docId));
-      if (searchOptions.filter == null || searchOptions.filter(result)) {
+      if (searchOptionsWithDefaults.filter == null || searchOptionsWithDefaults.filter(result)) {
         results.push(result);
       }
     }
-    if (query === MiniSearch.wildcard && searchOptions.boostDocument == null && this._options.searchOptions.boostDocument == null) {
+    if (query === MiniSearch.wildcard && searchOptionsWithDefaults.boostDocument == null) {
       return results;
     }
     results.sort(byScore);
