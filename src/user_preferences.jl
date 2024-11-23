@@ -190,8 +190,8 @@ function load_api_keys!()
     AZURE_OPENAI_HOST = @load_preference("AZURE_OPENAI_HOST",
         default=get(ENV, "AZURE_OPENAI_HOST", ""))
     global MISTRAL_API_KEY
-    MISTRAL_API_KEY = @load_preference("MISTRAL_API_KEY", 
-        default=get(ENV, "MISTRAL_API_KEY", 
+    MISTRAL_API_KEY = @load_preference("MISTRAL_API_KEY",
+        default=get(ENV, "MISTRAL_API_KEY",
             get(ENV, "MISTRALAI_API_KEY", "")))
     if !isempty(get(ENV, "MISTRALAI_API_KEY", ""))
         @warn "The MISTRALAI_API_KEY environment variable is deprecated. Use MISTRAL_API_KEY instead."
@@ -483,7 +483,7 @@ aliases = merge(
         "gem15p" => "gemini-1.5-pro-latest",
         "gem15f8" => "gemini-1.5-flash-8b-latest",
         "gem15f" => "gemini-1.5-flash-latest",
-        "gemexp" => "gemini-exp-1114" # latest experimental model from November 2024
+        "gemexp" => "gemini-exp-1121" # latest experimental model from November 2024
     ),
     ## Load aliases from preferences as well
     @load_preference("MODEL_ALIASES", default=Dict{String, String}()))
@@ -1130,6 +1130,11 @@ registry = Dict{String, ModelSpec}(
         3.0e-7,
         "Gemini 1.5 Flash is a high-performance model optimized for speed while maintaining strong capabilities across various tasks. 128K context window."),
     "gemini-exp-1114" => ModelSpec("gemini-exp-1114",
+        GoogleOpenAISchema(),
+        1.25e-6,
+        5e-6,
+        "Gemini Experimental Model from November 2024. Pricing assumed as per Gemini 1.5 Pro. See details [here](https://ai.google.dev/gemini-api/docs/models/experimental-models#use-an-experimental-model)."),
+    "gemini-exp-1121" => ModelSpec("gemini-exp-1121",
         GoogleOpenAISchema(),
         1.25e-6,
         5e-6,
