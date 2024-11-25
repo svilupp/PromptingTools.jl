@@ -85,8 +85,3 @@ let old_registry = deepcopy(PromptingTools.MODEL_REGISTRY.registry)
     empty!(PromptingTools.MODEL_REGISTRY.registry)
     merge!(PromptingTools.MODEL_REGISTRY.registry, old_registry)
 end
-
-    # Restore original registry
-    empty!(PromptingTools.MODEL_REGISTRY.registry)
-    merge!(PromptingTools.MODEL_REGISTRY.registry, old_registry)
-end

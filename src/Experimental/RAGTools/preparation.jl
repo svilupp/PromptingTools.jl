@@ -413,12 +413,15 @@ end
 function get_keywords(processor::AbstractProcessor, docs::AbstractVector{<:AbstractString};
         verbose::Bool = true,
         kwargs...)
-    ext = Base.get_extension(PromptingTools, :SnowballPromptingToolsExt)
-    if processor isa KeywordsProcessor && isnothing(ext)
-        throw(ArgumentError("You need to also import Snowball.jl to use this function"))
-    else
-        throw(ArgumentError("Not implemented for processor $(typeof(processor))."))
+    if processor isa KeywordsProcessor
+        ext = Base.get_extension(PromptingTools, :SnowballPromptingToolsExt)
+        if isnothing(ext)
+            @warn "Snowball.jl is not loaded. KeywordsProcessor requires Snowball for optimal functionality."
+            # Fallback to basic processing without stemming
+            return docs
+        end
     end
+    throw(ArgumentError("Not implemented for processor $(typeof(processor))."))
 end
 
 function get_keywords(processor::NoProcessor, docs::AbstractVector{<:AbstractString};
