@@ -6,6 +6,9 @@ const PT = PromptingTools
 using PromptingTools.Experimental.RAGTools
 const RT = PromptingTools.Experimental.RAGTools
 
+# Define Snowball availability
+const SNOWBALL_AVAILABLE = true  # If this extension is loaded, Snowball is available
+
 using Snowball
 
 # forward to Stemmer.stem

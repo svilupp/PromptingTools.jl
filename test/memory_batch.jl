@@ -2,7 +2,7 @@ using Test
 using PromptingTools
 using PromptingTools: SystemMessage, UserMessage, AIMessage, AbstractMessage, ConversationMemory
 using PromptingTools: issystemmessage, isusermessage, isaimessage, TestEchoOpenAISchema, register_model!
-using Test: @capture_out
+using Suppressor: @capture_out
 
 # Setup test schema for batch tests
 const BATCH_TEST_RESPONSE = Dict(
