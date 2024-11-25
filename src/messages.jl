@@ -254,26 +254,24 @@ function annotate!(messages::Vector{T}, content; kwargs...) where {T<:AbstractMe
     # Create new annotation message
     annotation = AnnotationMessage(content; kwargs...)
 
-    # Convert messages to Vector{AbstractMessage} to allow mixed types
-    abstract_messages = Vector{AbstractMessage}(messages)
-
-    # Find the last annotation message index
-    last_annotation_idx = findlast(isabstractannotationmessage, abstract_messages)
+    # Find the last annotation message index in original messages
+    last_annotation_idx = findlast(isabstractannotationmessage, messages)
 
     if isnothing(last_annotation_idx)
-        # If no annotation exists, insert at beginning
-        insert!(abstract_messages, 1, annotation)
+        # If no annotation exists, insert annotation at the start
+        insert!(messages, 1, annotation)
     else
-        # Insert after the last annotation
-        insert!(abstract_messages, last_annotation_idx + 1, annotation)
+        # Insert new annotation after the last annotation
+        insert!(messages, last_annotation_idx + 1, annotation)
     end
 
-    return abstract_messages
+    return messages
 end
 
-# Single message version - wrap in vector and use the other method
+# Single message is converted to vector and handled by the vector method
 function annotate!(message::AbstractMessage, content; kwargs...)
-    annotate!([message], content; kwargs...)
+    messages = AbstractMessage[message]
+    annotate!(messages, content; kwargs...)
 end
 
 """

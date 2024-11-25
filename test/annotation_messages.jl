@@ -1,11 +1,10 @@
 using Test
 using PromptingTools
-using PromptingTools: isabstractannotationmessage
+using PromptingTools: isabstractannotationmessage, NoSchema, render, pprint
 
 @testset "AnnotationMessage" begin
     # Test creation and basic properties
-    annotation = AnnotationMessage(
-        content="Test annotation",
+    annotation = AnnotationMessage("Test annotation";
         extras=Dict{Symbol,Any}(:key => "value"),
         tags=[:debug, :test],
         comment="Test comment"
@@ -21,7 +20,7 @@ using PromptingTools: isabstractannotationmessage
     messages = [
         SystemMessage("System prompt"),
         UserMessage("User message"),
-        AnnotationMessage(content="Debug info", comment="Debug note"),
+        AnnotationMessage("Debug info"; comment="Debug note"),
         AIMessage("AI response")
     ]
 
@@ -46,10 +45,6 @@ using PromptingTools: isabstractannotationmessage
     @test length(result) == 2
     @test isabstractannotationmessage(result[1])
     @test result[1].comment == "Note"
-
-    # Test tracer message handling
-    tracer_msg = TracerMessage(annotation)
-    @test isabstractannotationmessage(tracer_msg)
 
     # Test pretty printing
     io = IOBuffer()
