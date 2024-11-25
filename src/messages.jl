@@ -4,7 +4,7 @@
 abstract type AbstractMessage end
 abstract type AbstractChatMessage <: AbstractMessage end # with text-based content
 abstract type AbstractDataMessage <: AbstractMessage end # with data-based content, eg, embeddings
-abstract type AbstractAnnotationMessage <: AbstractMessage end # messages that provide extra information without being sent to LLMs
+abstract type AbstractAnnotationMessage <: AbstractChatMessage end # messages that provide extra information without being sent to LLMs
 abstract type AbstractTracerMessage{T <: AbstractMessage} <: AbstractMessage end # message with annotation that exposes the underlying message
 # Complementary type for tracing, follows the same API as TracerMessage
 abstract type AbstractTracer{T <: Any} end
@@ -12,59 +12,12 @@ abstract type AbstractTracer{T <: Any} end
 # Helper functions for message type checking
 isabstractannotationmessage(msg::AbstractMessage) = msg isa AbstractAnnotationMessage
 
-"""
-    annotate!(messages::Vector{<:AbstractMessage}, content::AbstractString; kwargs...)
-    annotate!(message::AbstractMessage, content::AbstractString; kwargs...)
-
-Add an annotation message to a vector of messages or wrap a single message in a vector.
-The annotation message is created as the first section, or if there are other annotation
-messages, it's slotted behind them.
-
-# Arguments
-- `messages`: Vector of messages or single message to annotate
-- `content`: Content for the annotation message
-- `kwargs...`: Additional fields for AnnotationMessage (extras, tags, comment)
-
-# Returns
-Vector{AbstractMessage} with the annotation message added
-"""
-function annotate!(messages::Vector{<:AbstractMessage}, content::AbstractString; kwargs...)
-    # Find last annotation message index
-    last_anno_idx = findlast(isabstractannotationmessage, messages)
-    insert_idx = isnothing(last_anno_idx) ? 1 : last_anno_idx + 1
-
-    # Create and insert annotation message
-    anno = AnnotationMessage(; content=content, kwargs...)
-    insert!(messages, insert_idx, anno)
-    return messages
-end
-
-function annotate!(message::AbstractMessage, content::AbstractString; kwargs...)
-    return annotate!([message], content; kwargs...)
-end
-
-"""
-    AnnotationMessage
-
-A message type for providing extra information and documentation without being sent to LLMs.
-Used to bundle key information with the conversation data for future reference.
-
-# Fields
-- `content::T`: The content of the message (can be used for inputs to airag etc.)
-- `extras::Dict{Symbol,Any}`: Additional metadata as key-value pairs
-- `tags::Vector{Symbol}`: Tags for categorizing the annotation
-- `comment::String`: Human-readable comment (never used for automatic operations)
-- `run_id::Union{Nothing,Int}`: The unique ID of the run
-- `_type::Symbol`: Message type identifier
-"""
-Base.@kwdef struct AnnotationMessage{T <: AbstractString} <: AbstractAnnotationMessage
-    content::T
-    extras::Dict{Symbol,Any} = Dict{Symbol,Any}()
-    tags::Vector{Symbol} = Symbol[]
-    comment::String = ""
-    run_id::Union{Nothing,Int} = Int(rand(Int16))
-    _type::Symbol = :annotationmessage
-end
+## Allowed inputs for ai* functions, AITemplate is resolved one level higher
+const ALLOWED_PROMPT_TYPE = Union{
+    AbstractString,
+    AbstractMessage,
+    Vector{<:AbstractMessage}
+}
 
 ## Allowed inputs for ai* functions, AITemplate is resolved one level higher
 const ALLOWED_PROMPT_TYPE = Union{
@@ -80,6 +33,7 @@ Base.@kwdef struct MetadataMessage{T <: AbstractString} <: AbstractChatMessage
     description::String = ""
     version::String = "1"
     source::String = ""
+    run_id::Union{Nothing, Int} = Int(rand(Int16))
     _type::Symbol = :metadatamessage
 end
 Base.@kwdef struct SystemMessage{T <: AbstractString} <: AbstractChatMessage
@@ -87,15 +41,15 @@ Base.@kwdef struct SystemMessage{T <: AbstractString} <: AbstractChatMessage
     variables::Vector{Symbol} = _extract_handlebar_variables(content)
     run_id::Union{Nothing, Int} = Int(rand(Int16))
     _type::Symbol = :systemmessage
-    SystemMessage{T}(c, v, r, t) where {T <: AbstractString} = new(c, v, r, t)
 end
-function SystemMessage(content::T,
-        variables::Vector{Symbol},
-        run_id::Union{Nothing, Int},
-        type::Symbol) where {T <: AbstractString}
+
+# Add positional constructor
+function SystemMessage(content::T; run_id::Union{Nothing,Int}=Int(rand(Int16)),
+                      _type::Symbol=:systemmessage) where {T <: AbstractString}
+    variables = _extract_handlebar_variables(content)
     not_allowed_kwargs = intersect(variables, RESERVED_KWARGS)
     @assert length(not_allowed_kwargs)==0 "Error: Some placeholders are invalid, as they are reserved for `ai*` functions. Change: $(join(not_allowed_kwargs,","))"
-    return SystemMessage{T}(content, variables, run_id, type)
+    SystemMessage{T}(content, variables, run_id, _type)
 end
 
 """
@@ -251,6 +205,18 @@ Base.@kwdef struct AnnotationMessage{T} <: AbstractAnnotationMessage
     _type::Symbol = :annotationmessage
 end
 
+# Add positional constructor for string content
+function AnnotationMessage(content::AbstractString;
+                         extras::Union{Dict{Symbol,Any}, Dict{Symbol,String}}=Dict{Symbol,Any}(),
+                         tags::Vector{Symbol}=Symbol[],
+                         comment::String="",
+                         run_id::Union{Nothing,Int}=Int(rand(Int16)),
+                         _type::Symbol=:annotationmessage)
+    # Convert Dict{Symbol,String} to Dict{Symbol,Any} if needed
+    extras_any = extras isa Dict{Symbol,String} ? Dict{Symbol,Any}(k => v for (k,v) in extras) : extras
+    AnnotationMessage{typeof(content)}(content, extras_any, tags, comment, run_id, _type)
+end
+
 """
     annotate!(messages::Vector{<:AbstractMessage}, content; kwargs...)
     annotate!(message::AbstractMessage, content; kwargs...)
@@ -272,22 +238,25 @@ messages = [SystemMessage("Assistant"), UserMessage("Hello")]
 annotate!(messages, "This is important"; tags=[:important], comment="For review")
 ```
 """
-function annotate!(messages::Vector{<:AbstractMessage}, content; kwargs...)
+function annotate!(messages::Vector{T}, content; kwargs...) where {T<:AbstractMessage}
     # Create new annotation message
     annotation = AnnotationMessage(content; kwargs...)
 
+    # Convert messages to Vector{AbstractMessage} to allow mixed types
+    abstract_messages = Vector{AbstractMessage}(messages)
+
     # Find the last annotation message index
-    last_annotation_idx = findlast(isabstractannotationmessage, messages)
+    last_annotation_idx = findlast(isabstractannotationmessage, abstract_messages)
 
     if isnothing(last_annotation_idx)
         # If no annotation exists, insert at beginning
-        insert!(messages, 1, annotation)
+        insert!(abstract_messages, 1, annotation)
     else
         # Insert after the last annotation
-        insert!(messages, last_annotation_idx + 1, annotation)
+        insert!(abstract_messages, last_annotation_idx + 1, annotation)
     end
 
-    return messages
+    return abstract_messages
 end
 
 # Single message version - wrap in vector and use the other method
@@ -710,7 +679,8 @@ function StructTypes.subtypes(::Type{AbstractChatMessage})
         usermessagewithimages = UserMessageWithImages,
         aimessage = AIMessage,
         systemmessage = SystemMessage,
-        metadatamessage = MetadataMessage)
+        metadatamessage = MetadataMessage,
+        annotationmessage = AnnotationMessage)
 end
 
 StructTypes.StructType(::Type{AbstractAnnotationMessage}) = StructTypes.AbstractType()
@@ -765,6 +735,30 @@ StructTypes.StructType(::Type{DataMessage}) = StructTypes.Struct()
 StructTypes.StructType(::Type{TracerMessage}) = StructTypes.Struct() # Ignore mutability once we serialize
 StructTypes.StructType(::Type{AnnotationMessage}) = StructTypes.Struct()
 StructTypes.StructType(::Type{TracerMessageLike}) = StructTypes.Struct() # Ignore mutability once we serialize
+
+### Message Access Utilities
+
+"""
+    last_message(messages::Vector{<:AbstractMessage})
+
+Get the last message in a conversation, regardless of type.
+"""
+function last_message(messages::Vector{<:AbstractMessage})
+    isempty(messages) && return nothing
+    return last(messages)
+end
+
+"""
+    last_output(messages::Vector{<:AbstractMessage})
+
+Get the last AI-generated message (AIMessage) in a conversation.
+"""
+function last_output(messages::Vector{<:AbstractMessage})
+    isempty(messages) && return nothing
+    last_ai_idx = findlast(isaimessage, messages)
+    isnothing(last_ai_idx) && return nothing
+    return messages[last_ai_idx]
+end
 
 ### Utilities for Pretty Printing
 """

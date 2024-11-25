@@ -26,6 +26,25 @@ include("../src/messages.jl")
 
     ai_msg = AIMessage("test ai")
     @test isaimessage(ai_msg)
+
+    # Test annotation message
+    annotation = AnnotationMessage("Test annotation";
+        extras=Dict{Symbol,Any}(:key => "value"),
+        tags=Symbol[:test],
+        comment="Test comment")
+    @test isabstractannotationmessage(annotation)
+
+    # Test conversation memory
+    memory = ConversationMemory()
+    push!(memory, sys_msg)
+    push!(memory, user_msg)
+    @test length(memory) == 1  # system messages not counted
+    @test last_message(memory) == user_msg
+
+    # Test rendering with annotation message
+    messages = [sys_msg, annotation, user_msg, ai_msg]
+    rendered = render(OpenAISchema(), messages)
+    @test length(rendered) == 3  # annotation message should be filtered out
 end
 
 end # module

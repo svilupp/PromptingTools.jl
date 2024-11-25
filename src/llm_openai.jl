@@ -33,6 +33,10 @@ function render(schema::AbstractOpenAISchema,
         kwargs...)
     ##
     @assert image_detail in ["auto", "high", "low"] "Image detail must be one of: auto, high, low"
+
+    # Filter out annotation messages before any processing
+    messages = filter(!isabstractannotationmessage, messages)
+
     ## First pass: keep the message types but make the replacements provided in `kwargs`
     messages_replaced = render(
         NoSchema(), messages; conversation, no_system_message, kwargs...)

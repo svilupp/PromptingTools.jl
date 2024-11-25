@@ -15,26 +15,29 @@ const TEST_RESPONSE = Dict(
 )
 
 @testset "ConversationMemory" begin
-    # Setup mock server for all tests
-    PORT = rand(10000:20000)
-    server = Ref{Union{Nothing, HTTP.Server}}(nothing)
+    # Setup test schema for all tests
+    response = Dict(
+        "model" => "gpt-3.5-turbo",
+        "choices" => [Dict("message" => Dict("role" => "assistant", "content" => "Echo response"))],
+        "usage" => Dict("total_tokens" => 3, "prompt_tokens" => 2, "completion_tokens" => 1),
+        "id" => "chatcmpl-123",
+        "object" => "chat.completion",
+        "created" => Int(floor(time()))
+    )
 
-    try
-        server[] = HTTP.serve!(PORT; verbose=-1) do req
-            return HTTP.Response(200, ["Content-Type" => "application/json"], JSON3.write(TEST_RESPONSE))
-        end
+    # Register test model
+    register_model!(;
+        name = "memory-echo",
+        schema = TestEchoOpenAISchema(; response=response),
+        cost_of_token_prompt = 0.0,
+        cost_of_token_generation = 0.0,
+        description = "Test echo model for memory tests"
+    )
 
-        # Register test model
-        register_model!(;
-            name = "memory-echo",
-            schema = TestEchoOpenAISchema(; response=TEST_RESPONSE),
-            api_kwargs = (; url = "http://localhost:$(PORT)")
-        )
-
-        # Test constructor and empty initialization
-        mem = ConversationMemory()
-        @test length(mem) == 0
-        @test isempty(mem.conversation)
+    # Test constructor and empty initialization
+    mem = ConversationMemory()
+    @test length(mem) == 0
+    @test isempty(mem.conversation)
 
         # Test show method
         io = IOBuffer()
@@ -86,13 +89,15 @@ const TEST_RESPONSE = Dict(
             @test contains(recent[3].content, "For efficiency reasons")
 
             # Test get_last with verbose
-            io = IOBuffer()
-            redirect_stdout(io) do
-                get_last(mem, 5; verbose=true)
+            mktemp() do path, io
+                redirect_stdout(io) do
+                    get_last(mem, 5; verbose=true)
+                end
+                seekstart(io)
+                output = read(io, String)
+                @test contains(output, "Total messages:")
+                @test contains(output, "Keeping:")
             end
-            output = String(take!(io))
-            @test contains(output, "Total messages:")
-            @test contains(output, "Keeping:")
         end
 
         @testset "Message Deduplication" begin
@@ -128,9 +133,16 @@ const TEST_RESPONSE = Dict(
         end
 
         @testset "Generation Interface" begin
-            mem = ConversationMemory()
+            # Setup mock response
+            response = Dict(
+                "choices" => [Dict("message" => Dict("content" => "Test response"), "finish_reason" => "stop")],
+                "usage" => Dict("total_tokens" => 3, "prompt_tokens" => 2, "completion_tokens" => 1)
+            )
+            schema = TestEchoOpenAISchema(; response=response, status=200)
+            OLD_PROMPT_SCHEMA = PromptingTools.PROMPT_SCHEMA
+            PromptingTools.PROMPT_SCHEMA = schema
 
-            # Test functor interface basic usage
+            mem = ConversationMemory()
             push!(mem, SystemMessage("You are a helpful assistant"))
             result = mem("Hello!"; model="memory-echo")
             @test result.content == "Echo response"
@@ -148,8 +160,5 @@ const TEST_RESPONSE = Dict(
             @test result.content == "Echo response"
             @test length(mem) == 14  # Previous messages + new exchange
         end
-    finally
-        # Ensure server is properly closed
-        !isnothing(server[]) && close(server[])
     end
 end

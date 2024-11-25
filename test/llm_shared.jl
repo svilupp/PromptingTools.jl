@@ -26,6 +26,9 @@ using PromptingTools: finalize_outputs, role4render
         UserMessage(;
             content = "Hello, my name is John",
             variables = [:name],
+            name = nothing,
+            run_id = nothing,
+            cost = nothing,
             _type = :usermessage)
     ]
     conversation = render(schema,
@@ -92,7 +95,7 @@ using PromptingTools: finalize_outputs, role4render
         SystemMessage("System message 1"),
         UserMessage("Hello {{name}}"),
         AIMessage("Hi there"),
-        UserMessage("How are you, John?", [:name], nothing, :usermessage),
+        UserMessage("How are you, John?", [:name], nothing, nothing, nothing, :usermessage),
         AIMessage("I'm doing well, thank you!")
     ]
     conversation = render(schema, messages; conversation, name = "John")
@@ -126,7 +129,7 @@ using PromptingTools: finalize_outputs, role4render
         UserMessage("How are you?")
     ]
     expected_output = [
-        SystemMessage("Hello, !", [:name], :systemmessage),
+        SystemMessage("Hello, !"; run_id=nothing),
         UserMessage("How are you?")
     ]
     conversation = render(schema, messages)
@@ -308,7 +311,7 @@ end
         SystemMessage("System message 1"),
         UserMessage("User message {{name}}"),
         AIMessage("AI message"),
-        UserMessage("User message John", [:name], nothing, :usermessage),
+        UserMessage("User message John", [:name], nothing, nothing, nothing, :usermessage),
         AIMessage("AI message 2"),
         msg
     ]
@@ -335,7 +338,7 @@ end
         SystemMessage("System message 1"),
         UserMessage("User message {{name}}"),
         AIMessage("AI message"),
-        UserMessage("User message John", [:name], nothing, :usermessage),
+        UserMessage("User message John", [:name], nothing, nothing, nothing, :usermessage),
         AIMessage("AI message 2"),
         msg,
         msg
