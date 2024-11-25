@@ -23,59 +23,65 @@ register_model!(;
     description = "Test echo model for memory deduplication tests"
 )
 
-@testset "ConversationMemory Deduplication" begin
-    # Test run_id based deduplication
-    mem = ConversationMemory()
+let old_registry = copy(PromptingTools.MODEL_REGISTRY.registry)
+    @testset "ConversationMemory Deduplication" begin
+        # Test run_id based deduplication
+        mem = ConversationMemory()
 
-    # Create messages with run_ids
-    msgs1 = [
-        SystemMessage("System", run_id=1),
-        UserMessage("User1", run_id=1),
-        AIMessage("AI1", run_id=1)
-    ]
+        # Create messages with run_ids
+        msgs1 = [
+            SystemMessage("System", run_id=1),
+            UserMessage("User1", run_id=1),
+            AIMessage("AI1", run_id=1)
+        ]
 
-    msgs2 = [
-        UserMessage("User2", run_id=2),
-        AIMessage("AI2", run_id=2)
-    ]
+        msgs2 = [
+            UserMessage("User2", run_id=2),
+            AIMessage("AI2", run_id=2)
+        ]
 
-    # Test initial append
-    append!(mem, msgs1)
-    @test length(mem.conversation) == 3
+        # Test initial append
+        append!(mem, msgs1)
+        @test length(mem.conversation) == 3
 
-    # Test appending newer messages
-    append!(mem, msgs2)
-    @test length(mem.conversation) == 5
+        # Test appending newer messages
+        append!(mem, msgs2)
+        @test length(mem.conversation) == 5
 
-    # Test appending older messages (should not append)
-    append!(mem, msgs1)
-    @test length(mem.conversation) == 5
+        # Test appending older messages (should not append)
+        append!(mem, msgs1)
+        @test length(mem.conversation) == 5
 
-    # Test mixed run_ids (should only append newer ones)
-    mixed_msgs = [
-        UserMessage("Old", run_id=1),
-        UserMessage("New", run_id=3),
-        AIMessage("Response", run_id=3)
-    ]
-    append!(mem, mixed_msgs)
-    @test length(mem.conversation) == 7
-end
-
-@testset "ConversationMemory AIGenerate Integration" begin
-    mem = ConversationMemory()
-
-    # Test direct aigenerate integration
-    result = aigenerate(mem, "Test prompt"; model="memory-dedup-echo")
-    @test result.content == "Dedup test response"
-
-    # Test functor interface with history truncation
-    push!(mem, SystemMessage("System"))
-    for i in 1:5
-        push!(mem, UserMessage("User$i"))
-        push!(mem, AIMessage("AI$i"))
+        # Test mixed run_ids (should only append newer ones)
+        mixed_msgs = [
+            UserMessage("Old", run_id=1),
+            UserMessage("New", run_id=3),
+            AIMessage("Response", run_id=3)
+        ]
+        append!(mem, mixed_msgs)
+        @test length(mem.conversation) == 7
     end
 
-    result = mem("Final prompt"; last=3, model="memory-dedup-echo")
-    @test result.content == "Dedup test response"
-    @test length(get_last(mem, 3)) == 4  # system + last 3
+    @testset "ConversationMemory AIGenerate Integration" begin
+        mem = ConversationMemory()
+
+        # Test direct aigenerate integration
+        result = aigenerate(mem, "Test prompt"; model="memory-dedup-echo")
+        @test result.content == "Dedup test response"
+
+        # Test functor interface with history truncation
+        push!(mem, SystemMessage("System"))
+        for i in 1:5
+            push!(mem, UserMessage("User$i"))
+            push!(mem, AIMessage("AI$i"))
+        end
+
+        result = mem("Final prompt"; last=3, model="memory-dedup-echo")
+        @test result.content == "Dedup test response"
+        @test length(get_last(mem, 3)) == 4  # system + last 3
+    end
+
+    # Restore original registry
+    empty!(PromptingTools.MODEL_REGISTRY.registry)
+    merge!(PromptingTools.MODEL_REGISTRY.registry, old_registry)
 end
