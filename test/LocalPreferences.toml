@@ -1,0 +1,4 @@
+[PromptingTools]
+MODEL_CHAT = "gpt-4o-mini"
+MODEL_EMBEDDING = "text-embedding-3-small"
+OPENAI_API_KEY = "sk-proj-DODnZqEwrRUSeny4tvtFT3BlbkFJfy3ftqOpDbdky6kEu60q "

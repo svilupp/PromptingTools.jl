@@ -39,6 +39,9 @@ function render(schema::NoSchema,
     count_system_msg = count(issystemmessage, conversation)
     # TODO: concat multiple system messages together (2nd pass)
 
+    # Filter out annotation messages from input messages
+    messages = filter(!isabstractannotationmessage, messages)
+
     # replace any handlebar variables in the messages
     for msg in messages
         if issystemmessage(msg) || isusermessage(msg) || isusermessagewithimages(msg)

@@ -1,0 +1,8 @@
+[deps]
+PromptingTools = "670122d1-24a8-4d70-bfce-740807c42192"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+HTTP = "cd3eb016-35fb-5094-929b-558a96fad6f3"
+JSON3 = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
+Snowball = "fb8f903a-0164-4e73-9ffe-431110250c3b"
+FlashRank = "22cc3f58-1757-4700-bb45-2032706e5a8d"
+Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"

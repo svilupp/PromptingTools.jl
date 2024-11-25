@@ -86,8 +86,9 @@ function get_last(mem::ConversationMemory, n::Integer=20;
     # Always include system message and first user message
     system_idx = findfirst(issystemmessage, messages)
     first_user_idx = findfirst(isusermessage, messages)
-    result = AbstractMessage[]
 
+    # Initialize result with required messages
+    result = AbstractMessage[]
     if !isnothing(system_idx)
         push!(result, messages[system_idx])
     end
@@ -95,25 +96,33 @@ function get_last(mem::ConversationMemory, n::Integer=20;
         push!(result, messages[first_user_idx])
     end
 
-    # Calculate remaining message budget
-    remaining_budget = n - length(result)
+    # Get remaining messages excluding system and first user
+    exclude_indices = filter(!isnothing, [system_idx, first_user_idx])
+    remaining_msgs = messages[setdiff(1:length(messages), exclude_indices)]
 
-    if remaining_budget > 0
-        if !isnothing(batch_size)
-            # Calculate how many complete batches we can include
-            total_msgs = length(messages)
-            num_batches = (total_msgs - length(result)) ÷ batch_size
+    # Calculate how many messages to include based on batch size
+    if !isnothing(batch_size)
+        # When batch_size=10, should return between 11-20 messages
+        total_msgs = length(remaining_msgs)
+        num_batches = ceil(Int, total_msgs / batch_size)
 
-            # We want to keep between batch_size+1 and 2*batch_size messages
-            # If we would exceed 2*batch_size, reset to batch_size+1
-            if num_batches * batch_size > 2 * batch_size
-                num_batches = 1  # Reset to one batch (batch_size+1 messages)
-            end
-
-            start_idx = max(1, total_msgs - (num_batches * batch_size) + 1)
-            append!(result, messages[start_idx:end])
+        # Calculate target size (between batch_size+1 and 2*batch_size)
+        target_size = if num_batches * batch_size > n
+            batch_size + 1  # Reset to minimum (11 for batch_size=10)
         else
-            append!(result, messages[max(1, end-remaining_budget+1):end])
+            min(num_batches * batch_size, n - length(result))
+        end
+
+        # Get messages to append
+        if !isempty(remaining_msgs)
+            start_idx = max(1, length(remaining_msgs) - target_size + 1)
+            append!(result, remaining_msgs[start_idx:end])
+        end
+    else
+        # Without batch size, just get the last n-length(result) messages
+        if !isempty(remaining_msgs)
+            start_idx = max(1, length(remaining_msgs) - (n - length(result)) + 1)
+            append!(result, remaining_msgs[start_idx:end])
         end
     end
 
@@ -126,12 +135,13 @@ function get_last(mem::ConversationMemory, n::Integer=20;
         end
     end
 
-    # Add explanation if requested
-    if explain && length(messages) > n
-        ai_msg_idx = findfirst(isaimessage, result)
+    # Add explanation if requested and we truncated messages
+    if explain && length(messages) > length(result)
+        # Find first AI message in result after required messages
+        ai_msg_idx = findfirst(m -> isaimessage(m) && !(m in result[1:length(exclude_indices)]), result)
         if !isnothing(ai_msg_idx)
             orig_content = result[ai_msg_idx].content
-            explanation = "For efficiency reasons, we have truncated the preceding $(length(messages) - n) messages.\n\n$orig_content"
+            explanation = "For efficiency reasons, we have truncated the preceding $(length(messages) - length(result)) messages.\n\n$orig_content"
             result[ai_msg_idx] = AIMessage(explanation)
         end
     end
@@ -146,16 +156,22 @@ Smart append that handles duplicate messages based on run IDs.
 Only appends messages that are newer than the latest matching message in memory.
 """
 function Base.append!(mem::ConversationMemory, msgs::Vector{<:AbstractMessage})
-    if isempty(mem.conversation) || isempty(msgs)
+    isempty(msgs) && return mem
+
+    if isempty(mem.conversation)
         append!(mem.conversation, msgs)
         return mem
     end
 
-    # Find latest common message based on run_id
-    # Default to 0 if run_id is not defined
-    latest_run_id = maximum(msg -> isdefined(msg, :run_id) ? msg.run_id : 0, mem.conversation)
+    # Find latest run_id in memory
+    latest_run_id = 0
+    for msg in mem.conversation
+        if isdefined(msg, :run_id)
+            latest_run_id = max(latest_run_id, msg.run_id)
+        end
+    end
 
-    # Only append messages with higher run_id or no run_id
+    # Keep messages that either don't have a run_id or have a higher run_id
     new_msgs = filter(msgs) do msg
         !isdefined(msg, :run_id) || msg.run_id > latest_run_id
     end
@@ -187,8 +203,12 @@ function (mem::ConversationMemory)(prompt::String; last::Union{Nothing,Integer}=
         get_last(mem, last)
     end
 
+    # Add user message to memory first
+    user_msg = UserMessage(prompt)
+    push!(mem.conversation, user_msg)
+
     # Generate response with context
-    response = PromptingTools.aigenerate(context, prompt; kwargs...)
+    response = aigenerate(context, prompt; kwargs...)
     push!(mem.conversation, response)
     return response
 end
@@ -198,6 +218,7 @@ end
 
 Generate a response using the conversation memory context.
 """
-function PromptingTools.aigenerate(mem::ConversationMemory, prompt::String; kwargs...)
-    PromptingTools.aigenerate(mem.conversation, prompt; kwargs...)
+function PromptingTools.aigenerate(messages::Vector{<:AbstractMessage}, prompt::String; kwargs...)
+    schema = get(kwargs, :schema, OpenAISchema())
+    aigenerate(schema, [messages..., UserMessage(prompt)]; kwargs...)
 end
