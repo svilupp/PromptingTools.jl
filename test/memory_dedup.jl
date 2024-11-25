@@ -2,7 +2,26 @@ using Test
 using PromptingTools
 using PromptingTools: SystemMessage, UserMessage, AIMessage, AbstractMessage, ConversationMemory
 using PromptingTools: issystemmessage, isusermessage, isaimessage, TestEchoOpenAISchema
-using PromptingTools: last_message, last_output
+using PromptingTools: last_message, last_output, register_model!
+
+# Setup test schema for dedup tests
+const DEDUP_TEST_RESPONSE = Dict(
+    "model" => "gpt-3.5-turbo",
+    "choices" => [Dict("message" => Dict("role" => "assistant", "content" => "Dedup test response"))],
+    "usage" => Dict("total_tokens" => 3, "prompt_tokens" => 2, "completion_tokens" => 1),
+    "id" => "chatcmpl-dedup-123",
+    "object" => "chat.completion",
+    "created" => Int(floor(time()))
+)
+
+# Register test model for dedup tests
+register_model!(;
+    name = "memory-dedup-echo",
+    schema = TestEchoOpenAISchema(; response=DEDUP_TEST_RESPONSE),
+    cost_of_token_prompt = 0.0,
+    cost_of_token_generation = 0.0,
+    description = "Test echo model for memory deduplication tests"
+)
 
 @testset "ConversationMemory Deduplication" begin
     # Test run_id based deduplication
@@ -43,21 +62,11 @@ using PromptingTools: last_message, last_output
 end
 
 @testset "ConversationMemory AIGenerate Integration" begin
-    OLD_PROMPT_SCHEMA = PromptingTools.PROMPT_SCHEMA
-
-    # Setup mock response
-    response = Dict(
-        :choices => [Dict(:message => Dict(:content => "Test response"), :finish_reason => "stop")],
-        :usage => Dict(:total_tokens => 3, :prompt_tokens => 2, :completion_tokens => 1)
-    )
-    schema = TestEchoOpenAISchema(; response, status=200)
-    PromptingTools.PROMPT_SCHEMA = schema
-
     mem = ConversationMemory()
 
     # Test direct aigenerate integration
-    result = aigenerate(mem, "Test prompt"; model="test-model")
-    @test result.content == "Test response"
+    result = aigenerate(mem, "Test prompt"; model="memory-dedup-echo")
+    @test result.content == "Dedup test response"
 
     # Test functor interface with history truncation
     push!(mem, SystemMessage("System"))
@@ -66,10 +75,7 @@ end
         push!(mem, AIMessage("AI$i"))
     end
 
-    result = mem("Final prompt"; last=3, model="test-model")
-    @test result.content == "Test response"
+    result = mem("Final prompt"; last=3, model="memory-dedup-echo")
+    @test result.content == "Dedup test response"
     @test length(get_last(mem, 3)) == 4  # system + last 3
-
-    # Restore schema
-    PromptingTools.PROMPT_SCHEMA = OLD_PROMPT_SCHEMA
 end

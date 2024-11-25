@@ -2,7 +2,26 @@ using Test
 using PromptingTools
 using PromptingTools: SystemMessage, UserMessage, AIMessage, AbstractMessage, ConversationMemory
 using PromptingTools: issystemmessage, isusermessage, isaimessage, TestEchoOpenAISchema
-using PromptingTools: last_message, last_output
+using PromptingTools: last_message, last_output, register_model!
+
+# Setup test schema for all tests
+const TEST_RESPONSE = Dict(
+    "model" => "gpt-3.5-turbo",
+    "choices" => [Dict("message" => Dict("role" => "assistant", "content" => "Echo response"))],
+    "usage" => Dict("total_tokens" => 3, "prompt_tokens" => 2, "completion_tokens" => 1),
+    "id" => "chatcmpl-123",
+    "object" => "chat.completion",
+    "created" => Int(floor(time()))
+)
+
+# Register test model
+register_model!(;
+    name = "memory-basic-echo",
+    schema = TestEchoOpenAISchema(; response=TEST_RESPONSE),
+    cost_of_token_prompt = 0.0,
+    cost_of_token_generation = 0.0,
+    description = "Test echo model for memory basic tests"
+)
 
 let
     @testset "ConversationMemory Basic Operations" begin
@@ -29,7 +48,7 @@ let
         # Test memory with AI generation
         mem = ConversationMemory()
         push!(mem, SystemMessage("You are a helpful assistant"))
-        result = mem("Hello!"; model="test-model")
+        result = mem("Hello!"; model="memory-basic-echo")
 
         @test length(mem.conversation) == 3  # system + user + ai
         @test last_message(mem).content == "Hello!"

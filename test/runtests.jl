@@ -20,7 +20,16 @@ end
     include("utils.jl")
     include("messages.jl")
     include("messages_utils.jl")
-    include("memory.jl")
+
+    # Memory and Annotation tests
+    @testset "Memory" begin
+        include("memory_core.jl")
+        include("memory_basic.jl")
+        include("memory_batch.jl")
+        include("memory_dedup.jl")
+        include("annotation_messages.jl")
+    end
+
     include("extraction.jl")
     include("user_preferences.jl")
     include("llm_interface.jl")

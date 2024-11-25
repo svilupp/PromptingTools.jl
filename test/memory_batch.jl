@@ -1,8 +1,27 @@
 using Test
 using PromptingTools
 using PromptingTools: SystemMessage, UserMessage, AIMessage, AbstractMessage, ConversationMemory
-using PromptingTools: issystemmessage, isusermessage, isaimessage
+using PromptingTools: issystemmessage, isusermessage, isaimessage, TestEchoOpenAISchema, register_model!
 using Test: @capture_out
+
+# Setup test schema for batch tests
+const BATCH_TEST_RESPONSE = Dict(
+    "model" => "gpt-3.5-turbo",
+    "choices" => [Dict("message" => Dict("role" => "assistant", "content" => "Batch test response"))],
+    "usage" => Dict("total_tokens" => 3, "prompt_tokens" => 2, "completion_tokens" => 1),
+    "id" => "chatcmpl-batch-123",
+    "object" => "chat.completion",
+    "created" => Int(floor(time()))
+)
+
+# Register test model for batch tests
+register_model!(;
+    name = "memory-batch-echo",
+    schema = TestEchoOpenAISchema(; response=BATCH_TEST_RESPONSE),
+    cost_of_token_prompt = 0.0,
+    cost_of_token_generation = 0.0,
+    description = "Test echo model for memory batch tests"
+)
 
 @testset "ConversationMemory Batch Tests" begin
     mem = ConversationMemory()
