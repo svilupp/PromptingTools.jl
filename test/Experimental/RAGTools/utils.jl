@@ -652,53 +652,56 @@ end
 end
 
 @testset "preprocess_tokens" begin
-    stemmer = Snowball.Stemmer("english")
     stopwords = Set([
         "a", "an", "and", "are", "as", "at", "be", "but", "by", "for", "if", "in",
         "into", "is", "it", "no", "not", "of", "on", "or", "such", "some", "that", "the",
         "their", "then", "there", "these", "they", "this", "to", "was", "will", "with"])
+
     # Empty string
     @test preprocess_tokens("") == []
 
-    # Simple case
+    # Simple case without stemming
     @test preprocess_tokens("This is a test."; stopwords) == ["test"]
 
     # Case insensitive
     @test preprocess_tokens("This Is A Test."; stopwords) == ["test"]
 
-    # Punctuation and numbers
-    @test preprocess_tokens(
-        "This is a test, with punctuation and 123 numbers!", stemmer; stopwords) ==
-          ["test", "punctuat", "number"]
+    if @isdefined(SNOWBALL_AVAILABLE) && SNOWBALL_AVAILABLE
+        stemmer = Snowball.Stemmer("english")
 
-    # Unicode and accents
-    @test preprocess_tokens(
-        "Thís is à tést wîth Ünïcôdë and áccênts.", stemmer; stopwords) ==
-          ["test", "unicod", "accent"]
+        # Punctuation and numbers
+        @test preprocess_tokens(
+            "This is a test, with punctuation and 123 numbers!", stemmer; stopwords) ==
+              ["test", "punctuat", "number"]
 
-    # Multiple spaces
-    @test preprocess_tokens(
-        "This  is a   test with   multiple    spaces.", stemmer; stopwords) ==
-          ["test", "multipl", "space"]
+        # Unicode and accents
+        @test preprocess_tokens(
+            "Thís is à tést wîth Ünïcôdë and áccênts.", stemmer; stopwords) ==
+              ["test", "unicod", "accent"]
 
-    # Stopwords
-    @test preprocess_tokens(
-        "This is a test with some stopwords like the and is.", stemmer; stopwords) ==
-          ["test", "stopword", "like"]
+        # Multiple spaces
+        @test preprocess_tokens(
+            "This  is a   test with   multiple    spaces.", stemmer; stopwords) ==
+              ["test", "multipl", "space"]
 
-    # Stemming
-    @test preprocess_tokens(
-        "This is a test with some words for stemming like testing and tested.",
-        stemmer; stopwords) == ["test", "word", "stem", "like", "test", "test"]
+        # Stopwords
+        @test preprocess_tokens(
+            "This is a test with some stopwords like the and is.", stemmer; stopwords) ==
+              ["test", "stopword", "like"]
 
-    # Long text
-    long_text = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed euismod, nulla sit amet aliquam lacinia, nisl nisl aliquam nisl, nec aliquam nisl nisl sit amet nisl. Sed euismod, nulla sit amet aliquam lacinia, nisl nisl aliquam nisl, nec aliquam nisl nisl sit amet nisl. Sed euismod, nulla sit amet aliquam lacinia, nisl nisl aliquam nisl, nec aliquam nisl nisl sit amet nisl."
-    @test preprocess_tokens(long_text, stemmer; stopwords) ==
-          ["lorem", "ipsum", "dolor", "sit", "amet", "consectetur", "adipisc", "elit",
-        "sed", "euismod", "nulla", "sit", "amet", "aliquam", "lacinia", "nisl", "nisl",
-        "aliquam", "nisl", "nec", "aliquam", "nisl", "nisl", "sit", "amet", "nisl",
-        "sed", "euismod", "nulla", "sit", "amet", "aliquam", "lacinia", "nisl", "nisl",
-        "aliquam", "nisl", "nec", "aliquam", "nisl", "nisl", "sit", "amet", "nisl",
+        # Stemming
+        @test preprocess_tokens(
+            "This is a test with some words for stemming like testing and tested.",
+            stemmer; stopwords) == ["test", "word", "stem", "like", "test", "test"]
+
+        # Long text
+        long_text = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed euismod, nulla sit amet aliquam lacinia, nisl nisl aliquam nisl, nec aliquam nisl nisl sit amet nisl. Sed euismod, nulla sit amet aliquam lacinia, nisl nisl aliquam nisl, nec aliquam nisl nisl sit amet nisl. Sed euismod, nulla sit amet aliquam lacinia, nisl nisl aliquam nisl, nec aliquam nisl nisl sit amet nisl."
+        @test preprocess_tokens(long_text, stemmer; stopwords) ==
+              ["lorem", "ipsum", "dolor", "sit", "amet", "consectetur", "adipisc", "elit",
+            "sed", "euismod", "nulla", "sit", "amet", "aliquam", "lacinia", "nisl", "nisl",
+            "aliquam", "nisl", "nec", "aliquam", "nisl", "nisl", "sit", "amet", "nisl",
+            "sed", "euismod", "nulla", "sit", "amet", "aliquam", "lacinia", "nisl", "nisl",
+            "aliquam", "nisl", "nec", "aliquam", "nisl", "nisl", "sit", "amet", "nisl",
         "sed", "euismod", "nulla", "sit", "amet", "aliquam", "lacinia", "nisl", "nisl",
         "aliquam", "nisl", "nec", "aliquam", "nisl", "nisl", "sit", "amet", "nisl"]
 

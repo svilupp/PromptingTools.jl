@@ -142,11 +142,13 @@ end
     @test all(sum(dtm_both.tf, dims = 1) .>= 2)
 
     # Test for KeywordsProcessor with custom stemmer and stopwords
-    custom_stemmer = Snowball.Stemmer("french")
-    dtm_custom = get_keywords(
-        processor, docs; stemmer = custom_stemmer, stopwords = stopwords)
-    @test dtm isa DocumentTermMatrix
-    @test size(dtm.tf) == (2, 6)
+    if @isdefined(SNOWBALL_AVAILABLE) && SNOWBALL_AVAILABLE
+        custom_stemmer = Snowball.Stemmer("french")
+        dtm_custom = get_keywords(
+            processor, docs; stemmer = custom_stemmer, stopwords = stopwords)
+        @test dtm isa DocumentTermMatrix
+        @test size(dtm.tf) == (2, 6)
+    end
 
     # Test for KeywordsProcessor with return_keywords = true
     keywords = get_keywords(processor, docs; return_keywords = true)
