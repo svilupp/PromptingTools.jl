@@ -23,7 +23,7 @@ register_model!(;
     description = "Test echo model for memory basic tests"
 )
 
-let old_registry = copy(PromptingTools.MODEL_REGISTRY.registry)
+let old_registry = deepcopy(PromptingTools.MODEL_REGISTRY.registry)
     @testset "ConversationMemory Basic Operations" begin
         # Single basic test
         mem = ConversationMemory()

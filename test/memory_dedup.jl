@@ -23,7 +23,7 @@ register_model!(;
     description = "Test echo model for memory deduplication tests"
 )
 
-let old_registry = copy(PromptingTools.MODEL_REGISTRY.registry)
+let old_registry = deepcopy(PromptingTools.MODEL_REGISTRY.registry)
     @testset "ConversationMemory Deduplication" begin
         # Test run_id based deduplication
         mem = ConversationMemory()
@@ -80,6 +80,11 @@ let old_registry = copy(PromptingTools.MODEL_REGISTRY.registry)
         @test result.content == "Dedup test response"
         @test length(get_last(mem, 3)) == 4  # system + last 3
     end
+
+    # Restore original registry
+    empty!(PromptingTools.MODEL_REGISTRY.registry)
+    merge!(PromptingTools.MODEL_REGISTRY.registry, old_registry)
+end
 
     # Restore original registry
     empty!(PromptingTools.MODEL_REGISTRY.registry)
