@@ -12,9 +12,9 @@ using Aqua
 @testset "Code quality (Aqua.jl)" begin
     # Skipping unbound_args check because we need our `MaybeExtract` type to be unboard
     @static if VERSION >= v"1.9" && VERSION <= v"1.10"
-        Aqua.test_all(PromptingTools; unbound_args = false, piracy = false, persistent_tasks = false)
+        Aqua.test_all(PromptingTools; unbound_args = false, piracy = false)
     else
-        Aqua.test_all(PromptingTools; unbound_args = false, persistent_tasks = false)
+        Aqua.test_all(PromptingTools; unbound_args = false)
     end
 end
 @testset "PromptingTools.jl" begin

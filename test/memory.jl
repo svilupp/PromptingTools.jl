@@ -151,7 +151,7 @@ const TEST_RESPONSE = Dict(
                     name = "memory-echo",
                     schema = schema,
                     cost_of_token_prompt = 0.0,
-                    cost_of_token_completion = 0.0
+                    cost_of_token_generation = 0.0
                 )
                 PromptingTools.PROMPT_SCHEMA = schema
 
