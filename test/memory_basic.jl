@@ -23,7 +23,7 @@ register_model!(;
     description = "Test echo model for memory basic tests"
 )
 
-let
+let old_registry = copy(PromptingTools.MODEL_REGISTRY.registry)
     @testset "ConversationMemory Basic Operations" begin
         # Single basic test
         mem = ConversationMemory()
@@ -35,16 +35,6 @@ let
     end
 
     @testset "ConversationMemory with AI Generation" begin
-        OLD_PROMPT_SCHEMA = PromptingTools.PROMPT_SCHEMA
-
-        # Setup mock response
-        response = Dict(
-            :choices => [Dict(:message => Dict(:content => "Hello!"), :finish_reason => "stop")],
-            :usage => Dict(:total_tokens => 3, :prompt_tokens => 2, :completion_tokens => 1)
-        )
-        schema = TestEchoOpenAISchema(; response, status=200)
-        PromptingTools.PROMPT_SCHEMA = schema
-
         # Test memory with AI generation
         mem = ConversationMemory()
         push!(mem, SystemMessage("You are a helpful assistant"))
@@ -53,9 +43,6 @@ let
         @test length(mem.conversation) == 3  # system + user + ai
         @test last_message(mem).content == "Hello!"
         @test isaimessage(last_message(mem))
-
-        # Restore schema
-        PromptingTools.PROMPT_SCHEMA = OLD_PROMPT_SCHEMA
     end
 
     @testset "ConversationMemory Advanced Features" begin
@@ -83,4 +70,8 @@ let
         # Test verbose output
         @test_nowarn get_last(mem, 10; batch_size=5, verbose=true)
     end
+
+    # Restore original registry
+    empty!(PromptingTools.MODEL_REGISTRY.registry)
+    merge!(PromptingTools.MODEL_REGISTRY.registry, old_registry)
 end
