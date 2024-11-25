@@ -16,3 +16,4 @@ SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
 [compat]
 DocumenterVitepress = "0.0.7"
+PromptingTools = "0.65.0"
