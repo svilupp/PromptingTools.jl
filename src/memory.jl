@@ -100,17 +100,21 @@ function get_last(mem::ConversationMemory, n::Integer=20;
     exclude_indices = filter(!isnothing, [system_idx, first_user_idx])
     remaining_msgs = messages[setdiff(1:length(messages), exclude_indices)]
 
-    # Calculate how many messages to include based on batch size
+    # Calculate how many additional messages to include (n minus required messages)
+    target_n = n - length(result)
+
     if !isnothing(batch_size)
         # When batch_size=10, should return between 11-20 messages
         total_msgs = length(remaining_msgs)
+
+        # Calculate number of complete batches needed
         num_batches = ceil(Int, total_msgs / batch_size)
 
-        # Calculate target size (between batch_size+1 and 2*batch_size)
-        target_size = if num_batches * batch_size > n
+        # Target size should be a multiple of batch_size plus 1
+        target_size = if total_msgs > 2 * batch_size
             batch_size + 1  # Reset to minimum (11 for batch_size=10)
         else
-            min(num_batches * batch_size, n - length(result))
+            min(total_msgs, target_n)  # Keep all messages up to target_n
         end
 
         # Get messages to append
@@ -119,9 +123,9 @@ function get_last(mem::ConversationMemory, n::Integer=20;
             append!(result, remaining_msgs[start_idx:end])
         end
     else
-        # Without batch size, just get the last n-length(result) messages
+        # Without batch size, just get the last target_n messages
         if !isempty(remaining_msgs)
-            start_idx = max(1, length(remaining_msgs) - (n - length(result)) + 1)
+            start_idx = max(1, length(remaining_msgs) - target_n + 1)
             append!(result, remaining_msgs[start_idx:end])
         end
     end
@@ -137,8 +141,7 @@ function get_last(mem::ConversationMemory, n::Integer=20;
 
     # Add explanation if requested and we truncated messages
     if explain && length(messages) > length(result)
-        # Find first AI message in result after required messages
-        ai_msg_idx = findfirst(m -> isaimessage(m) && !(m in result[1:length(exclude_indices)]), result)
+        ai_msg_idx = findfirst(isaimessage, result)
         if !isnothing(ai_msg_idx)
             orig_content = result[ai_msg_idx].content
             explanation = "For efficiency reasons, we have truncated the preceding $(length(messages) - length(result)) messages.\n\n$orig_content"

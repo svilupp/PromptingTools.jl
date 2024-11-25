@@ -4,6 +4,7 @@ using PromptingTools: SystemMessage, UserMessage, AIMessage, AbstractMessage
 using PromptingTools: TestEchoOpenAISchema, ConversationMemory
 using PromptingTools: issystemmessage, isusermessage, isaimessage, last_message, last_output, register_model!
 using HTTP, JSON3
+using Pkg
 
 const TEST_RESPONSE = Dict(
     "model" => "gpt-3.5-turbo",
@@ -135,30 +136,45 @@ const TEST_RESPONSE = Dict(
         @testset "Generation Interface" begin
             # Setup mock response
             response = Dict(
-                "choices" => [Dict("message" => Dict("content" => "Test response"), "finish_reason" => "stop")],
+                "choices" => [Dict("message" => Dict("content" => "Test response", "role" => "assistant"), "finish_reason" => "stop")],
                 "usage" => Dict("total_tokens" => 3, "prompt_tokens" => 2, "completion_tokens" => 1)
             )
             schema = TestEchoOpenAISchema(; response=response, status=200)
-            OLD_PROMPT_SCHEMA = PromptingTools.PROMPT_SCHEMA
-            PromptingTools.PROMPT_SCHEMA = schema
 
-            mem = ConversationMemory()
-            push!(mem, SystemMessage("You are a helpful assistant"))
-            result = mem("Hello!"; model="memory-echo")
-            @test result.content == "Echo response"
-            @test length(mem) == 2  # User message + AI response
+            # Save the current state
+            old_registry = deepcopy(PromptingTools.MODEL_REGISTRY)
+            old_schema = PromptingTools.PROMPT_SCHEMA
 
-            # Test functor interface with history truncation
-            for i in 1:5
-                result = mem("Message $i"; model="memory-echo")
+            try
+                # Register our test model
+                register_model!(;
+                    name = "memory-echo",
+                    schema = schema,
+                    cost_of_token_prompt = 0.0,
+                    cost_of_token_completion = 0.0
+                )
+                PromptingTools.PROMPT_SCHEMA = schema
+
+                mem = ConversationMemory()
+                push!(mem, SystemMessage("You are a helpful assistant"))
+                result = mem("Hello!"; model="memory-echo")
+                @test result.content == "Test response"
+                @test length(mem) == 2  # User message + AI response
+
+                # Test functor interface with history truncation
+                for i in 1:5
+                    result = mem("Message $i"; model="memory-echo")
+                end
+                result = mem("Final message"; last=3, model="memory-echo")
+                @test length(get_last(mem, 3)) == 5  # 3 messages + system + first user
+
+                # Test aigenerate method integration
+                result = aigenerate(mem, "Direct generation"; model="memory-echo")
+                @test result.content == "Test response"
+                @test length(mem) == 14  # Previous messages + new exchange
+            finally
+                PromptingTools.PROMPT_SCHEMA = old_schema
+                PromptingTools.MODEL_REGISTRY = old_registry
             end
-            result = mem("Final message"; last=3, model="memory-echo")
-            @test length(get_last(mem, 3)) == 5  # 3 messages + system + first user
-
-            # Test aigenerate method integration
-            result = aigenerate(mem, "Direct generation"; model="memory-echo")
-            @test result.content == "Echo response"
-            @test length(mem) == 14  # Previous messages + new exchange
         end
-    end
 end

@@ -196,13 +196,25 @@ Used to bundle key information and documentation for colleagues and future refer
 Note: The comment field is intended for human readers only and should never be used
 for automatic operations.
 """
-Base.@kwdef struct AnnotationMessage{T} <: AbstractAnnotationMessage
+struct AnnotationMessage{T} <: AbstractAnnotationMessage
     content::T
-    extras::Dict{Symbol,Any} = Dict{Symbol,Any}()
-    tags::Vector{Symbol} = Symbol[]
-    comment::String = ""
-    run_id::Union{Nothing,Int} = Int(rand(Int16))
+    extras::Dict{Symbol,Any}
+    tags::Vector{Symbol}
+    comment::String
+    run_id::Union{Nothing,Int}
+    _type::Symbol
+end
+
+# Define the keyword constructor
+function AnnotationMessage{T}(;
+    content::T,
+    extras::Dict{Symbol,Any} = Dict{Symbol,Any}(),
+    tags::Vector{Symbol} = Symbol[],
+    comment::String = "",
+    run_id::Union{Nothing,Int} = Int(rand(Int16)),
     _type::Symbol = :annotationmessage
+) where {T}
+    AnnotationMessage{T}(content, extras, tags, comment, run_id, _type)
 end
 
 # Add positional constructor for string content
