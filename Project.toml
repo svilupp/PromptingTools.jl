@@ -53,22 +53,22 @@ PrecompileTools = "1"
 Preferences = "1"
 REPL = "<0.0.1, 1"
 Random = "<0.0.1, 1"
+Snowball = "0.1"
 SparseArrays = "<0.0.1, 1"
 Statistics = "<0.0.1, 1"
 StreamCallbacks = "0.4, 0.5"
-Snowball = "0.1"
 Test = "<0.0.1, 1"
 julia = "1.9, 1.10"
 
 [extras]
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
+HTTP = "cd3eb016-35fb-5094-929b-558a96fad6f3"
+JSON3 = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+OpenAI = "e9f21f70-7185-4079-aca2-91159181367c"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 Unicode = "4ec0a83e-493e-50e2-b9ac-8f72acf5a8f5"
-HTTP = "cd3eb016-35fb-5094-929b-558a96fad6f3"
-JSON3 = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
-OpenAI = "e9f21f70-7185-4079-aca2-91159181367c"
 
 [targets]
 test = ["Aqua", "FlashRank", "SparseArrays", "Statistics", "LinearAlgebra", "Markdown", "Snowball", "Unicode", "HTTP", "JSON3", "OpenAI"]
