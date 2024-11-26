@@ -6,8 +6,24 @@ abstract type AbstractChatMessage <: AbstractMessage end # with text-based conte
 abstract type AbstractDataMessage <: AbstractMessage end # with data-based content, eg, embeddings
 abstract type AbstractTracerMessage{T <: AbstractMessage} <: AbstractMessage end # message with annotation that exposes the underlying message
 abstract type AbstractAnnotationMessage <: AbstractMessage end # message with metadata that is never sent to LLMs
+
+"""
+    isabstractannotationmessage(msg::AbstractMessage)
+
+Check if a message is an AbstractAnnotationMessage.
+These messages are never sent to LLMs and are used for metadata and documentation.
+"""
+isabstractannotationmessage(msg::AbstractMessage) = msg isa AbstractAnnotationMessage
+
 # Complementary type for tracing, follows the same API as TracerMessage
 abstract type AbstractTracer{T <: Any} end
+
+"""
+    get_run_id()
+
+Generate a random run ID for message tracking.
+"""
+get_run_id() = Int(rand(Int16))
 
 ## Allowed inputs for ai* functions, AITemplate is resolved one level higher
 const ALLOWED_PROMPT_TYPE = Union{
@@ -25,18 +41,41 @@ Base.@kwdef struct MetadataMessage{T <: AbstractString} <: AbstractChatMessage
     source::String = ""
     _type::Symbol = :metadatamessage
 end
+
+"""
+    SystemMessage
+
+A message type for system-level instructions and context.
+Used to set the behavior and context for AI models.
+
+# Fields
+- `content::T`: The content of the message
+- `variables::Vector{Symbol}`: Variables extracted from content
+- `run_id::Union{Nothing,Int}`: Unique identifier for the message
+- `_type::Symbol`: Message type identifier
+"""
 Base.@kwdef struct SystemMessage{T <: AbstractString} <: AbstractChatMessage
     content::T
-    variables::Vector{Symbol} = _extract_handlebar_variables(content)
+    variables::Vector{Symbol} = begin
+        vars = _extract_handlebar_variables(content)
+        not_allowed = intersect(vars, RESERVED_KWARGS)
+        @assert length(not_allowed)==0 "Error: Some placeholders are invalid, as they are reserved for `ai*` functions. Change: $(join(not_allowed,","))"
+        vars
+    end
+    run_id::Union{Nothing,Int} = get_run_id()
     _type::Symbol = :systemmessage
-    SystemMessage{T}(c, v, t) where {T <: AbstractString} = new(c, v, t)
 end
-function SystemMessage(content::T,
-        variables::Vector{Symbol},
-        type::Symbol) where {T <: AbstractString}
+
+# Single constructor for string-only input
+function SystemMessage(content::T) where {T <: AbstractString}
+    SystemMessage{T}(; content=content)
+end
+
+function SystemMessage(content::T; kwargs...) where {T <: AbstractString}
+    variables = get(kwargs, :variables, _extract_handlebar_variables(content))
     not_allowed_kwargs = intersect(variables, RESERVED_KWARGS)
     @assert length(not_allowed_kwargs)==0 "Error: Some placeholders are invalid, as they are reserved for `ai*` functions. Change: $(join(not_allowed_kwargs,","))"
-    return SystemMessage{T}(content, variables, type)
+    SystemMessage{T}(; content=content, kwargs...)
 end
 
 """
@@ -176,6 +215,22 @@ It represents both the request (fields `args`, `name`) and the response (field `
 - `args::Union{Nothing, Dict{Symbol, Any}}`: The arguments of the tool call request.
 - `name::Union{Nothing, String}`: The name of the tool call request.
 """
+
+"""
+    ToolMessage
+
+A message type for tool calls.
+
+It represents both the request (fields `args`, `name`) and the response (field `content`).
+
+# Fields
+- `content::Any`: The content of the message.
+- `req_id::Union{Nothing, Int}`: The unique ID of the request.
+- `tool_call_id::String`: The unique ID of the tool call.
+- `raw::AbstractString`: The raw JSON string of the tool call request.
+- `args::Union{Nothing, Dict{Symbol, Any}}`: The arguments of the tool call request.
+- `name::Union{Nothing, String}`: The name of the tool call request.
+"""
 Base.@kwdef mutable struct ToolMessage <: AbstractDataMessage
     content::Any = nothing
     req_id::Union{Nothing, Int} = nothing
@@ -227,6 +282,13 @@ Base.@kwdef struct AIToolRequest{T <: Union{AbstractString, Nothing}} <: Abstrac
 end
 
 """
+    AbstractAnnotationMessage
+
+Abstract type for messages that provide documentation and metadata without being sent to LLMs.
+"""
+abstract type AbstractAnnotationMessage <: AbstractChatMessage end
+
+"""
     AnnotationMessage{T} <: AbstractAnnotationMessage
 
 A message type for adding metadata and documentation to conversation histories without affecting LLM context.
@@ -251,8 +313,23 @@ Base.@kwdef mutable struct AnnotationMessage{T} <: AbstractAnnotationMessage
     _type::Symbol = :annotationmessage
 end
 
-# Constructor that accepts content as first argument
-AnnotationMessage(content; kwargs...) = AnnotationMessage(; content=content, kwargs...)
+# Constructors for AnnotationMessage
+function AnnotationMessage(content; kwargs...)
+    AnnotationMessage{typeof(content)}(; content=content, kwargs...)
+end
+
+# Specific methods to resolve ambiguities
+function AnnotationMessage(content::AbstractString)
+    AnnotationMessage{typeof(content)}(; content=content)
+end
+
+function AnnotationMessage(msg::AbstractChatMessage)
+    AnnotationMessage{typeof(msg.content)}(; content=msg.content)
+end
+
+function AnnotationMessage(msg::AbstractTracerMessage{<:AbstractChatMessage})
+    AnnotationMessage{typeof(msg.message.content)}(; content=msg.message.content)
+end
 
 """
     annotate!(messages::Vector{<:AbstractMessage}, content; kwargs...)
@@ -349,6 +426,29 @@ isdatamessage(m::AbstractTracerMessage) = isdatamessage(m.object)
 isaimessage(m::AbstractTracerMessage) = isaimessage(m.object)
 istoolmessage(m::AbstractTracerMessage) = istoolmessage(m.object)
 isaitoolrequest(m::AbstractTracerMessage) = isaitoolrequest(m.object)
+
+# Dict conversion for AnnotationMessage
+function Base.Dict(msg::AnnotationMessage)
+    return Dict{String,Any}(
+        "content" => msg.content,
+        "extras" => msg.extras,
+        "tags" => msg.tags,
+        "comment" => msg.comment,
+        "run_id" => msg.run_id,
+        "_type" => msg._type
+    )
+end
+
+function Base.convert(::Type{AnnotationMessage}, dict::Dict)
+    return AnnotationMessage(;
+        content = dict["content"],
+        extras = convert(Dict{Symbol,Any}, dict["extras"]),
+        tags = Symbol.(dict["tags"]),
+        comment = dict["comment"],
+        run_id = dict["run_id"],
+        _type = Symbol(dict["_type"])
+    )
+end
 
 # equality check for testing, only equal if all fields are equal and type is the same
 Base.var"=="(m1::AbstractMessage, m2::AbstractMessage) = false
@@ -577,6 +677,11 @@ end
 last_message(msg::AbstractMessage) = msg
 last_output(msg::AbstractMessage) = msg.content
 
+"Returns a vector of ToolMessage objects associated with the message. For AIToolRequest, returns its tool_calls field; for ToolMessage returns a single-element vector with itself; otherwise returns an empty vector."
+tool_calls(msg::AbstractMessage) = ToolMessage[]
+tool_calls(msg::ToolMessage) = [msg]
+tool_calls(msg::AIToolRequest) = msg.tool_calls
+
 ## Display methods
 function Base.show(io::IO, ::MIME"text/plain", m::AbstractChatMessage)
     type_ = string(typeof(m)) |> x -> split(x, "{")[begin]
@@ -656,6 +761,17 @@ end
 function role4render(schema::AbstractPromptSchema, msg::AbstractTracerMessage)
     role4render(schema, msg.object)
 end
+
+"""
+    render(schema::NoSchema, messages::Vector{<:AbstractMessage}; kwargs...)
+
+Base rendering implementation that filters out annotation messages and applies any replacements.
+Annotation messages are never sent to LLMs.
+"""
+function render(schema::NoSchema, messages::Vector{<:AbstractMessage}; kwargs...)
+    [render(schema, msg; kwargs...) for msg in messages if !isabstractannotationmessage(msg)]
+end
+
 function render(schema::AbstractPromptSchema, msg::AbstractMessage; kwargs...)
     render(schema, [msg]; kwargs...)
 end
