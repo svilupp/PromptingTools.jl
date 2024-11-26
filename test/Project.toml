@@ -1,5 +1,3 @@
-name = "PromptingTools_test"
-uuid = "670122d1-24a8-4d70-bfce-740807c42193"
 [deps]
 AbstractTrees = "1520ce14-60c1-5f80-bbc7-55ef81b5835c"
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
