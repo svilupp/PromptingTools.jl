@@ -14,3 +14,6 @@ docs/package-lock.json
 
 # Ignore Cursor rules
 .cursorrules
+
+# Ignore any local preferences
+**/LocalPreferences.toml

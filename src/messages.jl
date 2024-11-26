@@ -262,7 +262,7 @@ for automatic operations.
 """
 Base.@kwdef struct AnnotationMessage{T <: AbstractString} <: AbstractAnnotationMessage
     content::T
-    extras::Dict{Symbol, <:Any} = Dict{Symbol, Any}()
+    extras::Union{Nothing, Dict{Symbol, Any}} = nothing
     tags::Vector{Symbol} = Symbol[]
     comment::String = ""
     run_id::Union{Nothing, Int} = Int(rand(Int32))
@@ -275,7 +275,14 @@ function (MSG::Type{<:AbstractChatMessage})(prompt::AbstractString; kwargs...)
     MSG(; content = prompt, kwargs...)
 end
 function (MSG::Type{<:AbstractAnnotationMessage})(content::AbstractString; kwargs...)
-    MSG(; content, kwargs...)
+    ## Re-type extras to be generic Dict{Symbol, Any}
+    new_kwargs = if haskey(kwargs, :extras)
+        [f == :extras ? f => convert(Dict{Symbol, Any}, kwargs[f]) : f => kwargs[f]
+         for f in keys(kwargs)]
+    else
+        kwargs
+    end
+    MSG(; content, new_kwargs...)
 end
 function (MSG::Type{<:AbstractChatMessage})(msg::AbstractChatMessage)
     MSG(; msg.content)

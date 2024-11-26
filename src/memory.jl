@@ -257,7 +257,6 @@ function Base.append!(mem::ConversationMemory, msgs::Vector{<:AbstractMessage})
         if !isnothing(match_idx)
             # Found match - append everything after this message
             (idx + 1 <= length(msgs)) && append!(mem.conversation, msgs[(idx + 1):end])
-            @info idx
             return mem
         end
     end

@@ -10,13 +10,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-## [0.66.0]
-
-### Added
-- Added a new `AnnotationMessage` type for keeping human-only information in the message changes. See `?annotate!` on how to use it.
-- Added a new `ConversationMemory` type to enable long multi-turn conversations with a truncated memory of the conversation history. Truncation works in "batches" to not prevent caching. See `?ConversationMemory` and `get_last` for more information.
-
-
 ## [0.65.0]
 
 ### Breaking
@@ -24,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Added a new Gemini Experimental model from November 2024 (`gemini-exp-1121` with alias `gemexp`).
+- Added a new `AnnotationMessage` type for keeping human-only information in the message changes. See `?annotate!` on how to use it.
+- Added a new `ConversationMemory` type to enable long multi-turn conversations with a truncated memory of the conversation history. Truncation works in "batches" to not prevent caching. See `?ConversationMemory` and `get_last` for more information.
+
 
 ### Updated
 - Changed the ENV variable for MistralAI API from `MISTRALAI_API_KEY` to `MISTRAL_API_KEY` to be compatible with the Mistral docs.

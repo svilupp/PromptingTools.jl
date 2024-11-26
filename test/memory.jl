@@ -1,7 +1,8 @@
 using PromptingTools: SystemMessage, UserMessage, AIMessage, AbstractMessage
 using PromptingTools: TestEchoOpenAISchema, ConversationMemory
 using PromptingTools: issystemmessage, isusermessage, isaimessage, last_message,
-                      last_output, register_model!, batch_start_index, get_last
+                      last_output, register_model!, batch_start_index,
+                      get_last, pprint
 
 @testset "batch_start_index" begin
     # Test basic batch calculation
@@ -39,6 +40,8 @@ end
     io = IOBuffer()
     show(io, mem)
     @test String(take!(io)) == "ConversationMemory(0 messages)"
+    pprint(io, mem)
+    @test String(take!(io)) == ""
 
     # Test push! and length
     push!(mem, SystemMessage("System prompt"))
@@ -58,6 +61,10 @@ end
     push!(mem, UserMessage("How are you?"))
     @test last_message(mem).content == "How are you?"
     @test last_output(mem) == "How are you?"
+
+    pprint(io, mem)
+    output = String(take!(io))
+    @test occursin("How are you?", output)
 end
 
 @testset "get_last" begin

@@ -1,10 +1,11 @@
 using PromptingTools: AIMessage, SystemMessage, MetadataMessage, AbstractMessage
 using PromptingTools: UserMessage, UserMessageWithImages, DataMessage, AIToolRequest,
-                      ToolMessage
+                      ToolMessage, AnnotationMessage
 using PromptingTools: _encode_local_image, attach_images_to_user_message, last_message,
                       last_output, tool_calls
 using PromptingTools: isusermessage, issystemmessage, isdatamessage, isaimessage,
-                      istracermessage, isaitoolrequest, istoolmessage
+                      istracermessage, isaitoolrequest, istoolmessage,
+                      isabstractannotationmessage
 using PromptingTools: TracerMessageLike, TracerMessage, align_tracer!, unwrap,
                       AbstractTracerMessage, AbstractTracer, pprint
 using PromptingTools: TracerSchema, SaverSchema
@@ -47,6 +48,63 @@ using PromptingTools: TracerSchema, SaverSchema
     @test isaimessage(missing) == false
     @test istracermessage(1) == false
 end
+
+@testset "AnnotationMessage" begin
+    # Test creation and basic properties
+    annotation = AnnotationMessage(
+        content = "Test annotation",
+        extras = Dict{Symbol, Any}(:key => "value"),
+        tags = [:debug, :test],
+        comment = "Test comment"
+    )
+    @test annotation.content == "Test annotation"
+    @test annotation.extras[:key] == "value"
+    @test :debug in annotation.tags
+    @test annotation.comment == "Test comment"
+    @test isabstractannotationmessage(annotation)
+    @test !isabstractannotationmessage(UserMessage("test"))
+
+    # Test that annotations are filtered out during rendering
+    messages = [
+        SystemMessage("System prompt"),
+        UserMessage("User message"),
+        AnnotationMessage(content = "Debug info", comment = "Debug note"),
+        AIMessage("AI response")
+    ]
+
+    # Test annotate! utility
+    msgs = [UserMessage("Hello"), AIMessage("Hi")]
+    msgs = annotate!(msgs, "Debug info", tags = [:debug])
+    @test length(msgs) == 3
+    @test isabstractannotationmessage(msgs[1])
+    @test msgs[1].tags == [:debug]
+
+    # Test single message annotation
+    msg = UserMessage("Test")
+    result = annotate!(msg, "Annotation", comment = "Note")
+    @test length(result) == 2
+    @test isabstractannotationmessage(result[1])
+    @test result[1].comment == "Note"
+
+    # Test pretty printing
+    io = IOBuffer()
+    pprint(io, annotation)
+    output = String(take!(io))
+    @test occursin("Test annotation", output)
+    @test occursin("debug", output)
+    @test occursin("Test comment", output)
+
+    # Test show method
+    io = IOBuffer()
+    show(io, MIME("text/plain"), annotation)
+    output = String(take!(io))
+    @test occursin("AnnotationMessage", output)
+    @test occursin("Test annotation", output)
+    @test !occursin("extras", output) # Should only show type and content
+    @test !occursin("tags", output)
+    @test !occursin("comment", output)
+end
+
 @testset "UserMessageWithImages" begin
     content = "Hello, world!"
     image_path = joinpath(@__DIR__, "data", "julia.png")
