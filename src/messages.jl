@@ -527,7 +527,7 @@ end
 "Helpful accessor for the last generated output (`msg.content`) in `conversation`. Returns the last output in the conversation (eg, the string/data in the last message)."
 function last_output(conversation::AbstractVector{<:AbstractMessage})
     msg = last_message(conversation)
-    return isnothing(msg) ? nothing : msg.content
+    return isnothing(msg) ? nothing : last_output(msg)
 end
 last_message(msg::AbstractMessage) = msg
 last_output(msg::AbstractMessage) = msg.content
@@ -652,30 +652,6 @@ StructTypes.StructType(::Type{DataMessage}) = StructTypes.Struct()
 StructTypes.StructType(::Type{AnnotationMessage}) = StructTypes.Struct()
 StructTypes.StructType(::Type{TracerMessage}) = StructTypes.Struct() # Ignore mutability once we serialize
 StructTypes.StructType(::Type{TracerMessageLike}) = StructTypes.Struct() # Ignore mutability once we serialize
-
-### Message Access Utilities
-
-"""
-    last_message(messages::Vector{<:AbstractMessage})
-
-Get the last message in a conversation, regardless of type.
-"""
-function last_message(messages::Vector{<:AbstractMessage})
-    isempty(messages) && return nothing
-    return last(messages)
-end
-
-"""
-    last_output(messages::Vector{<:AbstractMessage})
-
-Get the last AI-generated message (AIMessage) in a conversation.
-"""
-function last_output(messages::Vector{<:AbstractMessage})
-    isempty(messages) && return nothing
-    last_ai_idx = findlast(isaimessage, messages)
-    isnothing(last_ai_idx) && return nothing
-    return messages[last_ai_idx]
-end
 
 ### Utilities for Pretty Printing
 """

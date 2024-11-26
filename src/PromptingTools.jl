@@ -66,20 +66,13 @@ include("llm_interface.jl")
 include("user_preferences.jl")
 
 ## Conversation history / Prompt elements
+export AIMessage
 include("messages.jl")
-include("memory.jl")
-
-# Export message types and predicates
-export SystemMessage, UserMessage, AIMessage, AnnotationMessage, issystemmessage, isusermessage, isaimessage, isabstractannotationmessage, annotate!
-# Export memory-related functionality
-export ConversationMemory, get_last, last_message, last_output
-# export UserMessage, UserMessageWithImages, SystemMessage, DataMessage # for debugging only
 
 # export ConversationMemory
 include("memory.jl")
 # export annotate!
 include("annotation.jl")
-
 
 export aitemplates, AITemplate
 include("templates.jl")

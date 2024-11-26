@@ -1,8 +1,7 @@
 using PromptingTools: SystemMessage, UserMessage, AIMessage, AbstractMessage
 using PromptingTools: TestEchoOpenAISchema, ConversationMemory
 using PromptingTools: issystemmessage, isusermessage, isaimessage, last_message,
-                      last_output, register_model!, batch_start_index
-using HTTP, JSON3
+                      last_output, register_model!, batch_start_index, get_last
 
 @testset "batch_start_index" begin
     # Test basic batch calculation
@@ -29,8 +28,6 @@ using HTTP, JSON3
 
     @test_throws AssertionError batch_start_index(3, 5, 10)
 end
-
-# @testset "ConversationMemory" begin
 
 @testset "ConversationMemory-type" begin
     # Test constructor and empty initialization
