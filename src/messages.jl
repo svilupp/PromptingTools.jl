@@ -262,7 +262,7 @@ for automatic operations.
 """
 Base.@kwdef struct AnnotationMessage{T <: AbstractString} <: AbstractAnnotationMessage
     content::T
-    extras::Dict{Symbol, Any} = Dict{Symbol, Any}()
+    extras::Dict{Symbol, <:Any} = Dict{Symbol, Any}()
     tags::Vector{Symbol} = Symbol[]
     comment::String = ""
     run_id::Union{Nothing, Int} = Int(rand(Int32))
