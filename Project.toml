@@ -66,6 +66,7 @@ SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 Unicode = "4ec0a83e-493e-50e2-b9ac-8f72acf5a8f5"
 HTTP = "cd3eb016-35fb-5094-929b-558a96fad6f3"
+JSON3 = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
 
 [targets]
-test = ["Aqua", "FlashRank", "SparseArrays", "Statistics", "LinearAlgebra", "Markdown", "Snowball", "Unicode", "HTTP"]
+test = ["Aqua", "FlashRank", "SparseArrays", "Statistics", "LinearAlgebra", "Markdown", "Snowball", "Unicode", "HTTP", "JSON3"]
