@@ -47,6 +47,8 @@ function render(schema::AbstractAnthropicSchema,
     for msg in messages_replaced
         if issystemmessage(msg)
             system = msg.content
+        elseif isabstractannotationmessage(msg)
+            continue
         elseif isusermessage(msg) || isaimessage(msg)
             content = msg.content
             push!(conversation,

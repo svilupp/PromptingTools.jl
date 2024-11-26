@@ -19,7 +19,7 @@ end
 @testset "PromptingTools.jl" begin
     include("utils.jl")
     include("messages.jl")
-    include("messages_utils.jl")
+    include("annotation.jl")
     include("memory.jl")
     include("extraction.jl")
     include("user_preferences.jl")

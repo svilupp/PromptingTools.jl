@@ -39,6 +39,9 @@ function render(schema::AbstractOllamaSchema,
 
     # replace any handlebar variables in the messages
     for msg in messages_replaced
+        if isabstractannotationmessage(msg)
+            continue
+        end
         new_message = Dict{String, Any}(
             "role" => role4render(schema, msg), "content" => msg.content)
         ## Special case for images

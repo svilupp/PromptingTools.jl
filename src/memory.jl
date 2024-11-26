@@ -1,59 +1,58 @@
-# Conversation Memory Implementation
-import PromptingTools: AbstractMessage, SystemMessage, AIMessage, UserMessage
-import PromptingTools: issystemmessage, isusermessage, isaimessage
-import PromptingTools: aigenerate, last_message, last_output
-
 """
     ConversationMemory
 
-A structured container for managing conversation history with intelligent truncation
-and caching capabilities.
+A structured container for managing conversation history. It has only one field `:conversation`
+which is a vector of `AbstractMessage`s. It's built to support intelligent truncation and caching
+behavior (`get_last`).
 
-The memory supports batched retrieval with deterministic truncation points for optimal
-caching behavior.
+You can also use it as a functor to have extended conversations (easier than constantly passing `conversation` kwarg)
 """
 Base.@kwdef mutable struct ConversationMemory
     conversation::Vector{AbstractMessage} = AbstractMessage[]
 end
 
-# Basic interface extensions
-import Base: show, push!, append!, length
-
 """
     show(io::IO, mem::ConversationMemory)
 
-Display the number of non-system messages in the conversation memory.
+Display the number of non-system/non-annotation messages in the conversation memory.
 """
 function Base.show(io::IO, mem::ConversationMemory)
-    n_msgs = count(!issystemmessage, mem.conversation)
+    n_msgs = count(
+        x -> !issystemmessage(x) && !isabstractannotationmessage(x), mem.conversation)
     print(io, "ConversationMemory($(n_msgs) messages)")
 end
 
 """
     length(mem::ConversationMemory)
 
-Return the number of messages, excluding system messages.
+Return the number of messages. All of them.
 """
 function Base.length(mem::ConversationMemory)
-    count(!issystemmessage, mem.conversation)
+    length(mem.conversation)
 end
 
 """
     last_message(mem::ConversationMemory)
 
-Get the last message in the conversation, delegating to PromptingTools.last_message.
+Get the last message in the conversation.
 """
 function last_message(mem::ConversationMemory)
-    PromptingTools.last_message(mem.conversation)
+    last_message(mem.conversation)
 end
 
 """
     last_output(mem::ConversationMemory)
 
-Get the last AI message in the conversation, delegating to PromptingTools.last_output.
+Get the last AI message in the conversation.
 """
 function last_output(mem::ConversationMemory)
-    PromptingTools.last_output(mem.conversation)
+    last_output(mem.conversation)
+end
+
+function pprint(
+        io::IO, mem::ConversationMemory;
+        text_width::Int = displaysize(io)[2])
+    pprint(io, mem.conversation; text_width)
 end
 
 """
@@ -62,7 +61,7 @@ end
              verbose::Bool=false,
              explain::Bool=false)
 
-Get the last n messages with intelligent batching and caching support.
+Get the last n messages (but including system message) with intelligent batching to preserve caching.
 
 Arguments:
 - n::Integer: Maximum number of messages to return (default: 20)
@@ -75,11 +74,34 @@ Vector{AbstractMessage} with the selected messages, always including:
 1. The system message (if present)
 2. First user message
 3. Messages up to n, respecting batch_size boundaries
+
+Once you get your full conversation back, you can use `append!(mem, conversation)` to merge the new messages into the memory.
+
+# Examples:
+```julia
+# Basic usage - get last 3 messages
+mem = ConversationMemory()
+push!(mem, SystemMessage("You are helpful"))
+push!(mem, UserMessage("Hello"))
+push!(mem, AIMessage("Hi!"))
+push!(mem, UserMessage("How are you?"))
+push!(mem, AIMessage("I'm good!"))
+messages = get_last(mem, 3)
+
+# Using batch_size for caching efficiency
+messages = get_last(mem, 10; batch_size=5)  # Aligns to 5-message batches for caching
+
+# Add explanation about truncation
+messages = get_last(mem, 3; explain=true)  # Adds truncation note to first AI message so the model knows it's truncated
+
+# Get verbose output about truncation
+messages = get_last(mem, 3; verbose=true)  # Prints info about truncation
+```
 """
-function get_last(mem::ConversationMemory, n::Integer=20;
-                 batch_size::Union{Nothing,Integer}=nothing,
-                 verbose::Bool=false,
-                 explain::Bool=false)
+function get_last(mem::ConversationMemory, n::Integer = 20;
+        batch_size::Union{Nothing, Integer} = nothing,
+        verbose::Bool = false,
+        explain::Bool = false)
     messages = mem.conversation
     isempty(messages) && return AbstractMessage[]
 
@@ -96,57 +118,66 @@ function get_last(mem::ConversationMemory, n::Integer=20;
         push!(result, messages[first_user_idx])
     end
 
-    # Get remaining messages excluding system and first user
-    exclude_indices = filter(!isnothing, [system_idx, first_user_idx])
-    remaining_msgs = messages[setdiff(1:length(messages), exclude_indices)]
+    # Calculate remaining message budget
+    remaining_budget = n - length(result)
+    visible_messages = findall(
+        x -> !issystemmessage(x) && !isabstractannotationmessage(x), messages)
 
-    # Calculate how many messages to include based on batch size
-    if !isnothing(batch_size)
-        # When batch_size=10, should return between 11-20 messages
-        total_msgs = length(remaining_msgs)
-        num_batches = ceil(Int, total_msgs / batch_size)
-
-        # Calculate target size (between batch_size+1 and 2*batch_size)
-        target_size = if num_batches * batch_size > n
-            batch_size + 1  # Reset to minimum (11 for batch_size=10)
-        else
-            min(num_batches * batch_size, n - length(result))
-        end
-
-        # Get messages to append
-        if !isempty(remaining_msgs)
-            start_idx = max(1, length(remaining_msgs) - target_size + 1)
-            append!(result, remaining_msgs[start_idx:end])
-        end
-    else
-        # Without batch size, just get the last n-length(result) messages
-        if !isempty(remaining_msgs)
-            start_idx = max(1, length(remaining_msgs) - (n - length(result)) + 1)
-            append!(result, remaining_msgs[start_idx:end])
-        end
+    if remaining_budget > 0
+        default_start_idx = max(1, length(visible_messages) - remaining_budget + 1)
+        start_idx = !isnothing(batch_size) ?
+                    batch_start_index(
+            length(visible_messages), remaining_budget, batch_size) : default_start_idx
+        ## find first AIMessage after that (it must be aligned to follow after UserMessage)
+        valid_idxs = @view(visible_messages[start_idx:end])
+        ai_msg_idx = findfirst(isaimessage, @view(messages[valid_idxs]))
+        !isnothing(ai_msg_idx) &&
+            append!(result, messages[@view(valid_idxs[ai_msg_idx:end])])
     end
 
-    if verbose
-        println("Total messages: ", length(messages))
-        println("Keeping: ", length(result))
-        println("Required messages: ", count(m -> issystemmessage(m) || m === messages[first_user_idx], result))
-        if !isnothing(batch_size)
-            println("Using batch size: ", batch_size)
-        end
-    end
+    verbose &&
+        @info "ConversationMemory truncated to $(length(result))/$(length(messages)) messages"
 
     # Add explanation if requested and we truncated messages
-    if explain && length(messages) > length(result)
+    if explain && (length(visible_messages) + 1) > length(result)
         # Find first AI message in result after required messages
-        ai_msg_idx = findfirst(m -> isaimessage(m) && !(m in result[1:length(exclude_indices)]), result)
+        ai_msg_idx = findfirst(x -> isaimessage(x) || isaitoolrequest(x), result)
+        trunc_count = length(visible_messages) + 1 - length(result)
         if !isnothing(ai_msg_idx)
-            orig_content = result[ai_msg_idx].content
-            explanation = "For efficiency reasons, we have truncated the preceding $(length(messages) - length(result)) messages.\n\n$orig_content"
-            result[ai_msg_idx] = AIMessage(explanation)
+            ai_msg = result[ai_msg_idx]
+            orig_content = ai_msg.content
+            explanation = "[This is an automatically added explanation to inform you that for efficiency reasons, the user has truncated the preceding $(trunc_count) messages.]\n\n$orig_content"
+            ai_msg_type = typeof(ai_msg)
+            result[ai_msg_idx] = ai_msg_type(;
+                [f => getfield(ai_msg, f)
+                 for f in fieldnames(ai_msg_type) if f != :content]...,
+                content = explanation)
         end
     end
 
     return result
+end
+
+"""
+    batch_start_index(array_length::Integer, n::Integer, batch_size::Integer) -> Integer
+
+Compute the starting index for retrieving the most recent data, adjusting in blocks of `batch_size`.
+The function accumulates messages until hitting a batch boundary, then jumps to the next batch.
+
+For example, with n=20 and batch_size=10:
+- At length 90-99: returns 80 (allowing accumulation of 11-20 messages)
+- At length 100-109: returns 90 (allowing accumulation of 11-20 messages)
+- At length 110: returns 100 (resetting to 11 messages)
+"""
+function batch_start_index(array_length::Integer, n::Integer, batch_size::Integer)::Integer
+    @assert n>=batch_size "n must be >= batch_size"
+    # Calculate which batch we're in
+    batch_number = (array_length - (n - batch_size)) ÷ batch_size
+    # Calculate the start of the current batch
+    batch_start = batch_number * batch_size
+
+    # Ensure we don't go before the first element
+    return max(1, batch_start)
 end
 
 """
@@ -157,27 +188,33 @@ Only appends messages that are newer than the latest matching message in memory.
 """
 function Base.append!(mem::ConversationMemory, msgs::Vector{<:AbstractMessage})
     isempty(msgs) && return mem
+    isempty(mem.conversation) && return append!(mem.conversation, msgs)
 
-    if isempty(mem.conversation)
-        append!(mem.conversation, msgs)
-        return mem
-    end
+    # get all messages in mem.conversation with run_id
+    run_id_indices = findall(x -> hasproperty(x, :run_id), mem.conversation)
 
-    # Find latest run_id in memory
-    latest_run_id = 0
-    for msg in mem.conversation
-        if isdefined(msg, :run_id)
-            latest_run_id = max(latest_run_id, msg.run_id)
+    # Search backwards through messages to find matching point
+    for idx in reverse(eachindex(msgs))
+        msg = msgs[idx]
+
+        # Find matching message in memory based on run_id if present
+        match_idx = if hasproperty(msg, :run_id)
+            findlast(
+                m -> hasproperty(m, :run_id) && m.run_id == msg.run_id, @view(mem.conversation[run_id_indices]))
+        else
+            findlast(m -> m == msg, mem.conversation)
+        end
+
+        if !isnothing(match_idx)
+            # Found match - append everything after this message
+            (idx + 1 <= length(msgs)) && append!(mem.conversation, msgs[(idx + 1):end])
+            @info idx
+            return mem
         end
     end
 
-    # Keep messages that either don't have a run_id or have a higher run_id
-    new_msgs = filter(msgs) do msg
-        !isdefined(msg, :run_id) || msg.run_id > latest_run_id
-    end
-
-    append!(mem.conversation, new_msgs)
-    return mem
+    @warn "No matching messages found in memory, appending all"
+    return append!(mem.conversation, msgs)
 end
 
 """
@@ -191,34 +228,33 @@ function Base.push!(mem::ConversationMemory, msg::AbstractMessage)
 end
 
 """
-    (mem::ConversationMemory)(prompt::String; last::Union{Nothing,Integer}=nothing, kwargs...)
+    (mem::ConversationMemory)(prompt::AbstractString; last::Union{Nothing,Integer}=nothing, kwargs...)
 
 Functor interface for direct generation using the conversation memory.
+Optionally, specify the number of last messages to include in the context (uses `get_last`).
 """
-function (mem::ConversationMemory)(prompt::String; last::Union{Nothing,Integer}=nothing, kwargs...)
+function (mem::ConversationMemory)(
+        prompt::AbstractString; last::Union{Nothing, Integer} = nothing, kwargs...)
     # Get conversation context
-    context = if isnothing(last)
-        mem.conversation
-    else
-        get_last(mem, last)
-    end
+    context = isnothing(last) ? mem.conversation : get_last(mem, last)
 
     # Add user message to memory first
     user_msg = UserMessage(prompt)
-    push!(mem.conversation, user_msg)
+    push!(mem, user_msg)
 
     # Generate response with context
-    response = aigenerate(context, prompt; kwargs...)
-    push!(mem.conversation, response)
-    return response
+    response = aigenerate(context; return_all = true, kwargs...)
+    append!(mem, response)
+    return last_message(response)
 end
 
 """
-    aigenerate(mem::ConversationMemory, prompt::String; kwargs...)
+    aigenerate(schema::AbstractPromptSchema,
+        mem::ConversationMemory; kwargs...)
 
 Generate a response using the conversation memory context.
 """
-function PromptingTools.aigenerate(messages::Vector{<:AbstractMessage}, prompt::String; kwargs...)
-    schema = get(kwargs, :schema, OpenAISchema())
-    aigenerate(schema, [messages..., UserMessage(prompt)]; kwargs...)
+function aigenerate(schema::AbstractPromptSchema,
+        mem::ConversationMemory; kwargs...)
+    aigenerate(schema, mem.conversation; kwargs...)
 end

@@ -37,6 +37,9 @@ function render(schema::AbstractGoogleSchema,
 
     # replace any handlebar variables in the messages
     for msg in messages_replaced
+        if isabstractannotationmessage(msg)
+            continue
+        end
         push!(conversation,
             Dict(
                 :role => role4render(schema, msg), :parts => [Dict("text" => msg.content)]))

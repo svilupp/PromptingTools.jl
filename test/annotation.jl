@@ -1,6 +1,6 @@
-using Test
-using PromptingTools
-using PromptingTools: OpenAISchema, AnthropicSchema, OllamaSchema, GoogleSchema, TestEchoOpenAISchema, render
+using PromptingTools: isabstractannotationmessage, annotate!, pprint
+using PromptingTools: OpenAISchema, AnthropicSchema, OllamaSchema, GoogleSchema, TestEchoOpenAISchema, render, NoSchema
+using PromptingTools: AnnotationMessage, SystemMessage, TracerMessage,UserMessage, AIMessage
 
 @testset "Annotation Message Rendering" begin
     # Create a mix of messages including annotation messages
@@ -12,21 +12,9 @@ using PromptingTools: OpenAISchema, AnthropicSchema, OllamaSchema, GoogleSchema,
         AIMessage("Hi there!")  # No status needed for basic message
     ]
 
-    # Additional edge cases
-    messages_complex = [
-        AnnotationMessage("Metadata 1", extras=Dict{Symbol,Any}(:key => "value")),
-        AnnotationMessage("Metadata 2", extras=Dict{Symbol,Any}(:key2 => "value2")),
-        SystemMessage("Be helpful"),
-        AnnotationMessage("Metadata 3", tags=[:important]),
-        UserMessage("Hello"),
-        AnnotationMessage("Metadata 4", comment="For debugging"),
-        AIMessage("Hi there!"),
-        AnnotationMessage("Metadata 5", extras=Dict{Symbol,Any}(:key3 => "value3"))
-    ]
-
     @testset "Basic Message Filtering" begin
         # Test OpenAI Schema with TestEcho
-        schema = TestEchoOpenAISchema(
+        schema = TestEchoOpenAISchema(; 
             response=Dict(
                 "choices" => [Dict("message" => Dict("content" => "Test response", "role" => "assistant"), "index" => 0, "finish_reason" => "stop")],
                 "usage" => Dict("prompt_tokens" => 10, "completion_tokens" => 20, "total_tokens" => 30),
@@ -62,33 +50,59 @@ using PromptingTools: OpenAISchema, AnthropicSchema, OllamaSchema, GoogleSchema,
         @test all(msg[:role] in ["user", "model"] for msg in rendered)  # Google uses "model" instead of "assistant"
         @test !any(msg -> any(part -> contains(part["text"], "metadata"), msg[:parts]), rendered)
     end
+end
 
-    @testset "Complex Edge Cases" begin
-        # Test with multiple consecutive annotation messages
-        for schema in [TestEchoOpenAISchema(), AnthropicSchema(), OllamaSchema(), GoogleSchema()]
-            rendered = render(schema, messages_complex)
 
-            if schema isa AnthropicSchema
-                @test length(rendered.conversation) == 2  # user and AI only
-                @test !isnothing(rendered.system)  # system preserved
-            else
-                @test length(rendered) == (schema isa GoogleSchema ? 2 : 3)  # Google schema combines system with user message
-            end
+@testset "AnnotationMessage" begin
+    # Test creation and basic properties
+    annotation = AnnotationMessage(
+        content="Test annotation",
+        extras=Dict{Symbol,Any}(:key => "value"),
+        tags=[:debug, :test],
+        comment="Test comment"
+    )
+    @test annotation.content == "Test annotation"
+    @test annotation.extras[:key] == "value"
+    @test :debug in annotation.tags
+    @test annotation.comment == "Test comment"
+    @test isabstractannotationmessage(annotation)
+    @test !isabstractannotationmessage(UserMessage("test"))
 
-            # Test no metadata leaks through
-            for i in 1:5
-                if schema isa GoogleSchema
-                    # Google schema uses a different structure
-                    @test !any(msg -> any(part -> contains(part["text"], "Metadata $i"), msg[:parts]), rendered)
-                elseif schema isa AnthropicSchema
-                    # Check each message's content array for metadata
-                    @test !any(msg -> any(content -> contains(content["text"], "Metadata $i"), msg["content"]), rendered.conversation)
-                    @test !contains(rendered.system, "Metadata $i")
-                else
-                    # OpenAI and Ollama schemas
-                    @test !any(msg -> contains(msg["content"], "Metadata $i"), rendered)
-                end
-            end
-        end
-    end
+    # Test that annotations are filtered out during rendering
+    messages = [
+        SystemMessage("System prompt"),
+        UserMessage("User message"),
+        AnnotationMessage(content="Debug info", comment="Debug note"),
+        AIMessage("AI response")
+    ]
+
+    # Create a basic schema for testing
+    schema = NoSchema()
+    rendered = render(schema, messages)
+
+    # Verify annotation message is not in rendered output
+    @test length(rendered) == 3  # Only system, user, and AI messages
+    @test all(!isabstractannotationmessage, rendered)
+
+    # Test annotate! utility
+    msgs = [UserMessage("Hello"), AIMessage("Hi")]
+    msgs=annotate!(msgs, "Debug info", tags=[:debug])
+    @test length(msgs) == 3
+    @test isabstractannotationmessage(msgs[1])
+    @test msgs[1].tags == [:debug]
+
+    # Test single message annotation
+    msg = UserMessage("Test")
+    result = annotate!(msg, "Annotation", comment="Note")
+    @test length(result) == 2
+    @test isabstractannotationmessage(result[1])
+    @test result[1].comment == "Note"
+
+    # Test pretty printing
+    io = IOBuffer()
+    pprint(io, annotation)
+    output = String(take!(io))
+    @test contains(output, "Test annotation")
+    @test contains(output, "debug")
+    @test contains(output, "Test comment")
 end

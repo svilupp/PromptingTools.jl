@@ -40,6 +40,8 @@ function render(schema::AbstractOllamaManagedSchema,
             system = msg.content
         elseif msg isa UserMessage
             prompt = msg.content
+        elseif isabstractannotationmessage(msg)
+            continue
         elseif msg isa UserMessageWithImages
             error("Managed schema does not support UserMessageWithImages. Please use OpenAISchema instead.")
         elseif msg isa AIMessage

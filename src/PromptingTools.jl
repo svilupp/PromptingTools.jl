@@ -75,6 +75,12 @@ export SystemMessage, UserMessage, AIMessage, AnnotationMessage, issystemmessage
 export ConversationMemory, get_last, last_message, last_output
 # export UserMessage, UserMessageWithImages, SystemMessage, DataMessage # for debugging only
 
+# export ConversationMemory
+include("memory.jl")
+# export annotate!
+include("annotation.jl")
+
+
 export aitemplates, AITemplate
 include("templates.jl")
 

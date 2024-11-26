@@ -1,16 +1,13 @@
 using PromptingTools: AIMessage, SystemMessage, MetadataMessage, AbstractMessage
 using PromptingTools: UserMessage, UserMessageWithImages, DataMessage, AIToolRequest,
-                      ToolMessage, AnnotationMessage
+                      ToolMessage
 using PromptingTools: _encode_local_image, attach_images_to_user_message, last_message,
                       last_output, tool_calls
 using PromptingTools: isusermessage, issystemmessage, isdatamessage, isaimessage,
-                      istracermessage, isaitoolrequest, istoolmessage, isabstractannotationmessage
+                      istracermessage, isaitoolrequest, istoolmessage
 using PromptingTools: TracerMessageLike, TracerMessage, align_tracer!, unwrap,
                       AbstractTracerMessage, AbstractTracer, pprint
-using PromptingTools: TracerSchema, SaverSchema, TestEchoOpenAISchema, render
-
-# Include the detailed annotation message tests
-include("test_annotation_messages.jl")
+using PromptingTools: TracerSchema, SaverSchema
 
 @testset "Message constructors" begin
     # Creates an instance of MSG with the given content string.
@@ -30,6 +27,7 @@ include("test_annotation_messages.jl")
     @test_throws AssertionError UserMessage(content)
     @test_throws AssertionError UserMessage(; content)
     @test_throws AssertionError SystemMessage(content)
+    @test_throws AssertionError SystemMessage(; content)
     @test_throws AssertionError UserMessageWithImages(; content, image_url = ["a"])
 
     # Check methods
@@ -42,14 +40,6 @@ include("test_annotation_messages.jl")
     @test UserMessage(content) != AIMessage(content)
     @test AIToolRequest() |> isaitoolrequest
     @test ToolMessage(; tool_call_id = "x", raw = "") |> istoolmessage
-
-    # Test AnnotationMessage
-    annotation = AnnotationMessage(content="Debug info", comment="Test annotation")
-    @test isabstractannotationmessage(annotation)
-    @test !isabstractannotationmessage(UserMessage("test"))
-    @test annotation.content == "Debug info"
-    @test annotation.comment == "Test annotation"
-
     ## check handling other types
     @test isusermessage(1) == false
     @test issystemmessage(nothing) == false
@@ -189,17 +179,6 @@ end
     output = String(take!(io))
     @test occursin("User Message", output)
     @test occursin("User input with image", output)
-
-    # AnnotationMessage
-    take!(io)
-    m = AnnotationMessage("Debug info", comment="Test annotation")
-    show(io, MIME("text/plain"), m)
-    @test occursin("AnnotationMessage(\"Debug info\")", String(take!(io)))
-    pprint(io, m)
-    output = String(take!(io))
-    @test occursin("Annotation Message", output)
-    @test occursin("Debug info", output)
-    @test occursin("Test annotation", output)
 
     # MetadataMessage
     take!(io)
@@ -371,29 +350,4 @@ end
     pprint_output = String(take!(io_pprint))
     @test occursin("TracerMessageLike with:", pprint_output)
     @test occursin("Test Message", pprint_output)
-end
-
-@testset "AnnotationMessage rendering" begin
-    # Test that annotations are filtered out during rendering
-    messages = [
-        SystemMessage("System prompt"),
-        UserMessage("User message"),
-        AnnotationMessage(content="Debug info", comment="Debug note"),
-        AIMessage("AI response")
-    ]
-
-    # Create a basic schema for testing
-    schema = TestEchoOpenAISchema()
-    rendered = render(schema, messages)
-
-    # Verify annotation message is not in rendered output
-    @test !contains(rendered, "Debug info")
-    @test !contains(rendered, "Debug note")
-
-    # Test single message rendering
-    annotation = AnnotationMessage("Debug info", comment="Debug")
-    @test render(schema, annotation) === nothing
-
-    # Test that other messages still render normally
-    @test !isnothing(render(schema, UserMessage("Test")))
 end

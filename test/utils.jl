@@ -215,7 +215,7 @@ end
 
     # Multiple messages
     conv = [AIMessage(; content = "", tokens = (1000, 2000), cost = 1.0),
-            UserMessage(; content = "", cost = 0.0)]
+        UserMessage(; content = "")]
     @test call_cost(conv) == 1.0
 
     # No model provided

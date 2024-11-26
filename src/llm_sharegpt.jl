@@ -9,7 +9,7 @@ end
 function render(schema::AbstractShareGPTSchema, conv::AbstractVector{<:AbstractMessage})
     Dict("conversations" => [Dict("from" => role4render(schema, msg),
                                  "value" => msg.content)
-                             for msg in conv])
+                             for msg in conv if !isabstractannotationmessage(msg)])
 end
 
 ### AI Functions
