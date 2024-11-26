@@ -1,12 +1,12 @@
 using PromptingTools
+using Test, Pkg
+# Ensure test dependencies are loaded
+Pkg.activate("test")
+Pkg.instantiate()
 using OpenAI, HTTP, JSON3
 using SparseArrays, LinearAlgebra, Markdown
 using Statistics
 using Dates: now
-using Test, Pkg, Random
-const PT = PromptingTools
-using Snowball, FlashRank
-using Aqua
 
 @testset "Code quality (Aqua.jl)" begin
     # Skipping unbound_args check because we need our `MaybeExtract` type to be unboard
