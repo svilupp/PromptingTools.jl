@@ -7,7 +7,7 @@ using PromptingTools: isusermessage, issystemmessage, isdatamessage, isaimessage
                       istracermessage, isaitoolrequest, istoolmessage,
                       isabstractannotationmessage
 using PromptingTools: TracerMessageLike, TracerMessage, align_tracer!, unwrap,
-                      AbstractTracerMessage, AbstractTracer, pprint
+                      AbstractTracerMessage, AbstractTracer, pprint, annotate!
 using PromptingTools: TracerSchema, SaverSchema
 
 @testset "Message constructors" begin
@@ -78,13 +78,6 @@ end
     @test length(msgs) == 3
     @test isabstractannotationmessage(msgs[1])
     @test msgs[1].tags == [:debug]
-
-    # Test single message annotation
-    msg = UserMessage("Test")
-    result = annotate!(msg, "Annotation", comment = "Note")
-    @test length(result) == 2
-    @test isabstractannotationmessage(result[1])
-    @test result[1].comment == "Note"
 
     # Test pretty printing
     io = IOBuffer()

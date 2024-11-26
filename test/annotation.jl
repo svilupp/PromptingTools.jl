@@ -65,3 +65,49 @@ using PromptingTools: AnnotationMessage, SystemMessage, TracerMessage, UserMessa
         @test all(!isabstractannotationmessage, rendered)
     end
 end
+
+@testset "annotate!" begin
+    # Test basic annotation with single message
+    msg = UserMessage("Hello")
+    annotated = annotate!(msg, "metadata"; tags = [:test])
+    @test length(annotated) == 2
+    @test isabstractannotationmessage(annotated[1])
+    @test annotated[1].content == "metadata"
+    @test annotated[1].tags == [:test]
+    @test annotated[2].content == "Hello"
+
+    # Test annotation with vector of messages
+    messages = [
+        SystemMessage("System"),
+        UserMessage("User"),
+        AIMessage("AI")
+    ]
+    annotated = annotate!(messages, "metadata"; comment = "test comment")
+    @test length(annotated) == 4
+    @test isabstractannotationmessage(annotated[1])
+    @test annotated[1].content == "metadata"
+    @test annotated[1].comment == "test comment"
+    @test annotated[2:end] == messages
+
+    # Test annotation with existing annotations
+    messages = [
+        AnnotationMessage("First annotation"),
+        SystemMessage("System"),
+        UserMessage("User"),
+        AnnotationMessage("Second annotation"),
+        AIMessage("AI")
+    ]
+    annotated = annotate!(messages, "new metadata")
+    @test length(annotated) == 6
+    @test isabstractannotationmessage(annotated[1])
+    @test isabstractannotationmessage(annotated[4])
+    @test annotated[5].content == "new metadata"
+    @test annotated[6].content == "AI"
+
+    # Test annotation with extras
+    extras = Dict{Symbol, Any}(:key => "value")
+    annotated = annotate!(UserMessage("Hello"), "metadata"; extras = extras)
+    @test length(annotated) == 2
+    @test annotated[1].content == "metadata"
+    @test annotated[1].extras == extras
+end
