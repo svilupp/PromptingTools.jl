@@ -1,10 +1,10 @@
-using PromptingTools: AIMessage, SystemMessage, MetadataMessage, AbstractMessage
+using PromptingTools: AIMessage, SystemMessage, MetadataMessage, AbstractMessage, AbstractAnnotationMessage
 using PromptingTools: UserMessage, UserMessageWithImages, DataMessage, AIToolRequest,
                       ToolMessage
 using PromptingTools: _encode_local_image, attach_images_to_user_message, last_message,
                       last_output, tool_calls
 using PromptingTools: isusermessage, issystemmessage, isdatamessage, isaimessage,
-                      istracermessage, isaitoolrequest, istoolmessage
+                      istracermessage, isaitoolrequest, istoolmessage, isabstractannotationmessage
 using PromptingTools: TracerMessageLike, TracerMessage, align_tracer!, unwrap,
                       AbstractTracerMessage, AbstractTracer, pprint
 using PromptingTools: TracerSchema, SaverSchema
@@ -259,6 +259,50 @@ end
     output = String(take!(io))
     @test occursin("DataMessage", output)
     @test occursin("Int64", output)
+end
+
+@testset "AnnotationMessage" begin
+    # Basic construction
+    content = "Test annotation"
+    comment = "For testing purposes"
+    tags = [:test, :example]
+    extras = Dict(:key1 => "value1", :key2 => 42)
+
+    msg = AnnotationMessage(content; comment, tags, extras)
+    @test msg.content == content
+    @test msg.comment == comment
+    @test msg.tags == tags
+    @test msg.extras == extras
+    @test isabstractannotationmessage(msg)
+
+    # Test show method
+    io = IOBuffer()
+    show(io, MIME("text/plain"), msg)
+    output = String(take!(io))
+    @test occursin("AnnotationMessage", output)
+    @test occursin("Test annotation", output)
+    @test occursin("test, example", output)
+
+    # Test pprint
+    pprint(io, msg)
+    output = String(take!(io))
+    @test occursin("Annotation Message", output)
+    @test occursin("Content: Test annotation", output)
+    @test occursin("Tags: [:test, :example]", output)
+
+    # Test annotate! utility
+    msgs = [UserMessage("Hello"), AIMessage("Hi")]
+    annotated = annotate!(msgs, "Annotation"; tags=[:conversation])
+    @test length(annotated) == 3
+    @test isabstractannotationmessage(annotated[1])
+    @test annotated[1].tags == [:conversation]
+
+    # Test multiple annotations
+    another_annotation = AnnotationMessage("Another note")
+    push!(msgs, another_annotation)
+    annotated = annotate!(msgs, "New annotation")
+    @test count(isabstractannotationmessage, annotated) == 2
+    @test findall(isabstractannotationmessage, annotated) == [1, 2]
 end
 
 @testset "TracerMessage,TracerMessageLike" begin

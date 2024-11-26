@@ -279,6 +279,43 @@ function annotate!(messages::Vector{<:AbstractMessage}, content; kwargs...)
     return messages
 end
 
+"""
+    annotate!(msgs::Vector{<:AbstractMessage}, content::String; kwargs...)
+
+Add an AnnotationMessage to a vector of messages, placing it after any existing annotations.
+Returns the modified vector.
+
+# Arguments
+- `msgs`: Vector of messages to annotate
+- `content`: Content of the annotation
+- `kwargs...`: Additional fields for AnnotationMessage (extras, tags, comment)
+
+# Example
+```julia
+msgs = [UserMessage("Hello"), AIMessage("Hi")]
+annotate!(msgs, "Conversation start"; tags=[:greeting])
+```
+"""
+function annotate!(msgs::Vector{<:AbstractMessage}, content::String; kwargs...)
+    annotation = AnnotationMessage(content; kwargs...)
+    # Find the last annotation message index
+    last_annotation_idx = findlast(isabstractannotationmessage, msgs)
+
+    if isnothing(last_annotation_idx)
+        # No existing annotations, insert at start
+        insert!(msgs, 1, annotation)
+    else
+        # Insert after the last annotation
+        insert!(msgs, last_annotation_idx + 1, annotation)
+    end
+    return msgs
+end
+
+"""
+    annotate!(message::AbstractMessage, content; kwargs...)
+
+Convenience method to annotate a single message by wrapping it in a vector.
+"""
 function annotate!(message::AbstractMessage, content; kwargs...)
     annotate!([message], content; kwargs...)
 end
@@ -556,6 +593,34 @@ function Base.show(io::IO, ::MIME"text/plain", m::AbstractChatMessage)
     end
     print(io, "(\"", m.content, "\")")
 end
+
+function Base.show(io::IO, ::MIME"text/plain", m::AnnotationMessage)
+    printstyled(io, "AnnotationMessage"; color = :cyan)
+    print(io, "(\"", m.content[1:min(30, length(m.content))])
+    if length(m.content) > 30
+        print(io, "...")
+    end
+    if !isempty(m.tags)
+        print(io, "\" [", join(m.tags, ", "), "])")
+    else
+        print(io, "\")")
+    end
+end
+
+function pprint(io::IO, msg::AnnotationMessage)
+    println(io, "Annotation Message:")
+    println(io, "Content: ", msg.content)
+    if !isempty(msg.tags)
+        println(io, "Tags: ", msg.tags)
+    end
+    if !isempty(msg.comment)
+        println(io, "Comment: ", msg.comment)
+    end
+    if !isempty(msg.extras)
+        println(io, "Extras: ", msg.extras)
+    end
+end
+
 function Base.show(io::IO, ::MIME"text/plain", m::AbstractDataMessage)
     type_ = string(typeof(m)) |> x -> split(x, "{")[begin]
     printstyled(io, type_; color = :light_yellow)

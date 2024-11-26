@@ -1,0 +1,4 @@
+[deps]
+OpenAI = "e9f21f70-7185-4079-aca2-91159181367c"
+PromptingTools = "670122d1-24a8-4d70-bfce-740807c42192"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"

@@ -73,6 +73,9 @@ function render(schema::NoSchema,
             count_system_msg += 1
             # move to the front
             pushfirst!(conversation, msg)
+        elseif isabstractannotationmessage(msg)
+            # Silently skip annotation messages - they are not meant for LLM consumption
+            continue
         else
             # Note: Ignores any DataMessage or other types for the prompt/conversation history
             @warn "Unexpected message type: $(typeof(msg)). Skipping."
