@@ -69,7 +69,7 @@ include("user_preferences.jl")
 export AIMessage
 include("messages.jl")
 
-# export ConversationMemory
+export ConversationMemory
 include("memory.jl")
 # export annotate!
 include("annotation.jl")
