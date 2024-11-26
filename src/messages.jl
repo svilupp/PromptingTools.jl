@@ -5,6 +5,7 @@ abstract type AbstractMessage end
 abstract type AbstractChatMessage <: AbstractMessage end # with text-based content
 abstract type AbstractDataMessage <: AbstractMessage end # with data-based content, eg, embeddings
 abstract type AbstractTracerMessage{T <: AbstractMessage} <: AbstractMessage end # message with annotation that exposes the underlying message
+abstract type AbstractAnnotationMessage <: AbstractMessage end # message for metadata and documentation
 # Complementary type for tracing, follows the same API as TracerMessage
 abstract type AbstractTracer{T <: Any} end
 
@@ -161,10 +162,120 @@ Base.@kwdef struct DataMessage{T <: Any} <: AbstractDataMessage
 end
 
 """
+    AnnotationMessage
+
+A message type for metadata and documentation that is never sent to LLMs.
+Used to bundle key information with conversation data for future reference.
+
+# Fields
+- `content::T`: The content of the message (can be used for inputs to airag etc.)
+- `extras::Dict{Symbol,Any}`: Additional metadata with symbol keys and any values
+- `tags::Vector{Symbol}`: Vector of tags for categorization, defaults to empty
+- `comment::String`: Human-readable comment, never used for automatic operations
+"""
+Base.@kwdef struct AnnotationMessage{T <: AbstractString} <: AbstractAnnotationMessage
+    content::T
+    extras::Dict{Symbol,Any} = Dict{Symbol,Any}()
+    tags::Vector{Symbol} = Symbol[]
+    comment::String = ""
+    _type::Symbol = :annotationmessage
+end
+
+# Convenience constructor for AnnotationMessage
+# Supports both direct content and keyword arguments
+AnnotationMessage(content::AbstractString; kwargs...) = AnnotationMessage(; content=content, kwargs...)
+
+"""
+    isabstractannotationmessage(msg::AbstractMessage)
+
+Check if a message is a subtype of AbstractAnnotationMessage.
+Never include these messages in LLM API calls.
+"""
+isabstractannotationmessage(msg::AbstractMessage) = msg isa AbstractAnnotationMessage
+
+"""
+    annotate!(msgs::Vector{<:AbstractMessage}, content::AbstractString; kwargs...)
+    annotate!(msg::AbstractMessage, content::AbstractString; kwargs...)
+
+Add an AnnotationMessage to a vector of messages or wrap a single message in a vector with an annotation.
+The annotation is always added after any existing annotation messages.
+
+# Arguments
+- `msgs`: Vector of messages or single message to annotate
+- `content`: Content of the annotation
+- `kwargs...`: Additional fields for AnnotationMessage (extras, tags, comment)
+
+# Returns
+Vector{AbstractMessage} with the annotation added
+"""
+# Vector version for AbstractChatMessage - returns new Vector{AbstractMessage}
+function annotate!(msgs::Vector{T}, content::AbstractString; kwargs...) where {T<:AbstractChatMessage}
+    # Create new annotation
+    annotation = AnnotationMessage(content; kwargs...)
+
+    # Create new vector of AbstractMessage type
+    result = Vector{AbstractMessage}()
+
+    # Add annotation at the beginning
+    push!(result, annotation)
+
+    # Add all original messages
+    append!(result, msgs)
+
+    return result
+end
+
+# Vector version for AbstractMessage - modifies in place
+function annotate!(msgs::Vector{AbstractMessage}, content::AbstractString; kwargs...)
+    # Create new annotation
+    annotation = AnnotationMessage(content; kwargs...)
+
+    # Insert at beginning
+    insert!(msgs, 1, annotation)
+
+    return msgs
+end
+
+# Vector version for other AbstractMessage types
+function annotate!(msgs::Vector{T}, content::AbstractString; kwargs...) where {T<:AbstractMessage}
+    # Create new annotation
+    annotation = AnnotationMessage(content; kwargs...)
+
+    # Find the last annotation message index
+    last_annotation_idx = findlast(isabstractannotationmessage, msgs)
+
+    # Create a new vector of the same type as the input
+    result = Vector{AbstractMessage}()
+
+    if isnothing(last_annotation_idx)
+        push!(result, annotation)
+        append!(result, msgs)
+    else
+        append!(result, msgs[1:last_annotation_idx])
+        push!(result, annotation)
+        append!(result, msgs[last_annotation_idx+1:end])
+    end
+
+    return result
+end
+
+# Single message version
+function annotate!(msg::AbstractMessage, content::AbstractString; kwargs...)
+    msgs = AbstractMessage[msg]
+    return annotate!(msgs, content; kwargs...)
+end
+
+"""
     ToolMessage
 
-A message type for tool calls. 
-    
+"""
+    ToolMessage
+
+"""
+    ToolMessage
+
+A message type for tool calls.
+
 It represents both the request (fields `args`, `name`) and the response (field `content`).
 
 # Fields
@@ -423,8 +534,17 @@ function TracerMessageLike(
 end
 Base.var"=="(t1::AbstractTracer, t2::AbstractTracer) = false
 function Base.var"=="(t1::AbstractTracer{T}, t2::AbstractTracer{T}) where {T <: Any}
-    ## except for run_id, that's random and not important for content comparison
-    all([getproperty(t1, f) == getproperty(t2, f) for f in fieldnames(T) if f != :run_id])
+    try
+        fields = fieldnames(T)
+        isempty(fields) && return false
+        return all(f -> f == :run_id || try
+            getproperty(t1, f) == getproperty(t2, f)
+        catch
+            false
+        end, fields)
+    catch
+        return false
+    end
 end
 
 # Shared methods
@@ -497,6 +617,10 @@ function Base.show(io::IO, ::MIME"text/plain", m::AbstractChatMessage)
         printstyled(io, type_; color = :light_red)
     elseif m isa MetadataMessage
         printstyled(io, type_; color = :light_blue)
+    elseif m isa AnnotationMessage
+        printstyled(io, type_; color = :cyan)
+        print(io, "(\"", m.content, "\", tags=[", join(m.tags, ","), "])")
+        return
     else
         print(io, type_)
     end
@@ -529,6 +653,14 @@ function Base.show(io::IO, ::MIME"text/plain", t::AbstractTracer)
 end
 
 ## Dispatch for render
+"""
+    render(schema::NoSchema, messages::Vector{<:AbstractMessage}; kwargs...)
+
+Base rendering implementation that filters out annotation messages and applies any replacements.
+Annotation messages are never sent to LLMs.
+"""
+# Implementation moved to llm_shared.jl for comprehensive message handling
+
 # function render(schema::AbstractPromptSchema,
 #         messages::Vector{<:AbstractMessage};
 #         kwargs...)
@@ -557,17 +689,21 @@ function StructTypes.subtypes(::Type{AbstractMessage})
         systemmessage = SystemMessage,
         metadatamessage = MetadataMessage,
         datamessage = DataMessage,
-        tracermessage = TracerMessage)
+        tracermessage = TracerMessage,
+        annotationmessage = AnnotationMessage)
 end
 
 StructTypes.StructType(::Type{AbstractChatMessage}) = StructTypes.AbstractType()
 StructTypes.subtypekey(::Type{AbstractChatMessage}) = :_type
+StructTypes.StructType(::Type{AnnotationMessage}) = StructTypes.Struct()
+
 function StructTypes.subtypes(::Type{AbstractChatMessage})
     (usermessage = UserMessage,
         usermessagewithimages = UserMessageWithImages,
         aimessage = AIMessage,
         systemmessage = SystemMessage,
-        metadatamessage = MetadataMessage)
+        metadatamessage = MetadataMessage,
+        annotationmessage = AnnotationMessage)
 end
 
 StructTypes.StructType(::Type{AbstractTracerMessage}) = StructTypes.AbstractType()
@@ -615,10 +751,16 @@ function pprint(io::IO, msg::AbstractMessage; text_width::Int = displaysize(io)[
         "AI Tool Request"
     elseif msg isa ToolMessage
         "Tool Message"
+    elseif msg isa AnnotationMessage
+        "Annotation Message"
     else
         "Unknown Message"
     end
-    content = if msg isa DataMessage
+    content = if msg isa AnnotationMessage
+        tags_str = isempty(msg.tags) ? "" : "\nTags: [$(join(msg.tags, ", "))]"
+        comment_str = isempty(msg.comment) ? "" : "\nComment: $(msg.comment)"
+        string(wrap_string(msg.content, text_width), tags_str, comment_str)
+    elseif msg isa DataMessage
         length_ = msg.content isa AbstractArray ? " (Size: $(size(msg.content)))" : ""
         "Data: $(typeof(msg.content))$(length_)"
     elseif isaitoolrequest(msg)
