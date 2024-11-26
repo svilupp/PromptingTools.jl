@@ -33,6 +33,10 @@ function render(schema::AbstractOpenAISchema,
         kwargs...)
     ##
     @assert image_detail in ["auto", "high", "low"] "Image detail must be one of: auto, high, low"
+
+    # Filter out annotation messages before any processing
+    messages = filter(!isabstractannotationmessage, messages)
+
     ## First pass: keep the message types but make the replacements provided in `kwargs`
     messages_replaced = render(
         NoSchema(), messages; conversation, no_system_message, kwargs...)
@@ -71,6 +75,8 @@ function render(schema::AbstractOpenAISchema,
             content = msg.content isa AbstractString ? msg.content : string(msg.content)
             Dict("role" => role4render(schema, msg), "content" => content,
                 "tool_call_id" => msg.tool_call_id)
+        elseif isabstractannotationmessage(msg)
+            continue
         else
             ## Vanilla assistant message
             Dict("role" => role4render(schema, msg),

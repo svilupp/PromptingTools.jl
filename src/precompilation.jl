@@ -1,6 +1,40 @@
+# Basic Message Types precompilation - moved to top
+sys_msg = SystemMessage("You are a helpful assistant")
+user_msg = UserMessage("Hello!")
+ai_msg = AIMessage(content = "Test response")
+
+# Annotation Message precompilation - after basic types
+annotation_msg = AnnotationMessage("Test metadata";
+    extras = Dict{Symbol, Any}(:key => "value"),
+    tags = Symbol[:test],
+    comment = "Test comment")
+_ = isabstractannotationmessage(annotation_msg)
+
+# ConversationMemory precompilation
+memory = ConversationMemory()
+push!(memory, sys_msg)
+push!(memory, user_msg)
+_ = get_last(memory, 2)
+_ = length(memory)
+_ = last_message(memory)
+
+# Test message rendering with all types - moved before API calls
+messages = [
+    sys_msg,
+    annotation_msg,
+    user_msg,
+    ai_msg
+]
+_ = render(OpenAISchema(), messages)
+
+## Utilities
+pprint(messages)
+last_output(messages)
+last_message(messages)
+
 # Load templates
 load_template(joinpath(@__DIR__, "..", "templates", "general", "BlankSystemUser.json"))
-load_templates!();
+load_templates!()
 
 # Preferences
 @load_preference("MODEL_CHAT", default="x")

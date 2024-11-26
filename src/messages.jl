@@ -4,6 +4,17 @@
 abstract type AbstractMessage end
 abstract type AbstractChatMessage <: AbstractMessage end # with text-based content
 abstract type AbstractDataMessage <: AbstractMessage end # with data-based content, eg, embeddings
+"""
+    AbstractAnnotationMessage
+
+Messages that provide extra information without being sent to LLMs.
+
+Required fields: `content`, `tags`, `comment`, `run_id`.
+
+Note: `comment` is intended for human readers only and should never be used.
+`run_id` should be a unique identifier for the annotation, typically a random number.
+"""
+abstract type AbstractAnnotationMessage <: AbstractMessage end # messages that provide extra information without being sent to LLMs
 abstract type AbstractTracerMessage{T <: AbstractMessage} <: AbstractMessage end # message with annotation that exposes the underlying message
 # Complementary type for tracing, follows the same API as TracerMessage
 abstract type AbstractTracer{T <: Any} end
@@ -22,6 +33,7 @@ Base.@kwdef struct MetadataMessage{T <: AbstractString} <: AbstractChatMessage
     description::String = ""
     version::String = "1"
     source::String = ""
+    run_id::Union{Nothing, Int} = Int(rand(Int16))
     _type::Symbol = :metadatamessage
 end
 Base.@kwdef struct SystemMessage{T <: AbstractString} <: AbstractChatMessage
@@ -230,10 +242,47 @@ tool_calls(msg::AbstractMessage) = ToolMessage[]
 tool_calls(msg::ToolMessage) = [msg]
 tool_calls(msg::AbstractTracerMessage) = tool_calls(msg.object)
 
+"""
+    AnnotationMessage
+
+A message type for providing extra information in the conversation history without being sent to LLMs.
+These messages are filtered out during rendering to ensure they don't affect the LLM's context.
+
+Used to bundle key information and documentation for colleagues and future reference together with the data.
+
+# Fields
+- `content::T`: The content of the annotation (can be used for inputs to airag etc.)
+- `extras::Dict{Symbol,Any}`: Additional metadata with symbol keys and any values
+- `tags::Vector{Symbol}`: Vector of tags for categorization (default: empty)
+- `comment::String`: Human-readable comment, never used for automatic operations (default: empty)
+- `run_id::Union{Nothing,Int}`: The unique ID of the annotation
+
+Note: The comment field is intended for human readers only and should never be used
+for automatic operations.
+"""
+Base.@kwdef struct AnnotationMessage{T <: AbstractString} <: AbstractAnnotationMessage
+    content::T
+    extras::Union{Nothing, Dict{Symbol, Any}} = nothing
+    tags::Vector{Symbol} = Symbol[]
+    comment::String = ""
+    run_id::Union{Nothing, Int} = Int(rand(Int32))
+    _type::Symbol = :annotationmessage
+end
+
 ### Other Message methods
 # content-only constructor
-function (MSG::Type{<:AbstractChatMessage})(prompt::AbstractString)
-    MSG(; content = prompt)
+function (MSG::Type{<:AbstractChatMessage})(prompt::AbstractString; kwargs...)
+    MSG(; content = prompt, kwargs...)
+end
+function (MSG::Type{<:AbstractAnnotationMessage})(content::AbstractString; kwargs...)
+    ## Re-type extras to be generic Dict{Symbol, Any}
+    new_kwargs = if haskey(kwargs, :extras)
+        [f == :extras ? f => convert(Dict{Symbol, Any}, kwargs[f]) : f => kwargs[f]
+         for f in keys(kwargs)]
+    else
+        kwargs
+    end
+    MSG(; content, new_kwargs...)
 end
 function (MSG::Type{<:AbstractChatMessage})(msg::AbstractChatMessage)
     MSG(; msg.content)
@@ -250,6 +299,7 @@ isdatamessage(m::Any) = m isa DataMessage
 isaimessage(m::Any) = m isa AIMessage
 istoolmessage(m::Any) = m isa ToolMessage
 isaitoolrequest(m::Any) = m isa AIToolRequest
+isabstractannotationmessage(msg::Any) = msg isa AbstractAnnotationMessage
 istracermessage(m::Any) = m isa AbstractTracerMessage
 isusermessage(m::AbstractTracerMessage) = isusermessage(m.object)
 isusermessagewithimages(m::AbstractTracerMessage) = isusermessagewithimages(m.object)
@@ -258,6 +308,9 @@ isdatamessage(m::AbstractTracerMessage) = isdatamessage(m.object)
 isaimessage(m::AbstractTracerMessage) = isaimessage(m.object)
 istoolmessage(m::AbstractTracerMessage) = istoolmessage(m.object)
 isaitoolrequest(m::AbstractTracerMessage) = isaitoolrequest(m.object)
+function isabstractannotationmessage(m::AbstractTracerMessage)
+    isabstractannotationmessage(m.object)
+end
 
 # equality check for testing, only equal if all fields are equal and type is the same
 Base.var"=="(m1::AbstractMessage, m2::AbstractMessage) = false
@@ -481,7 +534,7 @@ end
 "Helpful accessor for the last generated output (`msg.content`) in `conversation`. Returns the last output in the conversation (eg, the string/data in the last message)."
 function last_output(conversation::AbstractVector{<:AbstractMessage})
     msg = last_message(conversation)
-    return isnothing(msg) ? nothing : msg.content
+    return isnothing(msg) ? nothing : last_output(msg)
 end
 last_message(msg::AbstractMessage) = msg
 last_output(msg::AbstractMessage) = msg.content
@@ -521,6 +574,11 @@ function Base.show(io::IO, ::MIME"text/plain", m::AbstractDataMessage)
         print(io, "(", typeof(m.content), ")")
     end
 end
+function Base.show(io::IO, ::MIME"text/plain", m::AbstractAnnotationMessage)
+    type_ = string(typeof(m)) |> x -> split(x, "{")[begin]
+    printstyled(io, type_; color = :light_blue)
+    print(io, "(\"", m.content, "\")")
+end
 function Base.show(io::IO, ::MIME"text/plain", t::AbstractTracerMessage)
     dump(IOContext(io, :limit => true), t, maxdepth = 1)
 end
@@ -557,7 +615,8 @@ function StructTypes.subtypes(::Type{AbstractMessage})
         systemmessage = SystemMessage,
         metadatamessage = MetadataMessage,
         datamessage = DataMessage,
-        tracermessage = TracerMessage)
+        tracermessage = TracerMessage,
+        annotationmessage = AnnotationMessage)
 end
 
 StructTypes.StructType(::Type{AbstractChatMessage}) = StructTypes.AbstractType()
@@ -567,7 +626,14 @@ function StructTypes.subtypes(::Type{AbstractChatMessage})
         usermessagewithimages = UserMessageWithImages,
         aimessage = AIMessage,
         systemmessage = SystemMessage,
-        metadatamessage = MetadataMessage)
+        metadatamessage = MetadataMessage,
+        annotationmessage = AnnotationMessage)
+end
+
+StructTypes.StructType(::Type{AbstractAnnotationMessage}) = StructTypes.AbstractType()
+StructTypes.subtypekey(::Type{AbstractAnnotationMessage}) = :_type
+function StructTypes.subtypes(::Type{AbstractAnnotationMessage})
+    (annotationmessage = AnnotationMessage,)
 end
 
 StructTypes.StructType(::Type{AbstractTracerMessage}) = StructTypes.AbstractType()
@@ -590,6 +656,7 @@ StructTypes.StructType(::Type{ToolMessage}) = StructTypes.Struct()
 StructTypes.StructType(::Type{AIToolRequest}) = StructTypes.Struct()
 StructTypes.StructType(::Type{AIMessage}) = StructTypes.Struct()
 StructTypes.StructType(::Type{DataMessage}) = StructTypes.Struct()
+StructTypes.StructType(::Type{AnnotationMessage}) = StructTypes.Struct()
 StructTypes.StructType(::Type{TracerMessage}) = StructTypes.Struct() # Ignore mutability once we serialize
 StructTypes.StructType(::Type{TracerMessageLike}) = StructTypes.Struct() # Ignore mutability once we serialize
 
@@ -615,6 +682,8 @@ function pprint(io::IO, msg::AbstractMessage; text_width::Int = displaysize(io)[
         "AI Tool Request"
     elseif msg isa ToolMessage
         "Tool Message"
+    elseif msg isa AnnotationMessage
+        "Annotation Message"
     else
         "Unknown Message"
     end
@@ -633,6 +702,10 @@ function pprint(io::IO, msg::AbstractMessage; text_width::Int = displaysize(io)[
     elseif istoolmessage(msg)
         isnothing(msg.content) ? string("Name: ", msg.name, ", Args: ", msg.raw) :
         string(msg.content)
+    elseif isabstractannotationmessage(msg)
+        tags_str = isempty(msg.tags) ? "" : "\n [$(join(msg.tags, ", "))]"
+        comment_str = isempty(msg.comment) ? "" : "\n ($(msg.comment))"
+        "$(msg.content)$tags_str$comment_str"
     else
         wrap_string(msg.content, text_width)
     end

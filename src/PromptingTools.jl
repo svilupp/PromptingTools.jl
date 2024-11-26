@@ -67,8 +67,12 @@ include("user_preferences.jl")
 
 ## Conversation history / Prompt elements
 export AIMessage
-# export UserMessage, UserMessageWithImages, SystemMessage, DataMessage # for debugging only
 include("messages.jl")
+
+# export ConversationMemory
+include("memory.jl")
+# export annotate!
+include("annotation.jl")
 
 export aitemplates, AITemplate
 include("templates.jl")

@@ -28,9 +28,12 @@ function render(schema::AbstractAnthropicSchema,
         no_system_message::Bool = false,
         cache::Union{Nothing, Symbol} = nothing,
         kwargs...)
-    ## 
+    ##
     @assert count(issystemmessage, messages)<=1 "AbstractAnthropicSchema only supports at most 1 System message"
     @assert (isnothing(cache)||cache in [:system, :tools, :last, :all]) "Currently only `:system`, `:tools`, `:last`, `:all` are supported for Anthropic Prompt Caching"
+
+    # Filter out annotation messages before any processing
+    messages = filter(!isabstractannotationmessage, messages)
 
     system = nothing
 
@@ -44,6 +47,8 @@ function render(schema::AbstractAnthropicSchema,
     for msg in messages_replaced
         if issystemmessage(msg)
             system = msg.content
+        elseif isabstractannotationmessage(msg)
+            continue
         elseif isusermessage(msg) || isaimessage(msg)
             content = msg.content
             push!(conversation,

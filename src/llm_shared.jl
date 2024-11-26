@@ -8,6 +8,7 @@ role4render(schema::AbstractPromptSchema, msg::UserMessageWithImages) = "user"
 role4render(schema::AbstractPromptSchema, msg::AIMessage) = "assistant"
 role4render(schema::AbstractPromptSchema, msg::AIToolRequest) = "assistant"
 role4render(schema::AbstractPromptSchema, msg::ToolMessage) = "tool"
+role4render(schema::AbstractPromptSchema, msg::AbstractAnnotationMessage) = "annotation"
 """
     render(schema::NoSchema,
         messages::Vector{<:AbstractMessage};
@@ -38,6 +39,9 @@ function render(schema::NoSchema,
     conversation = copy(conversation)
     count_system_msg = count(issystemmessage, conversation)
     # TODO: concat multiple system messages together (2nd pass)
+
+    # Filter out annotation messages from input messages
+    messages = filter(!isabstractannotationmessage, messages)
 
     # replace any handlebar variables in the messages
     for msg in messages
@@ -73,6 +77,9 @@ function render(schema::NoSchema,
             count_system_msg += 1
             # move to the front
             pushfirst!(conversation, msg)
+        elseif isabstractannotationmessage(msg)
+            # Ignore annotation messages
+            continue
         else
             # Note: Ignores any DataMessage or other types for the prompt/conversation history
             @warn "Unexpected message type: $(typeof(msg)). Skipping."

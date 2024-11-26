@@ -41,14 +41,21 @@ struct OpenAISchema <: AbstractOpenAISchema end
 
 "Echoes the user's input back to them. Used for testing the implementation"
 @kwdef mutable struct TestEchoOpenAISchema <: AbstractOpenAISchema
-    response::AbstractDict
-    status::Integer
+    response::AbstractDict = Dict(
+        "choices" => [Dict("message" => Dict("content" => "Test response", "role" => "assistant"), "index" => 0, "finish_reason" => "stop")],
+        "usage" => Dict("prompt_tokens" => 10, "completion_tokens" => 20, "total_tokens" => 30),
+        "model" => "gpt-3.5-turbo",
+        "id" => "test-id",
+        "object" => "chat.completion",
+        "created" => 1234567890
+    )
+    status::Integer = 200
     model_id::String = ""
     inputs::Any = nothing
 end
 
 """
-    CustomOpenAISchema 
+    CustomOpenAISchema
     
 CustomOpenAISchema() allows user to call any OpenAI-compatible API.
 

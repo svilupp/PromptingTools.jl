@@ -16,6 +16,9 @@ end
 function role4render(schema::AbstractTracerSchema, msg::AIMessage)
     role4render(schema.schema, msg)
 end
+function role4render(schema::AbstractTracerSchema, msg::AbstractAnnotationMessage)
+    role4render(schema.schema, msg)
+end
 """
     render(tracer_schema::AbstractTracerSchema,
         conv::AbstractVector{<:AbstractMessage}; kwargs...)

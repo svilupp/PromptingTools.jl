@@ -25,6 +25,9 @@ function render(schema::AbstractGoogleSchema,
         no_system_message::Bool = false,
         kwargs...)
     ##
+    # Filter out annotation messages before any processing
+    messages = filter(!isabstractannotationmessage, messages)
+
     ## First pass: keep the message types but make the replacements provided in `kwargs`
     messages_replaced = render(
         NoSchema(), messages; conversation, no_system_message, kwargs...)
@@ -34,6 +37,9 @@ function render(schema::AbstractGoogleSchema,
 
     # replace any handlebar variables in the messages
     for msg in messages_replaced
+        if isabstractannotationmessage(msg)
+            continue
+        end
         push!(conversation,
             Dict(
                 :role => role4render(schema, msg), :parts => [Dict("text" => msg.content)]))

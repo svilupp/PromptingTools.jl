@@ -1,12 +1,17 @@
 using PromptingTools: AIMessage,
                       SystemMessage, UserMessage, UserMessageWithImages, AbstractMessage,
-                      DataMessage, ShareGPTSchema, Tool, ToolMessage, AIToolRequest
+                      DataMessage, ShareGPTSchema, Tool, ToolMessage, AIToolRequest,
+                      AnnotationMessage, AbstractAnnotationMessage
 using PromptingTools: save_conversation, load_conversation, save_conversations
 using PromptingTools: save_template, load_template
 
 @testset "Serialization - Messages" begin
     # Test save_conversation
-    messages = AbstractMessage[SystemMessage("System message 1"),
+    messages = AbstractMessage[AnnotationMessage(;
+            content = "Annotation message"),
+        AnnotationMessage(;
+            content = "Annotation message 2", extras = Dict{Symbol, Any}(:a => 1, :b => 2)),
+        SystemMessage("System message 1"),
         UserMessage("User message"),
         AIMessage("AI message"),
         UserMessageWithImages(; content = "a", image_url = String["b", "c"]),
@@ -22,6 +27,12 @@ using PromptingTools: save_template, load_template
     # Test load_conversation
     loaded_messages = load_conversation(tmp)
     @test loaded_messages == messages
+
+    # save and load AbstractAnnotationMessage
+    msg = AnnotationMessage("Annotation message"; extras = Dict(:a => 1))
+    JSON3.write(tmp, msg)
+    loaded_msg = JSON3.read(tmp, AbstractAnnotationMessage)
+    @test loaded_msg == msg
 end
 
 @testset "Serialization - Templates" begin
