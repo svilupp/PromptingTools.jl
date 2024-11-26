@@ -226,7 +226,7 @@ function AnnotationMessage(content::AbstractString;
                          _type::Symbol=:annotationmessage)
     # Convert Dict{Symbol,String} to Dict{Symbol,Any} if needed
     extras_any = extras isa Dict{Symbol,String} ? Dict{Symbol,Any}(k => v for (k,v) in extras) : extras
-    AnnotationMessage{typeof(content)}(content, extras_any, tags, comment, run_id, _type)
+    AnnotationMessage{typeof(content)}(; content=content, extras=extras_any, tags=tags, comment=comment, run_id=run_id, _type=_type)
 end
 
 """
