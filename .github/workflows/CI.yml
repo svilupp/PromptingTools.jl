@@ -37,6 +37,13 @@ jobs:
           arch: ${{ matrix.arch }}
       - uses: julia-actions/cache@v1
       - uses: julia-actions/julia-buildpkg@v1
+      - name: Install test dependencies
+        run: |
+          julia --project=test -e '
+            using Pkg;
+            Pkg.develop(PackageSpec(path=pwd()));
+            Pkg.instantiate();
+            Pkg.precompile()'
       - uses: julia-actions/julia-runtest@v1
       - uses: julia-actions/julia-processcoverage@v1
       - uses: codecov/codecov-action@v4
