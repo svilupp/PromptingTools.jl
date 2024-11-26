@@ -3,6 +3,7 @@ using Test, Pkg
 # Ensure test dependencies are loaded
 Pkg.activate("test")
 Pkg.instantiate()
+using Aqua
 using OpenAI, HTTP, JSON3
 using SparseArrays, LinearAlgebra, Markdown
 using Statistics
