@@ -109,12 +109,17 @@ end
 # 1) OpenAI / JSON format
 ######################
 
-to_json_type(s::Type{<:AbstractString}) = "string"
-to_json_type(n::Type{<:Real}) = "number"
-to_json_type(n::Type{<:Integer}) = "integer"
+"Check if a type is concrete."
+function is_concrete_type(s::Type)
+    isconcretetype(s) ||
+        throw(ArgumentError("Cannot convert abstract type $s to JSON type. You must provide concrete types!"))
+end
+to_json_type(s::Type{<:AbstractString}) = (is_concrete_type(s); "string")
+to_json_type(n::Type{<:Real}) = (is_concrete_type(n); "number")
+to_json_type(n::Type{<:Integer}) = (is_concrete_type(n); "integer")
 to_json_type(b::Type{Bool}) = "boolean"
 to_json_type(t::Type{<:Union{Missing, Nothing}}) = "null"
-to_json_type(t::Type{<:Any}) = "string" # object?
+to_json_type(t::Type{<:Any}) = (is_concrete_type(t); "string") # object?
 
 has_null_type(T::Type{Missing}) = true
 has_null_type(T::Type{Nothing}) = true

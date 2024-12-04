@@ -1,6 +1,7 @@
 using PromptingTools: MaybeExtract, extract_docstring, ItemsExtract, ToolMessage
 using PromptingTools: has_null_type, is_required_field, remove_null_types, to_json_schema
-using PromptingTools: tool_call_signature, set_properties_strict!,
+using PromptingTools: tool_call_signature, set_properties_strict!, is_concrete_type,
+                      to_json_type,
                       update_field_descriptions!, generate_struct
 using PromptingTools: Tool, isabstracttool, execute_tool, parse_tool, get_arg_names,
                       get_arg_types, get_method, get_function, remove_field!,
@@ -97,6 +98,41 @@ end
     output = String(take!(io))
     @test occursin("ToolRef", output)
     @test occursin("computer", output)
+end
+
+@testset "is_concrete_type" begin
+    @test is_concrete_type(Int) == true
+    @test_throws ArgumentError is_concrete_type(AbstractString)
+end
+
+@testset "to_json_type" begin
+    # Test string types
+    @test to_json_type(String) == "string"
+    @test to_json_type(SubString{String}) == "string"
+
+    # Test number types
+    @test to_json_type(Float64) == "number"
+    @test to_json_type(Float32) == "number"
+    @test to_json_type(Int64) == "integer"
+    @test to_json_type(Int32) == "integer"
+    @test to_json_type(UInt8) == "integer"
+
+    # Test boolean type
+    @test to_json_type(Bool) == "boolean"
+
+    # Test null types
+    @test to_json_type(Nothing) == "null"
+    @test to_json_type(Missing) == "null"
+
+    # Test concrete Any types
+    struct CustomType end
+    @test to_json_type(CustomType) == "string"
+
+    # Test error cases for abstract types
+    @test_throws ArgumentError to_json_type(AbstractString)
+    @test_throws ArgumentError to_json_type(Real)
+    @test_throws ArgumentError to_json_type(Integer)
+    @test_throws ArgumentError to_json_type(AbstractArray)
 end
 
 @testset "has_null_type" begin

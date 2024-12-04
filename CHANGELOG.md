@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.65.1]
+
+### Fixed
+- Removed unnecessary printing to `stdout` during precompilation in `precompile.jl`.
+- Fixed a "bug-waiting-to-happen" in tool use. `to_json_type` now enforces users to provide concrete types, because abstract types cannot be deserialized by JSON3.
+- Flowed through a bug fix in `StreamCallback` where the usage information was being included in the response even when `usage=nothing`. Lower bound of `StreamCallbacks` was bumped to `0.5.1`.
+
 ## [0.65.0]
 
 ### Breaking
