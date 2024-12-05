@@ -1,6 +1,7 @@
 using PromptingTools: MaybeExtract, extract_docstring, ItemsExtract, ToolMessage
 using PromptingTools: has_null_type, is_required_field, remove_null_types, to_json_schema
-using PromptingTools: tool_call_signature, set_properties_strict!,
+using PromptingTools: tool_call_signature, set_properties_strict!, is_concrete_type,
+                      to_json_type, is_not_union_type,
                       update_field_descriptions!, generate_struct
 using PromptingTools: Tool, isabstracttool, execute_tool, parse_tool, get_arg_names,
                       get_arg_types, get_method, get_function, remove_field!,
@@ -97,6 +98,46 @@ end
     output = String(take!(io))
     @test occursin("ToolRef", output)
     @test occursin("computer", output)
+end
+
+@testset "is_concrete_type" begin
+    @test is_concrete_type(Int) == true
+    @test_throws ArgumentError is_concrete_type(AbstractString)
+end
+
+@testset "is_not_union_type" begin
+    @test_throws ArgumentError is_not_union_type(Union{Int, String})
+    @test is_not_union_type(Int) == true
+end
+
+@testset "to_json_type" begin
+    # Test string types
+    @test to_json_type(String) == "string"
+    @test to_json_type(SubString{String}) == "string"
+
+    # Test number types
+    @test to_json_type(Float64) == "number"
+    @test to_json_type(Float32) == "number"
+    @test to_json_type(Int64) == "integer"
+    @test to_json_type(Int32) == "integer"
+    @test to_json_type(UInt8) == "integer"
+
+    # Test boolean type
+    @test to_json_type(Bool) == "boolean"
+
+    # Test null types
+    @test to_json_type(Nothing) == "null"
+    @test to_json_type(Missing) == "null"
+
+    # Test concrete Any types
+    struct CustomType end
+    @test to_json_type(CustomType) == "string"
+
+    # Test error cases for abstract types
+    @test_throws ArgumentError to_json_type(AbstractString)
+    @test_throws ArgumentError to_json_type(Real)
+    @test_throws ArgumentError to_json_type(Integer)
+    @test_throws ArgumentError to_json_type(AbstractArray)
 end
 
 @testset "has_null_type" begin
@@ -236,6 +277,10 @@ end
     @test schema["type"] == "array"
     @test schema["items"]["type"] == "number"
 
+    schema = to_json_schema(Tuple{Int64, String})
+    @test schema["type"] == "array"
+    @test schema["items"]["type"] == "string"
+
     ## Special types
     @enum TemperatureUnits celsius fahrenheit
     schema = to_json_schema(TemperatureUnits)
@@ -273,7 +318,8 @@ end
 
     ## Fallback to string (for tough unions)
     @test to_json_schema(Any) == Dict("type" => "string")
-    @test to_json_schema(Union{Int, String, Real}) == Dict("type" => "string")
+    ## We force user to be explicit about the type, so it fails with a clear error
+    @test_throws ArgumentError to_json_schema(Union{Int, String, Float64})
 
     ## Disallowed types
     @test_throws ArgumentError to_json_schema(Dict{String, Int})
@@ -309,6 +355,88 @@ end
     @test schema["required"] == ["x", "y"]
     @test haskey(schema, "description")
     @test schema["description"] == "This is a test function.\n"
+
+    ## Round trip on complicated types
+    struct MockTypeTest4
+        # Test concrete types
+        int_field::Int64
+        float_field::Float64
+        string_field::String
+        bool_field::Bool
+
+        # Test unions with Nothing/Missing
+        nullable_int::Union{Int64, Nothing}
+        missing_float::Union{Float64, Missing}
+
+        # No type
+        no_type_field::Any
+
+        # Test nested types
+        array_field::Vector{Float64}
+        tuple_field::Tuple{Int64, String}
+
+        ## Not supported
+        # dict_field::Dict{String, Int64}
+        # union_field::Union{Int64, String}
+    end
+
+    # Test basic schema structure for MockTypeTest4
+    schema = to_json_schema(MockTypeTest4)
+    @test schema isa Dict{String, Any}
+    @test schema["type"] == "object"
+    @test haskey(schema, "properties")
+    @test haskey(schema, "required")
+
+    # Test concrete type fields
+    props = schema["properties"]
+    @test props["int_field"]["type"] == "integer"
+    @test props["float_field"]["type"] == "number"
+    @test props["string_field"]["type"] == "string"
+    @test props["bool_field"]["type"] == "boolean"
+
+    # Test nullable/missing fields
+    @test props["nullable_int"]["type"] == "integer"
+
+    @test props["missing_float"]["type"] == "number"
+
+    # Test Any field
+    @test props["no_type_field"]["type"] == "string"
+
+    # Test array field
+    @test props["array_field"]["type"] == "array"
+    @test props["array_field"]["items"]["type"] == "number"
+
+    # Test tuple field
+    @test props["tuple_field"]["type"] == "array"
+    @test props["tuple_field"]["items"]["type"] == "string"
+
+    # Test required fields
+    @test "int_field" in schema["required"]
+    @test "float_field" in schema["required"]
+    @test "string_field" in schema["required"]
+    @test "bool_field" in schema["required"]
+    @test "nullable_int" ∉ schema["required"]
+
+    ## Round-trip test with JSON3
+    str = JSON3.write(MockTypeTest4(
+        1, 2.0, "3", true, nothing, missing, "any", [4.0], (5, "6")))
+    @test_nowarn instance = JSON3.read(str, MockTypeTest4)
+    @test instance.int_field == 1
+    @test instance.float_field == 2.0
+    @test instance.string_field == "3"
+    @test instance.bool_field == true
+    @test instance.nullable_int == nothing
+    @test instance.missing_float === missing
+    @test instance.no_type_field == "any"
+    @test instance.array_field == [4.0]
+    @test instance.tuple_field == (5, "6")
+
+    struct TestTuple1
+        x::Tuple{Int64, String}
+    end
+    str = JSON3.write(TestTuple1((1, "2")))
+    instance = JSON3.read(str, TestTuple1)
+    @test instance.x == (1, "2")
 end
 
 @testset "to_json_schema-MaybeExtract" begin

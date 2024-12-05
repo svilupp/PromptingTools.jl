@@ -28,7 +28,7 @@ messages = [
 _ = render(OpenAISchema(), messages)
 
 ## Utilities
-pprint(messages)
+pprint(devnull, messages)
 last_output(messages)
 last_message(messages)
 

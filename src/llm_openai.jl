@@ -909,6 +909,8 @@ This is a perfect solution for extracting structured information from text (eg, 
 It's effectively a light wrapper around `aigenerate` call, which requires additional keyword argument `return_type` to be provided
  and will enforce the model outputs to adhere to it.
 
+!!! Note: The types must be CONCRETE, it helps with correct conversion to JSON schema and then conversion back to the struct.
+
 # Arguments
 - `prompt_schema`: An optional object to specify which prompt template should be applied (Default to `PROMPT_SCHEMA = OpenAISchema`)
 - `prompt`: Can be a string representing the prompt for the AI conversation, a `UserMessage`, a vector of `AbstractMessage` or an `AITemplate`
