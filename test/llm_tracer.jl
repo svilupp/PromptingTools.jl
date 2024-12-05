@@ -270,7 +270,7 @@ end
 end
 
 # TODO: add aitools tracer tests
-function calculator(x::Number, y::Number; operation::String = "add")
+function calculator(x::Float64, y::Float64; operation::String = "add")
     operation == "add" ?
     x + y :
     throw(ArgumentError("Unsupported operation"))
