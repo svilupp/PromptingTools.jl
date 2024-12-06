@@ -33,7 +33,8 @@ using PromptingTools: extract_module_name
       """)
         eval!(cb)
         @test cb.success == false
-        @test cb.error == UndefVarError(:b)
+        @test cb.error isa UndefVarError
+        @test cb.error.var == :b
         @test !isnothing(cb.expression) # parsed
     end
 
@@ -45,7 +46,8 @@ using PromptingTools: extract_module_name
     cb = eval!(cb)
     eval!(cb, cb.expression; capture_stdout = false)
     @test cb.success == false
-    @test cb.error == UndefVarError(:b)
+    @test cb.error isa UndefVarError
+    @test cb.error.var == :b
     @test cb.error_lines == [1]
     # despite not capturing stdout, we always unwrap the error to be able to detect error lines
     @test occursin("UndefVarError", cb.stdout)

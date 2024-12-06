@@ -182,7 +182,8 @@ function extract_docstring(
     ## we ignore the ones that are subtypes for now (to prevent picking up Dicts, etc.)
     if (type isa Type && (supertype(type) == Any)) || (type isa Function)
         docs = Docs.doc(type) |> string
-        if !occursin("No documentation found.\n\n", docs)
+        ## Covers two known cases: "No documentation found.\n\n" and "No documentation found for private symbol."
+        if !startswith(docs, "No documentation found")
             return first(docs, max_description_length)
         end
     end

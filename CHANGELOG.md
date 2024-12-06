@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.65.2]
+
+### Fixed
+- Fixed a bug in `extract_docstring` where it would not correctly block "empty" docstrings on Julia 1.11.
+
+
 ## [0.65.1]
 
 ### Fixed
