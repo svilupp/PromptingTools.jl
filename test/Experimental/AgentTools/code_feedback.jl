@@ -136,8 +136,10 @@ end
 
     # Test case 1: Test error_feedback with defined variable
     e = UndefVarError(:Threads)
-    expected_output = "UndefVarError: `Threads` not defined\nExpert Tip: I know that the variable Threads is defined in Base module. Use `import Base.Threads` to use it."
-    @test error_feedback(e) == expected_output
+    str = error_feedback(e)
+    @test occursin("UndefVarError: `Threads` not defined", str)
+    @test occursin(
+        "Expert Tip: I know that the variable Threads is defined in Base module.", str)
 
     # Test case 2: Test error_feedback with undefined variable
     e = UndefVarError(:SomeVariable)

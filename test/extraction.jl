@@ -231,7 +231,6 @@ end
     @test get_arg_names(first(methods(f6))) == [:x, :y]
     @test get_arg_types(first(methods(f6))) == [Int, String]
 end
-
 @testset "to_json_schema" begin
     struct MyStruct
         field1::Int
