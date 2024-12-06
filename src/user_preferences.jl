@@ -432,14 +432,15 @@ aliases = merge(
         ## Groq
         "gllama3" => "llama-3.1-8b-instant",
         "gl3" => "llama-3.1-8b-instant",
-        "gllama370" => "llama-3.1-70b-versatile",
-        "gl70" => "llama-3.1-70b-versatile",
+        "gllama370" => "llama-3.3-70b-versatile",
+        "gl70" => "llama-3.3-70b-versatile",
         "gllama3405" => "llama-3.1-405b-reasoning",
         "gl405" => "llama-3.1-405b-reasoning",
         "glxxs" => "llama-3.2-1b-preview", #xxs for extra extra small
         "glxs" => "llama-3.2-3b-preview", #xs for extra small
         "gls" => "llama-3.1-8b-instant", #s for small
-        "glm" => "llama-3.1-70b-versatile", #m for medium
+        "glm" => "llama-3.3-70b-versatile", #m for medium
+        "glms" => "llama-3.3-70b-specdec", #ms for medium speculative decoding
         "gll" => "llama-3.1-405b-reasoning", #l for large
         "gmixtral" => "mixtral-8x7b-32768",
         "ggemma9" => "gemma2-9b-it",
@@ -943,6 +944,16 @@ registry = Dict{String, ModelSpec}(
         2.4e-5,
         "Anthropic's Claude 2.1 model."),
     ## Groq -- using preliminary pricing on https://wow.groq.com/
+    "llama-3.3-70b-specdec" => ModelSpec("llama-3.3-70b-specdec",
+        GroqOpenAISchema(),
+        5.9e-7,
+        9.9e-7,
+        "Meta's Llama3.3 70b with speculative decoding (slightly more expensive), hosted by Groq. Max output 8192 tokens, 128K context. See details [here](https://console.groq.com/docs/models)"),
+    "llama-3.3-70b-versatile" => ModelSpec("llama-3.3-70b-versatile",
+        GroqOpenAISchema(),
+        5.9e-7,
+        7.9e-7,
+        "Meta's Llama3.3 70b, hosted by Groq. Max output 8192 tokens, 128K context. See details [here](https://console.groq.com/docs/models)"),
     "llama-3.1-405b-reasoning" => ModelSpec("llama-3.1-405b-reasoning",
         GroqOpenAISchema(),
         5e-6, # based on prices at together.ai... likely it will be much cheaper
