@@ -434,6 +434,7 @@ aliases = merge(
         "gl3" => "llama-3.1-8b-instant",
         "gllama370" => "llama-3.3-70b-versatile",
         "gl70" => "llama-3.3-70b-versatile",
+        "gl70s" => "llama-3.3-70b-specdec", #s for small speculative decoding
         "gllama3405" => "llama-3.1-405b-reasoning",
         "gl405" => "llama-3.1-405b-reasoning",
         "glxxs" => "llama-3.2-1b-preview", #xxs for extra extra small

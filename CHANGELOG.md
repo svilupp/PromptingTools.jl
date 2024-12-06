@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.66.0]
 
 ### Added
-- Added support for Groq's new Llama3.3 models. Updated `gllama370`, `gl70`, `glm` aliases to `llama-3.3-70b-versatile` and added `glms` alias to `llama-3.3-70b-specdec` (faster with speculative decoding).
+- Added support for Groq's new Llama3.3 models. Updated `gllama370`, `gl70`, `glm` aliases to `llama-3.3-70b-versatile` and added `gl70s`, `glms` aliases to `llama-3.3-70b-specdec` (faster with speculative decoding).
 
 ### Fixed
 - Fixed a bug in `extract_docstring` where it would not correctly block "empty" docstrings on Julia 1.11.
