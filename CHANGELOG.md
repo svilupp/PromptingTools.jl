@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.67.0]
+
+### Added
+- Added a new Gemini Experimental model from December 2024 (`gemini-exp-1206`) and updated the `gemexp` alias to point to it.
+
 ## [0.66.0]
 
 ### Added
