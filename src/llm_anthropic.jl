@@ -24,13 +24,13 @@ Builds a history of the conversation to provide the prompt to the API. All unspe
 function render(schema::AbstractAnthropicSchema,
         messages::Vector{<:AbstractMessage};
         aiprefill::Union{Nothing, AbstractString} = nothing,
-        conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
+        conversation_msgs::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         no_system_message::Bool = false,
         cache::Union{Nothing, Symbol} = nothing,
         kwargs...)
     ##
     @assert count(issystemmessage, messages)<=1 "AbstractAnthropicSchema only supports at most 1 System message"
-    @assert (isnothing(cache)||cache in [:system, :tools, :last, :all]) "Currently only `:system`, `:tools`, `:last`, `:all` are supported for Anthropic Prompt Caching"
+    @assert (isnothing(cache)||cache in [:system, :tools, :last, :all, :all_but_last]) "Currently only `:system`, `:tools`, `:last`, `:all` are supported for Anthropic Prompt Caching (cache=$cache)"
 
     # Filter out annotation messages before any processing
     messages = filter(!isabstractannotationmessage, messages)
@@ -39,7 +39,7 @@ function render(schema::AbstractAnthropicSchema,
 
     ## First pass: keep the message types but make the replacements provided in `kwargs`
     messages_replaced = render(
-        NoSchema(), messages; conversation, no_system_message, kwargs...)
+        NoSchema(), messages; conversation_msgs, no_system_message, kwargs...)
 
     ## Second pass: convert to the message-based schema
     conversation = Dict{String, Any}[]
@@ -94,7 +94,12 @@ function render(schema::AbstractAnthropicSchema,
     if is_valid_conversation && (cache == :last || cache == :all)
         conversation[end]["content"][end]["cache_control"] = Dict("type" => "ephemeral")
     end
-    if !no_system_message && !isnothing(system) && (cache == :system || cache == :all)
+    if is_valid_conversation && (cache == :all_but_last)
+        for i in 1:length(conversation)-1
+            conversation[i]["content"][end]["cache_control"] = Dict("type" => "ephemeral")
+        end
+    end
+    if !no_system_message && !isnothing(system) && (cache == :system || cache == :all || cache == :all_but_last)
         ## Apply cache for system message
         system = [Dict("type" => "text", "text" => system,
             "cache_control" => Dict("type" => "ephemeral"))]
@@ -457,7 +462,7 @@ function aigenerate(
         kwargs...)
     ##
     global MODEL_ALIASES
-    @assert (isnothing(cache)||cache in [:system, :tools, :last, :all]) "Currently only `:system`, `:tools`, `:last` and `:all` are supported for Anthropic Prompt Caching"
+    @assert (isnothing(cache) || cache in [:system, :tools, :last, :all, :all_but_last]) "Currently only `:system`, `:tools`, `:last`, `all_but_last` and `:all` are supported for Anthropic Prompt Caching (cache=$cache)"
     @assert (isnothing(aiprefill)||!isempty(strip(aiprefill))) "`aiprefill` must not be empty`"
     ## Find the unique ID for the model alias provided
     model_id = get(MODEL_ALIASES, model, model)
