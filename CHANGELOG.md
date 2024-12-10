@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.68.0]
+
+### Added
+- Added a new `cache=:all_but_last` cache strategy for Anthropic models to enable caching of the entire conversation except for the last user message (useful for longer conversations that you want to re-use, but not continue). See the docstrings for more information on which cache strategy to use.
+
 ## [0.67.0]
 
 ### Added
