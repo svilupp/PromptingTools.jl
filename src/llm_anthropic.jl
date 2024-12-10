@@ -30,7 +30,7 @@ function render(schema::AbstractAnthropicSchema,
         kwargs...)
     ##
     @assert count(issystemmessage, messages)<=1 "AbstractAnthropicSchema only supports at most 1 System message"
-    @assert (isnothing(cache)||cache in [:system, :tools, :last, :all, :all_but_last]) "Currently only `:system`, `:tools`, `:last`, `:all` are supported for Anthropic Prompt Caching (cache=$cache)"
+    @assert (isnothing(cache)||cache in [:system, :tools, :last, :all, :all_but_last]) "Currently only `:system`, `:tools`, `:last`, `all_but_last`, `:all` are supported for Anthropic Prompt Caching (cache=$cache)"
 
     # Filter out annotation messages before any processing
     messages = filter(!isabstractannotationmessage, messages)
@@ -95,9 +95,7 @@ function render(schema::AbstractAnthropicSchema,
         conversation[end]["content"][end]["cache_control"] = Dict("type" => "ephemeral")
     end
     if is_valid_conversation && (cache == :all_but_last)
-        for i in 1:length(conversation)-1
-            conversation[i]["content"][end]["cache_control"] = Dict("type" => "ephemeral")
-        end
+        length(conversation)-2>0 && (conversation[length(conversation)-2]["content"][end]["cache_control"] = Dict("type" => "ephemeral"))
     end
     if !no_system_message && !isnothing(system) && (cache == :system || cache == :all || cache == :all_but_last)
         ## Apply cache for system message
