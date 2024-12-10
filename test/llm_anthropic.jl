@@ -174,6 +174,23 @@ using PromptingTools: call_cost, anthropic_api, function_call_signature,
                 "cache_control" => Dict("type" => "ephemeral"))])])
     @test conversation == expected_output
 
+    ## We mark only user messages
+    messages_with_ai = [
+        SystemMessage("Act as a helpful AI assistant"),
+        UserMessage("Hello, my name is {{name}}"),
+        AIMessage("Hi there")
+    ]
+    conversation = render(schema, messages_with_ai; name = "John", cache = :last)
+    expected_output = (;
+        system = "Act as a helpful AI assistant",
+        conversation = [
+            Dict("role" => "user",
+                "content" => [Dict("type" => "text", "text" => "Hello, my name is John",
+                    "cache_control" => Dict("type" => "ephemeral"))]),
+            Dict("role" => "assistant",
+                "content" => [Dict("type" => "text", "text" => "Hi there")])])
+    @test conversation == expected_output
+
     conversation = render(schema, messages; name = "John", cache = :all)
     expected_output = (;
         system = Dict{String, Any}[Dict("cache_control" => Dict("type" => "ephemeral"),
@@ -183,7 +200,48 @@ using PromptingTools: call_cost, anthropic_api, function_call_signature,
                 "cache_control" => Dict("type" => "ephemeral"))])])
     @test conversation == expected_output
 
-    # Test aiprefill functionality
+    conversation = render(schema, messages_with_ai; name = "John", cache = :all)
+    expected_output = (;
+        system = Dict{String, Any}[Dict("cache_control" => Dict("type" => "ephemeral"),
+            "text" => "Act as a helpful AI assistant", "type" => "text")],
+        conversation = [
+            Dict("role" => "user",
+                "content" => [Dict("type" => "text", "text" => "Hello, my name is John",
+                    "cache_control" => Dict("type" => "ephemeral"))]),
+            Dict("role" => "assistant",
+                "content" => [Dict("type" => "text", "text" => "Hi there")])])
+    @test conversation == expected_output
+
+    ## Longer conversation
+    messages_longer = [
+        SystemMessage("Act as a helpful AI assistant"),
+        UserMessage("Hello, my name is {{name}}"),
+        AIMessage("Hi there"),
+        UserMessage("How are you?"),
+        AIMessage("I'm doing well, thank you!")
+    ]
+    system, conversation = render(schema, messages_longer; name = "John", cache = :all)
+    ## marks last user message
+    @test conversation[end - 1]["content"][end]["cache_control"] ==
+          Dict("type" => "ephemeral")
+    ## marks one before last user message
+    @test conversation[end - 3]["content"][end]["cache_control"] ==
+          Dict("type" => "ephemeral")
+    ## marks system message
+    @test system[1]["cache_control"] == Dict("type" => "ephemeral")
+
+    ## all_but_last
+    system, conversation = render(
+        schema, messages_longer; name = "John", cache = :all_but_last)
+    ## does not mark last user message
+    @test !haskey(conversation[end - 1]["content"][end], "cache_control")
+    ## marks one before last user message
+    @test conversation[end - 3]["content"][end]["cache_control"] ==
+          Dict("type" => "ephemeral")
+    ## marks system message
+    @test system[1]["cache_control"] == Dict("type" => "ephemeral")
+
+    ### aiprefill functionality
     messages = [
         SystemMessage("Act as a helpful AI assistant"),
         UserMessage("Hello, what's your name?")
