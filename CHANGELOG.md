@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.69.0]
+
+### Added
+- Added a new Gemini 2.0 Flash Experimental model (`gemini-2.0-flash-exp`) and updated the alias `gem20f` with it.
+
 ## [0.68.0]
 
 ### Added
