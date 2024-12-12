@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Fixed
+- Added assertion in `response_to_message` for missing `:tool_calls` key in the response message. It's model failure but it wasn't obvious from the original error.
 
 ## [0.69.0]
 
