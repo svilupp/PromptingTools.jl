@@ -856,6 +856,7 @@ function response_to_message(schema::AbstractOpenAISchema,
         [parse_tool(
             tool.callable, content_obj)]
     else
+        @assert haskey(choice[:message], :tool_calls) "`:tool_calls` key is missing in the response message! Retry the request."
         ## If name does not match, we use the callable from the tool_map 
         ## Can happen only in testing with auto-generated struct
         [parse_tool(
