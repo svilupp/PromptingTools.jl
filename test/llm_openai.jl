@@ -434,6 +434,18 @@ end
     @test msg.sample_id == nothing
     @test msg.cost == call_cost(2, 1, "gpt4t")
 
+    ## CamelCase usage keys
+    mock_response2 = (;
+        response = Dict(:choices => [mock_choice],
+            :usage => Dict(:totalTokens => 3, :promptTokens => 2, :completionTokens => 1)),
+        status = 200)
+    msg2 = response_to_message(OpenAISchema(),
+        AIMessage,
+        mock_choice,
+        mock_response2;
+        model_id = "gpt4t")
+    @test msg.tokens == (2, 1)
+
     # Test without logprobs
     choice = deepcopy(mock_choice)
     delete!(choice, :logprobs)

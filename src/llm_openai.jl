@@ -176,9 +176,19 @@ function response_to_message(schema::AbstractOpenAISchema,
     else
         nothing
     end
+    # Extract usage information with default values for tokens
+    tokens_prompt = 0
+    tokens_completion = 0
+    # Merge with response usage if available
+    if haskey(resp.response, :usage)
+        response_usage = resp.response[:usage]
+        # Handle both snake_case and camelCase keys
+        tokens_prompt = get(response_usage, :prompt_tokens,
+            get(response_usage, :promptTokens, 0))
+        tokens_completion = get(response_usage, :completion_tokens,
+            get(response_usage, :completionTokens, 0))
+    end
     ## calculate cost
-    tokens_prompt = get(resp.response, :usage, Dict(:prompt_tokens => 0))[:prompt_tokens]
-    tokens_completion = get(resp.response, :usage, Dict(:completion_tokens => 0))[:completion_tokens]
     cost = call_cost(tokens_prompt, tokens_completion, model_id)
     extras = Dict{Symbol, Any}()
     if has_log_prob
@@ -438,7 +448,9 @@ function aiembed(prompt_schema::AbstractOpenAISchema,
         model_id;
         http_kwargs,
         api_kwargs...)
-    tokens_prompt = get(r.response, :usage, Dict(:prompt_tokens => 0))[:prompt_tokens]
+    tokens_prompt = haskey(r.response, :usage) ?
+                    get(
+        r.response[:usage], :prompt_tokens, get(r.response[:usage], :promptTokens, 0)) : 0
     msg = DataMessage(;
         content = mapreduce(x -> postprocess(x[:embedding]), hcat, r.response[:data]),
         status = Int(r.status),
@@ -844,9 +856,19 @@ function response_to_message(schema::AbstractOpenAISchema,
     else
         nothing
     end
+    # Extract usage information with default values for tokens
+    tokens_prompt = 0
+    tokens_completion = 0
+    # Merge with response usage if available
+    if haskey(resp.response, :usage)
+        response_usage = resp.response[:usage]
+        # Handle both snake_case and camelCase keys
+        tokens_prompt = get(response_usage, :prompt_tokens,
+            get(response_usage, :promptTokens, 0))
+        tokens_completion = get(response_usage, :completion_tokens,
+            get(response_usage, :completionTokens, 0))
+    end
     ## calculate cost
-    tokens_prompt = get(resp.response, :usage, Dict(:prompt_tokens => 0))[:prompt_tokens]
-    tokens_completion = get(resp.response, :usage, Dict(:completion_tokens => 0))[:completion_tokens]
     cost = call_cost(tokens_prompt, tokens_completion, model_id)
     # "Safe" parsing of the response - it still fails if JSON is invalid
     tools_array = if json_mode == true
@@ -1490,9 +1512,19 @@ function response_to_message(schema::AbstractOpenAISchema,
     else
         nothing
     end
+    # Extract usage information with default values for tokens
+    tokens_prompt = 0
+    tokens_completion = 0
+    # Merge with response usage if available
+    if haskey(resp.response, :usage)
+        response_usage = resp.response[:usage]
+        # Handle both snake_case and camelCase keys
+        tokens_prompt = get(response_usage, :prompt_tokens,
+            get(response_usage, :promptTokens, 0))
+        tokens_completion = get(response_usage, :completion_tokens,
+            get(response_usage, :completionTokens, 0))
+    end
     ## calculate cost
-    tokens_prompt = get(resp.response, :usage, Dict(:prompt_tokens => 0))[:prompt_tokens]
-    tokens_completion = get(resp.response, :usage, Dict(:completion_tokens => 0))[:completion_tokens]
     cost = call_cost(tokens_prompt, tokens_completion, model_id)
     # "Safe" parsing of the response - it still fails if JSON is invalid
     has_tools = haskey(choice[:message], :tool_calls) &&
