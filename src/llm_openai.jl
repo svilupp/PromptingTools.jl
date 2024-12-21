@@ -176,9 +176,19 @@ function response_to_message(schema::AbstractOpenAISchema,
     else
         nothing
     end
+    # Extract usage information with default values for tokens
+    tokens_prompt = 0
+    tokens_completion = 0
+    # Merge with response usage if available
+    if haskey(resp.response, :usage)
+        response_usage = resp.response[:usage]
+        # Handle both snake_case and camelCase keys
+        tokens_prompt = get(response_usage, :prompt_tokens,
+            get(response_usage, :promptTokens, 0))
+        tokens_completion = get(response_usage, :completion_tokens,
+            get(response_usage, :completionTokens, 0))
+    end
     ## calculate cost
-    tokens_prompt = get(resp.response, :usage, Dict(:prompt_tokens => 0))[:prompt_tokens]
-    tokens_completion = get(resp.response, :usage, Dict(:completion_tokens => 0))[:completion_tokens]
     cost = call_cost(tokens_prompt, tokens_completion, model_id)
     extras = Dict{Symbol, Any}()
     if has_log_prob
