@@ -9,7 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Fixed
+
+## [0.69.1]
+
+### Fixed
 - Added assertion in `response_to_message` for missing `:tool_calls` key in the response message. It's model failure but it wasn't obvious from the original error.
+- Fixes error for usage information in CamelCase from OpenAI servers (Gemini proxy now sends it in CamelCase).
 
 ## [0.69.0]
 
