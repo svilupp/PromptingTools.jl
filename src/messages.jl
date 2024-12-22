@@ -4,6 +4,111 @@
 abstract type AbstractMessage end
 abstract type AbstractChatMessage <: AbstractMessage end # with text-based content
 abstract type AbstractDataMessage <: AbstractMessage end # with data-based content, eg, embeddings
+
+# Content block types for multi-modal messages
+abstract type AbstractContentBlock end
+
+"""
+    TextContent <: AbstractContentBlock
+
+A content block type for text-based content.
+
+# Fields
+- `text::String`: The text content
+"""
+struct TextContent <: AbstractContentBlock
+    text::String
+end
+
+"""
+    ImageContent <: AbstractContentBlock
+
+A content block type for image-based content.
+
+# Fields
+- `url::String`: The URL of the image
+"""
+struct ImageContent <: AbstractContentBlock
+    url::String
+end
+
+"""
+    AudioContent <: AbstractContentBlock
+
+A content block type for audio-based content.
+
+# Fields
+- `url::String`: The URL of the audio file
+"""
+struct AudioContent <: AbstractContentBlock
+    url::String
+end
+
+"""
+    DataContent <: AbstractContentBlock
+
+A content block type for data-based content (e.g., embeddings).
+
+# Fields
+- `data::Any`: The data content
+"""
+struct DataContent <: AbstractContentBlock
+    data::Any
+end
+
+"""
+    AIMultiMessage <: AbstractChatMessage
+
+A message type for AI-generated responses that can contain multiple content types.
+Extends AbstractChatMessage to support multi-modal responses.
+
+# Fields
+- `content::Vector{AbstractContentBlock}`: Vector of content blocks (text, images, audio, data)
+- `status::Union{Int, Nothing}`: The status of the message from the API
+- `tokens::Tuple{Int, Int}`: The number of tokens used (prompt, completion)
+- `elapsed::Float64`: The time taken to generate the response in seconds
+- `cost::Union{Nothing, Float64}`: The cost of the API call
+- `log_prob::Union{Nothing, Float64}`: The log probability of the response
+- `extras::Union{Nothing, Dict{Symbol, Any}}`: Additional metadata
+- `finish_reason::Union{Nothing, String}`: The reason the response was finished
+- `run_id::Union{Nothing, Int}`: The unique ID of the run
+- `sample_id::Union{Nothing, Int}`: The unique ID of the sample
+- `name::Union{Nothing, String}`: The name of the role in the conversation
+"""
+Base.@kwdef mutable struct AIMultiMessage <: AbstractChatMessage
+    content::Vector{AbstractContentBlock}
+    status::Union{Int, Nothing} = nothing
+    tokens::Tuple{Int, Int} = (0, 0)
+    elapsed::Float64 = 0.0
+    cost::Union{Nothing, Float64} = nothing
+    log_prob::Union{Nothing, Float64} = nothing
+    extras::Union{Nothing, Dict{Symbol, Any}} = nothing
+    finish_reason::Union{Nothing, String} = nothing
+    run_id::Union{Nothing, Int} = Int(rand(Int16))
+    sample_id::Union{Nothing, Int} = nothing
+    name::Union{Nothing, String} = nothing
+    _type::Symbol = :aimultimessage
+end
+
+"""
+    UserMultiMessage <: AbstractChatMessage
+
+A message type for user-generated responses that can contain multiple content types.
+Extends AbstractChatMessage to support multi-modal inputs and tool specifications.
+
+# Fields
+- `content::Vector{AbstractContentBlock}`: Vector of content blocks (text, images, audio, data)
+- `tools::Vector{ToolMessage}`: Vector of tool messages that AI can use
+- `run_id::Union{Nothing, Int}`: The unique ID of the run
+- `name::Union{Nothing, String}`: The name of the role in the conversation
+"""
+Base.@kwdef mutable struct UserMultiMessage <: AbstractChatMessage
+    content::Vector{AbstractContentBlock}
+    tools::Vector{ToolMessage} = ToolMessage[]
+    run_id::Union{Nothing, Int} = Int(rand(Int16))
+    name::Union{Nothing, String} = nothing
+    _type::Symbol = :usermultimessage
+end
 """
     AbstractAnnotationMessage
 

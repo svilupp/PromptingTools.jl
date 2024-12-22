@@ -402,3 +402,89 @@ end
     @test occursin("TracerMessageLike with:", pprint_output)
     @test occursin("Test Message", pprint_output)
 end
+
+@testset "MultiMessage Types" begin
+    # Test AIMultiMessage
+    text_content = TextContent("Hello, AI!")
+    image_content = ImageContent("https://example.com/image.jpg")
+    audio_content = AudioContent("https://example.com/audio.mp3")
+    data_content = DataContent([1, 2, 3])
+    
+    # Test constructor and type inheritance
+    ai_msg = AIMultiMessage(content=[text_content, image_content])
+    @test ai_msg isa AbstractChatMessage
+    @test ai_msg isa AIMultiMessage
+    @test length(ai_msg.content) == 2
+    @test ai_msg.content[1] isa TextContent
+    @test ai_msg.content[2] isa ImageContent
+    
+    # Test all content types
+    ai_msg = AIMultiMessage(content=[text_content, image_content, audio_content, data_content])
+    @test length(ai_msg.content) == 4
+    @test ai_msg.content[1].text == "Hello, AI!"
+    @test ai_msg.content[2].url == "https://example.com/image.jpg"
+    @test ai_msg.content[3].url == "https://example.com/audio.mp3"
+    @test ai_msg.content[4].data == [1, 2, 3]
+    
+    # Test metadata fields
+    ai_msg = AIMultiMessage(
+        content=[text_content],
+        status=200,
+        tokens=(10, 20),
+        elapsed=1.5,
+        cost=0.001,
+        extras=Dict(:key => "value")
+    )
+    @test ai_msg.status == 200
+    @test ai_msg.tokens == (10, 20)
+    @test ai_msg.elapsed == 1.5
+    @test ai_msg.cost == 0.001
+    @test ai_msg.extras[:key] == "value"
+    
+    # Test UserMultiMessage
+    user_msg = UserMultiMessage(content=[text_content])
+    @test user_msg isa AbstractChatMessage
+    @test user_msg isa UserMultiMessage
+    @test length(user_msg.content) == 1
+    @test isempty(user_msg.tools)
+    
+    # Test with tools
+    tool_msg = ToolMessage(
+        tool_call_id="1",
+        name="test_tool",
+        raw="test args",
+        content="test output"
+    )
+    user_msg = UserMultiMessage(
+        content=[text_content, image_content],
+        tools=[tool_msg]
+    )
+    @test length(user_msg.content) == 2
+    @test length(user_msg.tools) == 1
+    @test user_msg.tools[1].tool_call_id == "1"
+    @test user_msg.tools[1].name == "test_tool"
+    
+    # Test show methods
+    io = IOBuffer()
+    show(io, MIME("text/plain"), ai_msg)
+    output = String(take!(io))
+    @test occursin("AIMultiMessage", output)
+    @test occursin("Hello, AI!", output)
+    
+    show(io, MIME("text/plain"), user_msg)
+    output = String(take!(io))
+    @test occursin("UserMultiMessage", output)
+    @test occursin("Hello, AI!", output)
+    
+    # Test pprint methods
+    pprint(io, ai_msg)
+    output = String(take!(io))
+    @test occursin("AI Multi Message", output)
+    @test occursin("Hello, AI!", output)
+    
+    pprint(io, user_msg)
+    output = String(take!(io))
+    @test occursin("User Multi Message", output)
+    @test occursin("Hello, AI!", output)
+    @test occursin("test_tool", output)
+end

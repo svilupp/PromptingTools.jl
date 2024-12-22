@@ -132,6 +132,95 @@ function render(schema::AbstractOpenAISchema,
 end
 
 """
+    render(schema::AbstractOpenAISchema, msg::AIMultiMessage; kwargs...)
+
+Render an AIMultiMessage for the OpenAI API schema. Combines multiple content blocks
+into a single message with appropriate formatting for each content type.
+"""
+function render(schema::AbstractOpenAISchema,
+        msg::AIMultiMessage;
+        image_detail::AbstractString = "auto",
+        kwargs...)
+    @assert image_detail in ["auto", "high", "low"] "Image detail must be one of: auto, high, low"
+    
+    # Initialize the content array for multi-modal content
+    content = []
+    
+    # Process each content block
+    for block in msg.content
+        if block isa TextContent
+            push!(content, Dict("type" => "text",
+                              "text" => block.text))
+        elseif block isa ImageContent
+            push!(content, Dict("type" => "image_url",
+                              "image_url" => Dict("url" => block.url,
+                                                "detail" => image_detail)))
+        elseif block isa AudioContent
+            # Currently, OpenAI doesn't support audio in messages directly
+            # Convert to text description or URL reference
+            push!(content, Dict("type" => "text",
+                              "text" => "Audio content: $(block.url)"))
+        elseif block isa DataContent
+            # Convert data content to string representation
+            push!(content, Dict("type" => "text",
+                              "text" => string(block.data)))
+        end
+    end
+    
+    Dict("role" => role4render(schema, msg),
+         "content" => content)
+end
+
+"""
+    render(schema::AbstractOpenAISchema, msg::UserMultiMessage; kwargs...)
+
+Render a UserMultiMessage for the OpenAI API schema. Handles both content blocks
+and tool messages in the appropriate format.
+"""
+function render(schema::AbstractOpenAISchema,
+        msg::UserMultiMessage;
+        image_detail::AbstractString = "auto",
+        kwargs...)
+    @assert image_detail in ["auto", "high", "low"] "Image detail must be one of: auto, high, low"
+    
+    # Initialize the message dictionary
+    message = Dict{String, Any}("role" => role4render(schema, msg))
+    
+    # Process content blocks similar to AIMultiMessage
+    content = []
+    for block in msg.content
+        if block isa TextContent
+            push!(content, Dict("type" => "text",
+                              "text" => block.text))
+        elseif block isa ImageContent
+            push!(content, Dict("type" => "image_url",
+                              "image_url" => Dict("url" => block.url,
+                                                "detail" => image_detail)))
+        elseif block isa AudioContent
+            push!(content, Dict("type" => "text",
+                              "text" => "Audio content: $(block.url)"))
+        elseif block isa DataContent
+            push!(content, Dict("type" => "text",
+                              "text" => string(block.data)))
+        end
+    end
+    message["content"] = content
+    
+    # Add tools if present
+    if !isempty(msg.tools)
+        message["tool_calls"] = [
+            Dict("id" => tool.tool_call_id,
+                 "type" => "function",
+                 "function" => Dict("name" => tool.name,
+                                  "arguments" => tool.raw))
+            for tool in msg.tools
+        ]
+    end
+    
+    message
+end
+
+"""
     response_to_message(schema::AbstractOpenAISchema,
         MSG::Type{AIMessage},
         choice,
