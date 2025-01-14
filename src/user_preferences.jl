@@ -376,6 +376,7 @@ aliases = merge(
         "gpt4t" => "gpt-4-turbo", # 4t is for "4 turbo"
         "gpt3t" => "gpt-3.5-turbo-0125", # 3t is for "3 turbo"
         "chatgpt" => "chatgpt-4o-latest",
+        "o1" => "o1",
         "o1p" => "o1-preview",
         "o1m" => "o1-mini",
         "ada" => "text-embedding-ada-002",
@@ -398,6 +399,8 @@ aliases = merge(
         "fls" => "accounts/fireworks/models/llama-v3p1-8b-instruct", #s for small
         "flm" => "accounts/fireworks/models/llama-v3p1-70b-instruct", #m for medium
         "fll" => "accounts/fireworks/models/llama-v3p1-405b-instruct", #l for large
+        "fds" => "accounts/fireworks/models/deepseek-v3",
+        "fqwen25c" => "accounts/fireworks/models/qwen2p5-coder-32b-instruct",
         ## t-mixtral -> Together.ai Mixtral
         "tmixtral" => "mistralai/Mixtral-8x7B-Instruct-v0.1",
         "tmixtral22" => "mistralai/Mixtral-8x22B-Instruct-v0.1",
@@ -409,6 +412,8 @@ aliases = merge(
         "tls" => "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo", #s for small
         "tlm" => "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo", #m for medium
         "tll" => "meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo", #l for large
+        "tqwen25c" => "Qwen/Qwen2.5-Coder-32B-Instruct", # c for coder
+        "tds" => "deepseek-ai/DeepSeek-V3",
         ## Mistral AI
         "mistral-nemo" => "open-mistral-nemo",
         "mistral-tiny" => "mistral-tiny",
@@ -473,6 +478,7 @@ aliases = merge(
         "grok" => "grok-beta",
         ## DeepSeek
         "dschat" => "deepseek-chat",
+        "ds" => "deepseek-chat",
         "dscode" => "deepseek-coder",
         ## OpenRouter
         "orgf8b" => "google/gemini-flash-1.5-8b",
@@ -582,6 +588,16 @@ registry = Dict{String, ModelSpec}(
         3e-6,
         1.2e-5,
         "O1 Mini is the latest version of OpenAI's O1 model. 128K context. Knowledge until October 2023."),
+    "o1" => ModelSpec("o1",
+        OpenAISchema(),
+        1.5e-5,
+        6e-5,
+        "O1 is the latest version of OpenAI's O1 model. 200K context, 100K output."),
+    "o1-2024-12-17" => ModelSpec("o1-2024-12-17",
+        OpenAISchema(),
+        1.5e-5,
+        6e-5,
+        "O1 is the latest version of OpenAI's O1 model. 200K context, 100K output."),
     "chatgpt-4o-latest" => ModelSpec("chatgpt-4o-latest",
         OpenAISchema(),
         5e-6,
@@ -844,6 +860,18 @@ registry = Dict{String, ModelSpec}(
         2e-7,
         2e-7,
         "Meta Llama 3.1 8b, hosted by Fireworks.ai. Context 131K tokens. For more information, see [models](https://fireworks.ai/models/fireworks/llama-v3p1-8b-instruct)."),
+    "accounts/fireworks/models/deepseek-v3" => ModelSpec(
+        "accounts/fireworks/models/deepseek-v3",
+        FireworksOpenAISchema(),
+        9e-7,
+        9e-7,
+        "Deepseek's latest model, DeepSeek V3, hosted by Fireworks.ai. 130K context."),
+    "accounts/fireworks/models/qwen2p5-coder-32b-instruct" => ModelSpec(
+        "accounts/fireworks/models/qwen2p5-coder-32b-instruct",
+        FireworksOpenAISchema(),
+        9e-7,
+        9e-7,
+        "Qwen 2.5 Coder 32B, hosted by Fireworks.ai. 32K context."),
     ## Together AI
     "mistralai/Mixtral-8x7B-Instruct-v0.1" => ModelSpec(
         "mistralai/Mixtral-8x7B-Instruct-v0.1",
@@ -899,6 +927,24 @@ registry = Dict{String, ModelSpec}(
         0.18e-6,
         0.3e-6,
         ""),
+    "deepseek-ai/DeepSeek-V3" => ModelSpec(
+        "deepseek-ai/DeepSeek-V3",
+        TogetherOpenAISchema(),
+        1.25e-6,
+        1.25e-6,
+        "Deepseek's latest model, DeepSeek V3, hosted by Together.ai. 130K context, FP8 version."),
+    "Qwen/Qwen2.5-Coder-32B-Instruct" => ModelSpec(
+        "Qwen/Qwen2.5-Coder-32B-Instruct",
+        TogetherOpenAISchema(),
+        8e-7,
+        8e-7,
+        "Qwen 2.5 Coder 32B, hosted by Together.ai. 32K context."),
+    "Qwen/QwQ-32B-Preview" => ModelSpec(
+        "Qwen/QwQ-32B-Preview",
+        TogetherOpenAISchema(),
+        1.2e-6,
+        1.2e-6,
+        "Qwen 32B reasoning model, hosted by Together.ai. 32K context."),
     ### Anthropic models
     "claude-3-5-sonnet-latest" => ModelSpec("claude-3-5-sonnet-latest",
         AnthropicSchema(),
