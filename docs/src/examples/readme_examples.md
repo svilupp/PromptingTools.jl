@@ -42,39 +42,6 @@ It uses exactly the same arguments and keyword arguments as `aigenerate` (see `?
 
 Or said differently, the `AICall` struct and all its flavors (`AIGenerate`, ...) are designed to facilitate a deferred execution model (lazy evaluation) for AI functions that interact with a Language Learning Model (LLM). It stores the necessary information for an AI call and executes the underlying AI function only when supplied with a `UserMessage` or when the `run!` method is applied. This allows us to remember user inputs and trigger the LLM call repeatedly if needed, which enables automatic fixing (see `?airetry!`).
 
-**Experimental: RAGTools**
-
-Lastly, we provide a set of tools to build RAG applications (Retrieve, Answer, Generate). 
-
-It can be as simple as two calls: `build_index` and `airag` (Retrieve, Answer, Generate). 
-
-If you then use pretty-printing with `PromptingTools.pprint`, we highlight the generated text vs text likely sourced from the context and we score how strongly is the generated answer supported by the context.
-In addition, we annotate each generated chunk with a reference to which source document it likely came from (including the confidence score between 0 and 1).
-
-
-## Seamless Integration Into Your Workflow
-Google search is great, but it's a context switch. You often have to open a few pages and read through the discussion to find the answer you need. Same with the ChatGPT website.
-
-Imagine you are in VSCode, editing your `.gitignore` file. How do I ignore a file in all subfolders again?
-
-All you need to do is to type:
-`aai"What to write in .gitignore to ignore file XYZ in any folder or subfolder?"`
-
-With `aai""` (as opposed to `ai""`), we make a non-blocking call to the LLM to not prevent you from continuing your work. When the answer is ready, we log it from the background:
-
-```plaintext
-[ Info: Tokens: 102 @ Cost: $0.0002 in 2.7 seconds
-┌ Info: AIMessage> To ignore a file called "XYZ" in any folder or subfolder, you can add the following line to your .gitignore file:
-│ 
-│ ```
-│ **/XYZ
-│ ```
-│ 
-└ This pattern uses the double asterisk (`**`) to match any folder or subfolder, and then specifies the name of the file you want to ignore.
-```
-
-You probably saved 3-5 minutes on this task and probably another 5-10 minutes, because of the context switch/distraction you avoided. It's a small win, but it adds up quickly.
-
 ## Advanced Prompts / Conversations
 
 You can use the `aigenerate` function to replace handlebar variables (eg, `{{name}}`) via keyword arguments.
