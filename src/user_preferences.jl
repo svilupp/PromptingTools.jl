@@ -480,6 +480,7 @@ aliases = merge(
         "dschat" => "deepseek-chat",
         "ds" => "deepseek-chat",
         "dscode" => "deepseek-coder",
+        "dsreason" => "deepseek-reasoner",
         ## OpenRouter
         "orgf8b" => "google/gemini-flash-1.5-8b",
         "orgf" => "google/gemini-flash-1.5",
@@ -1085,6 +1086,11 @@ registry = Dict{String, ModelSpec}(
         DeepSeekOpenAISchema(),
         1.4e-7,
         2.8e-7,
+        "Deepseek.com-hosted coding model. Max 16K context. See details [here](https://platform.deepseek.com/docs)"),
+    "deepseek-reasoner" => ModelSpec("deepseek-reasoner",
+        DeepSeekOpenAISchema(),
+        5.5e-7,
+        2.19e-6,
         "Deepseek.com-hosted coding model. Max 16K context. See details [here](https://platform.deepseek.com/docs)"),
     ## OpenRouter models
     "google/gemini-flash-1.5-8b" => ModelSpec("google/gemini-flash-1.5-8b",
