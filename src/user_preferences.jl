@@ -87,6 +87,7 @@ const ALLOWED_PREFERENCES = ["MISTRAL_API_KEY",
     "CEREBRAS_API_KEY",
     "SAMBANOVA_API_KEY",
     "XAI_API_KEY",  # Added XAI_API_KEY
+    "MINIMAX_API_KEY",
     "MODEL_CHAT",
     "MODEL_EMBEDDING",
     "MODEL_ALIASES",
@@ -173,6 +174,7 @@ global SAMBANOVA_API_KEY::String = ""
 global LOCAL_SERVER::String = ""
 global LOG_DIR::String = ""
 global XAI_API_KEY::String = ""
+global MINIMAX_API_KEY::String = ""
 
 # Load them on init
 "Loads API keys from environment variables and preferences"
@@ -247,6 +249,9 @@ function load_api_keys!()
     global XAI_API_KEY
     XAI_API_KEY = @load_preference("XAI_API_KEY",
         default=get(ENV, "XAI_API_KEY", ""))
+    global MINIMAX_API_KEY
+    MINIMAX_API_KEY = @load_preference("MINIMAX_API_KEY",
+        default=get(ENV, "MINIMAX_API_KEY", ""))
 
     return nothing
 end
@@ -476,6 +481,8 @@ aliases = merge(
         "sll" => "Meta-Llama-3.1-405B-Instruct", # l for large
         ## XAI's Grok
         "grok" => "grok-beta",
+        ## MiniMax
+        "minimax" => "MiniMax-Text-01",
         ## DeepSeek
         "dschat" => "deepseek-chat",
         "ds" => "deepseek-chat",
@@ -928,6 +935,11 @@ registry = Dict{String, ModelSpec}(
         0.18e-6,
         0.3e-6,
         ""),
+    "MiniMax-Text-01" => ModelSpec("MiniMax-Text-01",
+        MiniMaxOpenAISchema(),
+        0.2e-6,  # Update these costs if you know them
+        1.1e-6,
+        "MiniMax Text model for chat completions."),
     "deepseek-ai/DeepSeek-V3" => ModelSpec(
         "deepseek-ai/DeepSeek-V3",
         TogetherOpenAISchema(),

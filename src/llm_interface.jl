@@ -300,6 +300,19 @@ Warning: Token counting and cost counting have not yet been implemented by Googl
 """
 struct GoogleOpenAISchema <: AbstractOpenAISchema end
 
+"""
+    MiniMaxOpenAISchema
+
+Schema to call the MiniMax API.
+
+Links:
+- [API Reference](https://api.minimaxi.chat/v1/text/chatcompletion_v2)
+
+Requires one environment variable to be set:
+- `MINIMAX_API_KEY`: Your API key
+"""
+struct MiniMaxOpenAISchema <: AbstractOpenAISchema end
+
 abstract type AbstractOllamaSchema <: AbstractPromptSchema end
 
 """
