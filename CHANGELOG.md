@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.70.2]
+
+### Added
+- Added MiniMax model support and alias (`minimax`) for MiniMax-Text-01 model
+
 ## [0.70.1]
 
 ### Added
