@@ -27,6 +27,7 @@ Check your preferences by calling `get_preferences(key::String)`.
 - `CEREBRAS_API_KEY`: The API key for the Cerebras API. Get yours from [here](https://cloud.cerebras.ai/).
 - `SAMBANOVA_API_KEY`: The API key for the Sambanova API. Get yours from [here](https://cloud.sambanova.ai/apis).
 - `XAI_API_KEY`: The API key for the XAI API. Get your key from [here](https://console.x.ai/).
+- `MINIMAX_API_KEY`: The API key for the MiniMax API. Get your key from [here](https://intl.minimaxi.com/document/platform%20introduction).
 - `MODEL_CHAT`: The default model to use for aigenerate and most ai* calls. See `MODEL_REGISTRY` for a list of available models or define your own.
 - `MODEL_EMBEDDING`: The default model to use for aiembed (embedding documents). See `MODEL_REGISTRY` for a list of available models or define your own.
 - `PROMPT_SCHEMA`: The default prompt schema to use for aigenerate and most ai* calls (if not specified in `MODEL_REGISTRY`). Set as a string, eg, `"OpenAISchema"`.
@@ -62,6 +63,7 @@ Define your `register_model!()` calls in your `startup.jl` file to make them ava
 - `SAMBANOVA_API_KEY`: The API key for the Sambanova API.
 - `LOG_DIR`: The directory to save the logs to, eg, when using `SaverSchema <: AbstractTracerSchema`. Defaults to `joinpath(pwd(), "log")`. Refer to `?SaverSchema` for more information on how it works and examples.
 - `XAI_API_KEY`: The API key for the XAI API. Get your key from [here](https://console.x.ai/).
+- `MINIMAX_API_KEY`: The API key for the MiniMax API. Get your key from [here](https://intl.minimaxi.com/document/platform%20introduction).
 
 Preferences.jl takes priority over ENV variables, so if you set a preference, it will take precedence over the ENV variable.
 
