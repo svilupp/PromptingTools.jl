@@ -16,7 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added new DeepSeek V3 model via Deepseek (alias `dschat` or simply `ds`, because they are in a category of their own), Fireworks.ai and Together.ai (`fds` and `tds` for hosted Deepseek V3, respectively). Added Qwen 2.5 Coder 32B (alias `fqwen25c` or `tqwen25c` for Fireworks.ai and Together.ai, respectively).
 - Added the reasoning Qwen QwQ 32B hosted on Together.ai.
 - Added the new OpenAI's O1 model to the model registry (alias `o1`).
-- Added DeepSeek Reasoner model alias (`dsreason`) from DeepSeek
+- Added DeepSeek Reasoner model alias (`dsreason` or simply `dsr`) from DeepSeek
+- Added MiniMax model support and alias (`minimax`) for MiniMax-Text-01 model
 
 ## [0.69.1]
 
