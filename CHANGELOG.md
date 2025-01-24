@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.70.1]
+
+### Added
+- Added DeepSeek Reasoner model alias (`dsreason`) from DeepSeek
+
 ## [0.70.0]
 
 ### Added
