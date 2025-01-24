@@ -28,13 +28,13 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
       ]),
       _cache[5] || (_cache[5] = createBaseVNode("p", null, [
         createBaseVNode("a", {
-          href: "https://github.com/svilupp/PromptingTools.jl/blob/380d2560e860455f420e3c41b0070782f6c26eec/src/llm_interface.jl#L379-L393",
+          href: "https://github.com/svilupp/PromptingTools.jl/blob/fd573d9f7018ee5660b27038d10a61a9c8a9a67b/src/llm_interface.jl#L392-L406",
           target: "_blank",
           rel: "noreferrer"
         }, "source")
       ], -1))
     ]),
-    _cache[48] || (_cache[48] = createStaticVNode("", 111)),
+    _cache[48] || (_cache[48] = createStaticVNode("", 113)),
     createBaseVNode("div", _hoisted_2, [
       _cache[10] || (_cache[10] = createStaticVNode("", 9)),
       createBaseVNode("p", null, [
@@ -104,7 +104,7 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
       ], -1)),
       _cache[32] || (_cache[32] = createBaseVNode("p", null, [
         createBaseVNode("a", {
-          href: "https://github.com/svilupp/PromptingTools.jl/blob/380d2560e860455f420e3c41b0070782f6c26eec/src/llm_ollama_managed.jl#L9-L21",
+          href: "https://github.com/svilupp/PromptingTools.jl/blob/fd573d9f7018ee5660b27038d10a61a9c8a9a67b/src/llm_ollama_managed.jl#L9-L21",
           target: "_blank",
           rel: "noreferrer"
         }, "source")
@@ -150,7 +150,7 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
       ]),
       _cache[46] || (_cache[46] = createBaseVNode("p", null, [
         createBaseVNode("a", {
-          href: "https://github.com/svilupp/PromptingTools.jl/blob/380d2560e860455f420e3c41b0070782f6c26eec/src/llm_shared.jl#L12-L32",
+          href: "https://github.com/svilupp/PromptingTools.jl/blob/fd573d9f7018ee5660b27038d10a61a9c8a9a67b/src/llm_shared.jl#L12-L32",
           target: "_blank",
           rel: "noreferrer"
         }, "source")
@@ -533,7 +533,7 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
       createBaseVNode("p", null, 'tool_map = tool_call_signature(MyMeasurement; hidden_fields = ["ctx_user_id"]) ```'),
       createBaseVNode("p", null, [
         createBaseVNode("a", {
-          href: "https://github.com/svilupp/PromptingTools.jl/blob/380d2560e860455f420e3c41b0070782f6c26eec/src/extraction.jl#L463-L555",
+          href: "https://github.com/svilupp/PromptingTools.jl/blob/fd573d9f7018ee5660b27038d10a61a9c8a9a67b/src/extraction.jl#L463-L555",
           target: "_blank",
           rel: "noreferrer"
         }, "source")
