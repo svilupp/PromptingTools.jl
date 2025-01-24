@@ -488,6 +488,7 @@ aliases = merge(
         "ds" => "deepseek-chat",
         "dscode" => "deepseek-coder",
         "dsreason" => "deepseek-reasoner",
+        "dsr" => "deepseek-reasoner",
         ## OpenRouter
         "orgf8b" => "google/gemini-flash-1.5-8b",
         "orgf" => "google/gemini-flash-1.5",
