@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.71.0]
+
+### Added
+- Added the new OpenAI's O3 Mini reasoning model to the model registry (alias `o3m`).
+- Added the new DeepSeek R1 Distill Llama 70b model hosted on GroqCloud, which beats GPT 4o in many benchmarks while being upto 10x cheaper (alias `glmr` - stands for Groq Llama Medium(70b) Reasoning).
+
 ## [0.70.0]
 
 ### Added
