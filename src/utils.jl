@@ -472,7 +472,17 @@ function _report_stats(msg,
     cost = call_cost(msg, model)
     cost_str = iszero(cost) ? "" : " @ Cost: \$$(round(cost; digits=4))"
     metadata_str = if !isnothing(msg.extras) && !isempty(msg.extras)
-        " (Metadata: $(join([string(k, " => ", v) for (k, v) in msg.extras if v isa Number && !iszero(v)], ", ")))"
+        numeric_keys = join(
+            [string(k, " => ", v)
+             for (k, v) in msg.extras if v isa Number && !iszero(v)],
+            ", ")
+        other_keys = join(
+            [string(k)
+             for (k, v) in msg.extras if !(v isa Number && !iszero(v))],
+            ", ")
+        other_keys_str = !isempty(other_keys) && !isempty(numeric_keys) ?
+                         ", Other keys: $(other_keys)" : other_keys
+        " (Metadata: $(numeric_keys)$(other_keys_str))"
     else
         ""
     end

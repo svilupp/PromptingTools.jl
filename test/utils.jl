@@ -252,6 +252,11 @@ end
             :cache_read_input_tokens => 100, :cache_creation_input_tokens => 200))
     expected_output = "Tokens: 6000 @ Cost: \$0.008 in 5.0 seconds (Metadata: cache_read_input_tokens => 100, cache_creation_input_tokens => 200)"
     @test _report_stats(msg, "gpt-3.5-turbo") == expected_output
+    # Test with extra key that has no numeric value
+    msg = AIMessage(; content = "", tokens = (1000, 5000), elapsed = 5.0,
+        extras = Dict{Symbol, Any}(:extra_key1 => "value1"))
+    expected_output = "Tokens: 6000 @ Cost: \$0.008 in 5.0 seconds (Metadata: extra_key1)"
+    @test _report_stats(msg, "gpt-3.5-turbo") == expected_output
 end
 
 @testset "_string_to_vector" begin

@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Added the new OpenAI's O3 Mini reasoning model to the model registry (alias `o3m`).
 - Added the new DeepSeek R1 Distill Llama 70b model hosted on GroqCloud, which beats GPT 4o in many benchmarks while being upto 10x cheaper (alias `glmr` - stands for Groq Llama Medium(70b) Reasoning).
+- Added experimental support for "thinking tokens" that can be found with DeepSeek API and the reasoning model R1 (alias `dsr`). If the thought chain is provided, we save it in the `msg.extras[:reasoning_content]` field for advanced users.
 
 ## [0.70.0]
 
