@@ -56,4 +56,7 @@ include("annotation.jl")
 export build_qa_evals, run_qa_evals
 include("evaluation.jl")
 
+@warn """RAGTools will be moved into a dedicated package from PromptingTools v0.75 onward.
+Please adjust your code accordingly, see https://github.com/JuliaGenAI/RAGTools.jl"""
+
 end
