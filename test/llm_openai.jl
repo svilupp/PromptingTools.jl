@@ -926,13 +926,13 @@ end
 
     mock_choice = Dict(
         :message => Dict(:content => "Hello!",
+            :reasoning_content => "Reasoning content",
             :tool_calls => [
                 Dict(:function => Dict(
                 :arguments => JSON3.write(Dict(:x => 1)),
                 :name => "RandomType1235"))
             ]),
-        :logprobs => Dict(:content => [Dict(:logprob => -0.5), Dict(:logprob => -0.4)]),
-        :finish_reason => "stop")
+        :logprobs => Dict(:content => [Dict(:logprob => -0.5), Dict(:logprob => -0.4)]), :finish_reason => "stop")
     ## Test with a single sample
     response = Dict(:choices => [mock_choice],
         :usage => Dict(:total_tokens => 3, :prompt_tokens => 2, :completion_tokens => 1))
@@ -942,6 +942,7 @@ end
         api_kwargs = (; temperature = 0, n = 2))
     @test msg.content == RandomType1235(1)
     @test msg.log_prob ≈ -0.9
+    @test msg.extras[:reasoning_content] == "Reasoning content"
 
     ## Test with field descriptions
     fields = [:x => Int, :x__description => "Field 1 description"]
@@ -1081,6 +1082,7 @@ end
         :choices => [
             Dict(
             :message => Dict(:content => "",
+                :reasoning_content => "Reasoning content",
                 :tool_calls => [
                     Dict(:id => "123",
                     :function => Dict(
@@ -1107,6 +1109,7 @@ end
     @test msg_single.tool_calls[1].args[:location] == "New York"
     @test msg_single.tool_calls[1].args[:date] == "2023-05-01"
     @test msg_single.tokens == (15, 5)
+    @test msg_single.extras[:reasoning_content] == "Reasoning content"
 
     # Mock response for multiple tool calls
     multi_tool_response = Dict(
@@ -1210,12 +1213,16 @@ end
     ## Test with single sample and log_probs samples
     response = Dict(
         :choices => [
-            Dict(:message => Dict(:content => "Hello1!"),
+            Dict(
+            :message => Dict(:content => "Hello1!",
+                ## Only for DeepSeek API
+                :reasoning_content => "Reasoning content"),
             :finish_reason => "stop",
             :logprobs => Dict(:content => [
                 Dict(:logprob => -0.1),
                 Dict(:logprob => -0.2)
-            ]))
+            ])
+        )
         ],
         :usage => Dict(:total_tokens => 3, :prompt_tokens => 2, :completion_tokens => 1))
     schema1 = TestEchoOpenAISchema(; response, status = 200)
@@ -1225,7 +1232,7 @@ end
         api_kwargs = (; temperature = 0))
     @test msg.content == "Hello1!"
     @test msg.log_prob ≈ -0.3
-
+    @test msg.extras[:reasoning_content] == "Reasoning content"
     ## Test multiple samples
     response = Dict(
         :choices => [

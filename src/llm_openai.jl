@@ -176,6 +176,14 @@ function response_to_message(schema::AbstractOpenAISchema,
     else
         nothing
     end
+    ## Has reasoning content -- currently only provided by DeepSeek API
+    has_reasoning_content = haskey(choice, :message) &&
+                            haskey(choice[:message], :reasoning_content)
+    reasoning_content = if has_reasoning_content
+        choice[:message][:reasoning_content]
+    else
+        nothing
+    end
     # Extract usage information with default values for tokens
     tokens_prompt = 0
     tokens_completion = 0
@@ -190,9 +198,13 @@ function response_to_message(schema::AbstractOpenAISchema,
     end
     ## calculate cost
     cost = call_cost(tokens_prompt, tokens_completion, model_id)
+    ## Add extras, usually keys that are provider-specific
     extras = Dict{Symbol, Any}()
     if has_log_prob
         extras[:log_prob] = choice[:logprobs]
+    end
+    if has_reasoning_content
+        extras[:reasoning_content] = reasoning_content
     end
     ## build AIMessage object
     msg = MSG(;
@@ -856,6 +868,14 @@ function response_to_message(schema::AbstractOpenAISchema,
     else
         nothing
     end
+    ## Has reasoning content -- currently only provided by DeepSeek API
+    has_reasoning_content = haskey(choice, :message) &&
+                            haskey(choice[:message], :reasoning_content)
+    reasoning_content = if has_reasoning_content
+        choice[:message][:reasoning_content]
+    else
+        nothing
+    end
     # Extract usage information with default values for tokens
     tokens_prompt = 0
     tokens_completion = 0
@@ -893,6 +913,9 @@ function response_to_message(schema::AbstractOpenAISchema,
     end
     if has_log_prob
         extras[:log_prob] = choice[:logprobs]
+    end
+    if has_reasoning_content
+        extras[:reasoning_content] = reasoning_content
     end
 
     ## build DataMessage object
@@ -1512,6 +1535,14 @@ function response_to_message(schema::AbstractOpenAISchema,
     else
         nothing
     end
+    ## Has reasoning content -- currently only provided by DeepSeek API
+    has_reasoning_content = haskey(choice, :message) &&
+                            haskey(choice[:message], :reasoning_content)
+    reasoning_content = if has_reasoning_content
+        choice[:message][:reasoning_content]
+    else
+        nothing
+    end
     # Extract usage information with default values for tokens
     tokens_prompt = 0
     tokens_completion = 0
@@ -1560,6 +1591,9 @@ function response_to_message(schema::AbstractOpenAISchema,
     end
     if has_log_prob
         extras[:log_prob] = choice[:logprobs]
+    end
+    if has_reasoning_content
+        extras[:reasoning_content] = reasoning_content
     end
 
     ## build AIToolRequest object

@@ -386,6 +386,7 @@ aliases = merge(
         "o1" => "o1",
         "o1p" => "o1-preview",
         "o1m" => "o1-mini",
+        "o3m" => "o3-mini",
         "ada" => "text-embedding-ada-002",
         "emb3small" => "text-embedding-3-small",
         "emb3large" => "text-embedding-3-large",
@@ -453,6 +454,7 @@ aliases = merge(
         "glxs" => "llama-3.2-3b-preview", #xs for extra small
         "gls" => "llama-3.1-8b-instant", #s for small
         "glm" => "llama-3.3-70b-versatile", #m for medium
+        "glmr" => "DeepSeek-R1-Distill-Llama-70b", #r R1 Distill
         "glms" => "llama-3.3-70b-specdec", #ms for medium speculative decoding
         "gll" => "llama-3.1-405b-reasoning", #l for large
         "gmixtral" => "mixtral-8x7b-32768",
@@ -609,6 +611,16 @@ registry = Dict{String, ModelSpec}(
         1.5e-5,
         6e-5,
         "O1 is the latest version of OpenAI's O1 model. 200K context, 100K output."),
+    "o3-mini" => ModelSpec("o3-mini",
+        OpenAISchema(),
+        1.5e-5,
+        6e-5,
+        "O3 Mini is the latest version of OpenAI's O3 model. 200K context, 100K output."),
+    "o3-mini-2025-01-31" => ModelSpec("o3-mini-2025-01-31",
+        OpenAISchema(),
+        1.1e-6,
+        4.4e-6,
+        "O3 Mini is the latest version of OpenAI's O3 reasoning model. 200K context, 100K output."),
     "chatgpt-4o-latest" => ModelSpec("chatgpt-4o-latest",
         OpenAISchema(),
         5e-6,
@@ -1008,6 +1020,11 @@ registry = Dict{String, ModelSpec}(
         2.4e-5,
         "Anthropic's Claude 2.1 model."),
     ## Groq -- using preliminary pricing on https://wow.groq.com/
+    "DeepSeek-R1-Distill-Llama-70b" => ModelSpec("DeepSeek-R1-Distill-Llama-70b",
+        GroqOpenAISchema(),
+        5.9e-7,
+        7.9e-7,
+        "DeepSeek's R1 Distill Llama 70b, hosted by Groq. Context 128K tokens. See details [here](https://console.groq.com/docs/models)"),
     "llama-3.3-70b-specdec" => ModelSpec("llama-3.3-70b-specdec",
         GroqOpenAISchema(),
         5.9e-7,
