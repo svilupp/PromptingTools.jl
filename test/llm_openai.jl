@@ -926,14 +926,13 @@ end
 
     mock_choice = Dict(
         :message => Dict(:content => "Hello!",
+            :reasoning_content => "Reasoning content",
             :tool_calls => [
                 Dict(:function => Dict(
                 :arguments => JSON3.write(Dict(:x => 1)),
                 :name => "RandomType1235"))
             ]),
-        :logprobs => Dict(:content => [Dict(:logprob => -0.5), Dict(:logprob => -0.4)]),
-        :reasoning_content => "Reasoning content",
-        :finish_reason => "stop")
+        :logprobs => Dict(:content => [Dict(:logprob => -0.5), Dict(:logprob => -0.4)]), :finish_reason => "stop")
     ## Test with a single sample
     response = Dict(:choices => [mock_choice],
         :usage => Dict(:total_tokens => 3, :prompt_tokens => 2, :completion_tokens => 1))
@@ -1214,14 +1213,16 @@ end
     ## Test with single sample and log_probs samples
     response = Dict(
         :choices => [
-            Dict(:message => Dict(:content => "Hello1!"),
+            Dict(
+            :message => Dict(:content => "Hello1!",
+                ## Only for DeepSeek API
+                :reasoning_content => "Reasoning content"),
             :finish_reason => "stop",
             :logprobs => Dict(:content => [
                 Dict(:logprob => -0.1),
                 Dict(:logprob => -0.2)
-            ]),
-            ## Only for DeepSeek API
-            :reasoning_content => "Reasoning content")
+            ])
+        )
         ],
         :usage => Dict(:total_tokens => 3, :prompt_tokens => 2, :completion_tokens => 1))
     schema1 = TestEchoOpenAISchema(; response, status = 200)
