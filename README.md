@@ -15,6 +15,9 @@ PromptingTools.jl is not meant for building large-scale systems. It's meant to b
 > [!TIP]
 > Jump to the **[docs](https://svilupp.github.io/PromptingTools.jl/dev/)**
 
+> [!WARNING]
+> RAGTools.jl (module that enables RAG functionality) will be carved out into its own package from PromptingTools v0.75. See https://github.com/JuliaGenAI/RAGTools.jl
+
 ## Quick Start with `@ai_str` and Easy Templating
 
 Getting started with PromptingTools.jl is as easy as importing the package and using the `@ai_str` macro for your questions.
