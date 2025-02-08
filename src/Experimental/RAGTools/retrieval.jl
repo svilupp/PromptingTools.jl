@@ -452,6 +452,7 @@ function find_closest(
     return positions[new_positions], scores
 end
 
+function max_bm25_score end
 """
     find_closest(
         finder::BM25Similarity, dtm::AbstractDocumentTermMatrix,

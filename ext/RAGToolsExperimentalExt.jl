@@ -184,12 +184,26 @@ function RT.document_term_matrix(documents::AbstractVector{<:AbstractString})
 end
 
 """
-    RT.bm25(dtm::AbstractDocumentTermMatrix, query::Vector{String}; k1::Float32=1.2f0, b::Float32=0.75f0)
+    RT.bm25(
+        dtm::RT.AbstractDocumentTermMatrix, query::AbstractVector{<:AbstractString};
+        k1::Float32 = 1.2f0, b::Float32 = 0.75f0, normalize::Bool = false, normalize_max_tf::Real = 3,
+        normalize_min_doc_rel_length::Float32 = 1.0f0)
 
 Scores all documents in `dtm` based on the `query`.
 
 References: https://opensourceconnections.com/blog/2015/10/16/bm25-the-next-generation-of-lucene-relevation/
 
+# Arguments
+- `dtm`: A `DocumentTermMatrix` object.
+- `query`: A vector of query tokens.
+- `k1`: The k1 parameter for BM25.
+- `b`: The b parameter for BM25.
+- `normalize`: Whether to normalize the scores (returns scores between 0 and 1). 
+   Theoretically, if you choose `normalize_max_tf` and `normalize_min_doc_rel_length` to be too low, you could get scores greater than 1.
+- `normalize_max_tf`: The maximum term frequency to normalize to. 3 is a good default (assumes max 3 hits per document).
+- `normalize_min_doc_rel_length`: The minimum document relative length to normalize to. 0.5 is a good default.
+   Ideally, pick the minimum document relative length of the corpus that is non-zero
+   `min_doc_rel_length = minimum(x for x in RT.doc_rel_length(RT.chunkdata(key_index)) if x > 0) |> Float32`
 # Example
 ```
 documents = [["this", "is", "a", "test"], ["this", "is", "another", "test"], ["foo", "bar", "baz"]]
@@ -198,14 +212,36 @@ query = ["this"]
 scores = bm25(dtm, query)
 # Returns array with 3 scores (one for each document)
 ```
+
+Normalization is done by dividing the score by the maximum possible score (given some assumptions).
+It's useful to be get results in the same range as cosine similarity scores and when comparing different queries or documents.
+
+# Example
+```
+documents = [["this", "is", "a", "test"], ["this", "is", "another", "test"], ["foo", "bar", "baz"]]
+dtm = document_term_matrix(documents)
+query = ["this"]
+scores = bm25(dtm, query)
+scores_norm = bm25(dtm, query; normalize = true)
+
+## Make it more accurate for your dataset/index
+normalize_max_tf = 3 # assume max term frequency is 3 (what is likely for your dataset? depends on chunk size, preprocessing, etc.)
+normalize_min_doc_rel_length = minimum([x for x in RT.doc_rel_length(dtm) if x > 0]) |> Float32
+scores_norm = bm25(dtm, query; normalize = true, normalize_max_tf, normalize_min_doc_rel_length)
+```
 """
 function RT.bm25(
         dtm::RT.AbstractDocumentTermMatrix, query::AbstractVector{<:AbstractString};
-        k1::Float32 = 1.2f0, b::Float32 = 0.75f0)
+        k1::Float32 = 1.2f0, b::Float32 = 0.75f0, normalize::Bool = false, normalize_max_tf::Real = 3,
+        normalize_min_doc_rel_length::Float32 = 0.5f0)
+    @assert normalize_max_tf>0 "normalize_max_tf term frequency must be positive (got $normalize_max_tf)"
+    @assert normalize_min_doc_rel_length>0 "normalize_min_doc_rel_length must be positive (got $normalize_min_doc_rel_length)"
+
     scores = zeros(Float32, size(tf(dtm), 1))
     ## Identify non-zero items to leverage the sparsity
     nz_rows = rowvals(tf(dtm))
     nz_vals = nonzeros(tf(dtm))
+    max_score = 0.0f0
     for i in eachindex(query)
         t = query[i]
         t_id = get(vocab_lookup(dtm), t, nothing)
@@ -222,9 +258,60 @@ function RT.bm25(
             ## @info "di: $di, tf: $tf, doc_len: $doc_len, idf: $idf, tf_top: $tf_top, tf_bottom: $tf_bottom, score: $score"
             scores[di] += score
         end
+        ## Once per token, calculate max score
+        ## assumes max term frequency is `normalize_max_tf` and min document relative length is `normalize_min_doc_rel_length`
+        if normalize
+            max_score += idf_ * (normalize_max_tf * (k1 + 1.0f0)) / (normalize_max_tf +
+                          k1 * (1.0f0 - b + b * normalize_min_doc_rel_length))
+        end
+    end
+    if normalize && !iszero(max_score)
+        scores ./= max_score
+    elseif normalize && iszero(max_score)
+        ## happens only with empty queries, so scores is zero anyway
+        @warn "BM25: `max_score` is zero, so scores are not normalized. Returning unnormalized scores (all zero)."
     end
 
     return scores
+end
+
+"""
+    RT.max_bm25_score(
+        dtm::RT.AbstractDocumentTermMatrix, query_tokens::AbstractVector{<:AbstractString};
+        k1::Float32 = 1.2f0, b::Float32 = 0.75f0, max_tf::Real = 3,
+        min_doc_rel_length::Float32 = 0.5f0)
+
+Returns the maximum BM25 score that can be achieved for a given query (assuming the `max_tf` matches and the `min_doc_rel_length` being the smallest document relative length).
+Good for normalizing BM25 scores.
+
+# Example
+```
+max_score = max_bm25_score(RT.chunkdata(key_index), query_tokens)
+```
+"""
+function RT.max_bm25_score(
+        dtm::RT.AbstractDocumentTermMatrix, query_tokens::AbstractVector{<:AbstractString};
+        k1::Float32 = 1.2f0, b::Float32 = 0.75f0, max_tf::Real = 3,
+        min_doc_rel_length::Float32 = 0.5f0)
+    max_score = 0.0f0
+    @inbounds for t in query_tokens
+        t_id = get(RT.vocab_lookup(dtm), t, nothing)
+        t_id === nothing && continue
+
+        idf_ = RT.idf(dtm)[t_id]
+
+        # Find maximum tf (term frequency) for this term in any document - pre-set in kwargs!
+        # eg, `max_tf = maximum(@view(RT.tf(dtm)[:, t_id]))` but that would be a bit extreme and slow
+
+        # Find first non-zero element in doc lengths -- pre-set in kwargs!
+        # eg, `min_doc_rel_length = minimum(x for x in RT.doc_rel_length(RT.chunkdata(key_index)) if x > 0) |> Float32`
+
+        # Maximum tf component assuming perfect match
+        tf_top = (max_tf * (k1 + 1.0f0))
+        tf_bottom = (max_tf + k1 * (1.0f0 - b + b * min_doc_rel_length))
+        max_score += idf_ * tf_top / tf_bottom
+    end
+    return max_score
 end
 
 end # end of module

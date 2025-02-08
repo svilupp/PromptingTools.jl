@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Added new Gemini 2.0 Pro and Flash models to the model registry (aliases `gem20p` and `gem20f`, respectively). Added Gemini 2.0 Flash Lite Preview model (alias `gem20fl`) and Gemini 2.0 Flash Thinking Experimental model (alias `gem20ft`).
+- Added BM25 normalization kwarg to `RAGTools.jl` to enable 0-1 query-specific normalization of BM25 scores for easier filtering and comparison. See `?RT.bm25` and `?RT.max_bm25_score` for more information.
 
 ### Fixed
 
