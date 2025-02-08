@@ -504,7 +504,10 @@ aliases = merge(
         "gem15p" => "gemini-1.5-pro-latest",
         "gem15f8" => "gemini-1.5-flash-8b-latest",
         "gem15f" => "gemini-1.5-flash-latest",
-        "gem20f" => "gemini-2.0-flash-exp",
+        "gem20p" => "gemini-2.0-pro-exp-02-05",
+        "gem20f" => "gemini-2.0-flash",
+        "gem20fl" => "gemini-2.0-flash-lite-preview-02-05",
+        "gem20ft" => "gemini-2.0-flash-thinking-exp-01-21",
         "gemexp" => "gemini-exp-1206" # latest experimental model from December 2024
     ),
     ## Load aliases from preferences as well
@@ -1231,6 +1234,23 @@ registry = Dict{String, ModelSpec}(
         7.5e-8,
         3.0e-7,
         "Gemini 2.0 Flash Experimental Model from December 2024. Context 1M tokens, 8K output. See details [here](https://ai.google.dev/gemini-api/docs/models/experimental-models#use-an-experimental-model)."),
+    "gemini-2.0-flash" => ModelSpec("gemini-2.0-flash",
+        GoogleOpenAISchema(),
+        1.0e-7,
+        4.0e-7,
+        "Gemini 2.0 Flash Latest Model. Context 1M tokens, 8K output. See details [here](https://ai.google.dev/gemini-api/docs/models/experimental-models#use-an-experimental-model)."),
+    "gemini-2.0-flash-lite-preview-02-05" => ModelSpec(
+        "gemini-2.0-flash-lite-preview-02-05",
+        GoogleOpenAISchema(),
+        7.5e-8,
+        3.0e-7,
+        "Gemini 2.0 Flash Lite Preview from February 2025. Context 1M tokens, 8K output. See details [here](https://ai.google.dev/gemini-api/docs/models/experimental-models#use-an-experimental-model)."),
+    "gemini-2.0-flash-thinking-exp-01-21" => ModelSpec(
+        "gemini-2.0-flash-thinking-exp-01-21",
+        GoogleOpenAISchema(),
+        1.0e-7,
+        4.0e-7,
+        "Gemini 2.0 Flash Thinking Experimental Model from January 2025. Context 1M tokens, 8K output. See details [here](https://ai.google.dev/gemini-api/docs/models/experimental-models#use-an-experimental-model)."),
     "gemini-exp-1114" => ModelSpec("gemini-exp-1114",
         GoogleOpenAISchema(),
         1.25e-6,
@@ -1245,7 +1265,12 @@ registry = Dict{String, ModelSpec}(
         GoogleOpenAISchema(),
         1.25e-6,
         5e-6,
-        "Gemini Experimental Model from December 2024. Pricing assumed as per Gemini 1.5 Pro. See details [here](https://ai.google.dev/gemini-api/docs/models/experimental-models#use-an-experimental-model).")
+        "Gemini Experimental Model from December 2024. Pricing assumed as per Gemini 1.5 Pro. See details [here](https://ai.google.dev/gemini-api/docs/models/experimental-models#use-an-experimental-model)."),
+    "gemini-2.0-pro-exp-02-05" => ModelSpec("gemini-2.0-pro-exp-02-05",
+        GoogleOpenAISchema(),
+        1.25e-6,
+        5e-6,
+        "Gemini 2.0 Pro Experimental Model from February 2025. Pricing assumed as per Gemini 1.5 Pro. See details [here](https://ai.google.dev/gemini-api/docs/models/experimental-models#use-an-experimental-model).")
 )
 
 """
