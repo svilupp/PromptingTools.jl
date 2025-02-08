@@ -16,7 +16,8 @@ using PromptingTools.Experimental.RAGTools: find_closest, hamming_distance, find
 using PromptingTools.Experimental.RAGTools: NoReranker, CohereReranker
 using PromptingTools.Experimental.RAGTools: hamming_distance, BitPackedCosineSimilarity,
                                             pack_bits, unpack_bits
-using PromptingTools.Experimental.RAGTools: bm25, document_term_matrix, DocumentTermMatrix
+using PromptingTools.Experimental.RAGTools: bm25, max_bm25_score, document_term_matrix,
+                                            DocumentTermMatrix
 
 @testset "rephrase" begin
     # Test rephrase with NoRephraser, simple passthrough
@@ -184,6 +185,107 @@ end
     @test scores[1] ≈ expected * 4
     @test scores[2] ≈ expected * 4
     @test scores[3] ≈ 0
+
+    ## BM25 normalization
+    # Basic test corpus
+    documents = [
+        ["this", "is", "a", "test", "document"],
+        ["this", "is", "another", "test"],
+        ["completely", "different", "content"],
+        ["test", "test", "test", "test"],  # document with repeated terms
+        ["single"]  # shortest document
+    ]
+    dtm = document_term_matrix(documents)
+
+    # Test 1: Basic normalization - scores should be between 0 and 1
+    query = ["test"]
+    rel_len = RT.doc_rel_length(dtm)
+    scores_norm = bm25(dtm, query; normalize = true, normalize_max_tf = 3,
+        normalize_min_doc_rel_length = minimum(rel_len))
+    @test all(0 .≤ scores_norm .≤ 1)
+
+    # Test that document with most "test" occurrences gets highest score
+    @test argmax(scores_norm) == 4
+
+    # Test 2: Compare with manual normalization
+    scores_raw = bm25(dtm, query; normalize = false)
+    max_score = max_bm25_score(
+        dtm, query; max_tf = 3, min_doc_rel_length = minimum(rel_len))
+    scores_manual_norm = scores_raw ./ max_score
+    @test scores_norm ≈ scores_manual_norm
+
+    # Test 3: Parameter variations
+    params = [
+        (k1 = 1.2f0, b = 0.75f0, max_tf = 3, min_doc_len = 0.5f0),
+        (k1 = 2.0f0, b = 0.5f0, max_tf = 10, min_doc_len = 1.0f0)
+    ]
+
+    for p in params
+        scores = bm25(dtm, query;
+            normalize = true,
+            k1 = p.k1,
+            b = p.b,
+            normalize_max_tf = p.max_tf,
+            normalize_min_doc_rel_length = p.min_doc_len
+        )
+        @test all(0 .≤ scores .≤ 1)
+
+        # Verify against max_bm25_score
+        max_theoretical = max_bm25_score(dtm, query;
+            k1 = p.k1,
+            b = p.b,
+            max_tf = p.max_tf,
+            min_doc_rel_length = p.min_doc_len
+        )
+        scores_raw = bm25(dtm, query;
+            normalize = false,
+            k1 = p.k1,
+            b = p.b
+        )
+        @test maximum(scores_raw) ≤ max_theoretical
+    end
+
+    # Test 4: Edge cases
+    # Empty query
+    @test all(bm25(dtm, String[]; normalize = true) .== 0)
+
+    # Query with non-existent words
+    @test all(bm25(dtm, ["nonexistent"]; normalize = true) .== 0)
+
+    # Multiple query terms
+    multi_query = ["test", "document"]
+    multi_scores = bm25(dtm, multi_query; normalize = true)
+    @test all(0 .≤ multi_scores .≤ 1)
+    # Document 1 should have highest score as it contains both terms
+    @test argmax(multi_scores) == 1
+
+    # Test 5: Repeated terms in query
+    repeated_query = ["test", "test", "test"]
+    rep_scores = bm25(dtm, repeated_query; normalize = true)
+    @test all(0 .≤ rep_scores .≤ 1)
+
+    # Test 6: Special cases - uniform document length
+    uniform_docs = [["word", "test"] for _ in 1:3]
+    uniform_dtm = document_term_matrix(uniform_docs)
+    uniform_scores = bm25(uniform_dtm, ["test"]; normalize = true,
+        normalize_max_tf = 1, normalize_min_doc_rel_length = 1.0f0)
+    @test all(uniform_scores .≈ 1.0)
+
+    # Test 7: Verify normalization with different max_tf values
+    high_tf_docs = [
+        ["test", "test", "test"],  # tf = 3
+        ["test"],                  # tf = 1
+        ["other", "words"]         # tf = 0
+    ]
+    high_tf_dtm = document_term_matrix(high_tf_docs)
+
+    # With max_tf = 1 (matching actual tf in your dataset)
+    scores_max1 = bm25(high_tf_dtm, ["test"]; normalize = true, normalize_max_tf = 1)
+    # With max_tf = 3  (default)
+    scores_max3 = bm25(high_tf_dtm, ["test"]; normalize = true, normalize_max_tf = 3)
+
+    # The first document should get a lower relative score with max_tf=3 (max will be higher!)
+    @test scores_max3[1] < scores_max1[1]
 end
 
 @testset "find_closest" begin
