@@ -505,7 +505,7 @@ aliases = merge(
         "gem15f8" => "gemini-1.5-flash-8b-latest",
         "gem15f" => "gemini-1.5-flash-latest",
         "gem20p" => "gemini-2.0-pro-exp-02-05",
-        "gem20f" => "gemini-2.0-flash-latest",
+        "gem20f" => "gemini-2.0-flash",
         "gem20fl" => "gemini-2.0-flash-lite-preview-02-05",
         "gem20ft" => "gemini-2.0-flash-thinking-exp-01-21",
         "gemexp" => "gemini-exp-1206" # latest experimental model from December 2024
@@ -1234,7 +1234,7 @@ registry = Dict{String, ModelSpec}(
         7.5e-8,
         3.0e-7,
         "Gemini 2.0 Flash Experimental Model from December 2024. Context 1M tokens, 8K output. See details [here](https://ai.google.dev/gemini-api/docs/models/experimental-models#use-an-experimental-model)."),
-    "gemini-2.0-flash-latest" => ModelSpec("gemini-2.0-flash-latest",
+    "gemini-2.0-flash" => ModelSpec("gemini-2.0-flash",
         GoogleOpenAISchema(),
         1.0e-7,
         4.0e-7,
