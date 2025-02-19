@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.72.1]
+
+### Added
+- Added Qwen models from OpenRouter API: Qwen Turbo, Plus and Max models with competitive pricing and 128K context window.
+
 ## [0.72.0]
 
 ### Added
