@@ -500,9 +500,9 @@ aliases = merge(
         "oro1m" => "openai/o1-mini",
         "orcop" => "cohere/command-r-plus-08-2024",
         "orco" => "cohere/command-r-08-2024",
-        "oqwenturbo" => "qwen/qwen-turbo",
-        "oqwenplus" => "qwen/qwen-plus",
-        "oqwenmax" => "qwen/qwen-max",
+        "orqwenturbo" => "qwen/qwen-turbo",
+        "orqwenplus" => "qwen/qwen-plus",
+        "orqwenmax" => "qwen/qwen-max",
         ## Gemini 1.5 Models
         "gem15p" => "gemini-1.5-pro-latest",
         "gem15f8" => "gemini-1.5-flash-8b-latest",
@@ -1180,9 +1180,8 @@ registry = Dict{String, ModelSpec}(
         OpenRouterOpenAISchema(),
         1.6e-6,
         6.4e-6,
-        "OpenRouter's hosted version of Qwen's latest and strongest model Qwen-Plus. 128K context, max output 8K tokens."),
-
-    "cohere/command-r-08-2024" => ModelSpec("cohere/command-r-08-2024",
+        "OpenRouter's hosted version of Qwen's latest and strongest model Qwen-Plus. 128K context, max output 8K tokens."), "cohere/command-r-08-2024" => ModelSpec(
+        "cohere/command-r-08-2024",
         OpenRouterOpenAISchema(),
         1.5e-7,
         6e-7,
