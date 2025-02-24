@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.72.2]
+
+### Added
+- Added Claude 3.7 Sonnet model to the model registry (alias `claude37` and updated default `claude` alias to point to it).
+
 ## [0.72.1]
 
 ### Added
