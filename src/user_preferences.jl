@@ -438,9 +438,11 @@ aliases = merge(
         "ministral3" => "ministral-3b-latest",
         "ministral8" => "ministral-8b-latest",
         ## Default to Sonnet as a the medium offering
-        "claude" => "claude-3-5-sonnet-latest",
+        "claude" => "claude-3-7-sonnet-latest",
+        "claude37" => "claude-3-7-sonnet-latest",
+        "claude35" => "claude-3-5-sonnet-latest",
         "claudeo" => "claude-3-opus-20240229",
-        "claudes" => "claude-3-5-sonnet-latest",
+        "claudes" => "claude-3-7-sonnet-latest",
         "claudeh" => "claude-3-5-haiku-latest",
         ## Groq
         "gllama3" => "llama-3.1-8b-instant",
@@ -980,6 +982,11 @@ registry = Dict{String, ModelSpec}(
         1.2e-6,
         "Qwen 32B reasoning model, hosted by Together.ai. 32K context."),
     ### Anthropic models
+    "claude-3-7-sonnet-latest" => ModelSpec("claude-3-7-sonnet-latest",
+        AnthropicSchema(),
+        3e-6,
+        1.5e-5,
+        "Anthropic's latest Claude 3.7 Sonnet model. 200K context. See details [here](https://docs.anthropic.com/claude/docs/models-overview)"),
     "claude-3-5-sonnet-latest" => ModelSpec("claude-3-5-sonnet-latest",
         AnthropicSchema(),
         3e-6,
