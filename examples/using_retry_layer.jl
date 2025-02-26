@@ -1,3 +1,13 @@
+## The Simplest workflow
+using PromptingTools
+# Enable the custom retry layer
+custom_retry_layer!(true)
+# Any rate limiting / rate limit errors will be retried automatically
+aigenerate("What is the meaning of life?")
+# Uninstall with / remove it with
+custom_retry_layer!(false)
+
+## More Advanced use
 using HTTP
 using PromptingTools
 
