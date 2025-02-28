@@ -525,7 +525,7 @@ end
     @test schema2.inputs.system == "Act as a helpful AI assistant"
     @test schema2.inputs.messages == [Dict(
         "role" => "user", "content" => [Dict("type" => "text", "text" => "Hello World")])]
-    @test schema2.model_id == "claude-3-5-sonnet-latest"
+    @test schema2.model_id == "claude-3-7-sonnet-latest"
 
     # Test aiprefill functionality
     schema2 = TestEchoAnthropicSchema(;
@@ -560,7 +560,7 @@ end
         Dict("role" => "assistant",
             "content" => [Dict("type" => "text", "text" => aiprefill)])
     ]
-    @test schema2.model_id == "claude-3-5-sonnet-latest"
+    @test schema2.model_id == "claude-3-7-sonnet-latest"
 
     # With caching
     response3 = Dict(
@@ -590,7 +590,7 @@ end
     @test schema3.inputs.messages == [Dict("role" => "user",
         "content" => Dict{String, Any}[Dict("cache_control" => Dict("type" => "ephemeral"),
             "text" => "Hello World", "type" => "text")])]
-    @test schema3.model_id == "claude-3-5-sonnet-latest"
+    @test schema3.model_id == "claude-3-7-sonnet-latest"
 
     ## Bad cache
     @test_throws AssertionError aigenerate(

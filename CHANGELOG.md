@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.72.3]
+
+### Added
+- Added a OpenAI's GPT 4.5 research preview (alias `gpt45`) to the model registry.
+
 ## [0.72.2]
 
 ### Added
