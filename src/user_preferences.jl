@@ -382,6 +382,7 @@ aliases = merge(
         "gpt4v" => "gpt-4-vision-preview", # 4v is for "4 vision"
         "gpt4t" => "gpt-4-turbo", # 4t is for "4 turbo"
         "gpt3t" => "gpt-3.5-turbo-0125", # 3t is for "3 turbo"
+        "gpt45" => "gpt-4.5-preview", # 4.5 is for "4.5"
         "chatgpt" => "chatgpt-4o-latest",
         "o1" => "o1",
         "o1p" => "o1-preview",
@@ -564,6 +565,16 @@ registry = Dict{String, ModelSpec}(
         1e-5,
         3e-5,
         "GPT-4 Turbo is an updated version of GPT4 that is much faster and the cheaper to use. This is the general name for whatever is the latest GPT4 Turbo preview release. Right now it is 0125."),
+    "gpt-4.5-preview" => ModelSpec("gpt-4.5-preview",
+        OpenAISchema(),
+        7.5e-5,
+        1.5e-4,
+        "GPT-4.5 is the latest preview version of GPT4.5. It has 128K context, 16K output and is the largest model available on the OpenAI API."),
+    "gpt-4.5-preview-2025-02-27" => ModelSpec("gpt-4.5-preview-2025-02-27",
+        OpenAISchema(),
+        7.5e-5,
+        1.5e-4,
+        "GPT-4.5 is the latest preview version of GPT4.5. It has 128K context, 16K output and is the largest model available on the OpenAI API."),
     "gpt-4o-2024-05-13" => ModelSpec("gpt-4o-2024-05-13",
         OpenAISchema(),
         5e-6,
