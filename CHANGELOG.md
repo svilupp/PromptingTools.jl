@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.73.0]
+
+### Added
+- Added a new `enable_retry!` function to enable the retry layer for HTTP requests. Main use case is to prevent rate limiting errors from external AI services, but you can fully customize the retry behavior for any HTTP status codes, etc. See `?enable_retry!` for more information.
+
 ## [0.72.3]
 
 ### Added
