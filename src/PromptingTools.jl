@@ -110,7 +110,7 @@ include("llm_tracer.jl")
 
 ## Custom retry layer
 include("retry_layer.jl")
-using .CustomRetryLayer: custom_retry_layer!
+using .CustomRetryLayer: enable_retry!
 
 ## Convenience utils
 export @ai_str, @aai_str, @ai!_str, @aai!_str

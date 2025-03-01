@@ -11,35 +11,64 @@ Custom retry layer for HTTP.jl. Once installed, it will catch all errors with st
 using HTTP
 using PromptingTools
 
-# Let's push the layer globally in all HTTP.jl requests
-HTTP.pushlayer!(PromptingTools.CustomRetryLayer.custom_retry_layer, request=true) # for stream handling, we would set request=false
+# Enable the retry layer
+enable_retry!()
+
+# all subsequent requests will retry on 429 errors (rate-limiting)... There are many more options to customize.
 
 # Let's call the API - it fails with 404 Not Found (bad model name)
 msg = aigenerate("What is the meaning of life?", model = "bad-name")
 
-# Let's catch the 404 error in retry loop to demonstrate the retry logic
+# Let's catch the 404 error in retry loop to demonstrate the retry logic -- watch for custom_retry_* kwargs!
 msg = aigenerate("What is the meaning of life?", model = "bad-name", http_kwargs = (; custom_retry_status_codes = [404]))
 
 # We can temporarily disable the custom retry logic by setting custom_retry_enabled = false
 msg = aigenerate("What is the meaning of life?", model = "bad-name", http_kwargs = (; custom_retry_enabled = false))
+
+# Remove the retry layer completely
+enable_retry!(false) # notice the `false` first arg!
 ```
 
-We can also remove the layer completely
+Low-level enable/disable usage:
 ```julia
+# Let's push the layer globally in all HTTP.jl requests
+HTTP.pushlayer!(PromptingTools.CustomRetryLayer.custom_retry_layer, request=true) # for stream handling, we would set request=false
+
+# We can also remove the layer completely
 HTTP.poplayer!() # you should see it pop off the stack
 ```
 
 The layer is generally in either `HTTP.REQUEST_LAYERS` or `HTTP.STREAM_LAYERS`, depending on whether you set `request=true` or `request=false` in the `pushlayer!` call.
-
 There is much more to customize, eg, `custom_retry_max_retries`, `custom_retry_base_delay`, `custom_retry_status_codes`).
-```julia
-msg = aigenerate("What is the meaning of life?", model = "bad-name", http_kwargs = (; custom_retry_status_codes = [429]))
-```
+
+You can also configure the default behavior of the layer with `enable_retry!` function - you must set it before the first call to `custom_retry_layer`! See the docs for `enable_retry!` for more details.
 """
 module CustomRetryLayer
 
 using HTTP, JSON3
 using Dates
+
+# Global configuration for retry defaults
+"""
+    CustomRetryConfig
+
+Configuration settings for the HTTP retry layer.
+
+Fields:
+- `max_retries::Int`: Maximum number of retries before failing
+- `base_delay::Float64`: Base delay in seconds for exponential backoff
+- `status_codes::Vector{Int}`: HTTP status codes that trigger a retry
+- `show_headers::Bool`: Whether to show headers in warning messages
+"""
+@kwdef mutable struct CustomRetryConfig
+    max_retries::Int = 5
+    base_delay::Float64 = 2.0
+    status_codes::Vector{Int} = [429]
+    show_headers::Bool = true
+end
+
+# Global configuration instance
+const RETRY_CONFIG = CustomRetryConfig()
 
 # Global state to track rate limiting
 mutable struct RateLimitState
@@ -191,16 +220,14 @@ end
     custom_retry_layer(
         handler;
         custom_retry_enabled::Bool = true,
-        custom_retry_max_retries::Int = 5,
-        custom_retry_base_delay::Float64 = 2.0,
-        custom_retry_status_codes = [429],
-        custom_retry_show_headers::Bool = true
+        custom_retry_max_retries::Int = RETRY_CONFIG.max_retries,
+        custom_retry_base_delay::Float64 = RETRY_CONFIG.base_delay,
+        custom_retry_status_codes = RETRY_CONFIG.status_codes,
+        custom_retry_show_headers::Bool = RETRY_CONFIG.show_headers
 )
 
 HTTP-layer that retries requests with exponential backoff or with a delay specified in the headers.
-It pauses all requests globally (to not overwhelm the server when using `asyncmap`) when a rate limit is hit.
-
-By default, we only retry on 429 (rate limit hit) errors - most common issue with LLM providers.
+It uses the global configuration by default but can be overridden on a per-call basis.
 
 # Examples
 ```julia
@@ -208,19 +235,23 @@ using HTTP
 using PromptingTools    
 
 # Let's push the layer globally in all HTTP.jl requests
-HTTP.pushlayer!(PromptingTools.CustomRetryLayer.custom_retry_layer, request=true) # for stream handling, we would set request=false
+HTTP.pushlayer!(PromptingTools.CustomRetryLayer.custom_retry_layer, request=true)
 
 # All calls should have retry set for 429 errors
 msg = aigenerate("What is the meaning of life?")
+
+# Override settings for a specific call
+msg = aigenerate("What is the meaning of life?", 
+    http_kwargs = (; custom_retry_status_codes = [429, 503], custom_retry_max_retries = 3))
 ```
 """
 function custom_retry_layer(
         handler;
         custom_retry_enabled::Bool = true,
-        custom_retry_max_retries::Int = 5,
-        custom_retry_base_delay::Float64 = 2.0,
-        custom_retry_status_codes = [429],
-        custom_retry_show_headers::Bool = true
+        custom_retry_max_retries::Int = RETRY_CONFIG.max_retries,
+        custom_retry_base_delay::Float64 = RETRY_CONFIG.base_delay,
+        custom_retry_status_codes = RETRY_CONFIG.status_codes,
+        custom_retry_show_headers::Bool = RETRY_CONFIG.show_headers
 )
     return function (req; kw...)
         # If retries are disabled, just pass through to the handler
@@ -308,34 +339,66 @@ function custom_retry_layer(
 end
 
 """
-    custom_retry_layer!(enable::Bool = true; request::Bool = true)
+    enable_retry!(enable::Bool = true; request::Bool = true, kwargs...)
 
-Enable or disable the custom retry layer. 
-A convenience function that only installs the layer in the HTTP.jl stack if it's not already installed.
+Enable or disable the custom retry layer for HTTP requests and configure its default behavior.
+This overrides the kwargs in the `custom_retry_layer` function, so it MUST BE SET BEFORE the first call to `custom_retry_layer`!
+
+Configuration hierarchy (from lowest to highest priority):
+- Default values in `RETRY_CONFIG`
+- `enable_retry!` function arguments -- work only before the first call to `custom_retry_layer`
+- `custom_retry_layer` function arguments -- passed as `http_kwargs = (; custom_retry_*...)`, works for any call
+
+# Arguments
+- `enable::Bool = true`: Whether to enable (true) or disable (false) the retry layer
+- `request::Bool = true`: Whether to install in request layers (true) or stream layers (false)
+
+# Keyword Arguments
+- `max_retries::Int = 5`: Maximum number of retry attempts before failing
+- `base_delay::Float64 = 2.0`: Base delay in seconds for exponential backoff
+- `status_codes::Vector{Int} = [429]`: HTTP status codes that should trigger a retry
+- `show_headers::Bool = true`: Whether to show response headers in warning messages
 
 # Examples
 ```julia
 using HTTP
 using PromptingTools
 
-# Enable the custom retry layer
-custom_retry_layer!(true)
+# Enable with default settings
+enable_retry!()
 
-# Disable the custom retry layer
-custom_retry_layer!(false)
+# Enable with custom settings
+enable_retry!(; max_retries=3, status_codes=[429, 503])
+
+# Disable the retry layer
+enable_retry!(false)
 ```
 """
-function custom_retry_layer!(enable::Bool = true; request::Bool = true)
+function enable_retry!(enable::Bool = true;
+        request::Bool = true,
+        max_retries::Int = RETRY_CONFIG.max_retries,
+        base_delay::Float64 = RETRY_CONFIG.base_delay,
+        status_codes = RETRY_CONFIG.status_codes,
+        show_headers::Bool = RETRY_CONFIG.show_headers)
+    global RETRY_CONFIG
+    # Update the global configuration
+    RETRY_CONFIG.max_retries = max_retries
+    RETRY_CONFIG.base_delay = base_delay
+    RETRY_CONFIG.status_codes = status_codes
+    RETRY_CONFIG.show_headers = show_headers
+
     # Get the appropriate layer stack based on request parameter
     layer_stack = request ? HTTP.REQUEST_LAYERS : HTTP.STREAM_LAYERS
     layer_pos = findfirst(layer -> layer == custom_retry_layer, layer_stack)
 
     if enable && isnothing(layer_pos)
         HTTP.pushlayer!(custom_retry_layer, request = request)
+        @info "Retry layer enabled with max_retries=$(max_retries), base_delay=$(base_delay), status_codes=$(status_codes)"
     elseif enable
-        @warn "Custom retry layer is already in position $layer_pos of the $(request ? "request" : "stream") layer stack"
+        @info "Retry layer already in position $layer_pos of the $(request ? "request" : "stream") layer stack"
     elseif !enable && !isnothing(layer_pos)
         deleteat!(layer_stack, layer_pos)
+        @info "Retry layer disabled and removed from the $(request ? "request" : "stream") layer stack"
     else
         @warn "Custom retry layer not found in the $(request ? "request" : "stream") layer stack"
     end
