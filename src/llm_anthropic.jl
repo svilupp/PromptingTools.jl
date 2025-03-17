@@ -1015,11 +1015,45 @@ function aiclassify(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROM
         kwargs...)
     error("Anthropic schema does not yet support aiclassify. Please use OpenAISchema instead.")
 end
-function aiscan(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMPT_TYPE;
-        kwargs...)
-    error("Anthropic schema does not yet support aiscan. Please use OpenAISchema instead.")
-end
 function aiimage(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMPT_TYPE;
         kwargs...)
     error("Anthropic schema does not yet support aiimage. Please use OpenAISchema instead.")
+end
+
+"""
+    aiscan(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMPT_TYPE;
+        image_path::Union{Nothing, AbstractString, Vector{<:AbstractString}} = nothing,
+        verbose::Bool = true,
+        api_key::String = ANTHROPIC_API_KEY,
+        model::String = MODEL_CHAT,
+        return_all::Bool = false, dry_run::Bool = false,
+        conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
+        no_system_message::Bool = false,
+        http_kwargs::NamedTuple = NamedTuple(),
+        api_kwargs::NamedTuple = NamedTuple(),
+        cache::Union{Nothing, Symbol} = nothing,
+        betas::Union{Nothing, Vector{Symbol}} = nothing,
+        kwargs...)
+
+Analyze images with Anthropic Claude models by passing an image path.
+
+# Arguments
+- `prompt`: A string or UserMessage containing instructions for analyzing the image
+- `image_path`: A path to a local image file, or a vector of paths to local image files
+- `model`: Model name or alias (must support vision capabilities)
+- Other arguments are the same as `aigenerate`
+
+# Returns
+- `msg`: An `AIMessage` containing the analysis
+
+# Example
+msg = aiscan("What's in this image?"; image_path="path/to/image.jpg", model="claude3")
+"""
+function aiscan(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMPT_TYPE;
+        image_path::Union{Nothing, AbstractString, Vector{<:AbstractString}} = nothing,
+        kwargs...)
+    @assert !isnothing(image_path) "Image path must be provided for aiscan"
+    # Simply attach images and use aigenerate
+    prompt_with_images = attach_images_to_user_message(prompt; image_path, attach_to_latest=true)
+    return aigenerate(prompt_schema, prompt_with_images; kwargs...)
 end
