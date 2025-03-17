@@ -7,8 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Added support for extended output (up to 128K tokens) with Claude 3.7 models via the `:extended_output` beta header.
 
 ### Fixed
+- Added validation to ensure that `thinking.budget_tokens` does not exceed `max_tokens` when using Anthropic API.
 
 ## [0.73.0]
 

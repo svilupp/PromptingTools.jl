@@ -302,6 +302,12 @@ function anthropic_api(
     ##
     body = Dict(:model => model, :max_tokens => max_tokens,
         :stream => stream, :messages => messages, kwargs...)
+    
+    ## Check if thinking is enabled and validate budget_tokens
+    if haskey(kwargs, :thinking) && haskey(kwargs[:thinking], :budget_tokens)
+        @assert kwargs[:thinking][:budget_tokens] <= max_tokens "The thinking budget_tokens ($(kwargs[:thinking][:budget_tokens])) must not exceed max_tokens ($max_tokens)"
+    end
+    
     ## provide system message
     if !isnothing(system)
         body[:system] = system
