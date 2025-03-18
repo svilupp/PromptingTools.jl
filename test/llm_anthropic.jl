@@ -451,10 +451,7 @@ end
     ]
 
     # Test all betas
-    @test anthropic_extra_headers(betas = BETA_HEADERS_ANTHROPIC) == [
-        "anthropic-version" => "2023-06-01",
-        "anthropic-beta" => "tools-2024-04-04,prompt-caching-2024-07-31,max-tokens-3-5-sonnet-2024-07-15,computer-use-2024-10-22"
-    ]
+    @test anthropic_extra_headers(betas = BETA_HEADERS_ANTHROPIC) == ["anthropic-version" => "2023-06-01", "anthropic-beta" => "tools-2024-04-04,prompt-caching-2024-07-31,max-tokens-3-5-sonnet-2024-07-15,output-128k-2025-02-19,computer-use-2024-10-22"]
 
     # Test invalid beta
     @test_throws AssertionError anthropic_extra_headers(betas = [:invalid_beta])
