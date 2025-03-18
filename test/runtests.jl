@@ -33,6 +33,7 @@ end
     include("llm_google.jl")
     include("llm_openai_schema_def.jl")
     include("llm_anthropic.jl")
+    include("anthropic/thinking_budget_test.jl")
     include("llm_sharegpt.jl")
     include("llm_tracer.jl")
     include("macros.jl")

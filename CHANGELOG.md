@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-## [0.73.1]
+## [0.74.0]
 
 ### Added
 - Added support for extended output (up to 128K tokens) with Claude 3.7 models via the `:extended_output` beta header.
