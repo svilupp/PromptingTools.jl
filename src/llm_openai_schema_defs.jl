@@ -241,8 +241,8 @@ function convert_openai_to_gemini(conversation; kwargs...)
     system_instruction = nothing
     
     for msg in conversation
-        role = get(msg, :role, "user") # Use symbols for keys
-        content = get(msg, :content, "") # Use symbols for keys
+        role = get(msg, "role", "user") # Use symbols for keys
+        content = get(msg, "content", "") # Use symbols for keys
 
         if role == "system"
             # System instructions are handled separately in Gemini
