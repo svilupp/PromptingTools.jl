@@ -17,7 +17,10 @@ function configure_callback!(cb::T, schema::AbstractPromptSchema;
         api_kwargs...) where {T <: AbstractStreamCallback}
     ## Check if we are in passthrough mode or if we should configure the callback
     if isnothing(cb.flavor)
-        if schema isa AbstractOpenAISchema
+        if schema isa GoogleOpenAISchema # it must come first because its a subtype of AbstractOpenAISchema
+            # api_kwargs = (; api_kwargs..., stream = true)
+            flavor = GoogleStream()
+        elseif schema isa AbstractOpenAISchema
             ## Enable streaming for all OpenAI-compatible APIs
             api_kwargs = (;
                 api_kwargs..., stream = true, stream_options = (; include_usage = true))

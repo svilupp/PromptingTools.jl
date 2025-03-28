@@ -235,21 +235,100 @@ function OpenAI.auth_header(provider::GoogleProvider, api_key::AbstractString)
     OpenAI.auth_header(OpenAI.OpenAIProvider(provider.api_key, provider.base_url, provider.api_version), api_key)
 end
 
+# Add this function to convert OpenAI format to Gemini format
+function convert_openai_to_gemini(conversation; kwargs...)
+    contents = Dict{String, Any}[]
+    system_instruction = nothing
+    
+    for msg in conversation
+        role = get(msg, :role, "user") # Use symbols for keys
+        content = get(msg, :content, "") # Use symbols for keys
+
+        if role == "system"
+            # System instructions are handled separately in Gemini
+            system_instruction = Dict("parts" => [Dict("text" => content)])
+        else
+            # Map OpenAI roles to Gemini roles
+            gemini_role = role == "user" ? "user" : (role == "assistant" ? "model" : role)
+            # Content can be String or Vector of Dicts (eg, for images)
+            parts = content isa AbstractString ? [Dict("text" => content)] : content
+            push!(contents, Dict("role" => gemini_role, "parts" => parts))
+        end
+    end
+
+    result = Dict{String, Any}("contents" => contents)
+    # Add system instruction if present
+    !isnothing(system_instruction) && (result["system_instruction"] = system_instruction)
+
+    # Map OpenAI generation parameters to Gemini generationConfig
+    param_map = Dict(
+        :temperature => "temperature",
+        :max_tokens => "maxOutputTokens",
+        :maxOutputTokens => "maxOutputTokens", # Allow direct Gemini param
+        :top_p => "topP",
+        :topP => "topP", # Allow direct Gemini param
+        :top_k => "topK",
+        :topK => "topK", # Allow direct Gemini param
+        :stop => "stopSequences",
+        :stop_sequences => "stopSequences", # Alias
+        :stopSequences => "stopSequences" # Allow direct Gemini param
+    )
+    generation_config = Dict{String, Any}()
+    for (openai_key, gemini_key) in param_map
+        if haskey(kwargs, openai_key)
+            value = kwargs[openai_key]
+            # Ensure stopSequences is always a vector of strings
+            if gemini_key == "stopSequences"
+                value = value isa AbstractVector ? string.(value) : [string(value)]
+            end
+            generation_config[gemini_key] = value
+        end
+    end
+
+    # Add generation config to result if not empty
+    !isempty(generation_config) && (result["generationConfig"] = generation_config)
+
+    return result
+end
+
 function OpenAI.create_chat(schema::GoogleOpenAISchema,
         api_key::AbstractString,
         model::AbstractString,
         conversation;
         url::String = "https://generativelanguage.googleapis.com/v1beta",
+        http_kwargs::NamedTuple = NamedTuple(),
+        streamcallback::Any = nothing,
         kwargs...)
     api_key = isempty(GOOGLE_API_KEY) ? api_key : GOOGLE_API_KEY
-    # Use GoogleProvider instead of CustomProvider
     provider = GoogleProvider(; api_key, base_url = url)
-    OpenAI.openai_request("chat/completions",
-        provider;
-        method = "POST",
-        messages = conversation,
-        model = model,
-        kwargs...)
+    headers = ["Content-Type" => "application/json"]
+
+    if !isnothing(streamcallback)
+        ## Streaming via streamGenerateContent
+        stream_url = OpenAI.build_url(
+            provider, "models/$model:streamGenerateContent?alt=sse&key=$api_key")
+        streamcallback, new_kwargs = configure_callback!(streamcallback, schema; kwargs...)
+        
+        # Convert OpenAI format to Gemini format with generation config
+        gemini_payload = convert_openai_to_gemini(conversation; new_kwargs...)
+        
+        # Create Gemini-compatible payload
+        input = IOBuffer()
+        JSON3.write(input, gemini_payload)
+        
+        ## Use the streaming callback
+        resp = streamed_request!(streamcallback, stream_url, headers, input; http_kwargs...)
+        OpenAI.OpenAIResponse(resp.status, JSON3.read(resp.body))
+    else
+        ## Use OpenAI.jl default
+        OpenAI.openai_request("chat/completions",
+            provider;
+            method = "POST",
+            messages = conversation,
+            model = model,
+            http_kwargs,
+            kwargs...)
+    end
 end
 function OpenAI.create_chat(schema::DatabricksOpenAISchema,
         api_key::AbstractString,
