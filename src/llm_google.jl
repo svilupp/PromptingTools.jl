@@ -167,6 +167,7 @@ function aigenerate(prompt_schema::AbstractGoogleSchema, prompt::ALLOWED_PROMPT_
         http_kwargs::NamedTuple = (retry_non_idempotent = true,
             retries = 5,
             readtimeout = 120), api_kwargs::NamedTuple = NamedTuple(),
+        streamcallback::Any = nothing,
         kwargs...)
     ##
     global MODEL_ALIASES
@@ -187,7 +188,9 @@ function aigenerate(prompt_schema::AbstractGoogleSchema, prompt::ALLOWED_PROMPT_
             model_id,
             conv_rendered;
             http_kwargs,
-            api_kwargs...)
+            api_kwargs,
+            streamcallback, 
+            verbose)
         ## Big overestimate
         input_token_estimate = length(JSON3.write(conv_rendered))
         output_token_estimate = length(r.text)
