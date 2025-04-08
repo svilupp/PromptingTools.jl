@@ -200,12 +200,14 @@ Allowed:
 - `:cache`: Enables prompt caching.
 - `:long_output`: Enables long outputs (up to 8K tokens) with Anthropic's Sonnet 3.5.
 - `:computer_use`: Enables the use of the computer tool.
+- `:extended_output`: Enables extended output up to 128K tokens with Claude 3.7 Sonnet.
 """
-const BETA_HEADERS_ANTHROPIC = [:tools, :cache, :long_output, :computer_use]
+const BETA_HEADERS_ANTHROPIC = [:tools, :cache, :long_output, :computer_use, :extended_output]
 
 """
     anthropic_extra_headers(;
-        has_tools = false, has_cache = false, has_long_output = false,
+        has_tools = false, has_cache = false, has_long_output = false, 
+        has_extended_output = false,
         betas::Union{Nothing, Vector{Symbol}} = nothing)
 
 Adds API version and beta headers to the request.
@@ -214,12 +216,14 @@ Adds API version and beta headers to the request.
 - `has_tools`: Enables tools in the conversation.
 - `has_cache`: Enables prompt caching.
 - `has_long_output`: Enables long outputs (up to 8K tokens) with Anthropic's Sonnet 3.5.
-- `betas`: A vector of symbols representing the beta features to be used. Currently only `:computer_use`, `:long_output`,  `:tools` and `:cache` are supported.
+- `has_extended_output`: Enables extended output up to 128K tokens with Claude 3.7 Sonnet.
+- `betas`: A vector of symbols representing the beta features to be used. Currently only `:computer_use`, `:long_output`, `:tools`, `:cache`, and `:extended_output` are supported.
 
 Refer to `BETA_HEADERS_ANTHROPIC` for the allowed beta features.
 """
 function anthropic_extra_headers(;
-        has_tools = false, has_cache = false, has_long_output = false,
+        has_tools = false, has_cache = false, has_long_output = false, 
+        has_extended_output = false,
         betas::Union{Nothing, Vector{Symbol}} = nothing)
     global BETA_HEADERS_ANTHROPIC
     betas_parsed = isnothing(betas) ? Symbol[] : betas
@@ -235,6 +239,9 @@ function anthropic_extra_headers(;
     end
     if has_long_output || :long_output in betas_parsed
         push!(beta_headers, "max-tokens-3-5-sonnet-2024-07-15")
+    end
+    if has_extended_output || :extended_output in betas_parsed
+        push!(beta_headers, "output-128k-2025-02-19")
     end
     if :computer_use in betas_parsed
         push!(beta_headers, "computer-use-2024-10-22")
@@ -295,6 +302,12 @@ function anthropic_api(
     ##
     body = Dict(:model => model, :max_tokens => max_tokens,
         :stream => stream, :messages => messages, kwargs...)
+    
+    ## Check if thinking is enabled and validate budget_tokens
+    if haskey(kwargs, :thinking) && haskey(kwargs[:thinking], :budget_tokens)
+        @assert kwargs[:thinking][:budget_tokens] <= max_tokens "The thinking budget_tokens ($(kwargs[:thinking][:budget_tokens])) must not exceed max_tokens ($max_tokens)"
+    end
+    
     ## provide system message
     if !isnothing(system)
         body[:system] = system
@@ -303,6 +316,7 @@ function anthropic_api(
     extra_headers = anthropic_extra_headers(;
         has_tools = haskey(kwargs, :tools), has_cache = !isnothing(cache),
         has_long_output = (max_tokens > 4096 && model in ["claude-3-5-sonnet-20240620"]),
+        has_extended_output = (max_tokens > 8192 && occursin("claude-3-7", model)),
         betas = betas)
     headers = auth_header(
         api_key; bearer = false, x_api_key = true,
