@@ -241,8 +241,8 @@ function convert_openai_to_gemini(conversation; kwargs...)
     system_instruction = nothing
     
     for msg in conversation
-        role = get(msg, "role", "user") # Use symbols for keys
-        content = get(msg, "content", "") # Use symbols for keys
+        role = get(msg, "role", "user")
+        content = get(msg, "content", "")
 
         if role == "system"
             # System instructions are handled separately in Gemini
@@ -301,12 +301,12 @@ function OpenAI.create_chat(schema::GoogleOpenAISchema,
         kwargs...)
     api_key = isempty(GOOGLE_API_KEY) ? api_key : GOOGLE_API_KEY
     provider = GoogleProvider(; api_key, base_url = url)
-    headers = ["Content-Type" => "application/json"]
+    headers = ["Content-Type" => "application/json", "x-goog-api-key" => api_key] # Add API key header
 
     if !isnothing(streamcallback)
         ## Streaming via streamGenerateContent
         stream_url = OpenAI.build_url(
-            provider, "models/$model:streamGenerateContent?alt=sse&key=$api_key")
+            provider, "models/$model:streamGenerateContent?alt=sse")
         streamcallback, new_kwargs = configure_callback!(streamcallback, schema; kwargs...)
         
         # Convert OpenAI format to Gemini format with generation config
