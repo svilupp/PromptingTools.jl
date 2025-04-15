@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.74.1]
+
+### Added
+- Added support for GPT-4.1 models (aliases `gpt41` for GPT 4.1, `gpt41m` for GPT 4.1 mini, `gpt41n` for GPT 4.1 nano; see details [here](https://openai.com/index/gpt-4-1/)).
+
 ## [0.74.0]
 
 ### Added
