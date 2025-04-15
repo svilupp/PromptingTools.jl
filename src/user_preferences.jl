@@ -382,6 +382,9 @@ aliases = merge(
         "gpt4v" => "gpt-4-vision-preview", # 4v is for "4 vision"
         "gpt4t" => "gpt-4-turbo", # 4t is for "4 turbo"
         "gpt3t" => "gpt-3.5-turbo-0125", # 3t is for "3 turbo"
+        "gpt41" => "gpt-4.1-2025-04-14",
+        "gpt41m" => "gpt-4.1-mini-2025-04-14",
+        "gpt41n" => "gpt-4.1-nano-2025-04-14",
         "gpt45" => "gpt-4.5-preview", # 4.5 is for "4.5"
         "chatgpt" => "chatgpt-4o-latest",
         "o1" => "o1",
@@ -600,6 +603,21 @@ registry = Dict{String, ModelSpec}(
         1.5e-7,
         6e-7,
         "GPT-4 Omni Mini, the smallest and fastest model based on GPT4 (and cheaper than GPT3.5Turbo). Context of 128K, knowledge until October 2023. Currently points to version gpt-4o-2024-07-18."),
+    "gpt-4.1-mini-2025-04-14" => ModelSpec("gpt-4.1-mini-2025-04-14",
+        OpenAISchema(),
+        4e-7,
+        1.6e-6,
+        "GPT-4.1 mini is the latest OpenAI model. It has 1M context, 32K output."),
+    "gpt-4.1-nano-2025-04-14" => ModelSpec("gpt-4.1-nano-2025-04-14",
+        OpenAISchema(),
+        1e-7,
+        4e-7,
+        "GPT-4.1 nano is the cheapest and smallest OpenAI model. It has 1M context, 32K output."),
+    "gpt-4.1-2025-04-14" => ModelSpec("gpt-4.1-2025-04-14",
+        OpenAISchema(),
+        2e-6,
+        8e-6,
+        "GPT-4.1 is the latest OpenAI model. It has 1M context, 32K output."),
     "o1-preview" => ModelSpec("o1-preview",
         OpenAISchema(),
         1.5e-5,
