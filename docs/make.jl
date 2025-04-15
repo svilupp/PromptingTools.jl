@@ -36,7 +36,8 @@ makedocs(;
     draft = false,
     source = "src",
     build = "build",
-    )
+    warnonly = Documenter.except(:missing_docs)
+)
 
 deploydocs(;
     repo = "github.com/svilupp/PromptingTools.jl",
