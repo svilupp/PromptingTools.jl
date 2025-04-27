@@ -12,8 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.74.2]
 
+### Added
+- Added support for OpenAI's O3 and O4-Mini reasoning models (aliases `o3` and `o4m`, respectively).
+
 ### Fixed
 - Fixed a bug in the precompilation. If a user set `MODEL_CHAT` to be a non-OpenAI model, `aiclassify` would throw an error as it could not validate the tokenizer for correct functionality. Bypassed by forcing a specific tokenizer vocabulary (irrelevant for precompilation purposes).
+- Fixed failing CI due to not publishing docs for `CustomRetryLayer`.
 
 ## [0.74.1]
 
