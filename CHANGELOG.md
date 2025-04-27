@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.74.2]
+
+### Fixed
+- Fixed a bug in the precompilation. If a user set `MODEL_CHAT` to be a non-OpenAI model, `aiclassify` would throw an error as it could not validate the tokenizer for correct functionality. Bypassed by forcing a specific tokenizer vocabulary (irrelevant for precompilation purposes).
+
 ## [0.74.1]
 
 ### Added
