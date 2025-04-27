@@ -22,7 +22,8 @@ makedocs(;
     modules = [
         PromptingTools,
         PromptingTools.Experimental.RAGTools,
-        PromptingTools.Experimental.AgentTools
+        PromptingTools.Experimental.AgentTools,
+        PromptingTools.CustomRetryLayer
     ],
     authors = "J S <49557684+svilupp@users.noreply.github.com> and contributors",
     repo = "https://github.com/svilupp/PromptingTools.jl/blob/{commit}{path}#{line}",
@@ -35,8 +36,7 @@ makedocs(;
     ),
     draft = false,
     source = "src",
-    build = "build",
-    warnonly = Documenter.except(:missing_docs)
+    build = "build"
 )
 
 deploydocs(;
