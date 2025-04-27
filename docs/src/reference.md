@@ -10,5 +10,5 @@ outline: deep
 ```
 
 ```@autodocs
-Modules = [PromptingTools]
+Modules = [PromptingTools, PromptingTools.CustomRetryLayer]
 ```
