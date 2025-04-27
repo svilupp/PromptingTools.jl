@@ -1,3 +1,4 @@
+using PromptingTools: OPENAI_TOKEN_IDS_GPT4O
 # Basic Message Types precompilation - moved to top
 sys_msg = SystemMessage("You are a helpful assistant")
 user_msg = UserMessage("Hello!")
@@ -55,7 +56,8 @@ schema = TestEchoOpenAISchema(; response = mock_response, status = 200)
 
 # API calls
 msg = aigenerate(schema, "I want to ask {{it}}"; it = "Is this correct?")
-msg = aiclassify(schema, "I want to ask {{it}}"; it = "Is this correct?")
+msg = aiclassify(schema, "I want to ask {{it}}"; it = "Is this correct?",
+    token_ids_map = OPENAI_TOKEN_IDS_GPT4O)
 "With docstring"
 struct X123
     x::Int
@@ -72,7 +74,8 @@ empty!(CONV_HISTORY)
 # Use of Templates
 template_name = :JudgeIsItTrue
 msg = aigenerate(schema, template_name; it = "Is this correct?")
-msg = aiclassify(schema, template_name; it = "Is this correct?");
+msg = aiclassify(
+    schema, template_name; it = "Is this correct?", token_ids_map = OPENAI_TOKEN_IDS_GPT4O);
 msg = aiextract(schema,
     template_name;
     it = "This doesn't make sense but do run it...",
