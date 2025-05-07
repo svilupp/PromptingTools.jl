@@ -9,8 +9,9 @@ using JSON3
 using OpenAI
 
 # Import message types
-import ..AbstractChatMessage, ..AbstractMessage, ..ALLOWED_PROMPT_TYPE
+import ..AbstractChatMessage, ..AbstractMessage, ..ALLOWED_PROMPT_TYPE, ..AbstractOpenAISchema
 import .._calculate_cost, ..finalize_outputs, ..OPENAI_API_KEY, ..MODEL_CHAT, ..MODEL_ALIASES
+import ..render, .._report_stats
 
 # Type definitions
 """
