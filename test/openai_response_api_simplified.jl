@@ -48,7 +48,7 @@ using PromptingTools: UserMessage, SystemMessage
         ))
         result = PromptingTools.render(schema, tool)
         @test result["type"] == "file_search"
-        @test result["name"] => "file_search"
+        @test result["name"] == "file_search"
         @test result["vector_store_ids"] == ["store1", "store2"]
         @test result["max_num_results"] == 5
         
