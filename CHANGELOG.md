@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.74.3]
+
+### Added
+- Added support for Gemini 2.5 Pro and Flash preview models (aliases `gem25p` and `gem25f`, respectively).
+
 ## [0.74.2]
 
 ### Added
