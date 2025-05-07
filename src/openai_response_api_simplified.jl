@@ -159,7 +159,7 @@ function response_to_message(schema::AbstractOpenAISchema,
 end
 
 """
-    render_for_responses(schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE;
+    _render_for_responses(schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE;
                       conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
                       no_system_message::Bool = false,
                       name_user::Union{Nothing, String} = nothing,
@@ -178,7 +178,7 @@ Renders a prompt for the OpenAI Responses API.
 # Returns
 - `input_data`: The rendered input data for the API.
 """
-function render_for_responses(schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE;
+function _render_for_responses(schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE;
                            conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
                            no_system_message::Bool = false,
                            name_user::Union{Nothing, String} = nothing,
@@ -247,7 +247,7 @@ function render_for_responses(schema::AbstractOpenAISchema, prompt::ALLOWED_PROM
 end
 
 """
-    render_tool_for_responses(schema::AbstractOpenAISchema, tool::ToolRef; kwargs...)
+    _render_tool_for_responses(schema::AbstractOpenAISchema, tool::ToolRef; kwargs...)
 
 Renders a tool reference into the OpenAI Responses API format.
 
@@ -259,7 +259,7 @@ Renders a tool reference into the OpenAI Responses API format.
 # Returns
 - The rendered tool reference.
 """
-function render_tool_for_responses(schema::AbstractOpenAISchema, tool::ToolRef; kwargs...)
+function _render_tool_for_responses(schema::AbstractOpenAISchema, tool::ToolRef; kwargs...)
     # Map tool references to OpenAI tools
     (; extras) = tool
     rendered = if tool.ref == :websearch
@@ -367,14 +367,14 @@ function airespond(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_T
     # Add websearch tool if enabled
     if enable_websearch && !any(t -> t isa ToolRef && t.ref == :websearch, tools)
         websearch_tool = ToolRef(ref=:websearch, extras=Dict("name" => "web_search"))
-        push!(tools, render_tool_for_responses(prompt_schema, websearch_tool))
+        push!(tools, _render_tool_for_responses(prompt_schema, websearch_tool))
     end
     
     # Convert any ToolRef objects to the format expected by the Responses API
-    tools = [t isa ToolRef ? render_tool_for_responses(prompt_schema, t) : t for t in tools]
+    tools = [t isa ToolRef ? _render_tool_for_responses(prompt_schema, t) : t for t in tools]
     
     # Render the conversation
-    input_data = render_for_responses(
+    input_data = _render_for_responses(
         prompt_schema, prompt;
         conversation, no_system_message, name_user, kwargs...)
     
