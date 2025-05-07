@@ -189,7 +189,8 @@ function render_for_responses(schema::AbstractOpenAISchema, prompt::ALLOWED_PROM
         return prompt
     else
         # For messages, render them into the format expected by the Responses API
-        conv_rendered = render(
+        # Use the existing render function from the main codebase
+        conv_rendered = PromptingTools.render(
             schema, prompt;
             conversation, no_system_message, name_user, kwargs...)
         
@@ -246,7 +247,7 @@ function render_for_responses(schema::AbstractOpenAISchema, prompt::ALLOWED_PROM
 end
 
 """
-    render(schema::AbstractOpenAISchema, tool::ToolRef; kwargs...)
+    render_tool_for_responses(schema::AbstractOpenAISchema, tool::ToolRef; kwargs...)
 
 Renders a tool reference into the OpenAI Responses API format.
 
@@ -258,7 +259,7 @@ Renders a tool reference into the OpenAI Responses API format.
 # Returns
 - The rendered tool reference.
 """
-function render(schema::AbstractOpenAISchema, tool::ToolRef; kwargs...)
+function render_tool_for_responses(schema::AbstractOpenAISchema, tool::ToolRef; kwargs...)
     # Map tool references to OpenAI tools
     (; extras) = tool
     rendered = if tool.ref == :websearch
@@ -365,8 +366,12 @@ function airespond(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_T
     
     # Add websearch tool if enabled
     if enable_websearch && !any(t -> t isa ToolRef && t.ref == :websearch, tools)
-        push!(tools, ToolRef(ref=:websearch, extras=Dict("name" => "web_search")))
+        websearch_tool = ToolRef(ref=:websearch, extras=Dict("name" => "web_search"))
+        push!(tools, render_tool_for_responses(prompt_schema, websearch_tool))
     end
+    
+    # Convert any ToolRef objects to the format expected by the Responses API
+    tools = [t isa ToolRef ? render_tool_for_responses(prompt_schema, t) : t for t in tools]
     
     # Render the conversation
     input_data = render_for_responses(
