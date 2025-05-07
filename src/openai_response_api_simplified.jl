@@ -394,7 +394,7 @@ function airespond(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_T
             time, model_id, run_id = Int(rand(Int32)))
         
         # Reporting
-        verbose && @info _report_stats(msg, model_id)
+        verbose && @info PromptingTools._report_stats(msg, model_id)
     else
         msg = nothing
     end
