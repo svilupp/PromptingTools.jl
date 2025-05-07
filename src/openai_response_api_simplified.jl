@@ -367,14 +367,14 @@ function airespond(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_T
     # Add websearch tool if enabled
     if enable_websearch && !any(t -> t isa ToolRef && t.ref == :websearch, tools)
         websearch_tool = ToolRef(ref=:websearch, extras=Dict("name" => "web_search"))
-        push!(tools, _render_tool_for_responses(prompt_schema, websearch_tool))
+        push!(tools, PromptingTools._render_tool_for_responses(prompt_schema, websearch_tool))
     end
     
     # Convert any ToolRef objects to the format expected by the Responses API
-    tools = [t isa ToolRef ? _render_tool_for_responses(prompt_schema, t) : t for t in tools]
+    tools = [t isa ToolRef ? PromptingTools._render_tool_for_responses(prompt_schema, t) : t for t in tools]
     
     # Render the conversation
-    input_data = _render_for_responses(
+    input_data = PromptingTools._render_for_responses(
         prompt_schema, prompt;
         conversation, no_system_message, name_user, kwargs...)
     
