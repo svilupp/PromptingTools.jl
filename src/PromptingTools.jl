@@ -107,7 +107,7 @@ include("llm_google.jl")
 include("llm_anthropic.jl")
 include("llm_sharegpt.jl")
 include("llm_tracer.jl")
-include("openai_response_api.jl")
+include("openai_response_api_simplified.jl")
 
 ## Custom retry layer
 include("retry_layer.jl")
