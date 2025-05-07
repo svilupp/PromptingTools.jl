@@ -135,7 +135,7 @@ function response_to_message(schema::AbstractOpenAISchema,
     output_tokens = get(usage_data, "output_tokens", -1)
     
     # Calculate cost based on token usage
-    cost = _calculate_cost(model_id, input_tokens, output_tokens)
+    cost = PromptingTools._calculate_cost(model_id, input_tokens, output_tokens)
     
     # Create extras dictionary with all additional information
     extras = Dict{Symbol, Any}(
