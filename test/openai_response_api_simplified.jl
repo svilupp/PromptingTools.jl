@@ -1,4 +1,4 @@
-using PromptingTools: OpenAISchema, render, AIMessage
+using PromptingTools: OpenAISchema, AIMessage
 using PromptingTools: ToolRef
 using PromptingTools: UserMessage, SystemMessage
 
@@ -31,12 +31,12 @@ using PromptingTools: UserMessage, SystemMessage
         @test result[4]["role"] == "user"
     end
     
-    @testset "render ToolRef" begin
+    @testset "render_tool_for_responses" begin
         schema = OpenAISchema()
         
         # Test websearch tool
         tool = ToolRef(ref=:websearch, extras=Dict("name" => "web_search"))
-        result = PromptingTools.render(schema, tool)
+        result = PromptingTools.render_tool_for_responses(schema, tool)
         @test result["type"] == "web_search"
         @test result["name"] == "web_search"
         
@@ -46,7 +46,7 @@ using PromptingTools: UserMessage, SystemMessage
             "vector_store_ids" => ["store1", "store2"],
             "max_num_results" => 5
         ))
-        result = PromptingTools.render(schema, tool)
+        result = PromptingTools.render_tool_for_responses(schema, tool)
         @test result["type"] == "file_search"
         @test result["name"] == "file_search"
         @test result["vector_store_ids"] == ["store1", "store2"]
@@ -58,13 +58,13 @@ using PromptingTools: UserMessage, SystemMessage
             "description" => "Get weather information",
             "parameters" => Dict("type" => "object", "properties" => Dict())
         ))
-        result = PromptingTools.render(schema, tool)
+        result = PromptingTools.render_tool_for_responses(schema, tool)
         @test result["type"] == "function"
         @test result["name"] == "get_weather"
         @test result["description"] == "Get weather information"
         @test haskey(result, "parameters")
         
         # Test unknown tool
-        @test_throws ArgumentError PromptingTools.render(schema, ToolRef(ref=:unknown, extras=Dict()))
+        @test_throws ArgumentError PromptingTools.render_tool_for_responses(schema, ToolRef(ref=:unknown, extras=Dict()))
     end
 end
