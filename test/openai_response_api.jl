@@ -2,6 +2,7 @@ using PromptingTools: OpenAISchema, render, response_to_message, create_response
 using PromptingTools: AIMessageParts, TextMessagePart, ImageMessagePart, ReasoningParams, UsageMetrics
 using PromptingTools: AbstractMessagePart, render_for_responses
 using PromptingTools: ToolRef
+using PromptingTools: UserMessage, SystemMessage, AIMessage
 
 @testset "openai_response_api" begin
     @testset "AIMessageParts" begin
