@@ -519,7 +519,9 @@ aliases = merge(
         "gem20f" => "gemini-2.0-flash",
         "gem20fl" => "gemini-2.0-flash-lite-preview-02-05",
         "gem20ft" => "gemini-2.0-flash-thinking-exp-01-21",
-        "gemexp" => "gemini-exp-1206" # latest experimental model from December 2024
+        "gemexp" => "gemini-exp-1206", # latest experimental model from December 2024,
+        "gem25p" => "gemini-2.5-pro-preview-05-06",
+        "gem25f" => "gemini-2.5-flash-preview-04-17"
     ),
     ## Load aliases from preferences as well
     @load_preference("MODEL_ALIASES", default=Dict{String, String}()))
@@ -1322,6 +1324,11 @@ registry = Dict{String, ModelSpec}(
         1.0e-7,
         4.0e-7,
         "Gemini 2.0 Flash Thinking Experimental Model from January 2025. Context 1M tokens, 8K output. See details [here](https://ai.google.dev/gemini-api/docs/models/experimental-models#use-an-experimental-model)."),
+    "gemini-2.5-flash-preview-04-17" => ModelSpec("gemini-2.5-flash-preview-04-17",
+        GoogleOpenAISchema(),
+        1.5e-7,
+        3.5e-6,
+        "Gemini 2.5 Flash Preview from April 2025. 1M context, 65K output. Price differs if you request thinking or not. See details [here](https://ai.google.dev/gemini-api/docs/models/experimental-models#use-an-experimental-model)."),
     "gemini-exp-1114" => ModelSpec("gemini-exp-1114",
         GoogleOpenAISchema(),
         1.25e-6,
@@ -1341,7 +1348,12 @@ registry = Dict{String, ModelSpec}(
         GoogleOpenAISchema(),
         1.25e-6,
         5e-6,
-        "Gemini 2.0 Pro Experimental Model from February 2025. Pricing assumed as per Gemini 1.5 Pro. See details [here](https://ai.google.dev/gemini-api/docs/models/experimental-models#use-an-experimental-model).")
+        "Gemini 2.0 Pro Experimental Model from February 2025. Pricing assumed as per Gemini 1.5 Pro. See details [here](https://ai.google.dev/gemini-api/docs/models/experimental-models#use-an-experimental-model)."),
+    "gemini-2.5-pro-preview-05-06" => ModelSpec("gemini-2.5-pro-preview-05-06",
+        GoogleOpenAISchema(),
+        1.25e-6,
+        10e-6,
+        "Gemini 2.5 Pro Preview from May 2025. 1M context, 65K output. See details [here](https://ai.google.dev/gemini-api/docs/models/experimental-models#use-an-experimental-model).")
 )
 
 """
