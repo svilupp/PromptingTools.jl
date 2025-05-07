@@ -35,25 +35,25 @@ using PromptingTools: UserMessage, SystemMessage
         schema = OpenAISchema()
         
         # Test websearch tool
-        tool = ToolRef(:websearch, Dict("name" => "web_search"))
+        tool = ToolRef(ref=:websearch, extras=Dict("name" => "web_search"))
         result = PromptingTools.render(schema, tool)
         @test result["type"] == "web_search"
         @test result["name"] == "web_search"
         
         # Test file_search tool
-        tool = ToolRef(:file_search, Dict(
+        tool = ToolRef(ref=:file_search, extras=Dict(
             "name" => "file_search",
             "vector_store_ids" => ["store1", "store2"],
             "max_num_results" => 5
         ))
         result = PromptingTools.render(schema, tool)
         @test result["type"] == "file_search"
-        @test result["name"] == "file_search"
+        @test result["name"] => "file_search"
         @test result["vector_store_ids"] == ["store1", "store2"]
         @test result["max_num_results"] == 5
         
         # Test function tool
-        tool = ToolRef(:function, Dict(
+        tool = ToolRef(ref=:function, extras=Dict(
             "name" => "get_weather",
             "description" => "Get weather information",
             "parameters" => Dict("type" => "object", "properties" => Dict())
@@ -65,6 +65,6 @@ using PromptingTools: UserMessage, SystemMessage
         @test haskey(result, "parameters")
         
         # Test unknown tool
-        @test_throws ArgumentError PromptingTools.render(schema, ToolRef(:unknown, Dict()))
+        @test_throws ArgumentError PromptingTools.render(schema, ToolRef(ref=:unknown, extras=Dict()))
     end
 end

@@ -194,27 +194,27 @@ function render_for_responses(schema::AbstractOpenAISchema, prompt::ALLOWED_PROM
             conversation, no_system_message, name_user, kwargs...)
         
         # Convert to Responses API format
-        if isempty(conv_rendered) || (length(conv_rendered) == 1 && conv_rendered[1][:role] == "user")
+        if isempty(conv_rendered) || (length(conv_rendered) == 1 && conv_rendered[1]["role"] == "user")
             # Simple user message
             user_message = conv_rendered[1]
             
             # Check if it's a simple text message or a message with images
-            if haskey(user_message, :content) && user_message[:content] isa String
+            if haskey(user_message, "content") && user_message["content"] isa String
                 # Simple text message
-                return user_message[:content]
+                return user_message["content"]
             else
                 # Message with structured content (e.g., text and images)
                 input_items = []
                 
                 # For each message in the conversation
                 for msg in conv_rendered
-                    item = Dict{String, Any}("role" => msg[:role])
+                    item = Dict{String, Any}("role" => msg["role"])
                     
                     # Convert content to the format expected by the Responses API
-                    if msg[:content] isa String
-                        item["content"] = [Dict{String, Any}("type" => "input_text", "text" => msg[:content])]
-                    elseif msg[:content] isa Vector
-                        item["content"] = msg[:content]
+                    if msg["content"] isa String
+                        item["content"] = [Dict{String, Any}("type" => "input_text", "text" => msg["content"])]
+                    elseif msg["content"] isa Vector
+                        item["content"] = msg["content"]
                     end
                     
                     push!(input_items, item)
@@ -228,13 +228,13 @@ function render_for_responses(schema::AbstractOpenAISchema, prompt::ALLOWED_PROM
             
             # For each message in the conversation
             for msg in conv_rendered
-                item = Dict{String, Any}("role" => msg[:role])
+                item = Dict{String, Any}("role" => msg["role"])
                 
                 # Convert content to the format expected by the Responses API
-                if msg[:content] isa String
-                    item["content"] = [Dict{String, Any}("type" => "input_text", "text" => msg[:content])]
-                elseif msg[:content] isa Vector
-                    item["content"] = msg[:content]
+                if msg["content"] isa String
+                    item["content"] = [Dict{String, Any}("type" => "input_text", "text" => msg["content"])]
+                elseif msg["content"] isa Vector
+                    item["content"] = msg["content"]
                 end
                 
                 push!(input_items, item)
@@ -365,7 +365,7 @@ function airespond(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_T
     
     # Add websearch tool if enabled
     if enable_websearch && !any(t -> t isa ToolRef && t.ref == :websearch, tools)
-        push!(tools, ToolRef(:websearch, Dict("name" => "web_search")))
+        push!(tools, ToolRef(ref=:websearch, extras=Dict("name" => "web_search")))
     end
     
     # Render the conversation
