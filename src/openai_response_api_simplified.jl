@@ -104,23 +104,23 @@ function response_to_message(schema::AbstractOpenAISchema,
                             model_id::AbstractString = "",
                             run_id::Int = Int(rand(Int32)))
     # Extract the response ID
-    response_id = response.response[:id]
+    response_id = response.response["id"]
     
     # Extract text content from the response
     content = ""
     
     # Extract output from the response
-    output = response.response[:output]
+    output = response.response["output"]
     
     # Process each output item to extract text
     for item in output
         # Check item type (message, etc.)
-        if item[:type] == "message"
+        if item["type"] == "message"
             # Process message content
-            for content_item in item[:content]
-                if content_item[:type] == "output_text"
+            for content_item in item["content"]
+                if content_item["type"] == "output_text"
                     # Append text content
-                    content *= content_item[:text] * "\n"
+                    content *= content_item["text"] * "\n"
                 end
             end
         end
@@ -130,9 +130,9 @@ function response_to_message(schema::AbstractOpenAISchema,
     content = rstrip(content)
     
     # Extract usage metrics
-    usage_data = get(response.response, :usage, Dict())
-    input_tokens = get(usage_data, :input_tokens, -1)
-    output_tokens = get(usage_data, :output_tokens, -1)
+    usage_data = get(response.response, "usage", Dict())
+    input_tokens = get(usage_data, "input_tokens", -1)
+    output_tokens = get(usage_data, "output_tokens", -1)
     
     # Calculate cost based on token usage
     cost = _calculate_cost(model_id, input_tokens, output_tokens)
@@ -140,7 +140,7 @@ function response_to_message(schema::AbstractOpenAISchema,
     # Create extras dictionary with all additional information
     extras = Dict{Symbol, Any}(
         :response_id => response_id,
-        :reasoning => get(response.response, :reasoning, Dict()),
+        :reasoning => get(response.response, "reasoning", Dict()),
         :usage => usage_data,
         :full_response => response.response
     )
@@ -153,7 +153,7 @@ function response_to_message(schema::AbstractOpenAISchema,
         elapsed = time,
         cost = cost,
         extras = extras,
-        finish_reason = get(response.response, :status, nothing),
+        finish_reason = get(response.response, "status", nothing),
         run_id = run_id
     )
 end
