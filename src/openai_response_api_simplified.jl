@@ -400,7 +400,7 @@ function airespond(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_T
     end
     
     # Select what to return
-    output = finalize_outputs(prompt,
+    output = PromptingTools.finalize_outputs(prompt,
         input_data,
         msg;
         conversation,
