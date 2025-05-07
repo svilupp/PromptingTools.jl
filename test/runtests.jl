@@ -35,7 +35,7 @@ end
     include("llm_anthropic.jl")
     include("llm_sharegpt.jl")
     include("llm_tracer.jl")
-    include("openai_response_api.jl")
+    include("openai_response_api_simplified.jl")
     include("macros.jl")
     include("templates.jl")
     include("serialization.jl")
