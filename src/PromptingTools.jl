@@ -58,7 +58,7 @@ const RESERVED_KWARGS = [
 # export pprint
 include("utils.jl")
 
-export aigenerate, aiembed, aiclassify, aiextract, aitools, aiscan, aiimage
+export aigenerate, aiembed, aiclassify, aiextract, aitools, aiscan, aiimage, airespond
 # export render # for debugging only
 include("llm_interface.jl")
 
@@ -107,6 +107,7 @@ include("llm_google.jl")
 include("llm_anthropic.jl")
 include("llm_sharegpt.jl")
 include("llm_tracer.jl")
+include("openai_response_api.jl")
 
 ## Custom retry layer
 include("retry_layer.jl")
