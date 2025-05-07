@@ -121,12 +121,12 @@ function airespond(prompt;
     
     # Extract the text content from the response
     content = ""
-    if haskey(response.response, :output)
-        for item in response.response[:output]
-            if item[:type] == "message"
-                for msg_content in item[:content]
-                    if msg_content[:type] == "output_text"
-                        content *= msg_content[:text] * "\n"
+    if haskey(response.response, "output")
+        for item in response.response["output"]
+            if item["type"] == "message"
+                for msg_content in item["content"]
+                    if msg_content["type"] == "output_text"
+                        content *= msg_content["text"] * "\n"
                     end
                 end
             end
@@ -137,14 +137,14 @@ function airespond(prompt;
     end
     
     # Extract usage information
-    usage_data = get(response.response, :usage, Dict())
-    input_tokens = get(usage_data, :input_tokens, -1)
-    output_tokens = get(usage_data, :output_tokens, -1)
+    usage_data = get(response.response, "usage", Dict())
+    input_tokens = get(usage_data, "input_tokens", -1)
+    output_tokens = get(usage_data, "output_tokens", -1)
     
     # Create extras dictionary with all the additional information
     extras = Dict{Symbol, Any}(
-        :response_id => get(response.response, :id, ""),
-        :reasoning => get(response.response, :reasoning, Dict()),
+        :response_id => get(response.response, "id", ""),
+        :reasoning => get(response.response, "reasoning", Dict()),
         :usage => usage_data,
         :full_response => response.response
     )
