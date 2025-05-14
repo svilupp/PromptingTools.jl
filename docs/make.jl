@@ -39,7 +39,7 @@ makedocs(;
     build = "build"
 )
 
-deploydocs(;
+DocumenterVitepress.deploydocs(;
     repo = "github.com/svilupp/PromptingTools.jl",
     target = "build",
     push_preview = true,

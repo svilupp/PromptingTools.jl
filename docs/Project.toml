@@ -15,4 +15,4 @@ Snowball = "fb8f903a-0164-4e73-9ffe-431110250c3b"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
 [compat]
-DocumenterVitepress = "0.0.7"
+DocumenterVitepress = "0.2.1"
