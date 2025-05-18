@@ -70,7 +70,7 @@ PromptingTools offers many advanced features:
 - Easy prompt templating and automatic serialization and tracing of your AI conversations for great observability
 - Ability to export into a ShareGPT-compatible format for easy fine-tuning
 - Code evaluation and automatic error localization for better LLM debugging
-- RAGTools module: from simple to advanced RAG implementations (hybrid index, rephrasing, reranking, etc.)
+- RAG workflows are now supported via the separate [RAGTools.jl](https://github.com/JuliaGenAI/RAGTools.jl) package
 - AgentTools module: lazy ai* calls with states, automatic code feedback, Monte-Carlo tree search-based auto-fixing of your workflows (ie, not just retrying in a loop)
 
 and more!

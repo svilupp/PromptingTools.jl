@@ -58,7 +58,6 @@ end
 
 ## Run experimental
 @testset "Experimental" begin
-    include("Experimental/RAGTools/runtests.jl")
     include("Experimental/AgentTools/runtests.jl")
     include("Experimental/APITools/runtests.jl")
 end

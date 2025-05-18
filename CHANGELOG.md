@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+### Changed
+- Experimental `RAGTools` module has been removed. Please use the
+  standalone [RAGTools.jl](https://github.com/JuliaGenAI/RAGTools.jl) package.
+
 ## [0.74.3]
 
 ### Added

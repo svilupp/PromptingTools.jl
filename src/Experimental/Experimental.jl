@@ -15,7 +15,7 @@ export APITools
 include("APITools/APITools.jl")
 
 export RAGTools
-include("RAGTools/RAGTools.jl")
+include("RAGTools.jl")
 
 export AgentTools
 include("AgentTools/AgentTools.jl")

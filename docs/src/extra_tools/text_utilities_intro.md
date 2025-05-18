@@ -21,13 +21,10 @@ You can import them simply via:
 using PromptingTools: recursive_splitter, replace_words, wrap_string, length_longest_common_subsequence, distance_longest_common_subsequence
 ```
 
-There are many more (especially in the AgentTools and RAGTools experimental modules)! 
+There are many more (especially in the AgentTools module).
 
-RAGTools module contains the following text utilities:
-- `split_into_code_and_sentences` to split a string into code and sentences
-- `tokenize` to tokenize a string (eg, a sentence) into words
-- `trigrams` to generate trigrams from a string (eg, a word)
-- `text_to_trigrams` to generate trigrams from a larger string (ie, effectively wraps the three functions above)
+Text utilities that used to live in `Experimental.RAGTools` have moved to
+the [RAGTools.jl](https://github.com/JuliaGenAI/RAGTools.jl) package.
 - `STOPWORDS` a set of common stopwords (very brief)
 
 Feel free to open an issue or ask in the `#generative-ai` channel in the JuliaLang Slack if you have a specific need.

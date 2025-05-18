@@ -1,8 +1,7 @@
 using Documenter, DocumenterVitepress
 using PromptingTools
 const PT = PromptingTools
-using SparseArrays, LinearAlgebra, Markdown, Unicode, FlashRank
-using PromptingTools.Experimental.RAGTools
+using SparseArrays, LinearAlgebra, Markdown, Unicode
 using PromptingTools.Experimental.AgentTools
 using JSON3, Serialization, DataFramesMeta
 using Statistics: mean
@@ -21,7 +20,6 @@ DocMeta.setdocmeta!(PromptingTools,
 makedocs(;
     modules = [
         PromptingTools,
-        PromptingTools.Experimental.RAGTools,
         PromptingTools.Experimental.AgentTools,
         PromptingTools.CustomRetryLayer
     ],
