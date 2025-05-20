@@ -80,14 +80,14 @@ Ensure that the conversation history is not too long to maintain relevancy and c
 """
 macro ai!_str(user_prompt, flags...)
     global CONV_HISTORY
-    model = isempty(flags) ? MODEL_CHAT : only(flags)
+    model = isempty(flags) ? :MODEL_CHAT : esc(only(flags))
     prompt = Meta.parse("\"$(escape_string(user_prompt))\"")
     quote
         @assert !isempty($(esc(CONV_HISTORY))) "No conversation history found. Please use `ai\"\"` instead."
         # grab the last conversation
         old_conv = $(esc(CONV_HISTORY))[end]
         conv = aigenerate(vcat(old_conv, [UserMessage($(esc(prompt)))]);
-            model = $(esc(model)),
+            model = $model,
             return_all = true)
         # replace the last conversation with the new one
         $(esc(CONV_HISTORY))[end] = conv
