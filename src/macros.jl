@@ -116,11 +116,11 @@ m = aai"Say Hi!"gpt4;
 """
 macro aai_str(user_prompt, flags...)
     global CONV_HISTORY, MAX_HISTORY_LENGTH, CONV_HISTORY_LOCK
-    model = isempty(flags) ? MODEL_CHAT : only(flags)
+    model = isempty(flags) ? :MODEL_CHAT : esc(only(flags))
     prompt = Meta.parse("\"$(escape_string(user_prompt))\"")
     quote
         Threads.@spawn begin
-            conv = aigenerate($(esc(prompt)); model = $(esc(model)), return_all = true)
+            conv = aigenerate($(esc(prompt)); model = $model, return_all = true)
             lock($(esc(CONV_HISTORY_LOCK))) do
                 push_conversation!($(esc(CONV_HISTORY)), conv, $(esc(MAX_HISTORY_LENGTH)))
             end
