@@ -36,7 +36,7 @@ macro ai_str(user_prompt, flags...)
     model = isempty(flags) ? :MODEL_CHAT : esc(only(flags))
     prompt = Meta.parse("\"$(escape_string(user_prompt))\"")
     quote
-        conv = aigenerate($(esc(prompt)); model = $(model), return_all = true)
+        conv = aigenerate($(esc(prompt)); model = $model, return_all = true)
         push_conversation!($(esc(CONV_HISTORY)), conv, $(esc(MAX_HISTORY_LENGTH)))
         last(conv)
     end
