@@ -33,10 +33,10 @@ result = ai"What is `1.23 * 100 + 1`?"gpt4t
 """
 macro ai_str(user_prompt, flags...)
     global CONV_HISTORY, MAX_HISTORY_LENGTH
-    model = isempty(flags) ? MODEL_CHAT : only(flags)
+    model = isempty(flags) ? :MODEL_CHAT : esc(only(flags))
     prompt = Meta.parse("\"$(escape_string(user_prompt))\"")
     quote
-        conv = aigenerate($(esc(prompt)); model = $(esc(model)), return_all = true)
+        conv = aigenerate($(esc(prompt)); model = $(model), return_all = true)
         push_conversation!($(esc(CONV_HISTORY)), conv, $(esc(MAX_HISTORY_LENGTH)))
         last(conv)
     end
