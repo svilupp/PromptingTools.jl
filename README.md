@@ -7,6 +7,7 @@
 [![Coverage](https://codecov.io/gh/svilupp/PromptingTools.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/svilupp/PromptingTools.jl)
 [![Aqua](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl)
 [![SciML Code Style](https://img.shields.io/static/v1?label=code%20style&message=SciML&color=9558b2&labelColor=389826)](https://github.com/SciML/SciMLStyle)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/svilupp/PromptingTools.jl)
 
 Streamline your life using PromptingTools.jl, the Julia package that simplifies interacting with large language models.
 
