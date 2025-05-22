@@ -156,7 +156,8 @@ Renders the tool reference into the Anthropic format.
 
 Available tools:
 - `:computer`: A tool for using the computer.
-- `:str_replace_editor`: A tool for replacing text in a string.
+- `:str_replace_editor`: A tool for replacing text in a string (use with Sonnet 3.7 models).
+- `:str_replace_based_edit_tool`: The newer Claude 4 text editor tool.
 - `:bash`: A tool for running bash commands.
 """
 function render(schema::AbstractAnthropicSchema,
@@ -173,8 +174,13 @@ function render(schema::AbstractAnthropicSchema,
         )
     elseif tool.ref == :str_replace_editor
         Dict(
-            "type" => "text_editor_20241022",
+            "type" => "text_editor_20250124",
             "name" => "str_replace_editor"
+        )
+    elseif tool.ref == :str_replace_based_edit_tool
+        Dict(
+            "type" => "text_editor_20250429",
+            "name" => "str_replace_based_edit_tool"
         )
     elseif tool.ref == :bash
         Dict(

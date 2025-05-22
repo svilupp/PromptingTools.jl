@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Added Claude 4 models (`claude-sonnet-4-20250514`, `claude-opus-4-20250514`) and set them as new defaults for aliases `claudeo` and `claudes` (Added specs for the new Claude 4 text editor as a ToolRef `:str_replace_based_edit_tool`).
 
 ### Fixed
 
