@@ -522,7 +522,7 @@ aliases = merge(
         "gem20ft" => "gemini-2.0-flash-thinking-exp-01-21",
         "gemexp" => "gemini-exp-1206", # latest experimental model from December 2024,
         "gem25p" => "gemini-2.5-pro-preview-05-06",
-        "gem25f" => "gemini-2.5-flash-preview-04-17"
+        "gem25f" => "gemini-2.5-flash-preview-05-20"
     ),
     ## Load aliases from preferences as well
     @load_preference("MODEL_ALIASES", default=Dict{String, String}()))
@@ -1340,6 +1340,11 @@ registry = Dict{String, ModelSpec}(
         1.5e-7,
         3.5e-6,
         "Gemini 2.5 Flash Preview from April 2025. 1M context, 65K output. Price differs if you request thinking or not. See details [here](https://ai.google.dev/gemini-api/docs/models/experimental-models#use-an-experimental-model)."),
+    "gemini-2.5-flash-preview-05-20" => ModelSpec("gemini-2.5-flash-preview-05-20",
+        GoogleOpenAISchema(),
+        1.5e-7,
+        3.5e-6,
+        "Gemini 2.5 Flash Preview from May 2025. 1M context, 65K output. Price differs if you request thinking or not. See details [here](https://ai.google.dev/gemini-api/docs/models/experimental-models#use-an-experimental-model)."),
     "gemini-exp-1114" => ModelSpec("gemini-exp-1114",
         GoogleOpenAISchema(),
         1.25e-6,
