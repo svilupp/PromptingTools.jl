@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Updated
 
+## [0.76.0]
+
+### Added
+- Added support for Anthropic's new web search tool and code execution tool (alias `:web_search` and `:code_execution`, respectively). See `?aitools` for more information.
+
+### Updated
+- Updated `claude` alias to point to the latest Claude 4.0 Sonnet model (same as `claudes`).
+
 ## [0.75.0]
 
 ###BREAKING CHANGES:
@@ -17,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Default chat model changed to GPT 4.1 mini (previously it was GPT 4o mini, variable `PromptingTools.MODEL_CHAT`).
 
 ### Added
-- Added Claude 4 models (`claude-sonnet-4-20250514`, `claude-opus-4-20250514`) and set them as new defaults for aliases `claudeo` and `claudes` (Added specs for the new Claude 4 text editor as a ToolRef `:str_replace_based_edit_tool`).
+- Added Claude 4 models (`claude-sonnet-4-20250514`, `claude-opus-4-20250514`) and set them as new defaults for aliases `claudeo` and`claudes` (Added specs for the new Claude 4 text editor as a ToolRef `:str_replace_based_edit_tool`).
 - Added a Deepwiki.com badge for AI-powered repo documentation.
 - Added Gemini 2.5 Flash Preview model from 20th May 2025 (alias `gem25f`).
 

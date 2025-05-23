@@ -159,33 +159,46 @@ Available tools:
 - `:str_replace_editor`: A tool for replacing text in a string (use with Sonnet 3.7 models).
 - `:str_replace_based_edit_tool`: The newer Claude 4 text editor tool.
 - `:bash`: A tool for running bash commands.
+- `:code_execution`: A tool for executing code.
+- `:web_search`: A tool for searching the web.
 """
 function render(schema::AbstractAnthropicSchema,
         tool::ToolRef;
         kwargs...)
     ## WARNING: We ignore the tool name here, because the names are strict
     (; extras) = tool
+    T = Dict{String, Any}
     rendered = if tool.ref == :computer
-        Dict(
+        T(
             "type" => "computer_20241022",
             "name" => "computer",
             "display_width_px" => get(extras, "display_width_px", 1024),
             "display_height_px" => get(extras, "display_height_px", 768)
         )
     elseif tool.ref == :str_replace_editor
-        Dict(
+        T(
             "type" => "text_editor_20250124",
             "name" => "str_replace_editor"
         )
     elseif tool.ref == :str_replace_based_edit_tool
-        Dict(
+        T(
             "type" => "text_editor_20250429",
             "name" => "str_replace_based_edit_tool"
         )
     elseif tool.ref == :bash
-        Dict(
+        T(
             "type" => "bash_20241022",
             "name" => "bash"
+        )
+    elseif tool.ref == :code_execution
+        T(
+            "type" => "code_execution_20250522",
+            "name" => "code_execution"
+        )
+    elseif tool.ref == :web_search
+        T(
+            "type" => "web_search_20250305",
+            "name" => "web_search"
         )
     else
         throw(ArgumentError("Unknown tool reference: $(tool.ref)"))
@@ -208,7 +221,8 @@ Allowed:
 - `:computer_use`: Enables the use of the computer tool.
 - `:extended_output`: Enables extended output up to 128K tokens with Claude 3.7 Sonnet.
 """
-const BETA_HEADERS_ANTHROPIC = [:tools, :cache, :long_output, :computer_use, :extended_output]
+const BETA_HEADERS_ANTHROPIC = [
+    :tools, :cache, :long_output, :computer_use, :extended_output]
 
 """
     anthropic_extra_headers(;
@@ -228,7 +242,7 @@ Adds API version and beta headers to the request.
 Refer to `BETA_HEADERS_ANTHROPIC` for the allowed beta features.
 """
 function anthropic_extra_headers(;
-        has_tools = false, has_cache = false, has_long_output = false, 
+        has_tools = false, has_cache = false, has_long_output = false,
         has_extended_output = false,
         betas::Union{Nothing, Vector{Symbol}} = nothing)
     global BETA_HEADERS_ANTHROPIC
@@ -308,12 +322,12 @@ function anthropic_api(
     ##
     body = Dict(:model => model, :max_tokens => max_tokens,
         :stream => stream, :messages => messages, kwargs...)
-    
+
     ## Check if thinking is enabled and validate budget_tokens
     if haskey(kwargs, :thinking) && haskey(kwargs[:thinking], :budget_tokens)
-        @assert kwargs[:thinking][:budget_tokens] <= max_tokens "The thinking budget_tokens ($(kwargs[:thinking][:budget_tokens])) must not exceed max_tokens ($max_tokens)"
+        @assert kwargs[:thinking][:budget_tokens]<=max_tokens "The thinking budget_tokens ($(kwargs[:thinking][:budget_tokens])) must not exceed max_tokens ($max_tokens)"
     end
-    
+
     ## provide system message
     if !isnothing(system)
         body[:system] = system
