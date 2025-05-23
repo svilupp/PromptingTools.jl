@@ -5,7 +5,7 @@ const __pageData = JSON.parse('{"title":"RAG Tools Introduction","description":"
 const _sfc_main = { name: "extra_tools/rag_tools_intro.md" };
 function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
   return openBlock(), createElementBlock("div", null, _cache[0] || (_cache[0] = [
-    createStaticVNode("", 88)
+    createStaticVNode("", 77)
   ]));
 }
 const rag_tools_intro = /* @__PURE__ */ _export_sfc(_sfc_main, [["render", _sfc_render]]);

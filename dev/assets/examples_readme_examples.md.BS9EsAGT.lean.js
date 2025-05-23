@@ -3,7 +3,7 @@ const __pageData = JSON.parse('{"title":"Various Examples","description":"","fro
 const _sfc_main = { name: "examples/readme_examples.md" };
 function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
   return openBlock(), createElementBlock("div", null, [
-    _cache[4] || (_cache[4] = createStaticVNode("", 28)),
+    _cache[4] || (_cache[4] = createStaticVNode("", 26)),
     createBaseVNode("p", null, [
       _cache[0] || (_cache[0] = createTextVNode("You can use the ")),
       _cache[1] || (_cache[1] = createBaseVNode("code", null, "aigenerate", -1)),
