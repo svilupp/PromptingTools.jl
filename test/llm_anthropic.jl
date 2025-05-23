@@ -379,7 +379,7 @@ end
     # Test text editor tool rendering
     editor_tool = ToolRef(ref = :str_replace_editor)
     rendered = render(schema, editor_tool)
-    @test rendered["type"] == "text_editor_20241022"
+    @test rendered["type"] == "text_editor_20250124"
     @test rendered["name"] == "str_replace_editor"
 
     # Test bash tool rendering
@@ -503,7 +503,7 @@ end
     @test schema1.inputs.system == "Act as a helpful AI assistant"
     @test schema1.inputs.messages == [Dict(
         "role" => "user", "content" => [Dict("type" => "text", "text" => "Hello World")])]
-    @test schema1.model_id == "claude-3-opus-20240229"
+    @test schema1.model_id == "claude-opus-4-20250514"
 
     # Test different input combinations and different prompts
     schema2 = TestEchoAnthropicSchema(; response, status = 200)
@@ -522,7 +522,7 @@ end
     @test schema2.inputs.system == "Act as a helpful AI assistant"
     @test schema2.inputs.messages == [Dict(
         "role" => "user", "content" => [Dict("type" => "text", "text" => "Hello World")])]
-    @test schema2.model_id == "claude-3-7-sonnet-latest"
+    @test schema2.model_id == "claude-sonnet-4-20250514"
 
     # Test aiprefill functionality
     schema2 = TestEchoAnthropicSchema(;
@@ -557,7 +557,7 @@ end
         Dict("role" => "assistant",
             "content" => [Dict("type" => "text", "text" => aiprefill)])
     ]
-    @test schema2.model_id == "claude-3-7-sonnet-latest"
+    @test schema2.model_id == "claude-sonnet-4-20250514"
 
     # With caching
     response3 = Dict(
@@ -587,7 +587,7 @@ end
     @test schema3.inputs.messages == [Dict("role" => "user",
         "content" => Dict{String, Any}[Dict("cache_control" => Dict("type" => "ephemeral"),
             "text" => "Hello World", "type" => "text")])]
-    @test schema3.model_id == "claude-3-7-sonnet-latest"
+    @test schema3.model_id == "claude-sonnet-4-20250514"
 
     ## Bad cache
     @test_throws AssertionError aigenerate(
@@ -639,7 +639,7 @@ end
           [Dict("role" => "user",
         "content" => Dict{String, Any}[Dict(
             "text" => "Hello World! Banana", "type" => "text")])]
-    @test schema1.model_id == "claude-3-opus-20240229"
+    @test schema1.model_id == "claude-opus-4-20250514"
 
     # Test badly formatted response
     response = Dict(
