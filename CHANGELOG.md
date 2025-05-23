@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated the OllamaManagedSchema to accept URLs with and without protocol to allow endpoints with `https://` (previously only `http://` was supported).
 
 ### Fixed
+- Fixed `@ai_str` macro to keep dynamic reference to your default model (`PromptingTools.MODEL_CHAT`). Prevents "baking in" the default model if PromptingTools is precompiled by another package.
 
 ## [0.74.3]
 
