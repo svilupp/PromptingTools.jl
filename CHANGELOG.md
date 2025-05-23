@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added a Deepwiki.com badge for AI-powered repo documentation.
 - Added Gemini 2.5 Flash Preview model from 20th May 2025 (alias `gem25f`).
 
+### Updated
+- Updated the OllamaManagedSchema to accept URLs with and without protocol to allow endpoints with `https://` (previously only `http://` was supported).
+
 ### Fixed
 
 ## [0.74.3]
