@@ -51,7 +51,10 @@ export default defineConfig({
           { text: 'Extra Tools', items: [
             { text: 'Text Utilities', link: '/extra_tools/text_utilities_intro' },
             { text: 'AgentTools', link: '/extra_tools/agent_tools_intro' },
-            { text: 'APITools', link: '/extra_tools/api_tools_intro' }]
+            { text: 'RAGTools', link: '/extra_tools/rag_tools_intro' },
+            { text: 'RAGTools Migration', link: '/ragtools_migration' },
+            { text: 'APITools', link: '/extra_tools/api_tools_intro' },
+          ]
           },
         ],
       },
