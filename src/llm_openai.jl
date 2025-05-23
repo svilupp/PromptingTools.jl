@@ -745,7 +745,7 @@ end
 """
     aiclassify(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE;
         choices::AbstractVector{T} = ["true", "false", "unknown"],
-        model::AbstractString = MODEL_CHAT,
+        model::AbstractString = "gpt-4o-mini,
         api_kwargs::NamedTuple = NamedTuple(),
         token_ids_map::Union{Nothing, Dict{<:AbstractString, <:Integer}} = nothing,
         kwargs...) where {T <: Union{AbstractString, Tuple{<:AbstractString, <:AbstractString}}}
@@ -765,7 +765,7 @@ It uses Logit bias trick and limits the output to 1 token to force the model to 
 - `prompt_schema::AbstractOpenAISchema`: The schema for the prompt.
 - `prompt`: The prompt/statement to classify if it's a `String`. If it's a `Symbol`, it is expanded as a template via `render(schema,template)`. Eg, templates `:JudgeIsItTrue` or `:InputClassifier`
 - `choices::AbstractVector{T}`: The choices to be classified into. It can be a vector of strings or a vector of tuples, where the first element is the choice and the second is the description.
-- `model::AbstractString = MODEL_CHAT`: The model to use for classification. Can be an alias corresponding to a model ID defined in `MODEL_ALIASES`.
+- `model::AbstractString = "gpt-4o-mini"`: The model to use for classification. Can be an alias corresponding to a model ID defined in `MODEL_ALIASES`.
 - `api_kwargs::NamedTuple = NamedTuple()`: Additional keyword arguments for the API call.
 - `token_ids_map::Union{Nothing, Dict{<:AbstractString, <:Integer}} = nothing`: A dictionary mapping custom token IDs to their corresponding integer values. If `nothing`, it will use the default token IDs for the given model.
 - `kwargs`: Additional keyword arguments for the prompt template.
@@ -826,7 +826,7 @@ aiclassify(:JudgeIsItTrue;
 """
 function aiclassify(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE;
         choices::AbstractVector{T} = ["true", "false", "unknown"],
-        model::AbstractString = MODEL_CHAT,
+        model::AbstractString = "gpt-4o-mini",
         api_kwargs::NamedTuple = NamedTuple(),
         token_ids_map::Union{Nothing, Dict{<:AbstractString, <:Integer}} = nothing,
         kwargs...) where {T <:
