@@ -46,13 +46,11 @@ export default defineConfig({
             { text: 'Using AITemplates', link: '/examples/working_with_aitemplates' },
             { text: 'Local models with Ollama.ai', link: '/examples/working_with_ollama' },
             { text: 'Google AIStudio', link: '/examples/working_with_google_ai_studio' },
-            { text: 'Custom APIs (Mistral, Llama.cpp)', link: '/examples/working_with_custom_apis' },
-            { text: 'Building RAG Application', link: '/examples/building_RAG' }]
+            { text: 'Custom APIs (Mistral, Llama.cpp)', link: '/examples/working_with_custom_apis' }]
           },
           { text: 'Extra Tools', items: [
             { text: 'Text Utilities', link: '/extra_tools/text_utilities_intro' },
             { text: 'AgentTools', link: '/extra_tools/agent_tools_intro' },
-            { text: 'RAGTools', link: '/extra_tools/rag_tools_intro' },
             { text: 'APITools', link: '/extra_tools/api_tools_intro' }]
           },
         ],
@@ -70,7 +68,6 @@ export default defineConfig({
       { text: 'Reference', items: [
       { text: 'PromptingTools.jl', link: '/reference' },
       { text: 'Experimental Modules', link: '/reference_experimental' },
-      { text: 'RAGTools', link: '/reference_ragtools' },
       { text: 'AgentTools', link: '/reference_agenttools' },
       { text: 'APITools', link: '/reference_apitools' }]
       }
@@ -87,13 +84,11 @@ export default defineConfig({
             { text: 'Using AITemplates', link: '/examples/working_with_aitemplates' },
             { text: 'Local models with Ollama.ai', link: '/examples/working_with_ollama' },
             { text: 'Google AIStudio', link: '/examples/working_with_google_ai_studio' },
-            { text: 'Custom APIs (Mistral, Llama.cpp)', link: '/examples/working_with_custom_apis' },
-            { text: 'Building RAG Application', link: '/examples/building_RAG' }]
+            { text: 'Custom APIs (Mistral, Llama.cpp)', link: '/examples/working_with_custom_apis' }]
           },
           { text: 'Extra Tools', collapsed: true, items: [
             { text: 'Text Utilities', link: '/extra_tools/text_utilities_intro' },
             { text: 'AgentTools', link: '/extra_tools/agent_tools_intro' },
-            { text: 'RAGTools', link: '/extra_tools/rag_tools_intro' },
             { text: 'APITools', link: '/extra_tools/api_tools_intro' }]
           },
         ],
@@ -111,7 +106,6 @@ export default defineConfig({
       { text: 'Reference', collapsed: true, items: [
       { text: 'PromptingTools.jl', link: '/reference' },
       { text: 'Experimental Modules', link: '/reference_experimental' },
-      { text: 'RAGTools', link: '/reference_ragtools' },
       { text: 'AgentTools', link: '/reference_agenttools' },
       { text: 'APITools', link: '/reference_apitools' }]
         }

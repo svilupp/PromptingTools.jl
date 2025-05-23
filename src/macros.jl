@@ -33,10 +33,10 @@ result = ai"What is `1.23 * 100 + 1`?"gpt4t
 """
 macro ai_str(user_prompt, flags...)
     global CONV_HISTORY, MAX_HISTORY_LENGTH
-    model = isempty(flags) ? MODEL_CHAT : only(flags)
+    model = isempty(flags) ? :MODEL_CHAT : esc(only(flags))
     prompt = Meta.parse("\"$(escape_string(user_prompt))\"")
     quote
-        conv = aigenerate($(esc(prompt)); model = $(esc(model)), return_all = true)
+        conv = aigenerate($(esc(prompt)); model = $model, return_all = true)
         push_conversation!($(esc(CONV_HISTORY)), conv, $(esc(MAX_HISTORY_LENGTH)))
         last(conv)
     end
@@ -80,14 +80,14 @@ Ensure that the conversation history is not too long to maintain relevancy and c
 """
 macro ai!_str(user_prompt, flags...)
     global CONV_HISTORY
-    model = isempty(flags) ? MODEL_CHAT : only(flags)
+    model = isempty(flags) ? :MODEL_CHAT : esc(only(flags))
     prompt = Meta.parse("\"$(escape_string(user_prompt))\"")
     quote
         @assert !isempty($(esc(CONV_HISTORY))) "No conversation history found. Please use `ai\"\"` instead."
         # grab the last conversation
         old_conv = $(esc(CONV_HISTORY))[end]
         conv = aigenerate(vcat(old_conv, [UserMessage($(esc(prompt)))]);
-            model = $(esc(model)),
+            model = $model,
             return_all = true)
         # replace the last conversation with the new one
         $(esc(CONV_HISTORY))[end] = conv
@@ -116,11 +116,11 @@ m = aai"Say Hi!"gpt4;
 """
 macro aai_str(user_prompt, flags...)
     global CONV_HISTORY, MAX_HISTORY_LENGTH, CONV_HISTORY_LOCK
-    model = isempty(flags) ? MODEL_CHAT : only(flags)
+    model = isempty(flags) ? :MODEL_CHAT : esc(only(flags))
     prompt = Meta.parse("\"$(escape_string(user_prompt))\"")
     quote
         Threads.@spawn begin
-            conv = aigenerate($(esc(prompt)); model = $(esc(model)), return_all = true)
+            conv = aigenerate($(esc(prompt)); model = $model, return_all = true)
             lock($(esc(CONV_HISTORY_LOCK))) do
                 push_conversation!($(esc(CONV_HISTORY)), conv, $(esc(MAX_HISTORY_LENGTH)))
             end
@@ -132,7 +132,7 @@ end
 
 macro aai!_str(user_prompt, flags...)
     global CONV_HISTORY, CONV_HISTORY_LOCK
-    model = isempty(flags) ? MODEL_CHAT : only(flags)
+    model = isempty(flags) ? :MODEL_CHAT : esc(only(flags))
     prompt = Meta.parse("\"$(escape_string(user_prompt))\"")
     quote
         @assert !isempty($(esc(CONV_HISTORY))) "No conversation history found. Please use `aai\"\"` instead."
@@ -142,7 +142,7 @@ macro aai!_str(user_prompt, flags...)
 
             # send to AI
             conv = aigenerate(vcat(old_conv, [UserMessage($(esc(prompt)))]);
-                model = $(esc(model)),
+                model = $model,
                 return_all = true)
 
             # replace the last conversation with the new one

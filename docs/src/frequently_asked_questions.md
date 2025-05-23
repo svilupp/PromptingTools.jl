@@ -429,6 +429,27 @@ PT.load_templates!("templates")
 ```
 After the first run, we will remember the folder and you can simply call `PT.load_templates!()` to reload all the templates in the future!
 
+## What happened to RAGTools? Where did the RAG functionality go?
+
+RAG (Retrieval-Augmented Generation) functionality has been moved to a dedicated package called [RAGTools.jl](https://github.com/JuliaGenAI/RAGTools.jl) since PromptingTools v0.75.
+
+**Quick Migration:**
+1. Install RAGTools: `using Pkg; Pkg.add("RAGTools")`
+2. Change imports: `using RAGTools` (instead of `using PromptingTools.Experimental.RAGTools`)
+3. Everything else stays the same!
+
+**Why the change?**
+- **Focused Development**: RAGTools can evolve independently with RAG-specific features
+- **Lighter Dependencies**: PromptingTools.jl is now lighter without heavy RAG dependencies
+- **Better Ecosystem**: Centralized location for RAG contributions and discussions
+
+**Need Help?**
+- 📖 [Migrating from PromptingTools.Experimental.RAGTools to RAGTools.jl](@ref) - Step-by-step instructions with examples
+- 🔧 [RAG Tools Introduction](@ref) - Overview of capabilities and examples
+- 💬 [Julia Slack #generative-ai](https://julialang.slack.com/archives/C06G90C697X) - Community support
+
+The API is 100% compatible - you only need to change your imports!
+
 ## Do we have a RecursiveCharacterTextSplitter like Langchain?
 
 Yes, we do! Look for utility `recursive_spliter` (previously known as `split_by_length`). See its docstring for more information.

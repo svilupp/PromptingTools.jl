@@ -145,7 +145,7 @@ function get_preferences(key::String)
 end
 
 ## Load up GLOBALS
-global MODEL_CHAT::String = @load_preference("MODEL_CHAT", default="gpt-4o-mini")
+global MODEL_CHAT::String = @load_preference("MODEL_CHAT", default="gpt-4.1-mini")
 global MODEL_EMBEDDING::String = @load_preference("MODEL_EMBEDDING",
     default="text-embedding-3-small")
 global MODEL_IMAGE_GENERATION::String = @load_preference("MODEL_IMAGE_GENERATION",
@@ -447,9 +447,10 @@ aliases = merge(
         "claude" => "claude-3-7-sonnet-latest",
         "claude37" => "claude-3-7-sonnet-latest",
         "claude35" => "claude-3-5-sonnet-latest",
-        "claudeo" => "claude-3-opus-20240229",
-        "claudes" => "claude-3-7-sonnet-latest",
+        "claude4" => "claude-sonnet-4-20250514",
         "claudeh" => "claude-3-5-haiku-latest",
+        "claudes" => "claude-sonnet-4-20250514",
+        "claudeo" => "claude-opus-4-20250514",
         ## Groq
         "gllama3" => "llama-3.1-8b-instant",
         "gl3" => "llama-3.1-8b-instant",
@@ -521,7 +522,7 @@ aliases = merge(
         "gem20ft" => "gemini-2.0-flash-thinking-exp-01-21",
         "gemexp" => "gemini-exp-1206", # latest experimental model from December 2024,
         "gem25p" => "gemini-2.5-pro-preview-05-06",
-        "gem25f" => "gemini-2.5-flash-preview-04-17"
+        "gem25f" => "gemini-2.5-flash-preview-05-20"
     ),
     ## Load aliases from preferences as well
     @load_preference("MODEL_ALIASES", default=Dict{String, String}()))
@@ -1055,6 +1056,16 @@ registry = Dict{String, ModelSpec}(
         1.5e-5,
         7.5e-5,
         "Anthropic's latest and strongest model Claude 3 Opus. Max output 4096 tokens, 200K context. See details [here](https://docs.anthropic.com/claude/docs/models-overview)"),
+    "claude-sonnet-4-20250514" => ModelSpec("claude-sonnet-4-20250514",
+        AnthropicSchema(),
+        3e-6,
+        1.5e-5,
+        "Anthropic's Claude 4 Sonnet model. 200K context, 64K output. See details [here](https://docs.anthropic.com/claude/docs/models-overview)"),
+    "claude-opus-4-20250514" => ModelSpec("claude-opus-4-20250514",
+        AnthropicSchema(),
+        1.5e-5,
+        7.5e-5,
+        "Anthropic's Claude 4 Opus model. 200K context, 32K output. See details [here](https://docs.anthropic.com/claude/docs/models-overview)"),
     "claude-3-sonnet-20240229" => ModelSpec("claude-3-sonnet-20240229",
         AnthropicSchema(),
         3e-6,
@@ -1329,6 +1340,11 @@ registry = Dict{String, ModelSpec}(
         1.5e-7,
         3.5e-6,
         "Gemini 2.5 Flash Preview from April 2025. 1M context, 65K output. Price differs if you request thinking or not. See details [here](https://ai.google.dev/gemini-api/docs/models/experimental-models#use-an-experimental-model)."),
+    "gemini-2.5-flash-preview-05-20" => ModelSpec("gemini-2.5-flash-preview-05-20",
+        GoogleOpenAISchema(),
+        1.5e-7,
+        3.5e-6,
+        "Gemini 2.5 Flash Preview from May 2025. 1M context, 65K output. Price differs if you request thinking or not. See details [here](https://ai.google.dev/gemini-api/docs/models/experimental-models#use-an-experimental-model)."),
     "gemini-exp-1114" => ModelSpec("gemini-exp-1114",
         GoogleOpenAISchema(),
         1.25e-6,

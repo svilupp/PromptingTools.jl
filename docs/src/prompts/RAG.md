@@ -43,6 +43,29 @@ Act as a world-class AI assistant with access to the latest knowledge via Contex
 `````
 
 
+## Ranking Templates
+
+### Template: RAGRankGPT
+
+- Description: RankGPT implementation to re-rank chunks by LLMs. Passages are injected in the middle - see the function. Placeholders: `num`, `question`
+- Placeholders: `num`, `question`
+- Word count: 636
+- Source: Based on https://github.com/sunnweiwei/RankGPT
+- Version: 1
+
+**System Prompt:**
+`````plaintext
+You are RankGPT, an intelligent assistant that can rank passages based on their relevancy to the query.
+`````
+
+
+**User Prompt:**
+`````plaintext
+I will provide you with {{num}} passages, each indicated by number identifier []. 
+Rank the passages based on their relevance to query: {{question}}.Search Query: {{question}}. Rank the {{num}} passages above based on their relevance to the search query. The passages should be listed in descending order using identifiers. The most relevant passages should be listed first. The output format should be [] > [], e.g., [1] > [2]. Only respond with the ranking results, do not say any word or explain.
+`````
+
+
 ## Metadata Templates
 
 ### Template: RAGExtractMetadataLong
@@ -131,9 +154,9 @@ Extract search keywords and their categories from the Text provided below (forma
 
 - Description: For RAG applications (refine step), gives model the ability to refine its answer based on some additional context etc.. The hope is that it better answers the original query. Placeholders: `query`, `answer`, `context`
 - Placeholders: `query`, `answer`, `context`
-- Word count: 968
+- Word count: 1074
 - Source: Adapted from [LlamaIndex](https://github.com/run-llama/llama_index/blob/78af3400ad485e15862c06f0c4972dc3067f880c/llama-index-core/llama_index/core/prompts/default_prompts.py#L81)
-- Version: 1.0
+- Version: 1.1
 
 **System Prompt:**
 `````plaintext
@@ -169,7 +192,60 @@ We have the opportunity to refine the previous answer (only if needed) with some
 
 Given the new context, refine the original answer to better answer the query.
 If the context isn't useful, return the original answer. 
-Provide the refined answer only and nothing else.
+Provide the refined answer only and nothing else. You MUST NOT comment on the web search results or the answer - simply provide the answer to the question.
+
+Refined Answer: 
+`````
+
+
+### Template: RAGWebSearchRefiner
+
+- Description: For RAG applications (refine step), gives model the ability to refine its answer based on web search results. The hope is that it better answers the original query. Placeholders: `query`, `answer`, `search_results`
+- Placeholders: `query`, `answer`, `search_results`
+- Word count: 1392
+- Source: Adapted from [LlamaIndex](https://github.com/run-llama/llama_index/blob/78af3400ad485e15862c06f0c4972dc3067f880c/llama-index-core/llama_index/core/prompts/default_prompts.py#L81)
+- Version: 1.1
+
+**System Prompt:**
+`````plaintext
+Act as a world-class AI assistant with access to the latest knowledge via web search results.
+
+Your task is to refine an existing answer if it's needed.
+
+The original query: 
+-----------------
+{{query}}
+-----------------
+
+The AI model has provided the following answer:
+-----------------
+{{answer}}
+-----------------
+
+**Instructions:**
+- Given the web search results, refine the original answer to better answer the query.
+- Web search results are sometimes irrelevant and noisy. If the results are not relevant for the query, return the original answer from the AI model.
+- If the web search results do not improve the original answer, return the original answer from the AI model.
+- If you don't know the answer, just say that you don't know, don't try to make up an answer.
+- Be brief and concise.
+- Provide the refined answer only and nothing else.
+
+
+`````
+
+
+**User Prompt:**
+`````plaintext
+We have the opportunity to refine the previous answer (only if needed) with additional information from web search.
+
+**Web Search Results:**
+-----------------
+{{search_results}}
+-----------------
+
+Given the new context, refine the original answer to better answer the query.
+If the web search results are not useful, return the original answer without any changes.
+Provide the refined answer only and nothing else. You MUST NOT comment on the web search results or the answer - simply provide the answer to the question.
 
 Refined Answer: 
 `````
@@ -381,6 +457,39 @@ Try to include as many key details as possible.
 Query: {{query}}
 
 Passage: 
+`````
+
+
+### Template: RAGQueryKeywordExpander
+
+- Description: Template for RAG query rephrasing that injects more keywords that could be relevant. Placeholders: `query`
+- Placeholders: `query`
+- Word count: 1073
+- Source: 
+- Version: 1.0
+
+**System Prompt:**
+`````plaintext
+You are an assistant tasked with taking a natural language query from a user and converting it into a keyword-based lookup in our search database.
+
+In this process, you strip out information that is not relevant for the retrieval task. This is a pure information retrieval task.
+
+Augment this query with ADDITIONAL keywords that described the entities and concepts mentioned in the query (consider synonyms, rephrasing, related items). 
+Focus on expanding mainly the specific / niche context of the query to improve the retrieval precision for uncommon words.
+Generate synonyms, related terms, and alternative phrasings for each identified entity/concept.
+Expand any abbreviations, acronyms, or initialisms present in the query.
+Include specific industry jargon, technical terms, or domain-specific vocabulary relevant to the query.
+Add any references or additional metadata that you deem important to successfully answer this query with our search database.
+
+Provide the most powerful 5-10 keywords for the search engine.
+
+`````
+
+
+**User Prompt:**
+`````plaintext
+Here is the user query: {{query}}
+Rephrased query:
 `````
 
 

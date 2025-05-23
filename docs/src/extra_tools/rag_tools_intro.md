@@ -1,24 +1,24 @@
-```@meta
-CurrentModule = PromptingTools.Experimental.RAGTools
-```
-
 # RAG Tools Introduction
 
-`RAGTools` is an experimental module that provides a set of utilities for building Retrieval-Augmented Generation (RAG) applications, ie, applications that generate answers by combining knowledge of the underlying AI model with the information from the user's knowledge base.
+> [!IMPORTANT]  
+> **RAGTools has moved to a separate package since PromptingTools v0.75!**  
+> This documentation demonstrates the RAG ecosystem but all functionality is now in [RAGTools.jl](https://github.com/JuliaGenAI/RAGTools.jl). See our [Migration Guide](../ragtools_migration.md) for details.
 
-It is designed to be powerful and flexible, allowing you to build RAG applications with minimal effort. Extend any step of the pipeline with your own custom code (see the [RAG Interface](@ref) section), or use the provided defaults to get started quickly.
+`RAGTools` provides a set of utilities for building Retrieval-Augmented Generation (RAG) applications - applications that generate answers by combining knowledge of the underlying AI model with information from your knowledge base.
 
-Once the API stabilizes (near term), we hope to carve it out into a separate package. 
+The examples below showcase the powerful and flexible RAG ecosystem available in Julia. You can extend any step of the pipeline with your own custom code, or use the provided defaults to get started quickly. 
 
 Import the module as follows:
 
 ```julia
-# required dependencies to load the necessary extensions!!!
-using LinearAlgebra, SparseArrays, Unicode, Snowball
-using PromptingTools.Experimental.RAGTools
-# to access unexported functionality
-const RT = PromptingTools.Experimental.RAGTools
+# Import the dedicated RAGTools package 
+using RAGTools
+# For accessing unexported functionality
+const RT = RAGTools
 ```
+
+> [!NOTE]  
+> Since PromptingTools v0.75, RAGTools is a separate package. Install it with `using Pkg; Pkg.add("RAGTools")`. The API remains identical - only the import changes!
 
 
 ## Highlights
@@ -156,7 +156,11 @@ See `?print_html` for the HTML version of the pretty-printing and styling system
 
 Want more?
 
-See `examples/building_RAG.jl` for one more example.
+See `examples/building_RAG.jl` for a comprehensive example. Note that examples now use `using RAGTools` instead of the experimental module.
+
+> [!TIP]  
+> **Migrating from PromptingTools.Experimental.RAGTools?**  
+> Check out our detailed [Migration Guide](../ragtools_migration.md) with step-by-step instructions and examples.
 
 ## RAG Interface
 
@@ -298,14 +302,3 @@ rephrase(SimpleRephraser(), question; model="custom", template = :RAGQueryHyDE, 
 Note that all generation steps are mutating the `RAGResult` object.
 
 See more details and corresponding functions and types in `src/Experimental/RAGTools/rag_interface.jl`.
-
-## References
-
-```@docs; canonical=false
-build_index
-airag
-retrieve
-generate!
-annotate_support
-build_qa_evals
-```

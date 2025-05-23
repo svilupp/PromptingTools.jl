@@ -5,7 +5,6 @@ using Statistics
 using Dates: now
 using Test, Pkg, Random
 const PT = PromptingTools
-using Snowball, FlashRank
 using Aqua
 
 @testset "Code quality (Aqua.jl)" begin
@@ -58,7 +57,6 @@ end
 
 ## Run experimental
 @testset "Experimental" begin
-    include("Experimental/RAGTools/runtests.jl")
     include("Experimental/AgentTools/runtests.jl")
     include("Experimental/APITools/runtests.jl")
 end

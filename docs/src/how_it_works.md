@@ -145,7 +145,7 @@ msg = aigenerate(:AssistantAsk; ask="What is the capital of France?")
 msg = aigenerate(PT.OpenAISchema(), PT.AITemplate(:AssistantAsk); ask="What is the capital of France?", model="gpt3t")
 ```
 
-There is no `model` provided, so we use the default `PT.MODEL_CHAT` (effectively GPT3.5-Turbo). Then we look it up in `PT.MDOEL_REGISTRY` and use the associated schema for it (`OpenAISchema` in this case).
+There is no `model` provided, so we use the default `PT.MODEL_CHAT` (effectively GPT-4o-mini). Then we look it up in `PT.MDOEL_REGISTRY` and use the associated schema for it (`OpenAISchema` in this case).
 
 The next step is to render the template, replace the placeholders and render it for the OpenAI model.
 

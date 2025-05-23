@@ -8,7 +8,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Updated
+
+## [0.75.0]
+
+###BREAKING CHANGES:
+- Removed the `RAGTools` module. Please use the standalone [RAGTools.jl](https://github.com/JuliaGenAI/RAGTools.jl) package. See the migration guide in the docs & FAQ.
+- Default chat model changed to GPT 4.1 mini (previously it was GPT 4o mini, variable `PromptingTools.MODEL_CHAT`).
+
+### Added
+- Added Claude 4 models (`claude-sonnet-4-20250514`, `claude-opus-4-20250514`) and set them as new defaults for aliases `claudeo` and `claudes` (Added specs for the new Claude 4 text editor as a ToolRef `:str_replace_based_edit_tool`).
+- Added a Deepwiki.com badge for AI-powered repo documentation.
+- Added Gemini 2.5 Flash Preview model from 20th May 2025 (alias `gem25f`).
+
+### Updated
+- Updated the OllamaManagedSchema to accept URLs with and without protocol to allow endpoints with `https://` (previously only `http://` was supported).
+- Removed the `RAGTools` module.
+
 ### Fixed
+- Fixed `@ai_str` macro to keep dynamic reference to your default model (`PromptingTools.MODEL_CHAT`). Prevents "baking in" the default model if PromptingTools is precompiled by another package.
 
 ## [0.74.3]
 
