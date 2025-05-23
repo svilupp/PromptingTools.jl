@@ -20,27 +20,18 @@ StreamCallbacks = "c1b9e933-98a0-46fc-8ea7-3b58b195fb0a"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [weakdeps]
-FlashRank = "22cc3f58-1757-4700-bb45-2032706e5a8d"
 GoogleGenAI = "903d41d1-eaca-47dd-943b-fee3930375ab"
-LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Markdown = "d6f4376e-aef5-505a-96c1-9c027394607a"
-Snowball = "fb8f903a-0164-4e73-9ffe-431110250c3b"
-SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
-Unicode = "4ec0a83e-493e-50e2-b9ac-8f72acf5a8f5"
 
 [extensions]
-FlashRankPromptingToolsExt = ["FlashRank"]
 GoogleGenAIPromptingToolsExt = ["GoogleGenAI"]
 MarkdownPromptingToolsExt = ["Markdown"]
-RAGToolsExperimentalExt = ["SparseArrays", "LinearAlgebra", "Unicode"]
-SnowballPromptingToolsExt = ["Snowball"]
 
 [compat]
 AbstractTrees = "0.4"
 Aqua = "0.7"
 Base64 = "<0.0.1, 1"
 Dates = "<0.0.1, 1"
-FlashRank = "0.4"
 GoogleGenAI = "0.3"
 HTTP = "1.10.8"
 JSON3 = "1"
@@ -57,6 +48,7 @@ SparseArrays = "<0.0.1, 1"
 Statistics = "<0.0.1, 1"
 StreamCallbacks = "0.6"
 Test = "<0.0.1, 1"
+Unicode = "<0.0.1, 1"
 julia = "1.9, 1.10"
 
 [extras]
@@ -67,4 +59,4 @@ Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 Unicode = "4ec0a83e-493e-50e2-b9ac-8f72acf5a8f5"
 
 [targets]
-test = ["Aqua", "FlashRank", "SparseArrays", "Statistics", "LinearAlgebra", "Markdown", "Snowball", "Unicode"]
+test = ["Aqua", "SparseArrays", "Statistics", "LinearAlgebra", "Markdown", "Unicode"]

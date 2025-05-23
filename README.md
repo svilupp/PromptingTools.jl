@@ -13,6 +13,10 @@ Streamline your life using PromptingTools.jl, the Julia package that simplifies 
 
 PromptingTools.jl is not meant for building large-scale systems. It's meant to be the go-to tool in your global environment that will save you 20 minutes every day!
 
+> [!IMPORTANT]  
+> **RAGTools Migration Notice**  
+> RAG (Retrieval-Augmented Generation) functionality has moved to the dedicated [RAGTools.jl](https://github.com/JuliaGenAI/RAGTools.jl) package. If you're using `PromptingTools.Experimental.RAGTools`, please migrate to `RAGTools.jl`. The API remains the same - just change your imports from `using PromptingTools.Experimental.RAGTools` to `using RAGTools`.
+
 > [!TIP]
 > Jump to the **[docs](https://svilupp.github.io/PromptingTools.jl/dev/)**
 
@@ -174,14 +178,11 @@ Or said differently, the `AICall` struct and all its flavors (`AIGenerate`, ...)
 
 If you would like a powerful auto-fixing workflow, you can use `airetry!`, which leverages Monte-Carlo tree search to pick the optimal trajectory of conversation based on your requirements.
 
-**Experimental: RAGTools**
+**RAGTools**
 
-Lastly, we provide a set of tools to build RAG applications (Retrieve, Answer, Generate). 
-
-It can be as simple as two calls: `build_index` and `airag` (Retrieve, Answer, Generate). 
-
-If you then use pretty-printing with `PromptingTools.pprint`, we highlight the generated text vs text likely sourced from the context and we score how strongly is the generated answer supported by the context.
-In addition, we annotate each generated chunk with a reference to which source document it likely came from (including the confidence score between 0 and 1).
+Retrieval-Augmented Generation tools have moved to the dedicated
+[RAGTools.jl](https://github.com/JuliaGenAI/RAGTools.jl) package. Please update
+your workflow to depend on that package for RAG functionality.
 
 ### Seamless Integration Into Your Workflow
 Google search is great, but it's a context switch. You often have to open a few pages and read through the discussion to find the answer you need. Same with the ChatGPT website.
