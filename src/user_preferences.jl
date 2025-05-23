@@ -444,7 +444,7 @@ aliases = merge(
         "ministral3" => "ministral-3b-latest",
         "ministral8" => "ministral-8b-latest",
         ## Default to Sonnet as a the medium offering
-        "claude" => "claude-3-7-sonnet-latest",
+        "claude" => "claude-sonnet-4-20250514",
         "claude37" => "claude-3-7-sonnet-latest",
         "claude35" => "claude-3-5-sonnet-latest",
         "claude4" => "claude-sonnet-4-20250514",

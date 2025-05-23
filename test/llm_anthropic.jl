@@ -388,16 +388,37 @@ end
     @test rendered["type"] == "bash_20241022"
     @test rendered["name"] == "bash"
 
+    # Test code execution tool rendering
+    code_exec_tool = ToolRef(ref = :code_execution)
+    rendered = render(schema, code_exec_tool)
+    @test rendered["type"] == "code_execution_20250522"
+    @test rendered["name"] == "code_execution"
+
+    # Test web search tool rendering
+    web_search_tool = ToolRef(ref = :web_search)
+    rendered = render(schema, web_search_tool)
+    @test rendered["type"] == "web_search_20250305"
+    @test rendered["name"] == "web_search"
+
+    # Test web search tool with custom max_uses
+    web_search_tool_custom = ToolRef(ref = :web_search, extras = Dict("max_uses" => 10))
+    rendered = render(schema, web_search_tool_custom)
+    @test rendered["type"] == "web_search_20250305"
+    @test rendered["name"] == "web_search"
+    @test rendered["max_uses"] == 10
+
     # Test invalid tool reference
     @test_throws ArgumentError render(schema, ToolRef(ref = :invalid_tool))
 
     # Test rendering multiple tool refs
-    tools = [computer_tool, editor_tool, bash_tool]
+    tools = [computer_tool, editor_tool, bash_tool, code_exec_tool, web_search_tool]
     rendered = render(schema, tools)
-    @test length(rendered) == 3
+    @test length(rendered) == 5
     @test rendered[1]["name"] == "computer"
     @test rendered[2]["name"] == "str_replace_editor"
     @test rendered[3]["name"] == "bash"
+    @test rendered[4]["name"] == "code_execution"
+    @test rendered[5]["name"] == "web_search"
 end
 
 @testset "anthropic_extra_headers" begin
@@ -451,7 +472,9 @@ end
     ]
 
     # Test all betas
-    @test anthropic_extra_headers(betas = BETA_HEADERS_ANTHROPIC) == ["anthropic-version" => "2023-06-01", "anthropic-beta" => "tools-2024-04-04,prompt-caching-2024-07-31,max-tokens-3-5-sonnet-2024-07-15,output-128k-2025-02-19,computer-use-2024-10-22"]
+    @test anthropic_extra_headers(betas = BETA_HEADERS_ANTHROPIC) ==
+          ["anthropic-version" => "2023-06-01",
+        "anthropic-beta" => "tools-2024-04-04,prompt-caching-2024-07-31,max-tokens-3-5-sonnet-2024-07-15,output-128k-2025-02-19,computer-use-2024-10-22"]
 
     # Test invalid beta
     @test_throws AssertionError anthropic_extra_headers(betas = [:invalid_beta])
@@ -830,7 +853,7 @@ end
         max_tokens = 100,
         thinking = Dict(:type => "enabled", :budget_tokens => 200)
     )
-    
+
     # Set up a dummy response for the test echo schema
     dummy_response = Dict(
         "content" => [Dict("text" => "Test response", "type" => "text")],
@@ -841,7 +864,7 @@ end
         "stop_reason" => "end_turn",
         "usage" => Dict("input_tokens" => 10, "output_tokens" => 20)
     )
-    
+
     # Test that no error is thrown when thinking budget is equal to max_tokens
     try
         PromptingTools.anthropic_api(
@@ -849,7 +872,8 @@ end
                 response = dummy_response,
                 status = 200
             ),
-            [Dict("role" => "user", "content" => [Dict("type" => "text", "text" => "Hello")])];
+            [Dict("role" => "user",
+                "content" => [Dict("type" => "text", "text" => "Hello")])];
             model = "claude-3-haiku-20240307",
             max_tokens = 100,
             thinking = Dict(:type => "enabled", :budget_tokens => 100)
@@ -858,7 +882,7 @@ end
     catch e
         @test false  # Should not reach here
     end
-    
+
     # Test that no error is thrown when thinking budget is less than max_tokens
     try
         PromptingTools.anthropic_api(
@@ -866,7 +890,8 @@ end
                 response = dummy_response,
                 status = 200
             ),
-            [Dict("role" => "user", "content" => [Dict("type" => "text", "text" => "Hello")])];
+            [Dict("role" => "user",
+                "content" => [Dict("type" => "text", "text" => "Hello")])];
             model = "claude-3-haiku-20240307",
             max_tokens = 100,
             thinking = Dict(:type => "enabled", :budget_tokens => 50)
