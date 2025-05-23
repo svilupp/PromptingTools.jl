@@ -2,7 +2,7 @@
 
 > [!IMPORTANT]  
 > **RAGTools has moved to a separate package since PromptingTools v0.75!**  
-> This documentation demonstrates the RAG ecosystem but all functionality is now in [RAGTools.jl](https://github.com/JuliaGenAI/RAGTools.jl). See our [Migration Guide](ragtools_migration.md) for details.
+> This documentation demonstrates the RAG ecosystem but all functionality is now in [RAGTools.jl](https://github.com/JuliaGenAI/RAGTools.jl). See our [Migration Guide](../ragtools_migration.md) for details.
 
 `RAGTools` provides a set of utilities for building Retrieval-Augmented Generation (RAG) applications - applications that generate answers by combining knowledge of the underlying AI model with information from your knowledge base.
 
@@ -160,7 +160,7 @@ See `examples/building_RAG.jl` for a comprehensive example. Note that examples n
 
 > [!TIP]  
 > **Migrating from PromptingTools.Experimental.RAGTools?**  
-> Check out our detailed [Migration Guide](ragtools_migration.md) with step-by-step instructions and examples.
+> Check out our detailed [Migration Guide](../ragtools_migration.md) with step-by-step instructions and examples.
 
 ## RAG Interface
 

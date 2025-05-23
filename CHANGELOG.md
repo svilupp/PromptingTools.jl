@@ -6,8 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+### Updated
+
+## [0.75.0]
+
 ###BREAKING CHANGES:
 - Removed the `RAGTools` module. Please use the standalone [RAGTools.jl](https://github.com/JuliaGenAI/RAGTools.jl) package. See the migration guide in the docs & FAQ.
+- Default chat model changed to GPT 4.1 mini (previously it was GPT 4o mini, variable `PromptingTools.MODEL_CHAT`).
 
 ### Added
 - Added Claude 4 models (`claude-sonnet-4-20250514`, `claude-opus-4-20250514`) and set them as new defaults for aliases `claudeo` and `claudes` (Added specs for the new Claude 4 text editor as a ToolRef `:str_replace_based_edit_tool`).
@@ -20,10 +27,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Fixed `@ai_str` macro to keep dynamic reference to your default model (`PromptingTools.MODEL_CHAT`). Prevents "baking in" the default model if PromptingTools is precompiled by another package.
-
-### Changed
-- Experimental `RAGTools` module has been removed. Please use the
-  standalone [RAGTools.jl](https://github.com/JuliaGenAI/RAGTools.jl) package.
 
 ## [0.74.3]
 

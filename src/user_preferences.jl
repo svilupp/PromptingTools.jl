@@ -145,7 +145,7 @@ function get_preferences(key::String)
 end
 
 ## Load up GLOBALS
-global MODEL_CHAT::String = @load_preference("MODEL_CHAT", default="gpt-4o-mini")
+global MODEL_CHAT::String = @load_preference("MODEL_CHAT", default="gpt-4.1-mini")
 global MODEL_EMBEDDING::String = @load_preference("MODEL_EMBEDDING",
     default="text-embedding-3-small")
 global MODEL_IMAGE_GENERATION::String = @load_preference("MODEL_IMAGE_GENERATION",
