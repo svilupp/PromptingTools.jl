@@ -64,7 +64,7 @@ end
         endpoint::String = "generate",
         model::String = "llama2", http_kwargs::NamedTuple = NamedTuple(),
         stream::Bool = false,
-        url::String = "localhost", port::Int = 11434,
+        url::String = "http://localhost", port::Int = 11434,
         kwargs...)
 
 Simple wrapper for a call to Ollama API.
@@ -78,7 +78,7 @@ Simple wrapper for a call to Ollama API.
 - `http_kwargs::NamedTuple`: Additional keyword arguments for the HTTP request. Defaults to empty `NamedTuple`.
 - `stream`: A boolean indicating whether to stream the response. Defaults to `false`.
 - `streamcallback::Any`: A callback function to handle streaming responses. Can be simply `stdout` or a `StreamCallback` object. See `?StreamCallback` for details.
-- `url`: The URL of the Ollama API. Defaults to "localhost".
+- `url`: The URL of the Ollama API. Defaults to "http://localhost". If no protocol is specified, "http://" will be automatically added.
 - `port`: The port of the Ollama API. Defaults to 11434.
 - `kwargs`: Prompt variables to be used to fill the prompt/template
 """
@@ -91,7 +91,7 @@ function ollama_api(
         model::String = "llama2", http_kwargs::NamedTuple = NamedTuple(),
         streamcallback::Any = nothing,
         stream::Bool = false,
-        url::String = "localhost", port::Int = 11434,
+        url::String = "http://localhost", port::Int = 11434,
         kwargs...)
     @assert endpoint in ["chat", "generate", "embeddings"] "Only 'chat', 'generate' and 'embeddings' Ollama endpoints are supported."
     ##
@@ -106,7 +106,7 @@ function ollama_api(
         body["system"] = system
     end
     # eg, http://localhost:11434/api/generate
-    api_url = string("http://", url, ":", port, "/api/", endpoint)
+    api_url = string(ensure_http_prefix(url), ":", port, "/api/", endpoint)
     if !isnothing(streamcallback)
         ## Note: Works only for OllamaSchema, not OllamaManagedSchema
         streamcallback, new_kwargs = configure_callback!(
