@@ -710,3 +710,31 @@ function extract_image_attributes(image_url::AbstractString)::Tuple{String, Stri
         throw(ArgumentError("Invalid data URL format"))
     end
 end
+
+"""
+    ensure_http_prefix(url::AbstractString) -> String
+
+Ensures that a URL has an HTTP or HTTPS protocol prefix. If the URL already starts with 
+"http://" or "https://", it is returned unchanged. Otherwise, "http://" is prepended.
+
+# Arguments
+- `url::AbstractString`: The URL to check and potentially modify.
+
+# Returns
+`String`: The URL with an appropriate protocol prefix.
+
+# Examples
+```julia
+ensure_http_prefix("localhost:8080")        # "http://localhost:8080"
+ensure_http_prefix("example.com")           # "http://example.com"
+ensure_http_prefix("http://localhost")      # "http://localhost"
+ensure_http_prefix("https://example.com")   # "https://example.com"
+```
+"""
+function ensure_http_prefix(url::AbstractString)::String
+    if startswith(url, "http://") || startswith(url, "https://")
+        return String(url)
+    else
+        return "http://" * url
+    end
+end
