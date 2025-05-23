@@ -3,12 +3,12 @@
 # This file contains examples of how to use FlashRank rankers.
 #
 # First, let's import the package and define a helper link for calling un-exported functions:
-using LinearAlgebra, SparseArrays, Unicode # imports required for full PT functionality
 using FlashRank
 using PromptingTools
 const PT = PromptingTools
-using PromptingTools.Experimental.RAGTools
-const RT = PromptingTools.Experimental.RAGTools
+# Note: RAGTools has been moved to a dedicated package RAGTools.jl
+using RAGTools
+const RT = RAGTools
 
 # Enable model downloading, otherwise you always have to approve it
 # see https://www.oxinabox.net/DataDeps.jl/dev/z10-for-end-users/

@@ -13,6 +13,10 @@ Streamline your life using PromptingTools.jl, the Julia package that simplifies 
 
 PromptingTools.jl is not meant for building large-scale systems. It's meant to be the go-to tool in your global environment that will save you 20 minutes every day!
 
+> [!IMPORTANT]  
+> **RAGTools Migration Notice**  
+> RAG (Retrieval-Augmented Generation) functionality has moved to the dedicated [RAGTools.jl](https://github.com/JuliaGenAI/RAGTools.jl) package. If you're using `PromptingTools.Experimental.RAGTools`, please migrate to `RAGTools.jl`. The API remains the same - just change your imports from `using PromptingTools.Experimental.RAGTools` to `using RAGTools`.
+
 > [!TIP]
 > Jump to the **[docs](https://svilupp.github.io/PromptingTools.jl/dev/)**
 
