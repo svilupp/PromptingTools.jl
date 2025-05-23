@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed the `RAGTools` module.
 
 ### Fixed
+- Fixed `@ai_str` macro to keep dynamic reference to your default model (`PromptingTools.MODEL_CHAT`). Prevents "baking in" the default model if PromptingTools is precompiled by another package.
 
 ### Changed
 - Experimental `RAGTools` module has been removed. Please use the
