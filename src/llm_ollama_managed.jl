@@ -106,7 +106,7 @@ function ollama_api(
         body["system"] = system
     end
     # eg, http://localhost:11434/api/generate
-    api_url = string("http://", url, ":", port, "/api/", endpoint)
+    api_url = string(url, ":", port, "/api/", endpoint)
     if !isnothing(streamcallback)
         ## Note: Works only for OllamaSchema, not OllamaManagedSchema
         streamcallback, new_kwargs = configure_callback!(
