@@ -36,6 +36,7 @@ GoogleGenAI = "0.3"
 HTTP = "1.10.8"
 JSON3 = "1"
 Logging = "<0.0.1, 1"
+LinearAlgebra = "<0.0.1, 1"
 Markdown = "<0.0.1, 1"
 OpenAI = "0.9"
 Pkg = "<0.0.1, 1"
@@ -43,9 +44,11 @@ PrecompileTools = "1"
 Preferences = "1"
 REPL = "<0.0.1, 1"
 Random = "<0.0.1, 1"
+SparseArrays = "<0.0.1, 1"
 Statistics = "<0.0.1, 1"
 StreamCallbacks = "0.6"
 Test = "<0.0.1, 1"
+Unicode = "<0.0.1, 1"
 julia = "1.9, 1.10"
 
 [extras]
@@ -56,4 +59,4 @@ Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 Unicode = "4ec0a83e-493e-50e2-b9ac-8f72acf5a8f5"
 
 [targets]
-test = ["Aqua", "FlashRank", "SparseArrays", "Statistics", "LinearAlgebra", "Markdown", "Snowball", "Unicode"]
+test = ["Aqua", "SparseArrays", "Statistics", "LinearAlgebra", "Markdown", "Unicode"]

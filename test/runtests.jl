@@ -5,7 +5,6 @@ using Statistics
 using Dates: now
 using Test, Pkg, Random
 const PT = PromptingTools
-using Snowball, FlashRank
 using Aqua
 
 @testset "Code quality (Aqua.jl)" begin
