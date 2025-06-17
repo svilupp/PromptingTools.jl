@@ -517,8 +517,9 @@ function aigenerate(
             conv_rendered.system, endpoint = "messages", model = model_id,
             streamcallback, http_kwargs, cache, betas,
             api_kwargs...)
-        tokens_prompt = get(resp.response[:usage], :input_tokens, 0)
-        tokens_completion = get(resp.response[:usage], :output_tokens, 0)
+        usage = get(resp.response, :usage, Dict{Symbol,Any}())
+        tokens_prompt = get(usage, :input_tokens, 0)
+        tokens_completion = get(usage, :output_tokens, 0)
         content = mapreduce(x -> get(x, :text, ""), *, resp.response[:content]) |> strip
         ## add aiprefill to the content
         if !isnothing(aiprefill) && !isempty(aiprefill)
@@ -528,10 +529,10 @@ function aigenerate(
         end
         ## Build metadata
         extras = Dict{Symbol, Any}()
-        haskey(resp.response[:usage], :cache_creation_input_tokens) &&
-            (extras[:cache_creation_input_tokens] = resp.response[:usage][:cache_creation_input_tokens])
-        haskey(resp.response[:usage], :cache_read_input_tokens) &&
-            (extras[:cache_read_input_tokens] = resp.response[:usage][:cache_read_input_tokens])
+        haskey(usage, :cache_creation_input_tokens) &&
+            (extras[:cache_creation_input_tokens] = usage[:cache_creation_input_tokens])
+        haskey(usage, :cache_read_input_tokens) &&
+            (extras[:cache_read_input_tokens] = usage[:cache_read_input_tokens])
         ## Build the message
         msg = AIMessage(; content,
             status = Int(resp.status),
@@ -779,8 +780,9 @@ function aiextract(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMP
             prompt_schema, conv_rendered.conversation; api_key,
             conv_rendered.system, endpoint = "messages", model = model_id, cache, http_kwargs, betas,
             api_kwargs...)
-        tokens_prompt = get(resp.response[:usage], :input_tokens, 0)
-        tokens_completion = get(resp.response[:usage], :output_tokens, 0)
+        usage = get(resp.response, :usage, Dict{Symbol,Any}())
+        tokens_prompt = get(usage, :input_tokens, 0)
+        tokens_completion = get(usage, :output_tokens, 0)
         finish_reason = get(resp.response, :stop_reason, nothing)
         content = if finish_reason == "tool_use"
             tool_array = [parse_tool(tool_map[tool_use[:name]], tool_use[:input])
@@ -795,10 +797,10 @@ function aiextract(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMP
         end
         ## Build metadata
         extras = Dict{Symbol, Any}()
-        haskey(resp.response[:usage], :cache_creation_input_tokens) &&
-            (extras[:cache_creation_input_tokens] = resp.response[:usage][:cache_creation_input_tokens])
-        haskey(resp.response[:usage], :cache_read_input_tokens) &&
-            (extras[:cache_read_input_tokens] = resp.response[:usage][:cache_read_input_tokens])
+        haskey(usage, :cache_creation_input_tokens) &&
+            (extras[:cache_creation_input_tokens] = usage[:cache_creation_input_tokens])
+        haskey(usage, :cache_read_input_tokens) &&
+            (extras[:cache_read_input_tokens] = usage[:cache_read_input_tokens])
         ## Build data message
         msg = DataMessage(; content,
             status = Int(resp.status),
@@ -988,8 +990,9 @@ function aitools(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMPT_
             prompt_schema, conv_rendered.conversation; api_key,
             conv_rendered.system, endpoint = "messages", model = model_id, cache, http_kwargs, betas,
             api_kwargs...)
-        tokens_prompt = get(resp.response[:usage], :input_tokens, 0)
-        tokens_completion = get(resp.response[:usage], :output_tokens, 0)
+        usage = get(resp.response, :usage, Dict{Symbol,Any}())
+        tokens_prompt = get(usage, :input_tokens, 0)
+        tokens_completion = get(usage, :output_tokens, 0)
         finish_reason = get(resp.response, :stop_reason, nothing)
         content_str = mapreduce(x -> get(x, :text, ""), *,
             filter(x -> x[:type] != "tool_use", resp.response[:content]), init = "") |>
@@ -1007,10 +1010,10 @@ function aitools(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMPT_
         end
         ## Build metadata
         extras = Dict{Symbol, Any}()
-        haskey(resp.response[:usage], :cache_creation_input_tokens) &&
-            (extras[:cache_creation_input_tokens] = resp.response[:usage][:cache_creation_input_tokens])
-        haskey(resp.response[:usage], :cache_read_input_tokens) &&
-            (extras[:cache_read_input_tokens] = resp.response[:usage][:cache_read_input_tokens])
+        haskey(usage, :cache_creation_input_tokens) &&
+            (extras[:cache_creation_input_tokens] = usage[:cache_creation_input_tokens])
+        haskey(usage, :cache_read_input_tokens) &&
+            (extras[:cache_read_input_tokens] = usage[:cache_read_input_tokens])
         length(tools_array) > 0 && (extras[:tool_calls] = tools_array)
         extras[:content] = content_str
         ## Build  message
