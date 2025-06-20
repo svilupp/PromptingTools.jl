@@ -712,7 +712,9 @@ You can get your API key from OpenAI by signing up for an account and accessing 
 1. Create an account with [OpenAI](https://platform.openai.com/signup)
 2. Go to [API Key page](https://platform.openai.com/account/api-keys)
 3. Click on “Create new secret key”
-  !!! Do not share it with anyone and do NOT save it to any files that get synced online.
+
+!!! danger
+  Do not share it with anyone and do NOT save it to any files that get synced online.
 
 Resources:
 - [OpenAI Documentation](https://platform.openai.com/docs/quickstart?context=python)
