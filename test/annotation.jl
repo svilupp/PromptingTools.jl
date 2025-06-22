@@ -53,10 +53,10 @@ using PromptingTools: AnnotationMessage, SystemMessage, TracerMessage, UserMessa
 
         # Test Google Schema
         rendered = render(GoogleSchema(), messages)
-        @test length(rendered) == 2  # Google schema combines system message with first user message
-        @test all(msg[:role] in ["user", "model"] for msg in rendered)  # Google uses "model" instead of "assistant"
+        @test length(rendered.conversation) == 2  # Google schema combines system message with first user message
+        @test all(msg[:role] in ["user", "model"] for msg in rendered.conversation)  # Google uses "model" instead of "assistant"
         @test !any(
-            msg -> any(part -> contains(part["text"], "metadata"), msg[:parts]), rendered)
+            msg -> any(part -> contains(part["text"], "metadata"), msg[:parts]), rendered.conversation)
 
         # Create a basic NoSchema
         schema = NoSchema()
