@@ -228,12 +228,12 @@ end
 @testset "process_google_config" begin
     # Basic functionality - preserve original tests
     config_kwargs = PT.process_google_config(
-        (temperature=0.5, max_tokens=100), 
+        (temperature=0.5, max_output_tokens=100), 
         "test system", 
         (timeout=30,)
     )
     @test config_kwargs[:temperature] == 0.5
-    @test config_kwargs[:max_tokens] == 100
+    @test config_kwargs[:max_output_tokens] == 100
     @test config_kwargs[:system_instruction] == "test system"
     @test config_kwargs[:http_options] == (timeout=30,)
     
@@ -260,11 +260,12 @@ end
 
     # Input type variations - Dict vs NamedTuple
     config_kwargs = PT.process_google_config(
-        Dict(:temperature => 0.5, :max_tokens => 100), 
+        Dict(:temperature => 0.5, :max_output_tokens => 100), 
         "test", 
         Dict(:timeout => 30)
     )
     @test config_kwargs[:temperature] == 0.5
+    @test config_kwargs[:max_output_tokens] == 100
     @test config_kwargs[:system_instruction] == "test"
     @test config_kwargs[:http_options][:timeout] == 30
 
@@ -305,12 +306,12 @@ end
 
     # Edge cases - boundary values
     config_kwargs = PT.process_google_config(
-        (temperature=0.0, max_tokens=1), 
+        (temperature=0.0, max_output_tokens=1), 
         "", 
         NamedTuple()
     )
     @test config_kwargs[:temperature] == 0.0
-    @test config_kwargs[:max_tokens] == 1
+    @test config_kwargs[:max_output_tokens] == 1
     @test config_kwargs[:system_instruction] == ""
 end
 
