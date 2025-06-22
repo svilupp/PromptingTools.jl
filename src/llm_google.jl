@@ -32,18 +32,24 @@ function render(schema::AbstractGoogleSchema,
     messages_replaced = render(
         NoSchema(), messages; conversation, no_system_message, kwargs...)
 
-    ## Second pass: convert to the OpenAI schema
+    ## Second pass: convert to the Google schema
     conversation = Dict{Symbol, Any}[]
+    system_instruction = nothing
 
-    # replace any handlebar variables in the messages
-    for msg in messages_replaced
+    # Extract system message if present
+    for (idx, msg) in enumerate(messages_replaced)
         if isabstractannotationmessage(msg)
             continue
+        elseif isa(msg, SystemMessage) && idx == 1 && !no_system_message
+            # Extract system instruction from first message if it's a SystemMessage
+            system_instruction = msg.content
+        else
+            push!(conversation,
+                Dict(
+                    :role => role4render(schema, msg), :parts => [Dict("text" => msg.content)]))
         end
-        push!(conversation,
-            Dict(
-                :role => role4render(schema, msg), :parts => [Dict("text" => msg.content)]))
     end
+    
     ## Merge any subsequent UserMessages
     merged_conversation = Dict{Symbol, Any}[]
     # run n-1 times, look at the current item and the next one
@@ -68,16 +74,58 @@ function render(schema::AbstractGoogleSchema,
     if i == length(conversation)
         push!(merged_conversation, conversation[end])
     end
-    return merged_conversation
+
+    # Return both conversation and system instruction
+    return (; conversation=merged_conversation, system_instruction=system_instruction)
+end
+
+"""
+Process Google API configuration arguments and create config dictionary.
+Returns a dictionary of config arguments that can be used to create GoogleGenAI.GenerateContentConfig.
+"""
+function process_google_config(api_kwargs, system_instruction, http_kwargs)
+    config_kwargs = Dict{Symbol,Any}()
+    
+    ext = Base.get_extension(PromptingTools, :GoogleGenAIPromptingToolsExt)
+    if !isnothing(ext)
+        GoogleGenAI = ext.GoogleGenAI
+        
+        unsupported_kwargs = Symbol[]
+        for (k, v) in pairs(api_kwargs)
+            if hasfield(GoogleGenAI.GenerateContentConfig, k)
+                config_kwargs[k] = v
+            else
+                push!(unsupported_kwargs, k)
+            end
+        end
+        
+        if !isempty(unsupported_kwargs)
+            @warn "The following api_kwargs are not supported in the new GoogleGenAI interface and will be ignored: $(join(unsupported_kwargs, ", "))"
+        end
+    else
+        for (k, v) in pairs(api_kwargs)
+            config_kwargs[k] = v
+        end
+    end
+    
+    if !isnothing(system_instruction)
+        config_kwargs[:system_instruction] = system_instruction
+    end
+    
+    config_kwargs[:http_options] = http_kwargs
+    
+    return config_kwargs
 end
 
 "Stub - to be extended in extension: GoogleGenAIPromptingToolsExt. `ggi` stands for GoogleGenAI"
 function ggi_generate_content end
 function ggi_generate_content(schema::TestEchoGoogleSchema, api_key::AbstractString,
         model::AbstractString,
-        conversation; kwargs...)
+        conversation; system_instruction=nothing, http_kwargs=NamedTuple(), api_kwargs=NamedTuple(), kwargs...)
     schema.model_id = model
     schema.inputs = conversation
+    config_kwargs = process_google_config(api_kwargs, system_instruction, http_kwargs)
+    schema.config_kwargs = config_kwargs
     return schema
 end
 
@@ -179,13 +227,16 @@ function aigenerate(prompt_schema::AbstractGoogleSchema, prompt::ALLOWED_PROMPT_
 
     ## Find the unique ID for the model alias provided
     model_id = get(MODEL_ALIASES, model, model)
-    conv_rendered = render(
+    rendered = render(
         prompt_schema, prompt; conversation, no_system_message, kwargs...)
+    conv_rendered = rendered.conversation
+    system_instruction = rendered.system_instruction
 
     if !dry_run
         time = @elapsed r = ggi_generate_content(prompt_schema, api_key,
             model_id,
             conv_rendered;
+            system_instruction,
             http_kwargs,
             api_kwargs...)
         ## Big overestimate

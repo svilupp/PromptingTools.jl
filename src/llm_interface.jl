@@ -385,6 +385,7 @@ struct GoogleSchema <: AbstractGoogleSchema end
     response_status::Integer
     model_id::String = ""
     inputs::Any = nothing
+    config_kwargs::Dict{Symbol,Any} = Dict{Symbol,Any}()
 end
 
 abstract type AbstractAnthropicSchema <: AbstractPromptSchema end
