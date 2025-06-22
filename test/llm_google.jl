@@ -226,6 +226,7 @@ end
 end
 
 @testset "process_google_config" begin
+    # Basic functionality - preserve original tests
     config_kwargs = PT.process_google_config(
         (temperature=0.5, max_tokens=100), 
         "test system", 
@@ -249,6 +250,68 @@ end
     @test schema.config_kwargs[:temperature] == 0.7
     @test schema.config_kwargs[:system_instruction] == "test"
     @test schema.config_kwargs[:http_options] == (timeout=60,)
+
+    # System instruction edge cases
+    config1 = PT.process_google_config(NamedTuple(), "", NamedTuple())
+    config2 = PT.process_google_config(NamedTuple(), nothing, NamedTuple())
+    @test haskey(config1, :system_instruction)
+    @test config1[:system_instruction] == ""
+    @test !haskey(config2, :system_instruction)
+
+    # Input type variations - Dict vs NamedTuple
+    config_kwargs = PT.process_google_config(
+        Dict(:temperature => 0.5, :max_tokens => 100), 
+        "test", 
+        Dict(:timeout => 30)
+    )
+    @test config_kwargs[:temperature] == 0.5
+    @test config_kwargs[:system_instruction] == "test"
+    @test config_kwargs[:http_options][:timeout] == 30
+
+    # Extension behavior - test both loaded and not loaded scenarios
+    ext = Base.get_extension(PromptingTools, :GoogleGenAIPromptingToolsExt)
+    
+    if !isnothing(ext)
+        # Test unsupported kwargs warning when extension is loaded
+        @test_logs (:warn, r"The following api_kwargs are not supported.*unsupported_field") begin
+            config_kwargs = PT.process_google_config(
+                (temperature=0.5, unsupported_field=123), 
+                nothing, 
+                NamedTuple()
+            )
+            @test config_kwargs[:temperature] == 0.5
+            @test !haskey(config_kwargs, :unsupported_field)
+        end
+        
+        # Test valid fields pass through correctly
+        GoogleGenAI = ext.GoogleGenAI
+        valid_fields = (temperature=0.7, max_output_tokens=1000)
+        config_kwargs = PT.process_google_config(valid_fields, nothing, NamedTuple())
+        @test config_kwargs[:temperature] == 0.7
+        @test config_kwargs[:max_output_tokens] == 1000
+        @test_nowarn GoogleGenAI.GenerateContentConfig(; config_kwargs...)
+    else
+        # Test passthrough behavior when extension is not loaded
+        config_kwargs = PT.process_google_config(
+            (unsupported_field=123, temperature=0.5), 
+            "test system", 
+            (timeout=30,)
+        )
+        @test config_kwargs[:unsupported_field] == 123
+        @test config_kwargs[:temperature] == 0.5
+        @test config_kwargs[:system_instruction] == "test system"
+        @test config_kwargs[:http_options] == (timeout=30,)
+    end
+
+    # Edge cases - boundary values
+    config_kwargs = PT.process_google_config(
+        (temperature=0.0, max_tokens=1), 
+        "", 
+        NamedTuple()
+    )
+    @test config_kwargs[:temperature] == 0.0
+    @test config_kwargs[:max_tokens] == 1
+    @test config_kwargs[:system_instruction] == ""
 end
 
 @testset "not implemented ai* functions" begin
