@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Updated
 - Increased GoogleGenAI compat to v0.5, fixing support for system prompts 
 
+## Fixed
+- Increased compat for StreamCallbacks.jl to fix a bug
+
 ## [0.76.0]
 
 ### Added
