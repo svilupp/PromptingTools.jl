@@ -225,8 +225,8 @@ function aigenerate(prompt_schema::AbstractGoogleSchema, prompt::ALLOWED_PROMPT_
         throw(ArgumentError("You need to also import GoogleGenAI package to use this function"))
     end
 
-    ## Check for valid API key
-    if isempty(api_key) || api_key == "invalid-key-just-for-testing"
+    ## Check for valid API key (skip validation for test schemas)
+    if !(prompt_schema isa TestEchoGoogleSchema) && (isempty(api_key) || api_key == "invalid-key-just-for-testing")
         throw(ArgumentError("Google API key is required. Get your key from https://ai.google.dev/"))
     end
 
