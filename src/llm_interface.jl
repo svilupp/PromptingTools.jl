@@ -313,6 +313,20 @@ Requires one environment variable to be set:
 """
 struct MiniMaxOpenAISchema <: AbstractOpenAISchema end
 
+"""
+    MoonshotOpenAISchema
+
+Schema to call the Moonshot API (Kimi models).
+
+Links:
+- [Get your API key](https://platform.moonshot.cn/)
+- [API Reference](https://platform.moonshot.cn/docs/api/chat)
+
+Requires one environment variable to be set:
+- `MOONSHOT_API_KEY`: Your API key
+"""
+struct MoonshotOpenAISchema <: AbstractOpenAISchema end
+
 abstract type AbstractOllamaSchema <: AbstractPromptSchema end
 
 """
