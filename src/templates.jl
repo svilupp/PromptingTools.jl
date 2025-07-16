@@ -93,7 +93,8 @@ end
 function Base.show(io::IO, m::MIME"text/plain", v::Vector{<:AITemplateMetadata})
     printstyled(io, "$(length(v))-element Vector{AITemplateMetadata}:"; color = :light_blue)
     println(io)
-    [(show(io, m, v[i]); println(io)) for i in eachindex(v)]
+    [(show(io, m, v[i]); println(io))
+     for i in eachindex(v)]
     nothing
 end
 
@@ -176,7 +177,9 @@ end
 
 Removes all templates from `TEMPLATE_STORE` and `TEMPLATE_METADATA`.
 """
-remove_templates!(; store = TEMPLATE_STORE, metadata_store = TEMPLATE_METADATA) = (empty!(store); empty!(metadata_store); nothing)
+function remove_templates!(; store = TEMPLATE_STORE, metadata_store = TEMPLATE_METADATA)
+    (empty!(store); empty!(metadata_store); nothing)
+end
 
 """
     load_templates!(dir_templates::Union{String, Nothing} = nothing;
@@ -318,7 +321,7 @@ function aitemplates(query_key::AbstractString;
     query_str = lowercase(query_key)
     found_templates = filter(
         x -> occursin(query_str, lowercase(string(x.name))) ||
-            occursin(query_str, lowercase(string(x.description))),
+             occursin(query_str, lowercase(string(x.description))),
         metadata_store)
     return first(found_templates, limit)
 end
@@ -328,12 +331,12 @@ function aitemplates(query_key::Regex;
         metadata_store::Vector{AITemplateMetadata} = TEMPLATE_METADATA)
     found_templates = filter(
         x -> occursin(query_key,
-                     string(x.name)) ||
-                 occursin(query_key,
-                     x.description) ||
-                 occursin(query_key,
-                     x.system_preview) ||
-                 occursin(query_key, x.user_preview),
+                 string(x.name)) ||
+             occursin(query_key,
+                 x.description) ||
+             occursin(query_key,
+                 x.system_preview) ||
+             occursin(query_key, x.user_preview),
         metadata_store)
     return first(found_templates, limit)
 end

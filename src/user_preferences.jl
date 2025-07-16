@@ -200,7 +200,7 @@ function load_api_keys!()
     global MISTRAL_API_KEY
     MISTRAL_API_KEY = @load_preference("MISTRAL_API_KEY",
         default=get(ENV, "MISTRAL_API_KEY",
-            get(ENV, "MISTRALAI_API_KEY", "")))
+        get(ENV, "MISTRALAI_API_KEY", "")))
     if !isempty(get(ENV, "MISTRALAI_API_KEY", ""))
         @debug "The MISTRALAI_API_KEY environment variable is deprecated. Use MISTRAL_API_KEY instead."
     end
@@ -280,7 +280,8 @@ See also: `push_conversation!`, `resize_conversation!`
 """
 const CONV_HISTORY = Vector{Vector{<:Any}}()
 const CONV_HISTORY_LOCK = ReentrantLock()
-global MAX_HISTORY_LENGTH::Union{Int, Nothing} = @load_preference("MAX_HISTORY_LENGTH",
+global MAX_HISTORY_LENGTH::Union{
+    Int, Nothing} = @load_preference("MAX_HISTORY_LENGTH",
     default=5)
 
 ## Model registry

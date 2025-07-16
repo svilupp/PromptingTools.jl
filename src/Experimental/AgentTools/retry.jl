@@ -300,7 +300,8 @@ function airetry!(f_cond::Function, aicall::AICallBlock,
     while !condition_passed
 
         ## Evaluation + feedback (sample is either the "successful" node or the best node to retry from)
-        condition_passed, sample = evaluate_condition!(f_cond, aicall, feedback;
+        condition_passed,
+        sample = evaluate_condition!(f_cond, aicall, feedback;
             evaluate_all, feedback_expensive)
 
         ## Update the aicall

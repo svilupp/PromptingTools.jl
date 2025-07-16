@@ -833,7 +833,8 @@ function aiclassify(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_
                           Union{AbstractString, Tuple{<:AbstractString, <:AbstractString}}}
     ## Encode the choices and the corresponding prompt 
     model_id = get(MODEL_ALIASES, model, model)
-    choices_prompt, logit_bias, decode_ids = encode_choices(
+    choices_prompt, logit_bias,
+    decode_ids = encode_choices(
         prompt_schema, choices; model = model_id, token_ids_map)
     ## We want only 1 token
     api_kwargs = merge(api_kwargs, (; logit_bias, max_tokens = 1, temperature = 0))
@@ -1764,7 +1765,8 @@ function aitools(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYP
     model_id = get(MODEL_ALIASES, model, model)
     ## Vision-specific functionality -- if `image_path` is provided, attach images to the latest user message
     !isnothing(image_path) &&
-        (prompt = attach_images_to_user_message(prompt; image_path, attach_to_latest = true))
+        (prompt = attach_images_to_user_message(
+            prompt; image_path, attach_to_latest = true))
     ## Render the conversation history from messages
     conv_rendered = render(
         prompt_schema, prompt; conversation, no_system_message, name_user, kwargs...)

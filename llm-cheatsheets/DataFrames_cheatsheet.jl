@@ -1,7 +1,7 @@
 using DataFramesMeta
 
 # Create a sample DataFrame
-df = DataFrame(x=[1, 1, 2, 2], y=[1, 2, 101, 102])
+df = DataFrame(x = [1, 1, 2, 2], y = [1, 2, 101, 102])
 
 # @select - Select columns
 @select(df, :x, :y)  # Select specific columns
@@ -46,7 +46,7 @@ gdf = @groupby(df, :x)
 end
 
 # @passmissing - Handle missing values
-df_missing = DataFrame(a=[1, 2, missing], b=[4, 5, 6])
+df_missing = DataFrame(a = [1, 2, missing], b = [4, 5, 6])
 @transform df_missing @passmissing @byrow :c = :a + :b
 
 # @astable - Create multiple columns at once

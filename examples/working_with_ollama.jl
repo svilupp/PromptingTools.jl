@@ -58,7 +58,8 @@ aigenerate(schema, "Say hi!"; model = "llama2")
 
 # It's as simple as providing an image URL (keyword `image_url`) or a local path (keyword `image_path`). You can provide one or more images:
 
-msg = aiscan("Describe the image"; image_path = ["/test/data/julia.png"]model = "bakllava")
+msg = aiscan(
+    "Describe the image"; image_path =  ["/test/data/julia.png"]model = "bakllava" )
 
 # ## Embeddings with aiembed
 

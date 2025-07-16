@@ -43,7 +43,8 @@ end
     @test length(conversation) == 2
     @test isa(conversation[1], PT.SystemMessage)
     @test isa(conversation[2], PT.UserMessage)
-    schema, conversation = unwrap_aicall_args([
+    schema,
+    conversation = unwrap_aicall_args([
         PT.OpenAISchema(), AITemplate(:BlankSystemUser)])
     @test schema == PT.OpenAISchema()
     @test length(conversation) == 2

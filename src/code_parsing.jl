@@ -41,12 +41,12 @@ function extract_julia_imports(input::AbstractString; base_or_main::Bool = false
                 ## keep only them
                 packages = filter(
                     x -> startswith(x, "Base") ||
-                        startswith(x, "Main"), packages)
+                         startswith(x, "Main"), packages)
             else
                 ## exclude them
                 packages = filter(
                     x -> !startswith(x, "Base") &&
-                        !startswith(x, "Main"), packages)
+                         !startswith(x, "Main"), packages)
             end
             append!(package_names, Symbol.(packages))
         end
@@ -256,7 +256,7 @@ function extract_code_blocks(markdown_content::T) where {T <: AbstractString}
     # Filter out nested blocks (only if they have full overlap)
     filtered_positions = filter(
         inner -> !any(outer -> (outer[1] < inner[1]) &&
-                (inner[2] < outer[2]),
+                               (inner[2] < outer[2]),
             block_positions),
         block_positions)
 
@@ -439,7 +439,7 @@ function detect_base_main_overrides(code_block::AbstractString)
     ## check Base/Main method overrides
     overriden_methods = filter(
         f -> occursin("Base.", f) || occursin("Main.", f) ||
-                 in(f, base_imports),
+             in(f, base_imports),
         funcs)
     detected = !isempty(overriden_methods)
     return detected, overriden_methods

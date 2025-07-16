@@ -49,7 +49,7 @@ function render(schema::AbstractGoogleSchema,
                     :role => role4render(schema, msg), :parts => [Dict("text" => msg.content)]))
         end
     end
-    
+
     ## Merge any subsequent UserMessages
     merged_conversation = Dict{Symbol, Any}[]
     # run n-1 times, look at the current item and the next one
@@ -76,7 +76,7 @@ function render(schema::AbstractGoogleSchema,
     end
 
     # Return both conversation and system instruction
-    return (; conversation=merged_conversation, system_instruction=system_instruction)
+    return (; conversation = merged_conversation, system_instruction = system_instruction)
 end
 
 """
@@ -84,12 +84,12 @@ Process Google API configuration arguments and create config dictionary.
 Returns a dictionary of config arguments that can be used to create GoogleGenAI.GenerateContentConfig.
 """
 function process_google_config(api_kwargs, system_instruction, http_kwargs)
-    config_kwargs = Dict{Symbol,Any}()
-    
+    config_kwargs = Dict{Symbol, Any}()
+
     ext = Base.get_extension(PromptingTools, :GoogleGenAIPromptingToolsExt)
     if !isnothing(ext)
         GoogleGenAI = ext.GoogleGenAI
-        
+
         unsupported_kwargs = Symbol[]
         for (k, v) in pairs(api_kwargs)
             if hasfield(GoogleGenAI.GenerateContentConfig, k)
@@ -98,7 +98,7 @@ function process_google_config(api_kwargs, system_instruction, http_kwargs)
                 push!(unsupported_kwargs, k)
             end
         end
-        
+
         if !isempty(unsupported_kwargs)
             @warn "The following api_kwargs are not supported in the new GoogleGenAI interface and will be ignored: $(join(unsupported_kwargs, ", "))"
         end
@@ -107,13 +107,13 @@ function process_google_config(api_kwargs, system_instruction, http_kwargs)
             config_kwargs[k] = v
         end
     end
-    
+
     if !isnothing(system_instruction)
         config_kwargs[:system_instruction] = system_instruction
     end
-    
+
     config_kwargs[:http_options] = http_kwargs
-    
+
     return config_kwargs
 end
 
@@ -121,7 +121,8 @@ end
 function ggi_generate_content end
 function ggi_generate_content(schema::TestEchoGoogleSchema, api_key::AbstractString,
         model::AbstractString,
-        conversation; system_instruction=nothing, http_kwargs=NamedTuple(), api_kwargs=NamedTuple(), kwargs...)
+        conversation; system_instruction = nothing, http_kwargs = NamedTuple(),
+        api_kwargs = NamedTuple(), kwargs...)
     schema.model_id = model
     schema.inputs = conversation
     config_kwargs = process_google_config(api_kwargs, system_instruction, http_kwargs)
@@ -226,7 +227,8 @@ function aigenerate(prompt_schema::AbstractGoogleSchema, prompt::ALLOWED_PROMPT_
     end
 
     ## Check for valid API key (skip validation for test schemas)
-    if !isa(prompt_schema, TestEchoGoogleSchema) && (isempty(api_key) || api_key == "invalid-key-just-for-testing")
+    if !isa(prompt_schema, TestEchoGoogleSchema) &&
+       (isempty(api_key) || api_key == "invalid-key-just-for-testing")
         throw(ArgumentError("Google API key is required. Get your key from https://ai.google.dev/"))
     end
 
