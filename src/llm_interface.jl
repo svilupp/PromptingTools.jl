@@ -42,8 +42,11 @@ struct OpenAISchema <: AbstractOpenAISchema end
 "Echoes the user's input back to them. Used for testing the implementation"
 @kwdef mutable struct TestEchoOpenAISchema <: AbstractOpenAISchema
     response::AbstractDict = Dict(
-        "choices" => [Dict("message" => Dict("content" => "Test response", "role" => "assistant"), "index" => 0, "finish_reason" => "stop")],
-        "usage" => Dict("prompt_tokens" => 10, "completion_tokens" => 20, "total_tokens" => 30),
+        "choices" => [Dict(
+            "message" => Dict("content" => "Test response", "role" => "assistant"),
+            "index" => 0, "finish_reason" => "stop")],
+        "usage" => Dict(
+            "prompt_tokens" => 10, "completion_tokens" => 20, "total_tokens" => 30),
         "model" => "gpt-3.5-turbo",
         "id" => "test-id",
         "object" => "chat.completion",
@@ -319,8 +322,8 @@ struct MiniMaxOpenAISchema <: AbstractOpenAISchema end
 Schema to call the Moonshot API (Kimi models).
 
 Links:
-- [Get your API key](https://platform.moonshot.cn/)
-- [API Reference](https://platform.moonshot.cn/docs/api/chat)
+- [Get your API key](https://platform.moonshot.ai/)
+- [API Reference](https://platform.moonshot.ai/docs/api/chat)
 
 Requires one environment variable to be set:
 - `MOONSHOT_API_KEY`: Your API key
@@ -399,7 +402,7 @@ struct GoogleSchema <: AbstractGoogleSchema end
     response_status::Integer
     model_id::String = ""
     inputs::Any = nothing
-    config_kwargs::Dict{Symbol,Any} = Dict{Symbol,Any}()
+    config_kwargs::Dict{Symbol, Any} = Dict{Symbol, Any}()
 end
 
 abstract type AbstractAnthropicSchema <: AbstractPromptSchema end

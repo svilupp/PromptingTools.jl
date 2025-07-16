@@ -27,7 +27,7 @@ Check your preferences by calling `get_preferences(key::String)`.
 - `CEREBRAS_API_KEY`: The API key for the Cerebras API. Get yours from [here](https://cloud.cerebras.ai/).
 - `SAMBANOVA_API_KEY`: The API key for the Sambanova API. Get yours from [here](https://cloud.sambanova.ai/apis).
 - `XAI_API_KEY`: The API key for the XAI API. Get your key from [here](https://console.x.ai/).
-- `MOONSHOT_API_KEY`: The API key for the Moonshot API. Get your key from [here](https://platform.moonshot.cn/).
+- `MOONSHOT_API_KEY`: The API key for the Moonshot API. Get your key from [here](https://platform.moonshot.ai/).
 - `MINIMAX_API_KEY`: The API key for the MiniMax API. Get your key from [here](https://intl.minimaxi.com/document/platform%20introduction).
 - `MODEL_CHAT`: The default model to use for aigenerate and most ai* calls. See `MODEL_REGISTRY` for a list of available models or define your own.
 - `MODEL_EMBEDDING`: The default model to use for aiembed (embedding documents). See `MODEL_REGISTRY` for a list of available models or define your own.
@@ -480,6 +480,7 @@ aliases = merge(
         "glguard" => "llama-guard-3-8b",
         "glsv" => "llama-3.2-11b-vision-preview",
         "glmv" => "llama-3.2-90b-vision-preview",
+        "gk2" => "moonshotai/kimi-k2-instruct",
         ## Cerebras
         "cl3" => "llama3.1-8b",
         "cllama3" => "llama3.1-8b",
@@ -531,7 +532,7 @@ aliases = merge(
         "gemexp" => "gemini-exp-1206", # latest experimental model from December 2024,
         "gem25p" => "gemini-2.5-pro-preview-05-06",
         "gem25f" => "gemini-2.5-flash-preview-05-20",
-        "kimi2" => "kimi-k2-0711-preview"
+        "k2" => "kimi-k2-0711-preview"
     ),
     ## Load aliases from preferences as well
     @load_preference("MODEL_ALIASES", default=Dict{String, String}()))
@@ -1190,6 +1191,11 @@ registry = Dict{String, ModelSpec}(
         2e-7,
         2e-7,
         "Google's Gemma 2 9b, hosted by Groq. Max 8K context. See details [here](https://console.groq.com/docs/models)"),
+    "moonshotai/kimi-k2-instruct" => ModelSpec("moonshotai/kimi-k2-instruct",
+        GroqOpenAISchema(),
+        1e-6,
+        3e-6,
+        "Moonshot's Kimi K2 model hosted by Groq. Advanced reasoning capabilities with long context support."),
     "deepseek-chat" => ModelSpec("deepseek-chat",
         DeepSeekOpenAISchema(),
         1.4e-7,
@@ -1386,9 +1392,9 @@ registry = Dict{String, ModelSpec}(
         "Gemini 2.5 Pro Preview from May 2025. 1M context, 65K output. See details [here](https://ai.google.dev/gemini-api/docs/models/experimental-models#use-an-experimental-model)."),
     "kimi-k2-0711-preview" => ModelSpec("kimi-k2-0711-preview",
         MoonshotOpenAISchema(),
-        0.55e-6,
-        2.2e-6,
-        "Moonshot's Kimi K2 model with advanced reasoning capabilities and long context support.")
+        0.6e-6,
+        2.5e-6,
+        "Moonshot's Kimi K2 model with advanced reasoning capabilities and long context support (131K tokens).")
 )
 
 """

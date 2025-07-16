@@ -219,7 +219,7 @@ function OpenAI.create_chat(schema::MoonshotOpenAISchema,
         api_key::AbstractString,
         model::AbstractString,
         conversation;
-        url::String = "https://api.moonshot.cn/v1",
+        url::String = "https://api.moonshot.ai/v1",
         kwargs...)
     api_key = isempty(MOONSHOT_API_KEY) ? api_key : MOONSHOT_API_KEY
     OpenAI.create_chat(CustomOpenAISchema(), api_key, model, conversation; url, kwargs...)
@@ -242,7 +242,9 @@ Base.@kwdef struct GoogleProvider <: AbstractCustomProvider
 end
 
 function OpenAI.auth_header(provider::GoogleProvider, api_key::AbstractString)
-    OpenAI.auth_header(OpenAI.OpenAIProvider(provider.api_key, provider.base_url, provider.api_version), api_key)
+    OpenAI.auth_header(
+        OpenAI.OpenAIProvider(provider.api_key, provider.base_url, provider.api_version),
+        api_key)
 end
 
 function OpenAI.create_chat(schema::GoogleOpenAISchema,
