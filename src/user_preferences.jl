@@ -1427,35 +1427,65 @@ function Base.show(io::IO, registry::ModelRegistry)
         "ModelRegistry with $num_models models and $num_aliases aliases. See `?MODEL_REGISTRY` for more information.")
 end
 
-"""
+@doc (
+    """
     MODEL_REGISTRY
 
-A store of available model names and their specs (ie, name, costs per token, etc.)
+    A store of available model names and their specs (ie, name, costs per token, etc.)
 
-# Accessing the registry
+    # Accessing the registry
 
-You can use both the alias name or the full name to access the model spec:
-```
-PromptingTools.MODEL_REGISTRY["gpt-3.5-turbo"]
-```
+    You can use both the alias name or the full name to access the model spec:
+    ```
+    PromptingTools.MODEL_REGISTRY["gpt-3.5-turbo"]
+    ```
 
-# Registering a new model
-```julia
-register_model!(
-    name = "gpt-3.5-turbo",
-    schema = :OpenAISchema,
-    cost_of_token_prompt = 0.0015,
-    cost_of_token_generation = 0.002,
-    description = "GPT-3.5 Turbo is a 175B parameter model and a common default on the OpenAI API.")
-```
+    # Registering a new model
+    ```julia
+    register_model!(
+        name = "gpt-3.5-turbo",
+        schema = :OpenAISchema,
+        cost_of_token_prompt = 0.0015,
+        cost_of_token_generation = 0.002,
+        description = "GPT-3.5 Turbo is a 175B parameter model and a common default on the OpenAI API.")
+    ```
 
-# Registering a model alias
-```julia
-PromptingTools.MODEL_ALIASES["gpt3"] = "gpt-3.5-turbo"
-```
+    # Registering a model alias
+    ```julia
+    PromptingTools.MODEL_ALIASES["gpt3"] = "gpt-3.5-turbo"
+    ```
+    # Extended help
+    """
+*
+begin
+    by_schema = Dict{Symbol, Vector{String}}()
+    foreach(MODEL_REGISTRY.registry) do (name, spec)
+        schema = nameof(typeof(spec.schema))
+        push!(get!(() -> Vector{String}(), by_schema, schema), name)
+    end
+
+    by_model = Dict{String, Vector{String}}()
+    foreach(MODEL_REGISTRY.aliases) do (name, model)
+        push!(get!(() -> Vector{String}(), by_model, model), name)
+    end
+
+    join(
+        (
+            """
+            ## $(string(schema))
+            - $(join(( "`$s` $(haskey(by_model, s) ? " - aliases: " : "")$(join(( "`$a`" for a in get(by_model,s, [])), ", ", " and "))" for s in by_schema[schema]), "\n - "))
+            """
+        for schema in sort(collect(keys(by_schema)), by = string)), "\n\n"
+    )
+end
+)
+const MODEL_REGISTRY = ModelRegistry(registry, aliases)
 
 """
-const MODEL_REGISTRY = ModelRegistry(registry, aliases)
+    keys(m::ModelRegistry)
+Returns all the model names and aliases that are available from the registry.
+"""
+Base.keys(m::ModelRegistry) = Set((keys(m.registry)..., keys(m.aliases)...))
 
 # We overload the getindex function to allow for lookup via model aliases
 function Base.getindex(registry::ModelRegistry, key::String)
