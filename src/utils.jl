@@ -17,10 +17,13 @@ replace_words(text, ["Disney", "Snow White", "Mickey Mouse"])
 # Output: "ABC is a great company"
 ```
 """
-replace_words(text::AbstractString, words::Vector{<:AbstractString}; replacement::AbstractString = "ABC") = replace_words(
-    text,
-    Regex("\\b$(join(words, "\\b|\\b"))\\b", "i"),
-    replacement)
+function replace_words(text::AbstractString, words::Vector{<:AbstractString};
+        replacement::AbstractString = "ABC")
+    replace_words(
+        text,
+        Regex("\\b$(join(words, "\\b|\\b"))\\b", "i"),
+        replacement)
+end
 function replace_words(text::AbstractString, pattern::Regex, replacement::AbstractString)
     replace(text, pattern => replacement)
 end
@@ -291,6 +294,7 @@ function length_longest_common_subsequence(itr1::AbstractString, itr2::AbstractS
     dp = fill(0, m, n)
 
     for (i, x) in enumerate(itr1), (j, y) in enumerate(itr2)
+
         dp[i + 1, j + 1] = (x == y) ? (dp[i, j] + 1) :
                            max(dp[i, j + 1], dp[i + 1, j])
     end

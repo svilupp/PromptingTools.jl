@@ -109,7 +109,8 @@ function ollama_api(
     api_url = string(ensure_http_prefix(url), ":", port, "/api/", endpoint)
     if !isnothing(streamcallback)
         ## Note: Works only for OllamaSchema, not OllamaManagedSchema
-        streamcallback, new_kwargs = configure_callback!(
+        streamcallback,
+        new_kwargs = configure_callback!(
             streamcallback, prompt_schema; kwargs...)
         for (k, v) in pairs(new_kwargs)
             body[string(k)] = v

@@ -19,7 +19,7 @@ using PromptingTools: save_template, load_template
             content = "Data message"),
         AIToolRequest(;
             tool_calls = [ToolMessage(;
-                tool_call_id = "1", name = "MyType", raw = "", args = Dict(:content => "x"))]),
+            tool_call_id = "1", name = "MyType", raw = "", args = Dict(:content => "x"))]),
         ToolMessage(;
             tool_call_id = "1", name = "MyType", content = "x", raw = "", args = Dict(:content => 1))]
     tmp, _ = mktemp()
@@ -61,7 +61,7 @@ end
         AIMessage("AI message"),
         AIToolRequest(;
             tool_calls = [ToolMessage(;
-                tool_call_id = "1", name = "MyType", raw = "", args = Dict(:content => "x"))]),
+            tool_call_id = "1", name = "MyType", raw = "", args = Dict(:content => "x"))]),
         ToolMessage(;
             tool_call_id = "1", name = "MyType", content = "x", raw = "", args = Dict(:content => 1))]
     dir = tempdir()

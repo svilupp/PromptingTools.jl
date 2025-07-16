@@ -307,21 +307,22 @@ end
     @test ensure_http_prefix("example.com") == "http://example.com"
     @test ensure_http_prefix("127.0.0.1:11434") == "http://127.0.0.1:11434"
     @test ensure_http_prefix("api.example.com/v1") == "http://api.example.com/v1"
-    
+
     # Test URLs with http:// prefix - should remain unchanged
     @test ensure_http_prefix("http://localhost:8080") == "http://localhost:8080"
     @test ensure_http_prefix("http://example.com") == "http://example.com"
     @test ensure_http_prefix("http://127.0.0.1:11434") == "http://127.0.0.1:11434"
-    
+
     # Test URLs with https:// prefix - should remain unchanged
     @test ensure_http_prefix("https://example.com") == "https://example.com"
     @test ensure_http_prefix("https://api.example.com/v1") == "https://api.example.com/v1"
-    @test ensure_http_prefix("https://secure.example.com:443") == "https://secure.example.com:443"
-    
+    @test ensure_http_prefix("https://secure.example.com:443") ==
+          "https://secure.example.com:443"
+
     # Test edge cases
     @test ensure_http_prefix("") == "http://"
     @test ensure_http_prefix("localhost") == "http://localhost"
-    
+
     # Test different string types (SubString, etc.)
     test_url = SubString("localhost:8080", 1, 14)
     @test ensure_http_prefix(test_url) == "http://localhost:8080"

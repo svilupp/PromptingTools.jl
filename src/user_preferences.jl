@@ -27,6 +27,7 @@ Check your preferences by calling `get_preferences(key::String)`.
 - `CEREBRAS_API_KEY`: The API key for the Cerebras API. Get yours from [here](https://cloud.cerebras.ai/).
 - `SAMBANOVA_API_KEY`: The API key for the Sambanova API. Get yours from [here](https://cloud.sambanova.ai/apis).
 - `XAI_API_KEY`: The API key for the XAI API. Get your key from [here](https://console.x.ai/).
+- `MOONSHOT_API_KEY`: The API key for the Moonshot API. Get your key from [here](https://platform.moonshot.ai/).
 - `MINIMAX_API_KEY`: The API key for the MiniMax API. Get your key from [here](https://intl.minimaxi.com/document/platform%20introduction).
 - `MODEL_CHAT`: The default model to use for aigenerate and most ai* calls. See `MODEL_REGISTRY` for a list of available models or define your own.
 - `MODEL_EMBEDDING`: The default model to use for aiembed (embedding documents). See `MODEL_REGISTRY` for a list of available models or define your own.
@@ -63,6 +64,7 @@ Define your `register_model!()` calls in your `startup.jl` file to make them ava
 - `SAMBANOVA_API_KEY`: The API key for the Sambanova API.
 - `LOG_DIR`: The directory to save the logs to, eg, when using `SaverSchema <: AbstractTracerSchema`. Defaults to `joinpath(pwd(), "log")`. Refer to `?SaverSchema` for more information on how it works and examples.
 - `XAI_API_KEY`: The API key for the XAI API. Get your key from [here](https://console.x.ai/).
+- `MOONSHOT_API_KEY`: The API key for the Moonshot API. Get your key from [here](https://platform.moonshot.cn/).
 - `MINIMAX_API_KEY`: The API key for the MiniMax API. Get your key from [here](https://intl.minimaxi.com/document/platform%20introduction).
 
 Preferences.jl takes priority over ENV variables, so if you set a preference, it will take precedence over the ENV variable.
@@ -88,7 +90,8 @@ const ALLOWED_PREFERENCES = ["MISTRAL_API_KEY",
     "OPENROUTER_API_KEY",  # Added OPENROUTER_API_KEY
     "CEREBRAS_API_KEY",
     "SAMBANOVA_API_KEY",
-    "XAI_API_KEY",  # Added XAI_API_KEY
+    "XAI_API_KEY",
+    "MOONSHOT_API_KEY",  # Added XAI_API_KEY
     "MINIMAX_API_KEY",
     "MODEL_CHAT",
     "MODEL_EMBEDDING",
@@ -176,6 +179,7 @@ global SAMBANOVA_API_KEY::String = ""
 global LOCAL_SERVER::String = ""
 global LOG_DIR::String = ""
 global XAI_API_KEY::String = ""
+global MOONSHOT_API_KEY::String = ""
 global MINIMAX_API_KEY::String = ""
 
 # Load them on init
@@ -196,7 +200,7 @@ function load_api_keys!()
     global MISTRAL_API_KEY
     MISTRAL_API_KEY = @load_preference("MISTRAL_API_KEY",
         default=get(ENV, "MISTRAL_API_KEY",
-            get(ENV, "MISTRALAI_API_KEY", "")))
+        get(ENV, "MISTRALAI_API_KEY", "")))
     if !isempty(get(ENV, "MISTRALAI_API_KEY", ""))
         @debug "The MISTRALAI_API_KEY environment variable is deprecated. Use MISTRAL_API_KEY instead."
     end
@@ -251,6 +255,9 @@ function load_api_keys!()
     global XAI_API_KEY
     XAI_API_KEY = @load_preference("XAI_API_KEY",
         default=get(ENV, "XAI_API_KEY", ""))
+    global MOONSHOT_API_KEY
+    MOONSHOT_API_KEY = @load_preference("MOONSHOT_API_KEY",
+        default=get(ENV, "MOONSHOT_API_KEY", ""))
     global MINIMAX_API_KEY
     MINIMAX_API_KEY = @load_preference("MINIMAX_API_KEY",
         default=get(ENV, "MINIMAX_API_KEY", ""))
@@ -273,7 +280,8 @@ See also: `push_conversation!`, `resize_conversation!`
 """
 const CONV_HISTORY = Vector{Vector{<:Any}}()
 const CONV_HISTORY_LOCK = ReentrantLock()
-global MAX_HISTORY_LENGTH::Union{Int, Nothing} = @load_preference("MAX_HISTORY_LENGTH",
+global MAX_HISTORY_LENGTH::Union{
+    Int, Nothing} = @load_preference("MAX_HISTORY_LENGTH",
     default=5)
 
 ## Model registry
@@ -473,6 +481,7 @@ aliases = merge(
         "glguard" => "llama-guard-3-8b",
         "glsv" => "llama-3.2-11b-vision-preview",
         "glmv" => "llama-3.2-90b-vision-preview",
+        "gk2" => "moonshotai/kimi-k2-instruct",
         ## Cerebras
         "cl3" => "llama3.1-8b",
         "cllama3" => "llama3.1-8b",
@@ -494,6 +503,7 @@ aliases = merge(
         "sll" => "Meta-Llama-3.1-405B-Instruct", # l for large
         ## XAI's Grok
         "grok" => "grok-beta",
+        "grok4" => "grok-4-0709",
         ## MiniMax
         "minimax" => "MiniMax-Text-01",
         ## DeepSeek
@@ -522,7 +532,8 @@ aliases = merge(
         "gem20ft" => "gemini-2.0-flash-thinking-exp-01-21",
         "gemexp" => "gemini-exp-1206", # latest experimental model from December 2024,
         "gem25p" => "gemini-2.5-pro-preview-05-06",
-        "gem25f" => "gemini-2.5-flash-preview-05-20"
+        "gem25f" => "gemini-2.5-flash-preview-05-20",
+        "k2" => "kimi-k2-0711-preview"
     ),
     ## Load aliases from preferences as well
     @load_preference("MODEL_ALIASES", default=Dict{String, String}()))
@@ -1181,6 +1192,11 @@ registry = Dict{String, ModelSpec}(
         2e-7,
         2e-7,
         "Google's Gemma 2 9b, hosted by Groq. Max 8K context. See details [here](https://console.groq.com/docs/models)"),
+    "moonshotai/kimi-k2-instruct" => ModelSpec("moonshotai/kimi-k2-instruct",
+        GroqOpenAISchema(),
+        1e-6,
+        3e-6,
+        "Moonshot's Kimi K2 model hosted by Groq. Advanced reasoning capabilities with long context support."),
     "deepseek-chat" => ModelSpec("deepseek-chat",
         DeepSeekOpenAISchema(),
         1.4e-7,
@@ -1297,6 +1313,11 @@ registry = Dict{String, ModelSpec}(
         5e-6,
         15e-6,
         "XAI's Grok 2 beta model. Max 128K context."),
+    "grok-4-0709" => ModelSpec("grok-4-0709",
+        XAIOpenAISchema(),
+        3e-6,
+        15e-6,
+        "XAI's Grok 4 model with 256K context window, vision, function calling, and reasoning capabilities."),
     ## Gemini 1.5 Models
     "gemini-1.5-pro-latest" => ModelSpec("gemini-1.5-pro-latest",
         GoogleOpenAISchema(),
@@ -1369,7 +1390,12 @@ registry = Dict{String, ModelSpec}(
         GoogleOpenAISchema(),
         1.25e-6,
         10e-6,
-        "Gemini 2.5 Pro Preview from May 2025. 1M context, 65K output. See details [here](https://ai.google.dev/gemini-api/docs/models/experimental-models#use-an-experimental-model).")
+        "Gemini 2.5 Pro Preview from May 2025. 1M context, 65K output. See details [here](https://ai.google.dev/gemini-api/docs/models/experimental-models#use-an-experimental-model)."),
+    "kimi-k2-0711-preview" => ModelSpec("kimi-k2-0711-preview",
+        MoonshotOpenAISchema(),
+        0.6e-6,
+        2.5e-6,
+        "Moonshot's Kimi K2 model with advanced reasoning capabilities and long context support (131K tokens).")
 )
 
 """

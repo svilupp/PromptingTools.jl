@@ -344,7 +344,8 @@ function anthropic_api(
     api_url = string(url, "/", endpoint)
     if !isnothing(streamcallback)
         ## Route to the streaming function
-        streamcallback, new_kwargs = configure_callback!(
+        streamcallback,
+        new_kwargs = configure_callback!(
             streamcallback, prompt_schema; kwargs...)
         input_buf = IOBuffer()
         JSON3.write(input_buf, merge(NamedTuple(body), new_kwargs))
@@ -978,7 +979,8 @@ function aitools(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMPT_
 
     ## Vision-specific functionality -- if `image_path` is provided, attach images to the latest user message
     !isnothing(image_path) &&
-        (prompt = attach_images_to_user_message(prompt; image_path, attach_to_latest = true))
+        (prompt = attach_images_to_user_message(
+            prompt; image_path, attach_to_latest = true))
     ## We provide the tool description to the rendering engine
     conv_rendered = render(
         prompt_schema, prompt; tools, conversation, no_system_message, cache, kwargs...)

@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Updated
 
+## [0.78.0]
+
+### Added
+- Added support for Moonshot's Kimi K2 model (alias `k2` and `gk2` for the version hosted by Groq, save api key to `MOONSHOT_API_KEY`).
+- Added support for xAI's Grok 4 model (alias `grok4`, save api key to `XAI_API_KEY`).
+
 ## [0.77.0]
 
 ### Updated

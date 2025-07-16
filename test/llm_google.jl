@@ -96,7 +96,7 @@ const PT = PromptingTools
 
     # Given an empty vector of messages, it should return an empty conversation dictionary just with the system prompt
     messages = AbstractMessage[]
-    expected_conversation = Dict{Symbol,Any}[]
+    expected_conversation = Dict{Symbol, Any}[]
     result = render(schema, messages)
     @test result.conversation == expected_conversation
     @test result.system_instruction == "Act as a helpful AI assistant"
@@ -179,9 +179,10 @@ const PT = PromptingTools
         UserMessage("Help me")
     ]
     expected_conversation = [
-        Dict(:role => "user", :parts => [Dict("text" => "You are a helpful assistant\n\nHelp me")])
+        Dict(:role => "user",
+        :parts => [Dict("text" => "You are a helpful assistant\n\nHelp me")])
     ]
-    result = render(schema, messages; no_system_message=true)
+    result = render(schema, messages; no_system_message = true)
     @test result.conversation == expected_conversation
     @test isnothing(result.system_instruction)
 end
@@ -193,7 +194,7 @@ end
     # corresponds to GoogleGenAI v0.1.0
     # Test the monkey patch
     schema = TestEchoGoogleSchema(; text = "Hello!", response_status = 200)
-    msg = ggi_generate_content(schema, "", "", "Hello"; system_instruction=nothing)
+    msg = ggi_generate_content(schema, "", "", "Hello"; system_instruction = nothing)
     @test msg isa TestEchoGoogleSchema
 
     # Real generation API
@@ -228,28 +229,28 @@ end
 @testset "process_google_config" begin
     # Basic functionality - preserve original tests
     config_kwargs = PT.process_google_config(
-        (temperature=0.5, max_output_tokens=100), 
-        "test system", 
-        (timeout=30,)
+        (temperature = 0.5, max_output_tokens = 100),
+        "test system",
+        (timeout = 30,)
     )
     @test config_kwargs[:temperature] == 0.5
     @test config_kwargs[:max_output_tokens] == 100
     @test config_kwargs[:system_instruction] == "test system"
-    @test config_kwargs[:http_options] == (timeout=30,)
-    
+    @test config_kwargs[:http_options] == (timeout = 30,)
+
     config_kwargs = PT.process_google_config(NamedTuple(), nothing, NamedTuple())
     @test !haskey(config_kwargs, :system_instruction)
     @test config_kwargs[:http_options] == NamedTuple()
-    
+
     schema = TestEchoGoogleSchema(; text = "Hello!", response_status = 200)
-    msg = ggi_generate_content(schema, "", "", "Hello"; 
-        system_instruction="test", 
-        api_kwargs=(temperature=0.7,),
-        http_kwargs=(timeout=60,))
+    msg = ggi_generate_content(schema, "", "", "Hello";
+        system_instruction = "test",
+        api_kwargs = (temperature = 0.7,),
+        http_kwargs = (timeout = 60,))
     @test haskey(schema.config_kwargs, :temperature)
     @test schema.config_kwargs[:temperature] == 0.7
     @test schema.config_kwargs[:system_instruction] == "test"
-    @test schema.config_kwargs[:http_options] == (timeout=60,)
+    @test schema.config_kwargs[:http_options] == (timeout = 60,)
 
     # System instruction edge cases
     config1 = PT.process_google_config(NamedTuple(), "", NamedTuple())
@@ -260,8 +261,8 @@ end
 
     # Input type variations - Dict vs NamedTuple
     config_kwargs = PT.process_google_config(
-        Dict(:temperature => 0.5, :max_output_tokens => 100), 
-        "test", 
+        Dict(:temperature => 0.5, :max_output_tokens => 100),
+        "test",
         Dict(:timeout => 30)
     )
     @test config_kwargs[:temperature] == 0.5
@@ -271,22 +272,22 @@ end
 
     # Extension behavior - test both loaded and not loaded scenarios
     ext = Base.get_extension(PromptingTools, :GoogleGenAIPromptingToolsExt)
-    
+
     if !isnothing(ext)
         # Test unsupported kwargs warning when extension is loaded
         @test_logs (:warn, r"The following api_kwargs are not supported.*unsupported_field") begin
             config_kwargs = PT.process_google_config(
-                (temperature=0.5, unsupported_field=123), 
-                nothing, 
+                (temperature = 0.5, unsupported_field = 123),
+                nothing,
                 NamedTuple()
             )
             @test config_kwargs[:temperature] == 0.5
             @test !haskey(config_kwargs, :unsupported_field)
         end
-        
+
         # Test valid fields pass through correctly
         GoogleGenAI = ext.GoogleGenAI
-        valid_fields = (temperature=0.7, max_output_tokens=1000)
+        valid_fields = (temperature = 0.7, max_output_tokens = 1000)
         config_kwargs = PT.process_google_config(valid_fields, nothing, NamedTuple())
         @test config_kwargs[:temperature] == 0.7
         @test config_kwargs[:max_output_tokens] == 1000
@@ -294,20 +295,20 @@ end
     else
         # Test passthrough behavior when extension is not loaded
         config_kwargs = PT.process_google_config(
-            (unsupported_field=123, temperature=0.5), 
-            "test system", 
-            (timeout=30,)
+            (unsupported_field = 123, temperature = 0.5),
+            "test system",
+            (timeout = 30,)
         )
         @test config_kwargs[:unsupported_field] == 123
         @test config_kwargs[:temperature] == 0.5
         @test config_kwargs[:system_instruction] == "test system"
-        @test config_kwargs[:http_options] == (timeout=30,)
+        @test config_kwargs[:http_options] == (timeout = 30,)
     end
 
     # Edge cases - boundary values
     config_kwargs = PT.process_google_config(
-        (temperature=0.0, max_output_tokens=1), 
-        "", 
+        (temperature = 0.0, max_output_tokens = 1),
+        "",
         NamedTuple()
     )
     @test config_kwargs[:temperature] == 0.0

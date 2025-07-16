@@ -75,7 +75,8 @@ end
     aicall.samples.success = true
     aicall.active_sample_id = aicall.samples.id # mimick what happens in run!
     node_success = expand!(aicall.samples, PT.AbstractMessage[]; success = true)
-    condition_passed, suggested_sample = evaluate_condition!(mock_f_cond_negative, aicall,
+    condition_passed,
+    suggested_sample = evaluate_condition!(mock_f_cond_negative, aicall,
         feedback_str; evaluate_all = true)
     @test condition_passed == false
     ## all nodes were evaluated and set to false
@@ -89,7 +90,8 @@ end
     aicall = AIGenerate("Say hi!"; config = RetryConfig(; n_samples = 1))
     aicall.samples.success = true
     aicall.active_sample_id = aicall.samples.id # mimick what happens in run!
-    condition_passed, suggested_sample = evaluate_condition!(mock_f_cond_negative, aicall,
+    condition_passed,
+    suggested_sample = evaluate_condition!(mock_f_cond_negative, aicall,
         feedback_fun, evaluate_all = true)
     @test condition_passed == false
     @test suggested_sample.feedback == "\n" * feedback_fun(aicall)
@@ -99,7 +101,8 @@ end
     aicall.samples.success = true
     aicall.active_sample_id = aicall.samples.id # mimick what happens in run!
     node_success = expand!(aicall.samples, PT.AbstractMessage[]; success = true)
-    condition_passed, suggested_sample = evaluate_condition!(mock_f_cond_negative, aicall,
+    condition_passed,
+    suggested_sample = evaluate_condition!(mock_f_cond_negative, aicall,
         feedback_str, feedback_expensive = true)
     @test condition_passed == false
     @test suggested_sample.feedback == "\n" * feedback_str
@@ -110,7 +113,8 @@ end
     aicall.samples.success = true
     aicall.active_sample_id = aicall.samples.id # mimick what happens in run!
     node_success = expand!(aicall.samples, PT.AbstractMessage[]; success = true)
-    condition_passed, suggested_sample = evaluate_condition!(mock_f_cond_negative, aicall,
+    condition_passed,
+    suggested_sample = evaluate_condition!(mock_f_cond_negative, aicall,
         feedback_fun, feedback_expensive = true)
     @test condition_passed == false
     @test suggested_sample.feedback == "\n" * feedback_fun(aicall)
@@ -121,7 +125,8 @@ end
     aicall.samples.success = true
     aicall.active_sample_id = aicall.samples.id # mimick what happens in run!
     node_success = expand!(aicall.samples, PT.AbstractMessage[]; success = true)
-    condition_passed, suggested_sample = evaluate_condition!(mock_f_cond_negative, aicall,
+    condition_passed,
+    suggested_sample = evaluate_condition!(mock_f_cond_negative, aicall,
         "", evaluate_all = false)
     @test condition_passed == false
     @test aicall.samples.success == false

@@ -5,7 +5,6 @@ using PromptingTools: GoogleOpenAISchema, AIMessage, aigenerate, aiembed
     # Save original API key
     original_api_key = PromptingTools.GOOGLE_API_KEY
 
-
     # Test with empty GOOGLE_API_KEY
     PromptingTools.GOOGLE_API_KEY = ""
     PORT = rand(10000:20000)
@@ -18,7 +17,7 @@ using PromptingTools: GoogleOpenAISchema, AIMessage, aigenerate, aiembed
         response = Dict(
             :choices => [
                 Dict(:message => Dict(:content => "Test response"),
-                    :finish_reason => "stop")
+                :finish_reason => "stop")
             ],
             :usage => Dict(:total_tokens => 5,
                 :prompt_tokens => 5,
@@ -48,7 +47,7 @@ using PromptingTools: GoogleOpenAISchema, AIMessage, aigenerate, aiembed
         response = Dict(
             :choices => [
                 Dict(:message => Dict(:content => "Test response"),
-                    :finish_reason => "stop")
+                :finish_reason => "stop")
             ],
             :usage => Dict(:total_tokens => 5,
                 :prompt_tokens => 5,

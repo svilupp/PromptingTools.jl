@@ -173,11 +173,11 @@ using PromptingTools: pick_tokenizer, OPENAI_TOKEN_IDS_GPT35_GPT4, OPENAI_TOKEN_
         UserMessage("User message"),
         AIToolRequest(;
             tool_calls = [ToolMessage(;
-                tool_call_id = "call_123",
-                raw = JSON3.write(args),
-                name = "get_weather",
-                args)
-            ])
+            tool_call_id = "call_123",
+            raw = JSON3.write(args),
+            name = "get_weather",
+            args)
+        ])
     ]
     conversation = render(schema, messages)
     expected_output = Dict{String, Any}[
@@ -417,7 +417,8 @@ end
         :finish_reason => "stop")
     mock_response = (;
         response = Dict(:choices => [mock_choice],
-            :usage => Dict(:total_tokens => 3, :prompt_tokens => 2, :completion_tokens => 1)),
+            :usage => Dict(
+                :total_tokens => 3, :prompt_tokens => 2, :completion_tokens => 1)),
         status = 200)
 
     # Test with valid logprobs
@@ -476,7 +477,8 @@ end
         :finish_reason => "stop")
     mock_response = (;
         response = Dict(:choices => [mock_choice],
-            :usage => Dict(:total_tokens => 3, :prompt_tokens => 2, :completion_tokens => 1)),
+            :usage => Dict(
+                :total_tokens => 3, :prompt_tokens => 2, :completion_tokens => 1)),
         status = 200)
     struct RandomType1235
         x::Int
@@ -772,7 +774,8 @@ end
 @testset "encode_choices" begin
     MODEL = "gpt-4-turbo"
     # Test encoding simple string choices
-    choices_prompt, logit_bias, ids = encode_choices(
+    choices_prompt, logit_bias,
+    ids = encode_choices(
         OpenAISchema(), ["true", "false"], model = MODEL)
     # Checks if the encoded choices format and logit_bias are correct
     @test choices_prompt == "true for \"true\"\nfalse for \"false\""
@@ -780,7 +783,8 @@ end
     @test ids == ["true", "false"]
 
     # Test encoding more than two choices
-    choices_prompt, logit_bias, ids = encode_choices(
+    choices_prompt, logit_bias,
+    ids = encode_choices(
         OpenAISchema(), ["animal", "plant"], model = MODEL)
     # Checks the format for multiple choices and correct logit_bias mapping
     @test choices_prompt == "1. \"animal\"\n2. \"plant\""
@@ -788,7 +792,8 @@ end
     @test ids == ["animal", "plant"]
 
     # with descriptions
-    choices_prompt, logit_bias, ids = encode_choices(OpenAISchema(),
+    choices_prompt, logit_bias,
+    ids = encode_choices(OpenAISchema(),
         [
             ("A", "any animal or creature"),
             ("P", "for any plant or tree"),
@@ -800,7 +805,8 @@ end
     @test logit_bias == expected_logit_bias
     @test ids == ["A", "P", "O"]
 
-    choices_prompt, logit_bias, ids = encode_choices(OpenAISchema(),
+    choices_prompt, logit_bias,
+    ids = encode_choices(OpenAISchema(),
         [
             ("true", "If the statement is true"),
             ("false", "If the statement is false")
@@ -821,7 +827,8 @@ end
         PT.OllamaSchema(), ["true", "false"], model = MODEL)
 
     ## Test a few token IDs for GPT4o models
-    choices_prompt, logit_bias, ids = encode_choices(OpenAISchema(),
+    choices_prompt, logit_bias,
+    ids = encode_choices(OpenAISchema(),
         ["A", "B", "C"], model = "gpt-4o-2024-07-18")
     @test choices_prompt == "1. \"A\"\n2. \"B\"\n3. \"C\""
     @test logit_bias == Dict(16 => 100, 17 => 100, 18 => 100)

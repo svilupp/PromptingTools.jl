@@ -231,7 +231,8 @@ using PromptingTools: call_cost, anthropic_api, function_call_signature,
     @test system[1]["cache_control"] == Dict("type" => "ephemeral")
 
     ## all_but_last
-    system, conversation = render(
+    system,
+    conversation = render(
         schema, messages_longer; name = "John", cache = :all_but_last)
     ## does not mark last user message
     @test !haskey(conversation[end - 1]["content"][end], "cache_control")
