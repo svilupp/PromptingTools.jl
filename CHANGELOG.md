@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Updated
 
+## [0.79.0]
+
+### Added
+- Updated `ModelRegistry` docstrings to show all supported models and aliases (see `??ModelRegistry`). Thanks to @Kunzaatko for the PR!
+
 ## [0.78.0]
 
 ### Added
