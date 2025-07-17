@@ -200,7 +200,7 @@ function load_api_keys!()
     global MISTRAL_API_KEY
     MISTRAL_API_KEY = @load_preference("MISTRAL_API_KEY",
         default=get(ENV, "MISTRAL_API_KEY",
-        get(ENV, "MISTRALAI_API_KEY", "")))
+            get(ENV, "MISTRALAI_API_KEY", "")))
     if !isempty(get(ENV, "MISTRALAI_API_KEY", ""))
         @debug "The MISTRALAI_API_KEY environment variable is deprecated. Use MISTRAL_API_KEY instead."
     end
@@ -281,7 +281,7 @@ See also: `push_conversation!`, `resize_conversation!`
 const CONV_HISTORY = Vector{Vector{<:Any}}()
 const CONV_HISTORY_LOCK = ReentrantLock()
 global MAX_HISTORY_LENGTH::Union{
-    Int, Nothing} = @load_preference("MAX_HISTORY_LENGTH",
+Int, Nothing} = @load_preference("MAX_HISTORY_LENGTH",
     default=5)
 
 ## Model registry
@@ -1427,6 +1427,32 @@ function Base.show(io::IO, registry::ModelRegistry)
         "ModelRegistry with $num_models models and $num_aliases aliases. See `?MODEL_REGISTRY` for more information.")
 end
 
+"""
+    model_docs(m::ModelRegistry)
+Generate a documentation string list of models and their aliases
+"""
+function model_docs(m::ModelRegistry)
+    by_schema = Dict{Symbol, Vector{String}}()
+    foreach(m.registry) do (name, spec)
+        schema = nameof(typeof(spec.schema))
+        push!(get!(() -> Vector{String}(), by_schema, schema), name)
+    end
+
+    by_model = Dict{String, Vector{String}}()
+    foreach(m.aliases) do (name, model)
+        push!(get!(() -> Vector{String}(), by_model, model), name)
+    end
+
+    join(
+        (
+            """
+            ## $(string(schema))
+            - $(join(( "`$s`$(haskey(by_model, s) ? " - aliases: " : "")$(join(( "`$a`" for a in get(by_model,s, [])), ", ", " and "))" for s in by_schema[schema]), "\n- "))
+            """
+        for schema in sort(collect(keys(by_schema)), by = string)), "\n"
+    )
+end
+
 @doc (
     """
     MODEL_REGISTRY
@@ -1455,29 +1481,7 @@ end
     PromptingTools.MODEL_ALIASES["gpt3"] = "gpt-3.5-turbo"
     ```
     # Extended help
-    """
-*
-begin
-    by_schema = Dict{Symbol, Vector{String}}()
-    foreach(MODEL_REGISTRY.registry) do (name, spec)
-        schema = nameof(typeof(spec.schema))
-        push!(get!(() -> Vector{String}(), by_schema, schema), name)
-    end
-
-    by_model = Dict{String, Vector{String}}()
-    foreach(MODEL_REGISTRY.aliases) do (name, model)
-        push!(get!(() -> Vector{String}(), by_model, model), name)
-    end
-
-    join(
-        (
-            """
-            ## $(string(schema))
-            - $(join(( "`$s` $(haskey(by_model, s) ? " - aliases: " : "")$(join(( "`$a`" for a in get(by_model,s, [])), ", ", " and "))" for s in by_schema[schema]), "\n - "))
-            """
-        for schema in sort(collect(keys(by_schema)), by = string)), "\n\n"
-    )
-end
+    """*model_docs(MODEL_REGISTRY)
 )
 const MODEL_REGISTRY = ModelRegistry(registry, aliases)
 

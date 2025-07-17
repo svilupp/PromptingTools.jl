@@ -125,4 +125,25 @@ end
     # list functions
     @test list_registry() == sort(collect(keys(MODEL_REGISTRY.registry)))
     @test list_aliases() == MODEL_REGISTRY.aliases
+
+    struct A <: PT.AbstractPromptSchema end
+    struct B <: PT.AbstractPromptSchema end
+
+    m = PT.ModelRegistry(
+        Dict("aa" => ModelSpec(name = "aa", schema = A()),
+            "aa2" => ModelSpec(name = "aa2", schema = A()),
+            "bb" => ModelSpec(name = "bb", schema = B())),
+        Dict("a" => "aa", "b" => "bb", "b2" => "bb")
+    )
+
+    @test keys(m) == Set(["aa2", "bb", "b", "b2", "aa", "a"])
+    @test PT.model_docs(m) ==
+          """
+          ## A
+          - `aa2`
+          - `aa` - aliases: `a`
+
+          ## B
+          - `bb` - aliases: `b` and `b2`
+          """ # sorted, multiple aliases, multiple schemas, multiple models for single schema
 end
