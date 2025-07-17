@@ -28,13 +28,13 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
       ]),
       _cache[5] || (_cache[5] = createBaseVNode("p", null, [
         createBaseVNode("a", {
-          href: "https://github.com/svilupp/PromptingTools.jl/blob/27f79ce69a4297a967bc8d611d0eb35c932b360c/src/llm_interface.jl#L410-L424",
+          href: "https://github.com/svilupp/PromptingTools.jl/blob/ac210d4bc8a63dc89e4227cfb9ff1785bb337c89/src/llm_interface.jl#L410-L424",
           target: "_blank",
           rel: "noreferrer"
         }, "source")
       ], -1))
     ]),
-    _cache[48] || (_cache[48] = createStaticVNode("", 115)),
+    _cache[48] || (_cache[48] = createStaticVNode("", 117)),
     createBaseVNode("div", _hoisted_2, [
       _cache[10] || (_cache[10] = createStaticVNode("", 9)),
       createBaseVNode("p", null, [
@@ -58,7 +58,7 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
       ]),
       _cache[17] || (_cache[17] = createStaticVNode("", 19))
     ]),
-    _cache[50] || (_cache[50] = createStaticVNode("", 111)),
+    _cache[50] || (_cache[50] = createStaticVNode("", 113)),
     createBaseVNode("div", _hoisted_4, [
       _cache[20] || (_cache[20] = createStaticVNode("", 7)),
       createBaseVNode("p", null, [
@@ -104,7 +104,7 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
       ], -1)),
       _cache[32] || (_cache[32] = createBaseVNode("p", null, [
         createBaseVNode("a", {
-          href: "https://github.com/svilupp/PromptingTools.jl/blob/27f79ce69a4297a967bc8d611d0eb35c932b360c/src/llm_ollama_managed.jl#L9-L21",
+          href: "https://github.com/svilupp/PromptingTools.jl/blob/ac210d4bc8a63dc89e4227cfb9ff1785bb337c89/src/llm_ollama_managed.jl#L9-L21",
           target: "_blank",
           rel: "noreferrer"
         }, "source")
@@ -150,7 +150,7 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
       ]),
       _cache[46] || (_cache[46] = createBaseVNode("p", null, [
         createBaseVNode("a", {
-          href: "https://github.com/svilupp/PromptingTools.jl/blob/27f79ce69a4297a967bc8d611d0eb35c932b360c/src/llm_shared.jl#L12-L32",
+          href: "https://github.com/svilupp/PromptingTools.jl/blob/ac210d4bc8a63dc89e4227cfb9ff1785bb337c89/src/llm_shared.jl#L12-L32",
           target: "_blank",
           rel: "noreferrer"
         }, "source")
@@ -533,7 +533,7 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
       createBaseVNode("p", null, 'tool_map = tool_call_signature(MyMeasurement; hidden_fields = ["ctx_user_id"]) ```'),
       createBaseVNode("p", null, [
         createBaseVNode("a", {
-          href: "https://github.com/svilupp/PromptingTools.jl/blob/27f79ce69a4297a967bc8d611d0eb35c932b360c/src/extraction.jl#L463-L555",
+          href: "https://github.com/svilupp/PromptingTools.jl/blob/ac210d4bc8a63dc89e4227cfb9ff1785bb337c89/src/extraction.jl#L463-L555",
           target: "_blank",
           rel: "noreferrer"
         }, "source")
