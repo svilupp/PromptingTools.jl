@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Updated
 
+## [0.80.0]
+
+### Added
+- Added GPT-5 family models (gpt-5, gpt-5-mini, gpt-5-nano) with aliases and defaulting to gpt-5-mini.
+- Integrated Groq and Cerebras hosted GPT-OSS 120B and 20B models with aliases.
+- Example demonstrating GPT-5-specific verbosity and reasoning effort controls.
+
 ## [0.79.0]
 
 ### Added
