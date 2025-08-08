@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.80.0]
 
-### Breaking Changes
+### Breaking Changes
 - Changed the default chat model to GPT-5 mini (`MODEL_CHAT` global variable).
 
 ### Added
