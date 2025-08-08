@@ -160,7 +160,8 @@ using PromptingTools: call_cost, anthropic_api, function_call_signature,
     ]
     conversation = render(schema, messages; name = "John", cache = :system)
     expected_output = (;
-        system = Dict{String, Any}[Dict("cache_control" => Dict("type" => "ephemeral"),
+        system = Dict{String, Any}[Dict(
+            "cache_control" => Dict("type" => "ephemeral"),
             "text" => "Act as a helpful AI assistant", "type" => "text")],
         conversation = [Dict("role" => "user",
             "content" => [Dict("type" => "text", "text" => "Hello, my name is John")])])
@@ -193,7 +194,8 @@ using PromptingTools: call_cost, anthropic_api, function_call_signature,
 
     conversation = render(schema, messages; name = "John", cache = :all)
     expected_output = (;
-        system = Dict{String, Any}[Dict("cache_control" => Dict("type" => "ephemeral"),
+        system = Dict{String, Any}[Dict(
+            "cache_control" => Dict("type" => "ephemeral"),
             "text" => "Act as a helpful AI assistant", "type" => "text")],
         conversation = [Dict("role" => "user",
             "content" => [Dict("type" => "text", "text" => "Hello, my name is John",
@@ -202,7 +204,8 @@ using PromptingTools: call_cost, anthropic_api, function_call_signature,
 
     conversation = render(schema, messages_with_ai; name = "John", cache = :all)
     expected_output = (;
-        system = Dict{String, Any}[Dict("cache_control" => Dict("type" => "ephemeral"),
+        system = Dict{String, Any}[Dict(
+            "cache_control" => Dict("type" => "ephemeral"),
             "text" => "Act as a helpful AI assistant", "type" => "text")],
         conversation = [
             Dict("role" => "user",
@@ -278,7 +281,8 @@ using PromptingTools: call_cost, anthropic_api, function_call_signature,
     conversation_with_cache = render(
         schema, messages; aiprefill = "My name is Claude", cache = :all)
     expected_output_with_cache = (;
-        system = Dict{String, Any}[Dict("cache_control" => Dict("type" => "ephemeral"),
+        system = Dict{String, Any}[Dict(
+            "cache_control" => Dict("type" => "ephemeral"),
             "text" => "Act as a helpful AI assistant", "type" => "text")],
         conversation = [
             Dict("role" => "user",
