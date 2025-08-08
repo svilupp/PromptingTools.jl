@@ -148,7 +148,7 @@ function get_preferences(key::String)
 end
 
 ## Load up GLOBALS
-global MODEL_CHAT::String = @load_preference("MODEL_CHAT", default="gpt-4.1-mini")
+global MODEL_CHAT::String = @load_preference("MODEL_CHAT", default="gpt-5-mini")
 global MODEL_EMBEDDING::String = @load_preference("MODEL_EMBEDDING",
     default="text-embedding-3-small")
 global MODEL_IMAGE_GENERATION::String = @load_preference("MODEL_IMAGE_GENERATION",
@@ -200,7 +200,7 @@ function load_api_keys!()
     global MISTRAL_API_KEY
     MISTRAL_API_KEY = @load_preference("MISTRAL_API_KEY",
         default=get(ENV, "MISTRAL_API_KEY",
-            get(ENV, "MISTRALAI_API_KEY", "")))
+        get(ENV, "MISTRALAI_API_KEY", "")))
     if !isempty(get(ENV, "MISTRALAI_API_KEY", ""))
         @debug "The MISTRALAI_API_KEY environment variable is deprecated. Use MISTRAL_API_KEY instead."
     end
@@ -281,7 +281,7 @@ See also: `push_conversation!`, `resize_conversation!`
 const CONV_HISTORY = Vector{Vector{<:Any}}()
 const CONV_HISTORY_LOCK = ReentrantLock()
 global MAX_HISTORY_LENGTH::Union{
-Int, Nothing} = @load_preference("MAX_HISTORY_LENGTH",
+    Int, Nothing} = @load_preference("MAX_HISTORY_LENGTH",
     default=5)
 
 ## Model registry
@@ -393,6 +393,9 @@ aliases = merge(
         "gpt41" => "gpt-4.1-2025-04-14",
         "gpt41m" => "gpt-4.1-mini-2025-04-14",
         "gpt41n" => "gpt-4.1-nano-2025-04-14",
+        "gpt5" => "gpt-5",
+        "gpt5m" => "gpt-5-mini",
+        "gpt5n" => "gpt-5-nano",
         "gpt45" => "gpt-4.5-preview", # 4.5 is for "4.5"
         "chatgpt" => "chatgpt-4o-latest",
         "o1" => "o1",
@@ -482,11 +485,14 @@ aliases = merge(
         "glsv" => "llama-3.2-11b-vision-preview",
         "glmv" => "llama-3.2-90b-vision-preview",
         "gk2" => "moonshotai/kimi-k2-instruct",
+        "ggptoss120" => "openai/gpt-oss-120b",
+        "ggptoss20" => "openai/gpt-oss-20b",
         ## Cerebras
         "cl3" => "llama3.1-8b",
         "cllama3" => "llama3.1-8b",
         "cl70" => "llama3.1-70b",
         "cllama70" => "llama3.1-70b",
+        "cgptoss120" => "gpt-oss-120b",
         ## SambaNova
         "sl3" => "Meta-Llama-3.1-8B-Instruct",
         "sllama3" => "Meta-Llama-3.1-8B-Instruct",
@@ -532,7 +538,8 @@ aliases = merge(
         "gem20ft" => "gemini-2.0-flash-thinking-exp-01-21",
         "gemexp" => "gemini-exp-1206", # latest experimental model from December 2024,
         "gem25p" => "gemini-2.5-pro-preview-05-06",
-        "gem25f" => "gemini-2.5-flash-preview-05-20",
+        "gem25f" => "gemini-2.5-flash",
+        "gem25fl" => "gemini-2.5-flash-lite",
         "k2" => "kimi-k2-0711-preview"
     ),
     ## Load aliases from preferences as well
@@ -634,6 +641,36 @@ registry = Dict{String, ModelSpec}(
         2e-6,
         8e-6,
         "GPT-4.1 is the latest OpenAI model. It has 1M context, 32K output."),
+    "gpt-5-2025-08-07" => ModelSpec("gpt-5-2025-08-07",
+        OpenAISchema(),
+        1.25e-6,
+        10e-6,
+        "GPT-5 is the newest OpenAI flagship model with 256K context and 128K output."),
+    "gpt-5" => ModelSpec("gpt-5",
+        OpenAISchema(),
+        1.25e-6,
+        10e-6,
+        "GPT-5 is the newest OpenAI flagship model with 256K context and 128K output."),
+    "gpt-5-mini-2025-08-07" => ModelSpec("gpt-5-mini-2025-08-07",
+        OpenAISchema(),
+        2.5e-7,
+        2e-6,
+        "GPT-5 Mini balances capability and cost with 256K context and 128K output."),
+    "gpt-5-mini" => ModelSpec("gpt-5-mini",
+        OpenAISchema(),
+        2.5e-7,
+        2e-6,
+        "GPT-5 Mini balances capability and cost with 256K context and 128K output."),
+    "gpt-5-nano-2025-08-07" => ModelSpec("gpt-5-nano-2025-08-07",
+        OpenAISchema(),
+        5e-8,
+        4e-7,
+        "GPT-5 Nano is the most affordable GPT-5 variant with 256K context and 128K output."),
+    "gpt-5-nano" => ModelSpec("gpt-5-nano",
+        OpenAISchema(),
+        5e-8,
+        4e-7,
+        "GPT-5 Nano is the most affordable GPT-5 variant with 256K context and 128K output."),
     "o1-preview" => ModelSpec("o1-preview",
         OpenAISchema(),
         1.5e-5,
@@ -1197,6 +1234,16 @@ registry = Dict{String, ModelSpec}(
         1e-6,
         3e-6,
         "Moonshot's Kimi K2 model hosted by Groq. Advanced reasoning capabilities with long context support."),
+    "openai/gpt-oss-120b" => ModelSpec("openai/gpt-oss-120b",
+        GroqOpenAISchema(),
+        1.5e-7,
+        7.5e-7,
+        "Open-source GPT-OSS 120B model hosted by Groq. 128K context."),
+    "openai/gpt-oss-20b" => ModelSpec("openai/gpt-oss-20b",
+        GroqOpenAISchema(),
+        1e-7,
+        5e-7,
+        "Open-source GPT-OSS 20B model hosted by Groq. 128K context."),
     "deepseek-chat" => ModelSpec("deepseek-chat",
         DeepSeekOpenAISchema(),
         1.4e-7,
@@ -1283,7 +1330,13 @@ registry = Dict{String, ModelSpec}(
         6e-7,
         6e-7,
         "Meta's Llama3.1 70b, hosted by Cerebras.ai. Max 8K context."),
-    "Meta-Llama-3.2-1B-Instruct" => ModelSpec("Meta-Llama-3.2-1B-Instruct",
+    "gpt-oss-120b" => ModelSpec("gpt-oss-120b",
+        CerebrasOpenAISchema(),
+        2.5e-7,
+        6.9e-7,
+        "Open-source GPT-OSS 120B model hosted by Cerebras. 8K context."),
+    "Meta-Llama-3.2-1B-Instruct" => ModelSpec(
+        "Meta-Llama-3.2-1B-Instruct",
         SambaNovaOpenAISchema(),
         4e-8,
         8e-8,
@@ -1366,6 +1419,16 @@ registry = Dict{String, ModelSpec}(
         1.5e-7,
         3.5e-6,
         "Gemini 2.5 Flash Preview from May 2025. 1M context, 65K output. Price differs if you request thinking or not. See details [here](https://ai.google.dev/gemini-api/docs/models/experimental-models#use-an-experimental-model)."),
+    "gemini-2.5-flash-lite" => ModelSpec("gemini-2.5-flash-lite",
+        GoogleOpenAISchema(),
+        1e-7,
+        4e-7,
+        "Gemini 2.5 Flash Lite. 1M context, 65K output. Price differs if you request thinking or not. See details [here](https://ai.google.dev/gemini-api/docs/models/experimental-models#use-an-experimental-model)."),
+    "gemini-2.5-flash" => ModelSpec("gemini-2.5-flash",
+        GoogleOpenAISchema(),
+        3e-7,
+        2.5e-6,
+        "Gemini 2.5 Flash Latest Model. Context 1M tokens, 8K output. See details [here](https://ai.google.dev/gemini-api/docs/models/experimental-models#use-an-experimental-model)."),
     "gemini-exp-1114" => ModelSpec("gemini-exp-1114",
         GoogleOpenAISchema(),
         1.25e-6,

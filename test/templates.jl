@@ -7,8 +7,8 @@ using PromptingTools: TestEchoOpenAISchema
 @testset "Template rendering" begin
     template = AITemplate(:JudgeIsItTrue)
     expected_output = AbstractChatMessage[
-        SystemMessage("You are an impartial AI judge evaluating whether the provided statement is \"true\" or \"false\". Answer \"unknown\" if you cannot decide."),
-        UserMessage("# Statement\n\n{{it}}")]
+    SystemMessage("You are an impartial AI judge evaluating whether the provided statement is \"true\" or \"false\". Answer \"unknown\" if you cannot decide."),
+    UserMessage("# Statement\n\n{{it}}")]
     @test expected_output == render(PT.PROMPT_SCHEMA, template)
     @test expected_output == render(template)
     @test expected_output == render(nothing, template)

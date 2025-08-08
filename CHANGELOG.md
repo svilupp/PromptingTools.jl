@@ -10,6 +10,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Updated
 
+## [0.80.0]
+
+### Breaking Changes
+- Changed the default chat model to GPT-5 mini (`MODEL_CHAT` global variable).
+
+### Added
+- Added GPT-5 family models (gpt-5, gpt-5-mini, gpt-5-nano) with aliases (`gpt5`, `gpt5m`, `gpt5n`).
+- Integrated Groq and Cerebras hosted GPT-OSS 120B and 20B models with aliases (`ggptoss120` for Groq, `cgptoss120` for Cerebras).
+- Example demonstrating GPT-5-specific verbosity and reasoning effort controls (see `examples/gpt5_api_kwargs.jl`).
+- Added Gemini 2.5 Flash Lite and Gemini 2.5 Flash models with aliases (`gem25fl` and `gem25f`, respectively).
+
 ## [0.79.0]
 
 ### Added

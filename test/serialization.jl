@@ -8,20 +8,21 @@ using PromptingTools: save_template, load_template
 @testset "Serialization - Messages" begin
     # Test save_conversation
     messages = AbstractMessage[AnnotationMessage(;
-            content = "Annotation message"),
-        AnnotationMessage(;
-            content = "Annotation message 2", extras = Dict{Symbol, Any}(:a => 1, :b => 2)),
-        SystemMessage("System message 1"),
-        UserMessage("User message"),
-        AIMessage("AI message"),
-        UserMessageWithImages(; content = "a", image_url = String["b", "c"]),
-        DataMessage(;
-            content = "Data message"),
-        AIToolRequest(;
-            tool_calls = [ToolMessage(;
-            tool_call_id = "1", name = "MyType", raw = "", args = Dict(:content => "x"))]),
-        ToolMessage(;
-            tool_call_id = "1", name = "MyType", content = "x", raw = "", args = Dict(:content => 1))]
+        content = "Annotation message"),
+    AnnotationMessage(;
+        content = "Annotation message 2", extras = Dict{Symbol, Any}(:a => 1, :b => 2)),
+    SystemMessage("System message 1"),
+    UserMessage("User message"),
+    AIMessage("AI message"),
+    UserMessageWithImages(;
+        content = "a", image_url = String["b", "c"]),
+    DataMessage(;
+        content = "Data message"),
+    AIToolRequest(;
+        tool_calls = [ToolMessage(;
+        tool_call_id = "1", name = "MyType", raw = "", args = Dict(:content => "x"))]),
+    ToolMessage(;
+        tool_call_id = "1", name = "MyType", content = "x", raw = "", args = Dict(:content => 1))]
     tmp, _ = mktemp()
     save_conversation(tmp, messages)
     # Test load_conversation
@@ -57,13 +58,13 @@ end
 @testset "Serialization - Messages" begin
     # Test save_conversations
     messages = AbstractMessage[SystemMessage("System message 1"),
-        UserMessage("User message"),
-        AIMessage("AI message"),
-        AIToolRequest(;
-            tool_calls = [ToolMessage(;
-            tool_call_id = "1", name = "MyType", raw = "", args = Dict(:content => "x"))]),
-        ToolMessage(;
-            tool_call_id = "1", name = "MyType", content = "x", raw = "", args = Dict(:content => 1))]
+    UserMessage("User message"),
+    AIMessage("AI message"),
+    AIToolRequest(;
+        tool_calls = [ToolMessage(;
+        tool_call_id = "1", name = "MyType", raw = "", args = Dict(:content => "x"))]),
+    ToolMessage(;
+        tool_call_id = "1", name = "MyType", content = "x", raw = "", args = Dict(:content => 1))]
     dir = tempdir()
     fn = joinpath(dir, "conversations.jsonl")
     save_conversations(fn, [messages])
@@ -74,8 +75,8 @@ end
 
 @testset "Serialization - TracerMessage" begin
     conv = AbstractMessage[SystemMessage("System message 1"),
-        UserMessage("User message"),
-        AIMessage("AI message")]
+    UserMessage("User message"),
+    AIMessage("AI message")]
     traced_conv = TracerMessage.(conv)
     align_tracer!(traced_conv)
     tmp, _ = mktemp()
