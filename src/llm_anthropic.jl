@@ -396,7 +396,7 @@ Generate an AI response based on a given prompt using the Anthropic API.
 - `dry_run::Bool=false`: If `true`, skips sending the messages to the model (for debugging, often used with `return_all=true`).
 - `conversation::AbstractVector{<:AbstractMessage}=[]`: Not allowed for this schema. Provided only for compatibility.
 - `streamcallback::Any`: A callback function to handle streaming responses. Can be simply `stdout` or `StreamCallback` object. See `?StreamCallback` for details.
-  Note: We configure the `StreamCallback` (and necessary `api_kwargs`) for you, unless you specify the `flavor`. See `?configure_callback!` for details.
+  Note: For this you need `using StreamCallbacks.jl` which implements the streaming_request! method for streaming or any other package with PromptingTools.jl streaming support.
 - `no_system_message::Bool=false`: If `true`, do not include the default system message in the conversation history OR convert any provided system message to a user message.
 - `aiprefill::Union{Nothing, AbstractString}`: A string to be used as a prefill for the AI response. This steer the AI response in a certain direction (and potentially save output tokens). It MUST NOT end with a trailing with space. Useful for JSON formatting.
 - `http_kwargs::NamedTuple`: Additional keyword arguments for the HTTP request. Defaults to empty `NamedTuple`.
@@ -471,12 +471,14 @@ Example of streaming:
 # Simplest usage, just provide where to steam the text
 msg = aigenerate("Count from 1 to 100."; streamcallback = stdout, model="claudeh")
 
-streamcallback = PT.StreamCallback()
+using StreamCallbacks
+
+streamcallback = StreamCallback()
 msg = aigenerate("Count from 1 to 100."; streamcallback, model="claudeh")
 # this allows you to inspect each chunk with `streamcallback.chunks`. You can them empty it with `empty!(streamcallback)` in between repeated calls.
 
 # Get verbose output with details of each chunk
-streamcallback = PT.StreamCallback(; verbose=true, throw_on_error=true)
+streamcallback = StreamCallback(; verbose=true, throw_on_error=true)
 msg = aigenerate("Count from 1 to 10."; streamcallback, model="claudeh")
 ```
 

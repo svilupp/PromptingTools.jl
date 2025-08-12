@@ -250,7 +250,7 @@ Generate an AI response based on a given prompt using the OpenAI API.
 - `dry_run::Bool=false`: If `true`, skips sending the messages to the model (for debugging, often used with `return_all=true`).
 - `conversation`: An optional vector of `AbstractMessage` objects representing the conversation history. If not provided, it is initialized as an empty vector.
 - `streamcallback`: A callback function to handle streaming responses. Can be simply `stdout` or a `StreamCallback` object. See `?StreamCallback` for details.
-  Note: We configure the `StreamCallback` (and necessary `api_kwargs`) for you, unless you specify the `flavor`. See `?configure_callback!` for details.
+  Note: For this you need `using StreamCallbacks.jl` which implements the streaming_request! method for streaming or any other package with PromptingTools.jl streaming support.
 - `no_system_message::Bool=false`: If `true`, the default system message is not included in the conversation history. Any existing system message is converted to a `UserMessage`.
 - `name_user::Union{Nothing, String} = nothing`: The name to use for the user in the conversation history. Defaults to `nothing`.
 - `name_assistant::Union{Nothing, String} = nothing`: The name to use for the assistant in the conversation history. Defaults to `nothing`.
@@ -313,12 +313,13 @@ Example of streaming:
 # Simplest usage, just provide where to steam the text
 msg = aigenerate("Count from 1 to 100."; streamcallback = stdout)
 
-streamcallback = PT.StreamCallback()
+using StreamCallbacks
+streamcallback = StreamCallback()
 msg = aigenerate("Count from 1 to 100."; streamcallback)
 # this allows you to inspect each chunk with `streamcallback.chunks`. You can them empty it with `empty!(streamcallback)` in between repeated calls.
 
 # Get verbose output with details of each chunk
-streamcallback = PT.StreamCallback(; verbose=true, throw_on_error=true)
+streamcallback = StreamCallback(; verbose=true, throw_on_error=true)
 msg = aigenerate("Count from 1 to 10."; streamcallback)
 ```
 

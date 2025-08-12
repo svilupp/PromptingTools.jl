@@ -24,7 +24,6 @@ end
     include("extraction.jl")
     include("user_preferences.jl")
     include("llm_interface.jl")
-    include("streaming.jl")
     include("retry_layer.jl")
     include("llm_shared.jl")
     include("llm_openai.jl")
