@@ -540,7 +540,12 @@ aliases = merge(
         "gem25p" => "gemini-2.5-pro-preview-05-06",
         "gem25f" => "gemini-2.5-flash",
         "gem25fl" => "gemini-2.5-flash-lite",
-        "k2" => "kimi-k2-0711-preview"
+        "gem25fi" => "gemini-2.5-flash-image-preview",
+        "k2" => "kimi-k2-0711-preview",
+        ## Grok Code Fast
+        "grokcode" => "grok-code-fast-1",
+        "grokfast" => "grok-code-fast-1",
+        "gcf1" => "grok-code-fast-1"
     ),
     ## Load aliases from preferences as well
     @load_preference("MODEL_ALIASES", default=Dict{String, String}()))
@@ -1371,6 +1376,11 @@ registry = Dict{String, ModelSpec}(
         3e-6,
         15e-6,
         "XAI's Grok 4 model with 256K context window, vision, function calling, and reasoning capabilities."),
+    "grok-code-fast-1" => ModelSpec("grok-code-fast-1",
+        XAIOpenAISchema(),
+        2e-7,
+        1.5e-6,
+        "XAI's Grok Code Fast 1 is a speedy and economical reasoning model that excels at agentic coding. 256K context window with visible reasoning traces. Supports function calling and structured outputs."),
     ## Gemini 1.5 Models
     "gemini-1.5-pro-latest" => ModelSpec("gemini-1.5-pro-latest",
         GoogleOpenAISchema(),
@@ -1429,6 +1439,11 @@ registry = Dict{String, ModelSpec}(
         3e-7,
         2.5e-6,
         "Gemini 2.5 Flash Latest Model. Context 1M tokens, 8K output. See details [here](https://ai.google.dev/gemini-api/docs/models/experimental-models#use-an-experimental-model)."),
+    "gemini-2.5-flash-image-preview" => ModelSpec("gemini-2.5-flash-image-preview",
+        GoogleSchema(),
+        3e-7,
+        2.5e-6,
+        "Gemini 2.5 Flash Image Preview - conversational image generation and editing model. Context 32K tokens, 32K output. Supports both image input and image generation. See details [here](https://ai.google.dev/gemini-api/docs/models/gemini#gemini-2.5-flash-image-preview)."),
     "gemini-exp-1114" => ModelSpec("gemini-exp-1114",
         GoogleOpenAISchema(),
         1.25e-6,
