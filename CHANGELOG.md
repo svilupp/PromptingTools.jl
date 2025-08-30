@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Updated
 
+## [0.81.1]
+
+### Added
+- Added support for xAI's Grok Code Fast 1 model (`grok-code-fast-1`) - a speedy and economical reasoning model optimized for agentic coding. 256K context window with visible reasoning traces. Supports function calling and structured outputs. Aliases: `grokcode`, `grokfast`, `gcf1`.
+- Added missing Gemini 2.5 Flash Image Preview model (`gemini-2.5-flash-image-preview`) with alias `gem25fi`.
+
 ## [0.81.0]
 
 ### Updated
