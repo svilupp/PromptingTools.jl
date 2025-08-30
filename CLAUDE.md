@@ -140,3 +140,9 @@ To add a new model to the package, follow these steps:
    - Add description in `CHANGELOG.md` under new version header
    - Always mention both the model name and its alias
    - Follow format from previous model additions
+
+4. **Testing**: Test both the exact model name and alias
+   - Test the exact model name: `aigenerate("say hi", model="model-exact-name")`
+   - Test the alias: `aigenerate("say hi", model="alias")`
+   - Verify both work correctly and produce expected responses
+   - Add unit tests if the model uses a new schema or has unique behavior
