@@ -85,6 +85,3 @@ msg = aiscan(schema,
     it = "Is the image a Julia logo?",
     image_url = "some_link_to_julia_logo");
 
-## Streaming configuration
-cb = StreamCallback()
-configure_callback!(cb, OpenAISchema())

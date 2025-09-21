@@ -12,9 +12,6 @@ using HTTP
 import Preferences
 using Preferences: @load_preference, @set_preferences!
 using PrecompileTools
-using StreamCallbacks
-using StreamCallbacks: OpenAIStream, AnthropicStream, OllamaStream, StreamCallback,
-                       StreamChunk, AbstractStreamCallback
 using Test, Pkg
 ## Added REPL because it extends methods in Base.docs for extraction of docstrings
 using REPL
@@ -94,7 +91,7 @@ include("code_expressions.jl")
 export AICode
 include("code_eval.jl")
 
-## Streaming support
+## Streaming interface
 include("streaming.jl")
 
 ## Individual interfaces
