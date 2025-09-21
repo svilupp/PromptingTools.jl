@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Updated
 
+## [0.82.0]
+
+### Added
+- Added support for xAI's Grok 4 Fast models (`grok-4-fast-reasoning`, alias `grok4fr`, and `grok-4-fast-non-reasoning`, alias `grok4f`) featuring 2M token context windows and competitive pricing.
+
 ## [0.81.1]
 
 ### Added
