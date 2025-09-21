@@ -1,6 +1,4 @@
-module RAGTools
-
-@warn """
+"""
 RAGTools functionality has moved to a dedicated package!
 
 The PromptingTools.Experimental.RAGTools module has been moved to the separate RAGTools.jl package.
@@ -11,6 +9,7 @@ To migrate your code:
 3. All function names and APIs remain the same
 
 For more information, visit: https://github.com/JuliaGenAI/RAGTools.jl
-""" maxlog=1
+"""
+module RAGTools
 
 end # module RAGTools

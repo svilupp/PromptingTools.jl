@@ -510,6 +510,8 @@ aliases = merge(
         ## XAI's Grok
         "grok" => "grok-beta",
         "grok4" => "grok-4-0709",
+        "grok4fr" => "grok-4-fast-reasoning",
+        "grok4f" => "grok-4-fast-non-reasoning",
         ## MiniMax
         "minimax" => "MiniMax-Text-01",
         ## DeepSeek
@@ -1376,6 +1378,16 @@ registry = Dict{String, ModelSpec}(
         3e-6,
         15e-6,
         "XAI's Grok 4 model with 256K context window, vision, function calling, and reasoning capabilities."),
+    "grok-4-fast-reasoning" => ModelSpec("grok-4-fast-reasoning",
+        XAIOpenAISchema(),
+        2e-7,
+        5e-7,
+        "XAI's Grok 4 Fast Reasoning model featuring a 2M token context window with optimized reasoning performance."),
+    "grok-4-fast-non-reasoning" => ModelSpec("grok-4-fast-non-reasoning",
+        XAIOpenAISchema(),
+        2e-7,
+        5e-7,
+        "XAI's Grok 4 Fast Non-Reasoning model with a 2M token context window optimized for general-purpose generation."),
     "grok-code-fast-1" => ModelSpec("grok-code-fast-1",
         XAIOpenAISchema(),
         2e-7,
