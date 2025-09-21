@@ -4,8 +4,10 @@ default: help
 
 format:
 	# assumes you have JuliaFormatter installed in your global env / somewhere on LOAD_PATH
-	julia -e 'using JuliaFormatter; format(".")'
+	julia --project=@Fmt -e 'using JuliaFormatter; format(".")'
 
+test:
+	julia --project=. -e 'using Pkg; Pkg.test()'
 
 help:
 	echo "make help - show this help"
