@@ -1476,7 +1476,7 @@ registry = Dict{String, ModelSpec}(
         4e-7,
         "Gemini Flash Lite Latest Model. Context 1M tokens, 65K output. Always points to the latest available version. See details [here](https://ai.google.dev/gemini-api/docs/models/experimental-models#use-an-experimental-model)."),
     "gemini-2.5-flash-image-preview" => ModelSpec("gemini-2.5-flash-image-preview",
-        GoogleOpenAISchema(),
+        GoogleSchema(),
         3e-7,
         2.5e-6,
         "Gemini 2.5 Flash Image Preview - conversational image generation and editing model. Context 32K tokens, 32K output. Supports both image input and image generation. See details [here](https://ai.google.dev/gemini-api/docs/models/gemini#gemini-2.5-flash-image-preview)."),
