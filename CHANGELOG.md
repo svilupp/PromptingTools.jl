@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Updated
 
+## [0.82.1]
+
+### Added
+- Added support for new Gemini 2.5 Flash models: `gemini-2.5-flash-preview-09-2025` (alias `gem25f09`), `gemini-2.5-flash-lite-preview-09-2025` (alias `gem25fl09`), and `gemini-flash-lite-latest` (alias `gemfl`).
+- Updated `gemf` alias to correctly point to `gemini-flash-latest`.
+
 ## [0.82.0]
 
 ### Added
