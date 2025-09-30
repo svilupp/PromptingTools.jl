@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Updated
 
+## [0.82.2]
+
+### Added
+- Added support for Anthropic's Claude Sonnet 4.5 model (`claude-sonnet-4-5-20250929`) - the best model for complex agents and coding with highest intelligence across most tasks. Available with alias `claude45`.
+
 ## [0.82.1]
 
 ### Added
