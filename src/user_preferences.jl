@@ -461,7 +461,7 @@ aliases = merge(
         "claude4" => "claude-sonnet-4-20250514",
         "claude45" => "claude-sonnet-4-5-20250929",
         "claudeh" => "claude-3-5-haiku-latest",
-        "claudes" => "claude-sonnet-4-20250514",
+        "claudes" => "claude-sonnet-4-5-20250929",
         "claudeo" => "claude-opus-4-20250514",
         ## Groq
         "gllama3" => "llama-3.1-8b-instant",
