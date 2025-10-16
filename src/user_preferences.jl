@@ -188,9 +188,6 @@ function load_api_keys!()
     global OPENAI_API_KEY
     OPENAI_API_KEY = @load_preference("OPENAI_API_KEY",
         default=get(ENV, "OPENAI_API_KEY", ""))
-    # Note: Disable this warning by setting OPENAI_API_KEY to anything
-    isempty(OPENAI_API_KEY) &&
-        @warn "OPENAI_API_KEY variable not set! OpenAI models will not be available - set API key directly via `PromptingTools.OPENAI_API_KEY=<api-key>`!"
     global AZURE_OPENAI_API_KEY
     AZURE_OPENAI_API_KEY = @load_preference("AZURE_OPENAI_API_KEY",
         default=get(ENV, "AZURE_OPENAI_API_KEY", ""))
