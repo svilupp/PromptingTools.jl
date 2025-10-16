@@ -28,7 +28,7 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
       ]),
       _cache[5] || (_cache[5] = createBaseVNode("p", null, [
         createBaseVNode("a", {
-          href: "https://github.com/svilupp/PromptingTools.jl/blob/3e76ef8e2b89e440a4e54376465f41bf5c67a195/src/llm_interface.jl#L410-L424",
+          href: "https://github.com/svilupp/PromptingTools.jl/blob/9b241cde7a4b3eecb29cb57f0f7a8e785534a806/src/llm_interface.jl#L410-L424",
           target: "_blank",
           rel: "noreferrer"
         }, "source")
@@ -104,7 +104,7 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
       ], -1)),
       _cache[32] || (_cache[32] = createBaseVNode("p", null, [
         createBaseVNode("a", {
-          href: "https://github.com/svilupp/PromptingTools.jl/blob/3e76ef8e2b89e440a4e54376465f41bf5c67a195/src/llm_ollama_managed.jl#L9-L21",
+          href: "https://github.com/svilupp/PromptingTools.jl/blob/9b241cde7a4b3eecb29cb57f0f7a8e785534a806/src/llm_ollama_managed.jl#L9-L21",
           target: "_blank",
           rel: "noreferrer"
         }, "source")
@@ -150,7 +150,7 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
       ]),
       _cache[46] || (_cache[46] = createBaseVNode("p", null, [
         createBaseVNode("a", {
-          href: "https://github.com/svilupp/PromptingTools.jl/blob/3e76ef8e2b89e440a4e54376465f41bf5c67a195/src/llm_shared.jl#L12-L32",
+          href: "https://github.com/svilupp/PromptingTools.jl/blob/9b241cde7a4b3eecb29cb57f0f7a8e785534a806/src/llm_shared.jl#L12-L32",
           target: "_blank",
           rel: "noreferrer"
         }, "source")
@@ -328,71 +328,81 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
         createBaseVNode("code", null, "return_type"),
         createTextVNode("):")
       ]),
-      createBaseVNode("div", { class: "language- vp-adaptive-theme" }, [
+      createBaseVNode("div", { class: "language-julia vp-adaptive-theme" }, [
         createBaseVNode("button", {
           title: "Copy Code",
           class: "copy"
         }),
-        createBaseVNode("span", { class: "lang" }),
+        createBaseVNode("span", { class: "lang" }, "julia"),
         createBaseVNode("pre", {
           class: "shiki shiki-themes github-light github-dark vp-code",
           tabindex: "0"
         }, [
           createBaseVNode("code", null, [
             createBaseVNode("span", { class: "line" }, [
-              createBaseVNode("span", null, "struct MyMeasurement")
+              createBaseVNode("span", { style: { "--shiki-light": "#D73A49", "--shiki-dark": "#F97583" } }, "struct"),
+              createBaseVNode("span", { style: { "--shiki-light": "#24292E", "--shiki-dark": "#E1E4E8" } }, " MyMeasurement")
             ]),
             createTextVNode("\n"),
             createBaseVNode("span", { class: "line" }, [
-              createBaseVNode("span", null, "    age::Int")
+              createBaseVNode("span", { style: { "--shiki-light": "#24292E", "--shiki-dark": "#E1E4E8" } }, "    age"),
+              createBaseVNode("span", { style: { "--shiki-light": "#D73A49", "--shiki-dark": "#F97583" } }, "::"),
+              createBaseVNode("span", { style: { "--shiki-light": "#005CC5", "--shiki-dark": "#79B8FF" } }, "Int")
             ]),
             createTextVNode("\n"),
             createBaseVNode("span", { class: "line" }, [
-              createBaseVNode("span", null, "    height::Union{Int,Nothing}")
+              createBaseVNode("span", { style: { "--shiki-light": "#24292E", "--shiki-dark": "#E1E4E8" } }, "    height"),
+              createBaseVNode("span", { style: { "--shiki-light": "#D73A49", "--shiki-dark": "#F97583" } }, "::"),
+              createBaseVNode("span", { style: { "--shiki-light": "#005CC5", "--shiki-dark": "#79B8FF" } }, "Union{Int,Nothing}")
             ]),
             createTextVNode("\n"),
             createBaseVNode("span", { class: "line" }, [
-              createBaseVNode("span", null, "    weight::Union{Nothing,Float64}")
+              createBaseVNode("span", { style: { "--shiki-light": "#24292E", "--shiki-dark": "#E1E4E8" } }, "    weight"),
+              createBaseVNode("span", { style: { "--shiki-light": "#D73A49", "--shiki-dark": "#F97583" } }, "::"),
+              createBaseVNode("span", { style: { "--shiki-light": "#005CC5", "--shiki-dark": "#79B8FF" } }, "Union{Nothing,Float64}")
             ]),
             createTextVNode("\n"),
             createBaseVNode("span", { class: "line" }, [
-              createBaseVNode("span", null, "end")
+              createBaseVNode("span", { style: { "--shiki-light": "#D73A49", "--shiki-dark": "#F97583" } }, "end")
             ]),
             createTextVNode("\n"),
             createBaseVNode("span", { class: "line" }, [
-              createBaseVNode("span", null, "tool_map = tool_call_signature(MyMeasurement)")
+              createBaseVNode("span", { style: { "--shiki-light": "#24292E", "--shiki-dark": "#E1E4E8" } }, "tool_map "),
+              createBaseVNode("span", { style: { "--shiki-light": "#D73A49", "--shiki-dark": "#F97583" } }, "="),
+              createBaseVNode("span", { style: { "--shiki-light": "#005CC5", "--shiki-dark": "#79B8FF" } }, " tool_call_signature"),
+              createBaseVNode("span", { style: { "--shiki-light": "#24292E", "--shiki-dark": "#E1E4E8" } }, "(MyMeasurement)")
             ]),
             createTextVNode("\n"),
             createBaseVNode("span", { class: "line" }, [
-              createBaseVNode("span", null, "#")
+              createBaseVNode("span", { style: { "--shiki-light": "#6A737D", "--shiki-dark": "#6A737D" } }, "#")
             ]),
             createTextVNode("\n"),
             createBaseVNode("span", { class: "line" }, [
-              createBaseVNode("span", null, '# Dict{String, PromptingTools.AbstractTool}("MyMeasurement" => PromptingTools.Tool')
+              createBaseVNode("span", { style: { "--shiki-light": "#6A737D", "--shiki-dark": "#6A737D" } }, '# Dict{String, PromptingTools.AbstractTool}("MyMeasurement" => PromptingTools.Tool')
             ]),
             createTextVNode("\n"),
             createBaseVNode("span", { class: "line" }, [
-              createBaseVNode("span", null, '#   name: String "MyMeasurement"')
+              createBaseVNode("span", { style: { "--shiki-light": "#6A737D", "--shiki-dark": "#6A737D" } }, '#   name: String "MyMeasurement"')
             ]),
             createTextVNode("\n"),
             createBaseVNode("span", { class: "line" }, [
-              createBaseVNode("span", null, "#   parameters: Dict{String, Any}")
+              createBaseVNode("span", { style: { "--shiki-light": "#6A737D", "--shiki-dark": "#6A737D" } }, "#   parameters: Dict{String, Any}")
             ]),
             createTextVNode("\n"),
             createBaseVNode("span", { class: "line" }, [
-              createBaseVNode("span", null, "#   description: Nothing nothing")
+              createBaseVNode("span", { style: { "--shiki-light": "#6A737D", "--shiki-dark": "#6A737D" } }, "#   description: Nothing nothing")
             ]),
             createTextVNode("\n"),
             createBaseVNode("span", { class: "line" }, [
-              createBaseVNode("span", null, "#   strict: Nothing nothing")
+              createBaseVNode("span", { style: { "--shiki-light": "#6A737D", "--shiki-dark": "#6A737D" } }, "#   strict: Nothing nothing")
             ]),
             createTextVNode("\n"),
             createBaseVNode("span", { class: "line" }, [
-              createBaseVNode("span", null, "#   callable: MyMeasurement <: Any")
+              createBaseVNode("span", { style: { "--shiki-light": "#6A737D", "--shiki-dark": "#6A737D" } }, "#   callable: MyMeasurement <: Any")
             ]),
             createTextVNode("\n"),
             createBaseVNode("span", { class: "line" }, [
-              createBaseVNode("span", null, '"')
+              createBaseVNode("span", { style: { "--shiki-light": "#032F62", "--shiki-dark": "#9ECBFF" } }, '"')
             ])
           ])
         ])
@@ -406,23 +416,29 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
         createBaseVNode("code", null, "weight"),
         createTextVNode(" are optional.")
       ]),
-      createBaseVNode("div", { class: "language- vp-adaptive-theme" }, [
+      createBaseVNode("div", { class: "language-julia vp-adaptive-theme" }, [
         createBaseVNode("button", {
           title: "Copy Code",
           class: "copy"
         }),
-        createBaseVNode("span", { class: "lang" }),
+        createBaseVNode("span", { class: "lang" }, "julia"),
         createBaseVNode("pre", {
           class: "shiki shiki-themes github-light github-dark vp-code",
           tabindex: "0"
         }, [
           createBaseVNode("code", null, [
             createBaseVNode("span", { class: "line" }, [
-              createBaseVNode("span", null, 'tool_map["MyMeasurement"].parameters["required"]')
+              createBaseVNode("span", { style: { "--shiki-light": "#24292E", "--shiki-dark": "#E1E4E8" } }, "tool_map["),
+              createBaseVNode("span", { style: { "--shiki-light": "#032F62", "--shiki-dark": "#9ECBFF" } }, '"MyMeasurement"'),
+              createBaseVNode("span", { style: { "--shiki-light": "#24292E", "--shiki-dark": "#E1E4E8" } }, "]"),
+              createBaseVNode("span", { style: { "--shiki-light": "#D73A49", "--shiki-dark": "#F97583" } }, "."),
+              createBaseVNode("span", { style: { "--shiki-light": "#24292E", "--shiki-dark": "#E1E4E8" } }, "parameters["),
+              createBaseVNode("span", { style: { "--shiki-light": "#032F62", "--shiki-dark": "#9ECBFF" } }, '"required"'),
+              createBaseVNode("span", { style: { "--shiki-light": "#24292E", "--shiki-dark": "#E1E4E8" } }, "]")
             ]),
             createTextVNode("\n"),
             createBaseVNode("span", { class: "line" }, [
-              createBaseVNode("span", null, '# ["age"]')
+              createBaseVNode("span", { style: { "--shiki-light": "#6A737D", "--shiki-dark": "#6A737D" } }, '# ["age"]')
             ])
           ])
         ])
@@ -432,35 +448,43 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
         createBaseVNode("code", null, "MyMeasurement"),
         createTextVNode(":")
       ]),
-      createBaseVNode("div", { class: "language- vp-adaptive-theme" }, [
+      createBaseVNode("div", { class: "language-julia vp-adaptive-theme" }, [
         createBaseVNode("button", {
           title: "Copy Code",
           class: "copy"
         }),
-        createBaseVNode("span", { class: "lang" }),
+        createBaseVNode("span", { class: "lang" }, "julia"),
         createBaseVNode("pre", {
           class: "shiki shiki-themes github-light github-dark vp-code",
           tabindex: "0"
         }, [
           createBaseVNode("code", null, [
             createBaseVNode("span", { class: "line" }, [
-              createBaseVNode("span", null, "struct MyMeasurementWrapper")
+              createBaseVNode("span", { style: { "--shiki-light": "#D73A49", "--shiki-dark": "#F97583" } }, "struct"),
+              createBaseVNode("span", { style: { "--shiki-light": "#24292E", "--shiki-dark": "#E1E4E8" } }, " MyMeasurementWrapper")
             ]),
             createTextVNode("\n"),
             createBaseVNode("span", { class: "line" }, [
-              createBaseVNode("span", null, "    measurements::Vector{MyMeasurement}")
+              createBaseVNode("span", { style: { "--shiki-light": "#24292E", "--shiki-dark": "#E1E4E8" } }, "    measurements"),
+              createBaseVNode("span", { style: { "--shiki-light": "#D73A49", "--shiki-dark": "#F97583" } }, "::"),
+              createBaseVNode("span", { style: { "--shiki-light": "#005CC5", "--shiki-dark": "#79B8FF" } }, "Vector{MyMeasurement}")
             ]),
             createTextVNode("\n"),
             createBaseVNode("span", { class: "line" }, [
-              createBaseVNode("span", null, "end")
+              createBaseVNode("span", { style: { "--shiki-light": "#D73A49", "--shiki-dark": "#F97583" } }, "end")
             ]),
             createTextVNode("\n"),
-            createBaseVNode("span", { class: "line" }, [
-              createBaseVNode("span")
-            ]),
+            createBaseVNode("span", { class: "line" }),
             createTextVNode("\n"),
             createBaseVNode("span", { class: "line" }, [
-              createBaseVNode("span", null, "Or if you want your extraction to fail gracefully when data isn't found, use `MaybeExtract{T}` wrapper (inspired by Instructor package!):")
+              createBaseVNode("span", { style: { "--shiki-light": "#24292E", "--shiki-dark": "#E1E4E8" } }, "Or "),
+              createBaseVNode("span", { style: { "--shiki-light": "#D73A49", "--shiki-dark": "#F97583" } }, "if"),
+              createBaseVNode("span", { style: { "--shiki-light": "#24292E", "--shiki-dark": "#E1E4E8" } }, " you want your extraction to fail gracefully when data isn"),
+              createBaseVNode("span", { style: { "--shiki-light": "#D73A49", "--shiki-dark": "#F97583" } }, "'"),
+              createBaseVNode("span", { style: { "--shiki-light": "#24292E", "--shiki-dark": "#E1E4E8" } }, "t found, use "),
+              createBaseVNode("span", { style: { "--shiki-light": "#032F62", "--shiki-dark": "#9ECBFF" } }, "`MaybeExtract{T}`"),
+              createBaseVNode("span", { style: { "--shiki-light": "#24292E", "--shiki-dark": "#E1E4E8" } }, " wrapper (inspired by Instructor package!)"),
+              createBaseVNode("span", { style: { "--shiki-light": "#D73A49", "--shiki-dark": "#F97583" } }, ":")
             ])
           ])
         ])
@@ -505,27 +529,32 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
       createBaseVNode("p", null, [
         createBaseVNode("strong", null, ":error => true")
       ]),
-      createBaseVNode("div", { class: "language- vp-adaptive-theme" }, [
+      createBaseVNode("div", { class: "language-julia vp-adaptive-theme" }, [
         createBaseVNode("button", {
           title: "Copy Code",
           class: "copy"
         }),
-        createBaseVNode("span", { class: "lang" }),
+        createBaseVNode("span", { class: "lang" }, "julia"),
         createBaseVNode("pre", {
           class: "shiki shiki-themes github-light github-dark vp-code",
           tabindex: "0"
         }, [
           createBaseVNode("code", null, [
             createBaseVNode("span", { class: "line" }, [
-              createBaseVNode("span", null, "That way, you can handle the error gracefully and get a reason why extraction failed.")
+              createBaseVNode("span", { style: { "--shiki-light": "#24292E", "--shiki-dark": "#E1E4E8" } }, "That way, you can handle the error gracefully and get a reason why extraction failed.")
             ]),
             createTextVNode("\n"),
-            createBaseVNode("span", { class: "line" }, [
-              createBaseVNode("span")
-            ]),
+            createBaseVNode("span", { class: "line" }),
             createTextVNode("\n"),
             createBaseVNode("span", { class: "line" }, [
-              createBaseVNode("span", null, 'You can also hide certain fields in your function call signature with Strings or Regex patterns (eg, `r"ctx"`).')
+              createBaseVNode("span", { style: { "--shiki-light": "#24292E", "--shiki-dark": "#E1E4E8" } }, "You can also hide certain fields "),
+              createBaseVNode("span", { style: { "--shiki-light": "#D73A49", "--shiki-dark": "#F97583" } }, "in"),
+              createBaseVNode("span", { style: { "--shiki-light": "#24292E", "--shiki-dark": "#E1E4E8" } }, " your "),
+              createBaseVNode("span", { style: { "--shiki-light": "#D73A49", "--shiki-dark": "#F97583" } }, "function"),
+              createBaseVNode("span", { style: { "--shiki-light": "#24292E", "--shiki-dark": "#E1E4E8" } }, " call signature with Strings or Regex patterns (eg, "),
+              createBaseVNode("span", { style: { "--shiki-light": "#032F62", "--shiki-dark": "#9ECBFF" } }, '`r"ctx"`'),
+              createBaseVNode("span", { style: { "--shiki-light": "#24292E", "--shiki-dark": "#E1E4E8" } }, ")"),
+              createBaseVNode("span", { style: { "--shiki-light": "#D73A49", "--shiki-dark": "#F97583" } }, ".")
             ])
           ])
         ])
@@ -533,7 +562,7 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
       createBaseVNode("p", null, 'tool_map = tool_call_signature(MyMeasurement; hidden_fields = ["ctx_user_id"]) ```'),
       createBaseVNode("p", null, [
         createBaseVNode("a", {
-          href: "https://github.com/svilupp/PromptingTools.jl/blob/3e76ef8e2b89e440a4e54376465f41bf5c67a195/src/extraction.jl#L463-L555",
+          href: "https://github.com/svilupp/PromptingTools.jl/blob/9b241cde7a4b3eecb29cb57f0f7a8e785534a806/src/extraction.jl#L463-L555",
           target: "_blank",
           rel: "noreferrer"
         }, "source")
