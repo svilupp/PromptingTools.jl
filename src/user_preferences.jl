@@ -188,9 +188,6 @@ function load_api_keys!()
     global OPENAI_API_KEY
     OPENAI_API_KEY = @load_preference("OPENAI_API_KEY",
         default=get(ENV, "OPENAI_API_KEY", ""))
-    # Note: Disable this warning by setting OPENAI_API_KEY to anything
-    isempty(OPENAI_API_KEY) &&
-        @warn "OPENAI_API_KEY variable not set! OpenAI models will not be available - set API key directly via `PromptingTools.OPENAI_API_KEY=<api-key>`!"
     global AZURE_OPENAI_API_KEY
     AZURE_OPENAI_API_KEY = @load_preference("AZURE_OPENAI_API_KEY",
         default=get(ENV, "AZURE_OPENAI_API_KEY", ""))
@@ -459,7 +456,7 @@ aliases = merge(
         "claude37" => "claude-3-7-sonnet-latest",
         "claude35" => "claude-3-5-sonnet-latest",
         "claude4" => "claude-sonnet-4-20250514",
-        "claudeh" => "claude-3-5-haiku-latest",
+        "claudeh" => "claude-haiku-4-5",
         "claudes" => "claude-sonnet-4-20250514",
         "claudeo" => "claude-opus-4-20250514",
         ## Groq
@@ -1130,6 +1127,11 @@ registry = Dict{String, ModelSpec}(
         3e-6,
         1.5e-5,
         "Anthropic's middle model Claude 3 Sonnet. Max output 4096 tokens, 200K context. See details [here](https://docs.anthropic.com/claude/docs/models-overview)"),
+    "claude-haiku-4-5" => ModelSpec("claude-haiku-4-5",
+        AnthropicSchema(),
+        1e-6,
+        5e-6,
+        "Anthropic's Claude Haiku 4.5 model. 200K context window, 64K output window. See details [here](https://docs.anthropic.com/claude/docs/models-overview)"),
     "claude-3-5-haiku-latest" => ModelSpec("claude-3-5-haiku-latest",
         AnthropicSchema(),
         1e-6,

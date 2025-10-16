@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Updated
 
+## [0.83.0]
+
+### Added
+- Added support for Anthropic's Claude Haiku 4.5 model (`claude-haiku-4-5`) with 200K context window, 64K output window, and updated pricing ($1/$5 per million tokens). The `claudeh` alias now points to this model.
+- Disabled warning that "OPENAI_API_KEY" is not set. 
+
 ## [0.82.1]
 
 ### Added
