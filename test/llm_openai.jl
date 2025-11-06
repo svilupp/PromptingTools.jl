@@ -383,6 +383,7 @@ end
     msg = aigenerate(CustomOpenAISchema(),
         prompt;
         model = "my_model",
+        api_key = "test_key",  # Provide a non-empty API key
         api_kwargs = (; url = "http://localhost:$(PORT)"),
         return_all = false)
     @test msg.content == prompt
@@ -412,6 +413,7 @@ end
     msg = aiembed(CustomOpenAISchema(),
         prompt;
         model = "my_model",
+        api_key = "test_key",
         api_kwargs = (; url = "http://localhost:$(PORT)"),
         return_all = false)
     @test msg.content == ones(128)

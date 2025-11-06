@@ -329,7 +329,7 @@ Note: Streaming support is only for OpenAI models and it doesn't yet support too
 """
 function aigenerate(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE;
         verbose::Bool = true,
-        api_key::String = OPENAI_API_KEY,
+        api_key::String = "",
         model::String = MODEL_CHAT, return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         streamcallback::Any = nothing,
