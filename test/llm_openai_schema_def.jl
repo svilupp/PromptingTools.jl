@@ -35,12 +35,12 @@ using PromptingTools: GoogleOpenAISchema, AIMessage, aigenerate, aiembed
     @test msg.finish_reason == "stop"
     close(echo_server)
 
-    # Test with non-empty GOOGLE_API_KEY
+    # Test with non-empty GOOGLE_API_KEY - explicit api_key should take precedence
     PromptingTools.GOOGLE_API_KEY = "env_key"
     PORT = rand(10000:20000)
     echo_server = HTTP.serve!(PORT, verbose = -1) do req
         auth_header = HTTP.header(req, "Authorization")
-        @test HTTP.header(req, "Authorization") == "Bearer env_key"
+        @test HTTP.header(req, "Authorization") == "Bearer test_key"
 
         content = JSON3.read(req.body)
 
@@ -57,7 +57,7 @@ using PromptingTools: GoogleOpenAISchema, AIMessage, aigenerate, aiembed
 
     msg = aigenerate(GoogleOpenAISchema(),
         "Test prompt";
-        api_key = "test_key",  # This should be ignored since GOOGLE_API_KEY is set
+        api_key = "test_key",
         model = "gemini-1.5-pro-latest",
         api_kwargs = (; url = "http://localhost:$(PORT)"))
 
@@ -91,12 +91,12 @@ using PromptingTools: GoogleOpenAISchema, AIMessage, aigenerate, aiembed
     @test msg.tokens == (5, 0)
     close(echo_server)
 
-    # Test embeddings with non-empty GOOGLE_API_KEY
+    # Test embeddings with non-empty GOOGLE_API_KEY - explicit api_key should take precedence
     PromptingTools.GOOGLE_API_KEY = "env_key"
     PORT = rand(10000:20000)
     echo_server = HTTP.serve!(PORT, verbose = -1) do req
         auth_header = HTTP.header(req, "Authorization")
-        @test HTTP.header(req, "Authorization") == "Bearer env_key"
+        @test HTTP.header(req, "Authorization") == "Bearer test_key"
 
         content = JSON3.read(req.body)
 
@@ -109,7 +109,7 @@ using PromptingTools: GoogleOpenAISchema, AIMessage, aigenerate, aiembed
 
     msg = aiembed(GoogleOpenAISchema(),
         "Test prompt";
-        api_key = "test_key",  # This should be ignored since GOOGLE_API_KEY is set
+        api_key = "test_key",
         model = "gemini-1.5-pro-latest",
         api_kwargs = (; url = "http://localhost:$(PORT)"))
 
