@@ -378,7 +378,7 @@ function OpenAI.create_embeddings(schema::MistralOpenAISchema,
     # Build the corresponding provider object
     # try to override provided api_key because the default is OpenAI key
     provider = CustomProvider(;
-        api_key = isempty(MISTRAL_API_KEY) ? api_key : MISTRAL_API_KEY,
+        api_key = !isempty(apikey) ? api_key : MISTRAL_API_KEY,
         base_url = url)
     OpenAI.create_embeddings(provider, docs, model; kwargs...)
 end
@@ -390,7 +390,7 @@ function OpenAI.create_embeddings(schema::DatabricksOpenAISchema,
         kwargs...)
     # Build the corresponding provider object
     provider = CustomProvider(;
-        api_key = isempty(DATABRICKS_API_KEY) ? api_key : DATABRICKS_API_KEY,
+        api_key = !isempty(apikey) ? api_key : DATABRICKS_API_KEY,
         base_url = isempty(DATABRICKS_HOST) ? url : DATABRICKS_HOST)
     # Override standard OpenAI request endpoint
     OpenAI.openai_request("serving-endpoints/$model/invocations",
@@ -407,7 +407,7 @@ function OpenAI.create_embeddings(schema::TogetherOpenAISchema,
         url::String = "https://api.together.xyz/v1",
         kwargs...)
     provider = CustomProvider(;
-        api_key = isempty(TOGETHER_API_KEY) ? api_key : TOGETHER_API_KEY,
+        api_key = !isempty(apikey) ? api_key : TOGETHER_API_KEY,
         base_url = url)
     OpenAI.create_embeddings(provider, docs, model; kwargs...)
 end
@@ -418,7 +418,7 @@ function OpenAI.create_embeddings(schema::FireworksOpenAISchema,
         url::String = "https://api.fireworks.ai/inference/v1",
         kwargs...)
     provider = CustomProvider(;
-        api_key = isempty(FIREWORKS_API_KEY) ? api_key : FIREWORKS_API_KEY,
+        api_key = !isempty(apikey) ? api_key : FIREWORKS_API_KEY,
         base_url = url)
     OpenAI.create_embeddings(provider, docs, model; kwargs...)
 end
@@ -429,7 +429,7 @@ function OpenAI.create_embeddings(schema::XAIOpenAISchema,
         url::String = "https://api.x.ai/v1",
         kwargs...)
     provider = CustomProvider(;
-        api_key = isempty(XAI_API_KEY) ? api_key : XAI_API_KEY,
+        api_key = !isempty(apikey) ? api_key : XAI_API_KEY,
         base_url = url)
     OpenAI.create_embeddings(provider, docs, model; kwargs...)
 end
@@ -439,7 +439,7 @@ function OpenAI.create_embeddings(schema::GoogleOpenAISchema,
         model::AbstractString;
         url::String = "https://generativelanguage.googleapis.com/v1beta",
         kwargs...)
-    api_key = isempty(GOOGLE_API_KEY) ? api_key : GOOGLE_API_KEY
+    api_key = !isempty(api_key) ? api_key : GOOGLE_API_KEY
     provider = GoogleProvider(; api_key, base_url = url)
     OpenAI.openai_request("embeddings",
         provider;
@@ -458,7 +458,7 @@ function OpenAI.create_embeddings(schema::AzureOpenAISchema,
 
     # Build the corresponding provider object
     provider = OpenAI.AzureProvider(;
-        api_key = isempty(AZURE_OPENAI_API_KEY) ? api_key : AZURE_OPENAI_API_KEY,
+        api_key = !isempty(apikey) ? api_key : AZURE_OPENAI_API_KEY,
         base_url = (isempty(AZURE_OPENAI_HOST) ? url : AZURE_OPENAI_HOST) *
                    "/openai/deployments/$model",
         api_version = api_version)
