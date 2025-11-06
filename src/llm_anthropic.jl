@@ -307,7 +307,7 @@ Simple wrapper for a call to Anthropic API.
 function anthropic_api(
         prompt_schema::AbstractAnthropicSchema,
         messages::Vector{<:AbstractDict{String, <:Any}} = Vector{Dict{String, Any}}();
-        api_key::AbstractString = ANTHROPIC_API_KEY,
+        api_key::AbstractString = "",
         system::Union{Nothing, AbstractString, AbstractVector{<:AbstractDict}} = nothing,
         endpoint::String = "messages",
         max_tokens::Int = 2048,
@@ -319,6 +319,8 @@ function anthropic_api(
         betas::Union{Nothing, Vector{Symbol}} = nothing,
         kwargs...)
     @assert endpoint in ["messages"] "Only 'messages' endpoint is supported."
+    ## Use explicit api_key if provided, otherwise fall back to environment variable
+    api_key = !isempty(api_key) ? api_key : ANTHROPIC_API_KEY
     ##
     body = Dict(:model => model, :max_tokens => max_tokens,
         :stream => stream, :messages => messages, kwargs...)
@@ -492,7 +494,7 @@ Note: It MUST NOT end with a trailing with space. You'll get an API error if you
 function aigenerate(
         prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMPT_TYPE;
         verbose::Bool = true,
-        api_key::String = ANTHROPIC_API_KEY,
+        api_key::String = "",
         model::String = MODEL_CHAT,
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
@@ -726,7 +728,7 @@ msg = aiextract("The weather in New York is sunny and 72.5 degrees Fahrenheit.";
 function aiextract(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMPT_TYPE;
         return_type::Union{Type, AbstractTool, Vector},
         verbose::Bool = true,
-        api_key::String = ANTHROPIC_API_KEY,
+        api_key::String = "",
         model::String = MODEL_CHAT,
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
@@ -937,7 +939,7 @@ PT.pprint(msg)
 function aitools(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMPT_TYPE;
         tools::Union{Type, Function, Method, AbstractTool, Vector} = Tool[],
         verbose::Bool = true,
-        api_key::String = ANTHROPIC_API_KEY,
+        api_key::String = "",
         model::String = MODEL_CHAT,
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
