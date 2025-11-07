@@ -244,7 +244,7 @@ Generate an AI response based on a given prompt using the OpenAI API.
 - `prompt_schema`: An optional object to specify which prompt template should be applied (Default to `PROMPT_SCHEMA = OpenAISchema`)
 - `prompt`: Can be a string representing the prompt for the AI conversation, a `UserMessage`, a vector of `AbstractMessage` or an `AITemplate`
 - `verbose`: A boolean indicating whether to print additional information.
-- `api_key`: A string representing the API key for accessing the OpenAI API.
+- `api_key`: A string representing the API key for accessing the OpenAI API, if not provided, the function will use the `OPENAI_API_KEY` environment variable.
 - `model`: A string representing the model to use for generating the response. Can be an alias corresponding to a model ID defined in `MODEL_ALIASES`.
 - `return_all::Bool=false`: If `true`, returns the entire conversation history, otherwise returns only the last message (the `AIMessage`).
 - `dry_run::Bool=false`: If `true`, skips sending the messages to the model (for debugging, often used with `return_all=true`).
@@ -445,7 +445,7 @@ msg.content' * msg.content[:, 1] # [1.0, 0.787]
 function aiembed(prompt_schema::AbstractOpenAISchema,
         doc_or_docs::Union{AbstractString, AbstractVector{<:AbstractString}},
         postprocess::F = identity; verbose::Bool = true,
-        api_key::String = OPENAI_API_KEY,
+        api_key::String = "",
         model::String = MODEL_EMBEDDING,
         http_kwargs::NamedTuple = (retry_non_idempotent = true,
             retries = 5,
@@ -964,7 +964,7 @@ It's effectively a light wrapper around `aigenerate` call, which requires additi
 - `return_type`: A **struct** TYPE (or a Tool, vector of Types) representing the the information we want to extract. Do not provide a struct instance, only the type. Alternatively, you can provide a vector of field names and their types (see `?generate_struct` function for the syntax).
   If the struct has a docstring, it will be provided to the model as well. It's used to enforce structured model outputs or provide more information.
 - `verbose`: A boolean indicating whether to print additional information.
-- `api_key`: A string representing the API key for accessing the OpenAI API.
+- `api_key`: A string representing the API key for accessing the OpenAI API. If not provided, the function will use the `OPENAI_API_KEY` environment variable.
 - `model`: A string representing the model to use for generating the response. Can be an alias corresponding to a model ID defined in `MODEL_ALIASES`.
 - `return_all::Bool=false`: If `true`, returns the entire conversation history, otherwise returns only the last message (the `AIMessage`).
 - `dry_run::Bool=false`: If `true`, skips sending the messages to the model (for debugging, often used with `return_all=true`).
@@ -1214,7 +1214,7 @@ end
     image_path::Union{Nothing, AbstractString, Vector{<:AbstractString}} = nothing,
     image_detail::AbstractString = "auto",
     attach_to_latest::Bool = true,
-    verbose::Bool = true, api_key::String = OPENAI_API_KEY,
+    verbose::Bool = true, api_key::String = "",
         model::String = MODEL_CHAT,
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
@@ -1240,7 +1240,7 @@ It's effectively a light wrapper around `aigenerate` call, which uses additional
 - `image_detail`: A string representing the level of detail to include for images. Can be `"auto"`, `"high"`, or `"low"`. See [OpenAI Vision Guide](https://platform.openai.com/docs/guides/vision) for more details.
 - `attach_to_latest`: A boolean how to handle if a conversation with multiple `UserMessage` is provided. When `true`, the images are attached to the latest `UserMessage`.
 - `verbose`: A boolean indicating whether to print additional information.
-- `api_key`: A string representing the API key for accessing the OpenAI API.
+- `api_key`: A string representing the API key for accessing the OpenAI API. If not provided, the function will use the `OPENAI_API_KEY` environment variable.
 - `model`: A string representing the model to use for generating the response. Can be an alias corresponding to a model ID defined in `MODEL_ALIASES`.
 - `return_all::Bool=false`: If `true`, returns the entire conversation history, otherwise returns only the last message (the `AIMessage`).
 - `dry_run::Bool=false`: If `true`, skips sending the messages to the model (for debugging, often used with `return_all=true`).
@@ -1305,7 +1305,7 @@ function aiscan(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE
         image_detail::AbstractString = "auto",
         attach_to_latest::Bool = true,
         verbose::Bool = true,
-        api_key::String = OPENAI_API_KEY,
+        api_key::String = "",
         model::String = MODEL_CHAT,
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
@@ -1372,7 +1372,7 @@ end
         image_quality::AbstractString = "standard",
         image_n::Integer = 1,
         verbose::Bool = true,
-        api_key::String = OPENAI_API_KEY,
+        api_key::String = "",
         model::String = MODEL_IMAGE_GENERATION,
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
@@ -1395,7 +1395,7 @@ This function DOES NOT SUPPORT multi-turn conversations (ie, do not provide prev
 - `image_quality`: It can be either "standard" or "hd". Defaults to "standard".
 - `image_n`: The number of images to generate. Currently, only single image generation is allowed (`image_n = 1`).
 - `verbose`: A boolean indicating whether to print additional information.
-- `api_key`: A string representing the API key for accessing the OpenAI API.
+- `api_key`: A string representing the API key for accessing the OpenAI API. If not provided, the function will use the `OPENAI_API_KEY` environment variable.
 - `model`: A string representing the model to use for generating the response. Can be an alias corresponding to a model ID defined in `MODEL_IMAGE_GENERATION`.
 - `return_all::Bool=false`: If `true`, returns the entire conversation history, otherwise returns only the last message (the `AIMessage`).
 - `dry_run::Bool=false`: If `true`, skips sending the messages to the model (for debugging, often used with `return_all=true`).
@@ -1457,7 +1457,7 @@ function aiimage(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYP
         image_quality::AbstractString = "standard",
         image_n::Integer = 1,
         verbose::Bool = true,
-        api_key::String = OPENAI_API_KEY,
+        api_key::String = "",
         model::String = MODEL_IMAGE_GENERATION,
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
@@ -1618,7 +1618,7 @@ end
     aitools(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE;
         tools::Union{Type, Function, Method, AbstractTool, Vector} = Tool[],
         verbose::Bool = true,
-        api_key::String = OPENAI_API_KEY,
+        api_key::String = "",
         model::String = MODEL_CHAT,
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
@@ -1646,7 +1646,7 @@ Differences to `aiextract`: Can provide infinitely many tools (including Functio
 - `prompt`: Can be a string representing the prompt for the AI conversation, a `UserMessage`, a vector of `AbstractMessage` or an `AITemplate`
 - `tools`: A vector of tools to be used in the conversation. Can be a vector of types, instances of `AbstractTool`, or a mix of both.
 - `verbose`: A boolean indicating whether to print additional information.
-- `api_key`: A string representing the API key for accessing the OpenAI API.
+- `api_key`: A string representing the API key for accessing the OpenAI API. If not provided, the function will use the `OPENAI_API_KEY` environment variable.
 - `model`: A string representing the model to use for generating the response. Can be an alias corresponding to a model ID defined in `MODEL_CHAT`.
 - `return_all`: If `true`, returns the entire conversation history, otherwise returns only the last message (the `AIMessage`).
 - `dry_run`: If `true`, skips sending the messages to the model (for debugging, often used with `return_all=true`).
@@ -1715,7 +1715,7 @@ conv = aitools(
 function aitools(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE;
         tools::Union{Type, Function, Method, AbstractTool, Vector} = Tool[],
         verbose::Bool = true,
-        api_key::String = OPENAI_API_KEY,
+        api_key::String = "",
         model::String = MODEL_CHAT,
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
