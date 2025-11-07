@@ -134,7 +134,7 @@ end
 """
     aigenerate(prompt_schema::AbstractGoogleSchema, prompt::ALLOWED_PROMPT_TYPE;
         verbose::Bool = true,
-        api_key::String = GOOGLE_API_KEY,
+        api_key::String = "",
         model::String = "gemini-pro", return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         no_system_message::Bool = false,
@@ -153,7 +153,7 @@ Note:
 - `prompt_schema`: An optional object to specify which prompt template should be applied (Default to `PROMPT_SCHEMA = OpenAISchema`)
 - `prompt`: Can be a string representing the prompt for the AI conversation, a `UserMessage`, a vector of `AbstractMessage` or an `AITemplate`
 - `verbose`: A boolean indicating whether to print additional information.
-- `api_key`: A string representing the API key for accessing the OpenAI API.
+- `api_key`: A string representing the API key for accessing the Google Gemini API. If not provided, loads from `GOOGLE_API_KEY` environment variable.
 - `model`: A string representing the model to use for generating the response. Can be an alias corresponding to a model ID defined in `MODEL_ALIASES`. Defaults to 
 - `return_all::Bool=false`: If `true`, returns the entire conversation history, otherwise returns only the last message (the `AIMessage`).
 - `dry_run::Bool=false`: If `true`, skips sending the messages to the model (for debugging, often used with `return_all=true`).
@@ -209,7 +209,7 @@ msg=aigenerate(conversation; model="gemini")
 """
 function aigenerate(prompt_schema::AbstractGoogleSchema, prompt::ALLOWED_PROMPT_TYPE;
         verbose::Bool = true,
-        api_key::String = GOOGLE_API_KEY,
+        api_key::String = "",
         model::String = "gemini-pro", return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         no_system_message::Bool = false,
@@ -219,6 +219,8 @@ function aigenerate(prompt_schema::AbstractGoogleSchema, prompt::ALLOWED_PROMPT_
         kwargs...)
     ##
     global MODEL_ALIASES
+    ## Use explicit api_key if provided, otherwise fall back to environment variable
+    api_key = !isempty(api_key) ? api_key : GOOGLE_API_KEY
 
     ## Check that package GoogleGenAI is loaded
     ext = Base.get_extension(PromptingTools, :GoogleGenAIPromptingToolsExt)
