@@ -31,7 +31,6 @@ function OpenAI.create_chat(schema::AbstractOpenAISchema,
         http_kwargs::NamedTuple = NamedTuple(),
         streamcallback::Any = nothing,
         kwargs...)
-
     api_key = !isempty(api_key) ? api_key : OPENAI_API_KEY
     if !isnothing(streamcallback)
         ## Take over from OpenAI.jl
