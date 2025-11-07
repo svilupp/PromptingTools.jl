@@ -220,7 +220,7 @@ end
     image_url::Union{Nothing, AbstractString, Vector{<:AbstractString}} = nothing,
     image_path::Union{Nothing, AbstractString, Vector{<:AbstractString}} = nothing,
     attach_to_latest::Bool = true,
-    verbose::Bool = true, api_key::String = OPENAI_API_KEY,
+    verbose::Bool = true, api_key::String = "",
         model::String = MODEL_CHAT,
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
@@ -246,7 +246,7 @@ It's effectively a light wrapper around `aigenerate` call, which uses additional
 - `image_detail`: A string representing the level of detail to include for images. Can be `"auto"`, `"high"`, or `"low"`. See [OpenAI Vision Guide](https://platform.openai.com/docs/guides/vision) for more details.
 - `attach_to_latest`: A boolean how to handle if a conversation with multiple `UserMessage` is provided. When `true`, the images are attached to the latest `UserMessage`.
 - `verbose`: A boolean indicating whether to print additional information.
-- `api_key`: A string representing the API key for accessing the OpenAI API.
+- `api_key`: A string representing the API key for accessing the API. Defaults to an empty string.
 - `model`: A string representing the model to use for generating the response. Can be an alias corresponding to a model ID defined in `MODEL_ALIASES`.
 - `return_all::Bool=false`: If `true`, returns the entire conversation history, otherwise returns only the last message (the `AIMessage`).
 - `dry_run::Bool=false`: If `true`, skips sending the messages to the model (for debugging, often used with `return_all=true`).
@@ -317,7 +317,7 @@ function aiscan(prompt_schema::AbstractOllamaSchema, prompt::ALLOWED_PROMPT_TYPE
         image_path::Union{Nothing, AbstractString, Vector{<:AbstractString}} = nothing,
         attach_to_latest::Bool = true,
         verbose::Bool = true,
-        api_key::String = OPENAI_API_KEY,
+        api_key::String = "",
         model::String = MODEL_CHAT,
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],

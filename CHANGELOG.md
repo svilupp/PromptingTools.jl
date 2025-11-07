@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Updated
 
+## [0.84.0]
+
+### Breaking Changes
+- **BREAKING**: `ai*` functions now prioritize explicit `api_key` parameters over environment variables. If `api_key=""` (default), the function will fall back to the respective environment variable allowing users to explicitly override environment variables when needed.
+
 ## [0.83.0]
 
 ### Added

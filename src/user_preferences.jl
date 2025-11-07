@@ -1467,7 +1467,8 @@ registry = Dict{String, ModelSpec}(
         3e-7,
         2.5e-6,
         "Gemini 2.5 Flash Preview from September 2025. 1M context, 65K output. See details [here](https://ai.google.dev/gemini-api/docs/models/experimental-models#use-an-experimental-model)."),
-    "gemini-2.5-flash-lite-preview-09-2025" => ModelSpec("gemini-2.5-flash-lite-preview-09-2025",
+    "gemini-2.5-flash-lite-preview-09-2025" => ModelSpec(
+        "gemini-2.5-flash-lite-preview-09-2025",
         GoogleOpenAISchema(),
         1e-7,
         4e-7,

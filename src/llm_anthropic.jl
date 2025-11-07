@@ -277,7 +277,7 @@ end
     anthropic_api(
         prompt_schema::AbstractAnthropicSchema,
         messages::Vector{<:AbstractDict{String, <:Any}} = Vector{Dict{String, Any}}();
-        api_key::AbstractString = ANTHROPIC_API_KEY,
+        api_key::AbstractString = "",
         system::Union{Nothing, AbstractString, AbstractVector{<:AbstractDict}} = nothing,
         endpoint::String = "messages",
         max_tokens::Int = 2048,
@@ -307,7 +307,7 @@ Simple wrapper for a call to Anthropic API.
 function anthropic_api(
         prompt_schema::AbstractAnthropicSchema,
         messages::Vector{<:AbstractDict{String, <:Any}} = Vector{Dict{String, Any}}();
-        api_key::AbstractString = ANTHROPIC_API_KEY,
+        api_key::AbstractString = "",
         system::Union{Nothing, AbstractString, AbstractVector{<:AbstractDict}} = nothing,
         endpoint::String = "messages",
         max_tokens::Int = 2048,
@@ -319,6 +319,8 @@ function anthropic_api(
         betas::Union{Nothing, Vector{Symbol}} = nothing,
         kwargs...)
     @assert endpoint in ["messages"] "Only 'messages' endpoint is supported."
+    ## Use explicit api_key if provided, otherwise fall back to environment variable
+    api_key = !isempty(api_key) ? api_key : ANTHROPIC_API_KEY
     ##
     body = Dict(:model => model, :max_tokens => max_tokens,
         :stream => stream, :messages => messages, kwargs...)
@@ -360,7 +362,7 @@ end
 # For testing
 function anthropic_api(prompt_schema::TestEchoAnthropicSchema,
         messages::Vector{<:AbstractDict{String, <:Any}} = Vector{Dict{String, Any}}();
-        api_key::AbstractString = ANTHROPIC_API_KEY,
+        api_key::AbstractString = "",
         system::Union{Nothing, AbstractString, AbstractVector{<:AbstractDict}} = nothing,
         endpoint::String = "messages",
         cache::Union{Nothing, Symbol} = nothing,
@@ -373,7 +375,7 @@ end
 ## User-Facing API
 """
     aigenerate(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMPT_TYPE; verbose::Bool = true,
-        api_key::String = ANTHROPIC_API_KEY, model::String = MODEL_CHAT,
+        api_key::String = "", model::String = MODEL_CHAT,
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         streamcallback::Any = nothing,
@@ -390,7 +392,7 @@ Generate an AI response based on a given prompt using the Anthropic API.
 - `prompt_schema`: An optional object to specify which prompt template should be applied (Default to `PROMPT_SCHEMA = OpenAISchema` not `AbstractAnthropicSchema`)
 - `prompt`: Can be a string representing the prompt for the AI conversation, a `UserMessage`, a vector of `AbstractMessage` or an `AITemplate`
 - `verbose`: A boolean indicating whether to print additional information.
-- `api_key`: API key for the Antropic API. Defaults to `ANTHROPIC_API_KEY` (loaded via `ENV["ANTHROPIC_API_KEY"]`).
+- `api_key`: API key for the Antropic API. Defaults to empty string. If not provided, loads from `ANTHROPIC_API_KEY` environment variable.
 - `model`: A string representing the model to use for generating the response. Can be an alias corresponding to a model ID defined in `MODEL_ALIASES`, eg, "claudeh".
 - `return_all::Bool=false`: If `true`, returns the entire conversation history, otherwise returns only the last message (the `AIMessage`).
 - `dry_run::Bool=false`: If `true`, skips sending the messages to the model (for debugging, often used with `return_all=true`).
@@ -492,7 +494,7 @@ Note: It MUST NOT end with a trailing with space. You'll get an API error if you
 function aigenerate(
         prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMPT_TYPE;
         verbose::Bool = true,
-        api_key::String = ANTHROPIC_API_KEY,
+        api_key::String = "",
         model::String = MODEL_CHAT,
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
@@ -563,7 +565,7 @@ end
     aiextract(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMPT_TYPE;
         return_type::Union{Type, AbstractTool, Vector},
         verbose::Bool = true,
-        api_key::String = ANTHROPIC_API_KEY,
+        api_key::String = "",
         model::String = MODEL_CHAT,
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
@@ -591,7 +593,7 @@ It's effectively a light wrapper around `aigenerate` call, which requires additi
   If the struct has a docstring, it will be provided to the model as well. It's used to enforce structured model outputs or provide more information.
   Alternatively, you can provide a vector of field names and their types (see `?generate_struct` function for the syntax).
 - `verbose`: A boolean indicating whether to print additional information.
-- `api_key`: A string representing the API key for accessing the OpenAI API.
+- `api_key`: A string representing the API key for accessing the Anthropic API. If not provided, loads from `ANTHROPIC_API_KEY` environment variable.
 - `model`: A string representing the model to use for generating the response. Can be an alias corresponding to a model ID defined in `MODEL_ALIASES`.
 - `return_all::Bool=false`: If `true`, returns the entire conversation history, otherwise returns only the last message (the `AIMessage`).
 - `dry_run::Bool=false`: If `true`, skips sending the messages to the model (for debugging, often used with `return_all=true`).
@@ -726,7 +728,7 @@ msg = aiextract("The weather in New York is sunny and 72.5 degrees Fahrenheit.";
 function aiextract(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMPT_TYPE;
         return_type::Union{Type, AbstractTool, Vector},
         verbose::Bool = true,
-        api_key::String = ANTHROPIC_API_KEY,
+        api_key::String = "",
         model::String = MODEL_CHAT,
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
@@ -831,7 +833,7 @@ end
         kwargs...)
         tools::Union{Type, Function, Method, AbstractTool, Vector} = Tool[],
         verbose::Bool = true,
-        api_key::String = ANTHROPIC_API_KEY,
+        api_key::String = "",
         model::String = MODEL_CHAT,
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
@@ -857,7 +859,7 @@ Differences to `aiextract`: Can provide infinitely many tools (including Functio
 - `prompt`: Can be a string representing the prompt for the AI conversation, a `UserMessage`, a vector of `AbstractMessage` or an `AITemplate`
 - `tools`: A vector of tools to be used in the conversation. Can be a vector of types, instances of `AbstractTool`, or a mix of both.
 - `verbose`: A boolean indicating whether to print additional information.
-- `api_key`: A string representing the API key for accessing the Anthropic API.
+- `api_key`: A string representing the API key for accessing the Anthropic API. If not provided, loads from `ANTHROPIC_API_KEY` environment variable.
 - `model`: A string representing the model to use for generating the response. Can be an alias corresponding to a model ID defined in `MODEL_CHAT`.
 - `return_all`: If `true`, returns the entire conversation history, otherwise returns only the last message (the `AIMessage`).
 - `dry_run`: If `true`, skips sending the messages to the model (for debugging, often used with `return_all=true`).
@@ -937,7 +939,7 @@ PT.pprint(msg)
 function aitools(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMPT_TYPE;
         tools::Union{Type, Function, Method, AbstractTool, Vector} = Tool[],
         verbose::Bool = true,
-        api_key::String = ANTHROPIC_API_KEY,
+        api_key::String = "",
         model::String = MODEL_CHAT,
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
