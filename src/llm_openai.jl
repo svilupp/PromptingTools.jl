@@ -226,7 +226,7 @@ end
 """
     aigenerate(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE;
         verbose::Bool = true,
-        api_key::String = OPENAI_API_KEY,
+        api_key::String = "",
         model::String = MODEL_CHAT, return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         streamcallback::Any = nothing,
@@ -394,7 +394,7 @@ end
             doc_or_docs::Union{AbstractString, AbstractVector{<:AbstractString}},
             postprocess::F = identity;
             verbose::Bool = true,
-            api_key::String = OPENAI_API_KEY,
+            api_key::String = "",
             model::String = MODEL_EMBEDDING, 
             http_kwargs::NamedTuple = (retry_non_idempotent = true,
                                        retries = 5,
@@ -409,7 +409,7 @@ The `aiembed` function generates embeddings for the given input using a specifie
 - `doc_or_docs::Union{AbstractString, AbstractVector{<:AbstractString}}`: The document or list of documents to generate embeddings for.
 - `postprocess::F`: The post-processing function to apply to each embedding. Defaults to the identity function.
 - `verbose::Bool`: A flag indicating whether to print verbose information. Defaults to `true`.
-- `api_key::String`: The API key to use for the OpenAI API. Defaults to `OPENAI_API_KEY`.
+- `api_key::String`: The API key to use for the OpenAI API. Defaults to `""`, which will use `OPENAI_API_KEY` from environment.
 - `model::String`: The model to use for generating embeddings. Defaults to `MODEL_EMBEDDING`.
 - `http_kwargs::NamedTuple`: Additional keyword arguments for the HTTP request. Defaults to `(retry_non_idempotent = true, retries = 5, readtimeout = 120)`.
 - `api_kwargs::NamedTuple`: Additional keyword arguments for the OpenAI API. Defaults to an empty `NamedTuple`.
@@ -938,7 +938,7 @@ end
     aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE;
         return_type::Union{Type, AbstractTool, Vector},
         verbose::Bool = true,
-        api_key::String = OPENAI_API_KEY,
+        api_key::String = "",
         model::String = MODEL_CHAT,
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
@@ -1119,7 +1119,7 @@ msg = aiextract("James is 30, weighs 80kg. He's 180cm tall."; return_type=MyMeas
 function aiextract(prompt_schema::AbstractOpenAISchema, prompt::ALLOWED_PROMPT_TYPE;
         return_type::Union{Type, AbstractTool, Vector},
         verbose::Bool = true,
-        api_key::String = OPENAI_API_KEY,
+        api_key::String = "",
         model::String = MODEL_CHAT,
         return_all::Bool = false, dry_run::Bool = false,
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],

@@ -593,7 +593,7 @@ It's effectively a light wrapper around `aigenerate` call, which requires additi
   If the struct has a docstring, it will be provided to the model as well. It's used to enforce structured model outputs or provide more information.
   Alternatively, you can provide a vector of field names and their types (see `?generate_struct` function for the syntax).
 - `verbose`: A boolean indicating whether to print additional information.
-- `api_key`: A string representing the API key for accessing the OpenAI API.
+- `api_key`: A string representing the API key for accessing the Anthropic API.
 - `model`: A string representing the model to use for generating the response. Can be an alias corresponding to a model ID defined in `MODEL_ALIASES`.
 - `return_all::Bool=false`: If `true`, returns the entire conversation history, otherwise returns only the last message (the `AIMessage`).
 - `dry_run::Bool=false`: If `true`, skips sending the messages to the model (for debugging, often used with `return_all=true`).

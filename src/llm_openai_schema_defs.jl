@@ -31,6 +31,8 @@ function OpenAI.create_chat(schema::AbstractOpenAISchema,
         http_kwargs::NamedTuple = NamedTuple(),
         streamcallback::Any = nothing,
         kwargs...)
+
+    api_key = !isempty(api_key) ? api_key : OPENAI_API_KEY
     if !isnothing(streamcallback)
         ## Take over from OpenAI.jl
         url = OpenAI.build_url(OpenAI.DEFAULT_PROVIDER, "chat/completions")
@@ -333,6 +335,7 @@ function OpenAI.create_embeddings(schema::AbstractOpenAISchema,
         docs,
         model::AbstractString;
         kwargs...)
+    api_key = !isempty(api_key) ? api_key : OPENAI_API_KEY
     OpenAI.create_embeddings(api_key, docs, model; kwargs...)
 end
 function OpenAI.create_embeddings(schema::TestEchoOpenAISchema, api_key::AbstractString,
@@ -495,6 +498,7 @@ function OpenAI.create_images(schema::AbstractOpenAISchema,
         prompt,
         args...;
         kwargs...)
+    api_key = !isempty(api_key) ? api_key : OPENAI_API_KEY
     OpenAI.create_images(api_key, prompt, args...; kwargs...)
 end
 function OpenAI.create_images(schema::TestEchoOpenAISchema,
