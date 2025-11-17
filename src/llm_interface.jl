@@ -575,3 +575,32 @@ abstract type AbstractExtractedData end
 Base.show(io::IO, x::AbstractExtractedData) = dump(io, x; maxdepth = 1)
 "Check if the object is an instance of `AbstractExtractedData`"
 isextracted(x) = x isa AbstractExtractedData
+
+# OpenAI Responses API implementation
+#
+# This file contains the implementation for OpenAI's Responses API endpoint (/responses)
+# which is used by models like gpt-5.1-codex that don't support the standard chat completions API.
+
+"""
+    AbstractResponseSchema
+
+Abstract type for all response-based schemas that use the `/responses` endpoint instead of `/chat/completions`.
+"""
+abstract type AbstractResponseSchema <: AbstractPromptSchema end
+
+"""
+    OpenAIResponseSchema <: AbstractResponseSchema
+
+A schema for OpenAI's Responses API (`/responses` endpoint).
+
+This schema is used for models that only support the Responses API, such as `gpt-5.1-codex`.
+Unlike the standard chat completions API, the Responses API uses `input` and `instructions` 
+fields instead of a messages array.
+
+# Example
+```julia
+schema = OpenAIResponseSchema()
+response = airespond(schema, "What is Julia?"; model="gpt-5.1-codex")
+```
+"""
+struct OpenAIResponseSchema <: AbstractResponseSchema end
