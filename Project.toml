@@ -1,7 +1,7 @@
 name = "PromptingTools"
 uuid = "670122d1-24a8-4d70-bfce-740807c42192"
 authors = ["J S @svilupp and contributors"]
-version = "0.84.0"
+version = "0.85.0"
 
 [deps]
 AbstractTrees = "1520ce14-60c1-5f80-bbc7-55ef81b5835c"
@@ -46,7 +46,7 @@ REPL = "<0.0.1, 1"
 Random = "<0.0.1, 1"
 SparseArrays = "<0.0.1, 1"
 Statistics = "<0.0.1, 1"
-StreamCallbacks = "0.6.2"
+StreamCallbacks = "0.7.0"
 Test = "<0.0.1, 1"
 Unicode = "<0.0.1, 1"
 julia = "1.9, 1.10, 1.11"

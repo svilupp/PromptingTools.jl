@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Updated
 
+## [0.85.0]
+
+### Added
+- Added OpenAI GPT-5.1 models with aliases:
+  - `gpt-5.1` and `gpt-5.1-2025-11-13` with alias `gpt51` (same pricing and context as GPT-5)
+  - `gpt-5.1-codex` with alias `gpt51c` (same pricing as GPT-5.1)
+  - `gpt-5.1-codex-mini` with alias `gpt51cm` (same pricing as GPT-5 Mini)
+
 ## [0.84.0]
 
 ### Breaking Changes

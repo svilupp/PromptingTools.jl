@@ -13,7 +13,7 @@ import Preferences
 using Preferences: @load_preference, @set_preferences!
 using PrecompileTools
 using StreamCallbacks
-using StreamCallbacks: OpenAIStream, AnthropicStream, OllamaStream, StreamCallback,
+using StreamCallbacks: OpenAIStream, AnthropicStream, OllamaStream, ResponseStream, StreamCallback,
                        StreamChunk, AbstractStreamCallback
 using Test, Pkg
 ## Added REPL because it extends methods in Base.docs for extraction of docstrings
@@ -101,6 +101,8 @@ include("streaming.jl")
 include("llm_shared.jl")
 include("llm_openai_schema_defs.jl")
 include("llm_openai.jl")
+include("llm_responses.jl")
+
 include("llm_ollama_managed.jl")
 include("llm_ollama.jl")
 include("llm_google.jl")
