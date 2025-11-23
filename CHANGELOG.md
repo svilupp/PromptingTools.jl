@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Updated
 
+## [0.85.0]
+
+### Added
+- Added support for OpenAI's GPT-5.1 family: `gpt-5.1` (alias `gpt51`), `gpt-5.1-2025-11-13`, `gpt-5.1-codex` (alias `gpt51c`), and `gpt-5.1-codex-mini` (alias `gpt51cm`) with 256K context and 128K output (Note: The codex models require `responses` endpoint, which is NOT yet supported by the package).
+- Added support for Google's Gemini 3 Pro Preview model (`gemini-3-pro-preview`, alias `gem3p`) with 1M context and 64K output.
+
 ## [0.84.0]
 
 ### Breaking Changes
