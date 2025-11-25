@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Updated
 
+## [0.86.0]
+
+### Added
+- Added support for Anthropic's Claude Opus 4.5 model (`claude-opus-4-5-20251101`, alias `claudeo`).
+
 ## [0.85.0]
 
 ### Added
