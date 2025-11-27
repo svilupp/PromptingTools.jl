@@ -12,7 +12,7 @@ const _hoisted_8 = { style: { "border-width": "1px", "border-style": "solid", "b
 const _hoisted_9 = { style: { "border-width": "1px", "border-style": "solid", "border-color": "black", "padding": "1em", "border-radius": "25px" } };
 function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
   return openBlock(), createElementBlock("div", null, [
-    _cache[47] || (_cache[47] = createStaticVNode("", 42)),
+    _cache[47] || (_cache[47] = createStaticVNode("", 44)),
     createBaseVNode("div", _hoisted_1, [
       _cache[4] || (_cache[4] = createStaticVNode("", 11)),
       createBaseVNode("p", null, [
@@ -28,13 +28,13 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
       ]),
       _cache[5] || (_cache[5] = createBaseVNode("p", null, [
         createBaseVNode("a", {
-          href: "https://github.com/svilupp/PromptingTools.jl/blob/e810768da81f7e7cecb1d92758da9ea21e6b52a1/src/llm_interface.jl#L410-L424",
+          href: "https://github.com/svilupp/PromptingTools.jl/blob/644757033057e0733e23df4e38fbbaabfa9d4bf4/src/llm_interface.jl#L415-L429",
           target: "_blank",
           rel: "noreferrer"
         }, "source")
       ], -1))
     ]),
-    _cache[48] || (_cache[48] = createStaticVNode("", 117)),
+    _cache[48] || (_cache[48] = createStaticVNode("", 121)),
     createBaseVNode("div", _hoisted_2, [
       _cache[10] || (_cache[10] = createStaticVNode("", 9)),
       createBaseVNode("p", null, [
@@ -46,7 +46,7 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
       ]),
       _cache[11] || (_cache[11] = createStaticVNode("", 21))
     ]),
-    _cache[49] || (_cache[49] = createStaticVNode("", 73)),
+    _cache[49] || (_cache[49] = createStaticVNode("", 77)),
     createBaseVNode("div", _hoisted_3, [
       _cache[16] || (_cache[16] = createStaticVNode("", 10)),
       createBaseVNode("p", null, [
@@ -104,7 +104,7 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
       ], -1)),
       _cache[32] || (_cache[32] = createBaseVNode("p", null, [
         createBaseVNode("a", {
-          href: "https://github.com/svilupp/PromptingTools.jl/blob/e810768da81f7e7cecb1d92758da9ea21e6b52a1/src/llm_ollama_managed.jl#L9-L21",
+          href: "https://github.com/svilupp/PromptingTools.jl/blob/644757033057e0733e23df4e38fbbaabfa9d4bf4/src/llm_ollama_managed.jl#L9-L21",
           target: "_blank",
           rel: "noreferrer"
         }, "source")
@@ -130,7 +130,7 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
       ]),
       _cache[40] || (_cache[40] = createStaticVNode("", 3))
     ]),
-    _cache[55] || (_cache[55] = createStaticVNode("", 5)),
+    _cache[55] || (_cache[55] = createStaticVNode("", 7)),
     createBaseVNode("div", _hoisted_9, [
       _cache[45] || (_cache[45] = createStaticVNode("", 12)),
       createBaseVNode("ul", null, [
@@ -150,7 +150,7 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
       ]),
       _cache[46] || (_cache[46] = createBaseVNode("p", null, [
         createBaseVNode("a", {
-          href: "https://github.com/svilupp/PromptingTools.jl/blob/e810768da81f7e7cecb1d92758da9ea21e6b52a1/src/llm_shared.jl#L12-L32",
+          href: "https://github.com/svilupp/PromptingTools.jl/blob/644757033057e0733e23df4e38fbbaabfa9d4bf4/src/llm_shared.jl#L12-L32",
           target: "_blank",
           rel: "noreferrer"
         }, "source")
@@ -562,7 +562,7 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
       createBaseVNode("p", null, 'tool_map = tool_call_signature(MyMeasurement; hidden_fields = ["ctx_user_id"]) ```'),
       createBaseVNode("p", null, [
         createBaseVNode("a", {
-          href: "https://github.com/svilupp/PromptingTools.jl/blob/e810768da81f7e7cecb1d92758da9ea21e6b52a1/src/extraction.jl#L463-L555",
+          href: "https://github.com/svilupp/PromptingTools.jl/blob/644757033057e0733e23df4e38fbbaabfa9d4bf4/src/extraction.jl#L463-L555",
           target: "_blank",
           rel: "noreferrer"
         }, "source")
