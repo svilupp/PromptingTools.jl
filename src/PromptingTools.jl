@@ -15,6 +15,8 @@ using PrecompileTools
 using StreamCallbacks
 using StreamCallbacks: OpenAIStream, AnthropicStream, OllamaStream, StreamCallback,
                        StreamChunk, AbstractStreamCallback
+# ResponseStream will be available in a future StreamCallbacks release
+# For now, we use OpenAIStream as a fallback for the Responses API
 using Test, Pkg
 ## Added REPL because it extends methods in Base.docs for extraction of docstrings
 using REPL
@@ -100,7 +102,12 @@ include("streaming.jl")
 ## Individual interfaces
 include("llm_shared.jl")
 include("llm_openai_schema_defs.jl")
-include("llm_openai.jl")
+# OpenAI API has two endpoints: /chat/completions and /responses
+# - llm_openai_chat.jl: Standard Chat Completions API (most models)
+# - llm_openai_responses.jl: Responses API for models like gpt-5.1-codex
+include("llm_openai_chat.jl")
+include("llm_openai_responses.jl")
+
 include("llm_ollama_managed.jl")
 include("llm_ollama.jl")
 include("llm_google.jl")

@@ -5,6 +5,11 @@
 # - user-facing functionality (eg, `aigenerate`, `aiembed`)
 #
 # Ideally, each new interface would be defined in a separate `llm_<interface>.jl` file (eg, `llm_chatml.jl`).
+#
+# OpenAI API Organization:
+# - llm_openai_schema_defs.jl: Schema type definitions for OpenAI-compatible APIs
+# - llm_openai_chat.jl: Chat Completions API (`/chat/completions` endpoint)
+# - llm_openai_responses.jl: Responses API (`/responses` endpoint) for models like gpt-5.1-codex
 
 ## Main Functions
 function role4render end
@@ -575,3 +580,57 @@ abstract type AbstractExtractedData end
 Base.show(io::IO, x::AbstractExtractedData) = dump(io, x; maxdepth = 1)
 "Check if the object is an instance of `AbstractExtractedData`"
 isextracted(x) = x isa AbstractExtractedData
+
+# OpenAI Responses API implementation
+#
+# This file contains the implementation for OpenAI's Responses API endpoint (/responses)
+# which is used by models like gpt-5.1-codex that don't support the standard chat completions API.
+
+"""
+    AbstractResponseSchema
+
+Abstract type for all response-based schemas that use the `/responses` endpoint instead of `/chat/completions`.
+"""
+abstract type AbstractResponseSchema <: AbstractPromptSchema end
+
+"""
+    OpenAIResponseSchema <: AbstractResponseSchema
+
+A schema for OpenAI's Responses API (`/responses` endpoint).
+
+This schema is used for models that only support the Responses API, such as `gpt-5.1-codex`.
+Unlike the standard chat completions API, the Responses API uses `input` and `instructions` 
+fields instead of a messages array.
+
+# Example
+```julia
+schema = OpenAIResponseSchema()
+response = aigenerate(schema, "What is Julia?"; model="gpt-5.1-codex")
+```
+"""
+struct OpenAIResponseSchema <: AbstractResponseSchema end
+
+"Echoes the user's input back to them. Used for testing the Responses API implementation"
+@kwdef mutable struct TestEchoOpenAIResponseSchema <: AbstractResponseSchema
+    response::AbstractDict = Dict(
+        "id" => "resp_test123",
+        "object" => "response",
+        "status" => "completed",
+        "output" => [
+            Dict(
+            "type" => "message",
+            "content" => [
+                Dict("type" => "output_text", "text" => "Test response")
+            ]
+        )
+        ],
+        "usage" => Dict(
+            "input_tokens" => 10,
+            "output_tokens" => 20
+        ),
+        "reasoning" => Dict()
+    )
+    status::Integer = 200
+    model_id::String = ""
+    inputs::Any = nothing
+end
