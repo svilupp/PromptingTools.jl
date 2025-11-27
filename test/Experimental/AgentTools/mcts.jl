@@ -184,8 +184,18 @@ end
     best_uct2 = select_best(root, UCT(); ordering = :PostOrderDFS)
     @test child11 == best_uct1 == best_uct2
 
-    best_ts = select_best(root, ThompsonSampling())
-    @test child2 != best_ts  # Unlikely to be the losing node
+    ## ThompsonSampling test with stronger statistics to avoid flakiness
+    # Create a separate tree with more visits to make selection deterministic
+    data2 = PT.AbstractMessage[]
+    root2 = SampleNode(; data = data2)
+    good_child = expand!(root2, data2)
+    backpropagate!(good_child; wins = 10, visits = 10)  # 100% win rate
+    bad_child = expand!(root2, data2)
+    backpropagate!(bad_child; wins = 0, visits = 10)    # 0% win rate
+    # With these stats: good_child ~ Beta(11,1), bad_child ~ Beta(1,11)
+    # Probability of bad_child winning is negligible (~1e-6)
+    best_ts = select_best(root2, ThompsonSampling())
+    @test bad_child != best_ts  # Should never select the clearly losing node
 
     ## if no scores, Pre/Post with UCT determines which node is selected
     data = PT.AbstractMessage[]

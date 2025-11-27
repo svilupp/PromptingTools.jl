@@ -83,6 +83,7 @@ function OpenAI.create_chat(schema::CustomOpenAISchema,
         kwargs...)
     # Build the corresponding provider object
     # Create chat will automatically pass our data to endpoint `/chat/completions`
+    api_key = !isempty(api_key) ? api_key : OPENAI_API_KEY
     provider = CustomProvider(; api_key, base_url = url)
     if !isnothing(streamcallback)
         ## Take over from OpenAI.jl
@@ -352,6 +353,7 @@ function OpenAI.create_embeddings(schema::CustomOpenAISchema,
         kwargs...)
     # Build the corresponding provider object
     # Create chat will automatically pass our data to endpoint `/embeddings`
+    api_key = !isempty(api_key) ? api_key : OPENAI_API_KEY
     provider = CustomProvider(; api_key, base_url = url)
     OpenAI.create_embeddings(provider, docs, model; kwargs...)
 end

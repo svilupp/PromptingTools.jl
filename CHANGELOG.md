@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Updated
 
+## [0.87.0]
+
+### Fixed
+- Fixed missing `api_key` fallback in `CustomOpenAISchema` for both `create_embeddings` and `create_chat` methods. Previously, these methods would fail with an empty API key error even when `OPENAI_API_KEY` was set.
+- Fixed flaky `select_best` test for `ThompsonSampling` to be more deterministic.
+
 ## [0.86.0]
 
 ### Added
