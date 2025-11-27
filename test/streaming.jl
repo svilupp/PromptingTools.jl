@@ -1,6 +1,7 @@
 using PromptingTools: StreamCallback, StreamChunk, OpenAIStream, AnthropicStream,
                       configure_callback!, OllamaStream
-using PromptingTools: OpenAISchema, AnthropicSchema, GoogleSchema, OllamaSchema
+using PromptingTools: OpenAISchema, AnthropicSchema, GoogleSchema, OllamaSchema,
+                      OpenAIResponseSchema
 
 @testset "configure_callback!" begin
     # Test configure_callback! method
@@ -15,6 +16,11 @@ using PromptingTools: OpenAISchema, AnthropicSchema, GoogleSchema, OllamaSchema
 
     cb, api_kwargs = configure_callback!(StreamCallback(), OllamaSchema())
     @test cb.flavor isa OllamaStream
+    @test api_kwargs[:stream] == true
+
+    # Test ResponseSchema streaming (uses OpenAIStream until ResponseStream is available)
+    cb, api_kwargs = configure_callback!(StreamCallback(), OpenAIResponseSchema())
+    @test cb.flavor isa OpenAIStream
     @test api_kwargs[:stream] == true
 
     # Test error for unsupported schema
