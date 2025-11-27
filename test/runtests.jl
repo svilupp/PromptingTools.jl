@@ -28,6 +28,7 @@ end
     include("retry_layer.jl")
     include("llm_shared.jl")
     include("llm_openai.jl")
+    include("llm_openai_responses.jl")
     include("llm_ollama_managed.jl")
     include("llm_ollama.jl")
     include("llm_google.jl")
