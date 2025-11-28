@@ -18,11 +18,11 @@ schema = PT.OpenAIResponseSchema()
 # ```bash
 # curl "https://api.openai.com/v1/responses" \
 #     -H "Authorization: Bearer $OPENAI_API_KEY" \
-#     -d '{"model": "gpt-4o-mini", "input": "Write a one-sentence bedtime story about a unicorn."}'
+#     -d '{"model": "gpt-5-mini", "input": "Write a one-sentence bedtime story about a unicorn."}'
 # ```
 
 response = aigenerate(schema, "Write a one-sentence bedtime story about a unicorn.";
-    model = "gpt-4o-mini",
+    model = "gpt-5-mini",
     verbose = true)
 
 println("Response: ", response.content)
@@ -33,14 +33,15 @@ println("Response ID: ", response.extras[:response_id])
 # Use SystemMessage for instructions - equivalent to:
 # ```bash
 # curl "https://api.openai.com/v1/responses" \
-#     -d '{"model": "gpt-4o-mini", "instructions": "Talk like a pirate.", "input": "Hello!"}'
+#     -d '{"model": "gpt-5-mini", "instructions": "Talk like a pirate.", "input": "Hello!"}'
 # ```
 
-response = aigenerate(schema, [
-        SystemMessage("Talk like a pirate."),
-        UserMessage("Are semicolons optional in JavaScript?")
+response = aigenerate(schema,
+    [
+        PT.SystemMessage("Talk like a pirate."),
+        PT.UserMessage("Are semicolons optional in JavaScript?")
     ];
-    model = "gpt-4o-mini",
+    model = "gpt-5-mini",
     verbose = true)
 
 println("Pirate response: ", response.content)
@@ -50,24 +51,29 @@ println("Pirate response: ", response.content)
 # Use `api_kwargs` to control reasoning effort ("low", "medium", "high"):
 # This is for reasoning models that support the `reasoning` parameter.
 #
+# NOTE: Reasoning is only available on certain models like o1, o3, o4-mini, gpt-5.
+# Regular models like gpt-4o-mini don't support reasoning and will return empty reasoning_content.
+#
 # ```bash
 # curl "https://api.openai.com/v1/responses" \
-#     -d '{"model": "o1", "reasoning": {"effort": "low"}, "input": "What is 2+2*3?"}'
+#     -d '{"model": "o3-mini", "reasoning": {"effort": "low"}, "input": "What is 2+2*3?"}'
 # ```
 
 # Low reasoning effort - faster, less detailed thinking
+# Use a reasoning model like o3-mini, o4-mini, or o1
 response_low = aigenerate(schema, "What is 2+2*3?";
-    model = "o1",  # Use a reasoning model
-    api_kwargs = (reasoning = Dict("effort" => "low"),),
+    model = "o4-mini",  # Use a reasoning model for reasoning content
+    api_kwargs = (reasoning = Dict("effort" => "low", "summary" => "auto"),),
     verbose = true)
 
 println("Low effort result: ", response_low.content)
 println("Reasoning content: ", response_low.extras[:reasoning_content])
 
 # High reasoning effort - slower, more detailed thinking
-response_high = aigenerate(schema, "What is the integral of x^2?";
-    model = "o1",
-    api_kwargs = (reasoning = Dict("effort" => "high"),),
+response_high = aigenerate(schema,
+    "What is the integral of x^2? Think about it step by step. Then return the answer";
+    model = "o4-mini",
+    api_kwargs = (reasoning = Dict("effort" => "high", "summary" => "detailed"),),
     verbose = true)
 
 println("High effort result: ", response_high.content)
@@ -76,13 +82,16 @@ println("Reasoning content: ", response_high.extras[:reasoning_content])
 # ## 4. Controlling Reasoning Summary Verbosity
 #
 # Control how much reasoning is shown in the summary ("concise", "detailed", "auto"):
+# - "auto": Let the model decide (default)
+# - "concise": Brief summary of reasoning steps
+# - "detailed": More verbose reasoning trace
 
 response = aigenerate(schema, "Explain quantum entanglement simply.";
-    model = "o1",
-    api_kwargs = (reasoning = Dict("effort" => "medium", "summary" => "concise"),),
+    model = "o4-mini",
+    api_kwargs = (reasoning = Dict("effort" => "medium", "summary" => "detailed"),),
     verbose = true)
 
-println("Concise reasoning summary: ", response.extras[:reasoning])
+println("Reasoning summary: ", response.extras[:reasoning_content])
 
 # ## 5. Multi-Turn Conversations with previous_response_id
 #
@@ -92,7 +101,7 @@ println("Concise reasoning summary: ", response.extras[:reasoning])
 
 # First turn - introduce yourself
 turn1 = aigenerate(schema, "My name is Alice and I love programming in Julia.";
-    model = "gpt-4o-mini",
+    model = "gpt-5-mini",
     verbose = true)
 
 println("\n=== Multi-turn Conversation ===")
@@ -102,7 +111,7 @@ println("Response ID: ", turn1.extras[:response_id])
 # Second turn - the model remembers context via previous_response_id
 # No need to re-send the conversation history!
 turn2 = aigenerate(schema, "What's my name and what language do I like?";
-    model = "gpt-4o-mini",
+    model = "gpt-5-mini",
     previous_response_id = turn1.extras[:response_id],
     verbose = true)
 
@@ -111,7 +120,7 @@ println("Turn 2: ", turn2.content)
 
 # Third turn - continue building on the conversation
 turn3 = aigenerate(schema, "Can you suggest a project I might enjoy?";
-    model = "gpt-4o-mini",
+    model = "gpt-5-mini",
     previous_response_id = turn2.extras[:response_id],
     verbose = true)
 
@@ -135,11 +144,11 @@ end
 # Extract structured data
 result = aiextract(schema,
     [
-        SystemMessage("Extract the event information."),
-        UserMessage("Alice and Bob are going to a science fair on Friday.")
+        PT.SystemMessage("Extract the event information."),
+        PT.UserMessage("Alice and Bob are going to a science fair on Friday.")
     ];
     return_type = CalendarEvent,
-    model = "gpt-4o-mini",
+    model = "gpt-5-mini",
     verbose = true)
 
 # Access the parsed data
@@ -181,7 +190,7 @@ println("\nReasoning trace: ", result.extras[:reasoning_content])
 # Enable web search for up-to-date information:
 
 response = aigenerate(schema, "What are the latest developments in Julia 1.11?";
-    model = "gpt-4o-mini",
+    model = "gpt-5-mini",
     enable_websearch = true,
     verbose = true)
 
@@ -193,7 +202,7 @@ println("Web search result: ", response.content)
 # All API response details are available in `extras`:
 
 response = aigenerate(schema, "Hello!";
-    model = "gpt-4o-mini",
+    model = "gpt-5-mini",
     verbose = true)
 
 println("\n=== Response Details ===")
@@ -210,7 +219,7 @@ println("Usage: ", response.extras[:usage])
 response = aigenerate(schema, :BlankSystemUser;
     system = "You are a helpful coding assistant specialized in Julia.",
     user = "How do I read a CSV file?",
-    model = "gpt-4o-mini",
+    model = "gpt-5-mini",
     verbose = true)
 
 println("\n=== Template Usage ===")
@@ -220,7 +229,7 @@ println("Template response: ", response.content)
 #
 # | Feature | How to Use |
 # |---------|------------|
-# | Basic generation | `aigenerate(schema, "prompt"; model="gpt-4o-mini")` |
+# | Basic generation | `aigenerate(schema, "prompt"; model="gpt-5-mini")` |
 # | System instructions | `aigenerate(schema, [SystemMessage(...), UserMessage(...)])` |
 # | Reasoning effort | `api_kwargs = (reasoning = Dict("effort" => "low"),)` |
 # | Reasoning verbosity | `api_kwargs = (reasoning = Dict("summary" => "concise"),)` |
