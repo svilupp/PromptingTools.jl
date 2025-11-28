@@ -39,7 +39,7 @@ Creates a response using the OpenAI Responses API with streaming support.
 - `streamcallback::Any`: Callback function for streaming responses
 - `tools::Vector{<:Any}`: Tools for the model to use
 - `api_kwargs::NamedTuple`: Additional API-specific keyword arguments:
-  - `reasoning`: Dict controlling reasoning (e.g., `Dict("effort" => "low")` or `Dict("summary" => "concise")`)
+  - `reasoning`: Dict controlling reasoning (e.g., `Dict("effort" => "low")` or `Dict("summary" => "detailed")`)
   - `text`: Dict controlling text output (e.g., `Dict("format" => Dict("type" => "json_schema", ...))`)
 - `kwargs...`: Additional keyword arguments for the API call
 
@@ -198,10 +198,12 @@ function extract_response_content(response)
                     end
                 end
             elseif item_type == "reasoning"
-                # Extract reasoning content
-                for reasoning_item in get(item, :content, [])
-                    if get(reasoning_item, :type, "") == "reasoning_text"
-                        push!(reasoning_content, get(reasoning_item, :text, ""))
+                # Extract reasoning summary from the summary array
+                # OpenAI format: {"type": "reasoning", "summary": [{"type": "summary_text", "text": "..."}]}
+                for summary_item in get(item, :summary, [])
+                    text = get(summary_item, :text, "")
+                    if !isempty(text)
+                        push!(reasoning_content, text)
                     end
                 end
             end
@@ -238,30 +240,38 @@ Returns an AIMessage with the response content and additional information in the
 - `api_key`: The API key for OpenAI (defaults to `""`, falls back to ENV["OPENAI_API_KEY"])
 - `streamcallback=nothing`: Callback function for streaming responses
 - `api_kwargs`: Additional API-specific keyword arguments:
-  - `reasoning`: Control reasoning effort/verbosity, e.g., `Dict("effort" => "low")` or `Dict("summary" => "concise")`
+  - `reasoning`: Control reasoning effort/verbosity, e.g., `Dict("effort" => "low")` or `Dict("summary" => "auto")`
+    - `effort`: "low", "medium", or "high" - controls how much reasoning effort the model applies
+    - `summary`: "auto", "concise", or "detailed" - controls verbosity of reasoning summary in response
   - `text`: Control text output format
 
 # Returns
 - `AIMessage`: The response from the API with extras containing:
   - `response_id`: The response ID for continuing conversations
   - `reasoning`: Full reasoning object from API
-  - `reasoning_content`: Extracted reasoning text (Vector{String})
+  - `reasoning_content`: Extracted reasoning summary text (Vector{String})
   - `usage`: Token usage information
   - `full_response`: The complete API response
+
+# Notes
+- Reasoning content is only available for models that support reasoning (e.g., o1, o3, o4-mini, gpt-5)
+- By default, reasoning traces are encrypted and hidden from the client for safety
+- The `reasoning_content` field contains the summary text, not the full reasoning trace
+- Use `reasoning = Dict("summary" => "auto")` or `"detailed"` to get more verbose summaries
 
 # Example
 ```julia
 schema = OpenAIResponseSchema()
 
 # Basic usage (no reasoning by default)
-response = aigenerate(schema, "What is Julia?"; model="gpt-5-nano")
+response = aigenerate(schema, "What is Julia?"; model="gpt-4o-mini")
 
-# With low reasoning effort
+# With reasoning enabled (for reasoning models like o1, o3)
 response = aigenerate(schema, "Solve 2+2*3";
-    model="gpt-5",
-    api_kwargs = (reasoning = Dict("effort" => "low"),))
+    model="o3-mini",
+    api_kwargs = (reasoning = Dict("effort" => "medium", "summary" => "auto"),))
 
-# Access reasoning content
+# Access reasoning summary
 println(response.extras[:reasoning_content])
 ```
 """

@@ -202,15 +202,17 @@ end
 
 @testset "Reasoning content extraction" begin
     # Test extraction of reasoning content from response
+    # Uses actual OpenAI format: reasoning items have "summary" array, not "content" with "reasoning_text"
     mock_response = Dict{Symbol, Any}(
         :id => "resp_reasoning",
         :status => "completed",
         :output => [
             Dict{Symbol, Any}(
                 :type => "reasoning",
-                :content => [
-                    Dict{Symbol, Any}(:type => "reasoning_text", :text => "Step 1: Think"),
-                    Dict{Symbol, Any}(:type => "reasoning_text", :text => "Step 2: Reason")
+                :id => "rs_123",
+                :summary => [
+                    Dict{Symbol, Any}(:type => "summary_text", :text => "Step 1: Think"),
+                    Dict{Symbol, Any}(:type => "summary_text", :text => "Step 2: Reason")
                 ]
             ),
             Dict{Symbol, Any}(
