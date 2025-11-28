@@ -25,7 +25,7 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
       createBaseVNode("code", null, toDisplayString(_ctx.description), 1),
       _cache[9] || (_cache[9] = createTextVNode(") to fill with user inputs later.", -1))
     ]),
-    _cache[13] || (_cache[13] = createStaticVNode("", 16))
+    _cache[13] || (_cache[13] = createStaticVNode("", 54))
   ]);
 }
 const how_it_works = /* @__PURE__ */ _export_sfc(_sfc_main, [["render", _sfc_render]]);
