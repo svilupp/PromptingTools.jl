@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.88.0]
 
 ### Added
-- Added support for OpenAI's Responses API (`/responses` endpoint) with reasoning traces and streaming support via `OpenAIResponseSchema`. Use `airespond(OpenAIResponseSchema(), prompt)` for models like `gpt-5.1-codex` that require this endpoint.
+- Added support for OpenAI's Responses API (`/responses` endpoint) via `OpenAIResponseSchema`. Supports reasoning traces, multi-turn conversations with `previous_response_id`, and structured extraction with `aiextract`. Use `aigenerate(OpenAIResponseSchema(), prompt; model="o4-mini")` for reasoning models (access via `result.extras[:reasoning_content]`).
 
 ## [0.87.0]
 
