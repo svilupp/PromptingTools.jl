@@ -13,10 +13,9 @@ import Preferences
 using Preferences: @load_preference, @set_preferences!
 using PrecompileTools
 using StreamCallbacks
-using StreamCallbacks: OpenAIStream, AnthropicStream, OllamaStream, StreamCallback,
-                       StreamChunk, AbstractStreamCallback
-# ResponseStream will be available in a future StreamCallbacks release
-# For now, we use OpenAIStream as a fallback for the Responses API
+using StreamCallbacks: OpenAIStream, OpenAIResponsesStream, AnthropicStream, OllamaStream,
+                       StreamCallback, StreamChunk, AbstractStreamCallback,
+                       streamed_request!, build_response_body
 using Test, Pkg
 ## Added REPL because it extends methods in Base.docs for extraction of docstrings
 using REPL
