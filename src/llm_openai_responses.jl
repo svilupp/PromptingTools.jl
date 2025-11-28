@@ -358,7 +358,7 @@ end
 
 """
     aiextract(schema::AbstractResponseSchema, prompt::ALLOWED_PROMPT_TYPE;
-              return_type::Union{Type, AbstractTool, Vector},
+              return_type::Union{Type, AbstractTool},
               model::AbstractString = MODEL_CHAT,
               api_key::AbstractString = "",
               verbose::Bool = true,
@@ -369,10 +369,13 @@ Extract structured data from text using the OpenAI Responses API with JSON schem
 
 Uses the existing `tool_call_signature` and `parse_tool` utilities for schema generation and parsing.
 
+Note: Unlike the Chat Completions API, the Responses API `text.format` only supports a single
+JSON schema. For multi-type extraction (union of structs), use the Chat Completions API instead.
+
 # Arguments
 - `schema::AbstractResponseSchema`: The schema to use
 - `prompt`: The input prompt
-- `return_type`: A Julia struct type, Tool, or vector of types to extract
+- `return_type`: A Julia struct type or AbstractTool to extract (single type only)
 - `model`: The model to use
 - `api_key`: OpenAI API key
 - `verbose`: Print stats
@@ -412,7 +415,7 @@ println(result.extras[:reasoning_content])
 ```
 """
 function aiextract(schema::AbstractResponseSchema, prompt::ALLOWED_PROMPT_TYPE;
-        return_type::Union{Type, AbstractTool, Vector},
+        return_type::Union{Type, AbstractTool},
         model::AbstractString = MODEL_CHAT,
         api_key::AbstractString = "",
         verbose::Bool = true,
@@ -428,23 +431,45 @@ function aiextract(schema::AbstractResponseSchema, prompt::ALLOWED_PROMPT_TYPE;
     rendered = render(schema, prompt; no_system_message, kwargs...)
 
     # Use existing tool_call_signature utility to generate JSON schema
+    # Note: Responses API text.format only supports a single schema, unlike Chat Completions tools
     tool_map = tool_call_signature(return_type; strict = strict)
+    if length(tool_map) != 1
+        throw(ArgumentError("Responses API aiextract only supports a single return_type. " *
+                            "Got $(length(tool_map)) types. Use Chat Completions API for multi-type extraction."))
+    end
     name, tool = only(tool_map)
 
     # Configure text output format for structured extraction
     # Responses API uses text.format instead of tools
     api_kwargs = get(kwargs, :api_kwargs, NamedTuple())
-    text_format = Dict(
-        "format" => Dict(
-        "type" => "json_schema",
-        "name" => tool.name,
-        "schema" => tool.parameters,
-        "strict" => something(tool.strict, true)
-    )
-    )
 
-    # Merge with existing api_kwargs
-    merged_kwargs = (; api_kwargs..., text = text_format)
+    # Build text format, preserving user's text settings (e.g., verbosity) but overriding format
+    user_text = get(api_kwargs, :text, Dict())
+    text_format = if user_text isa Dict
+        # Merge user settings with our format (our format takes precedence)
+        merge(user_text,
+            Dict(
+                "format" => Dict(
+                "type" => "json_schema",
+                "name" => tool.name,
+                "schema" => tool.parameters,
+                "strict" => something(tool.strict, true)
+            )
+            ))
+    else
+        Dict(
+            "format" => Dict(
+            "type" => "json_schema",
+            "name" => tool.name,
+            "schema" => tool.parameters,
+            "strict" => something(tool.strict, true)
+        )
+        )
+    end
+
+    # Merge with existing api_kwargs, replacing text with our merged version
+    merged_kwargs = (;
+        [k => v for (k, v) in pairs(api_kwargs) if k != :text]..., text = text_format)
 
     # Call the API
     response = create_response(

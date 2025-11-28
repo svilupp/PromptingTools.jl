@@ -4,7 +4,7 @@
 # which provides features like reasoning traces, multi-turn conversations without
 # re-sending history, and structured extraction.
 #
-# The Responses API is used by reasoning models like `o1`, `o3`, and code models like `gpt-5.1-codex`.
+# The Responses API is used by reasoning models like `gpt-5`, `o3`, and code models like `gpt-5.1-codex`.
 
 using PromptingTools
 const PT = PromptingTools
@@ -72,7 +72,7 @@ println("Reasoning content: ", response_low.extras[:reasoning_content])
 # High reasoning effort - slower, more detailed thinking
 response_high = aigenerate(schema,
     "What is the integral of x^2? Think about it step by step. Then return the answer";
-    model = "o4-mini",
+    model = "gpt-5.1-codex",
     api_kwargs = (reasoning = Dict("effort" => "high", "summary" => "detailed"),),
     verbose = true)
 
