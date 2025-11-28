@@ -526,4 +526,4 @@ msg.extras[:full_response]      # Complete API response
 | Endpoint | `/v1/chat/completions` | `/v1/responses` |
 | Schema | `OpenAISchema()` | `OpenAIResponseSchema()` |
 
-For more details on when to use each API, see the [FAQ section on Responses API](@ref).
+For more details on when to use each API, see the [FAQ section on Responses API](frequently_asked_questions.md#Why-use-the-Responses-API-instead-of-Chat-Completions).

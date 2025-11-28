@@ -84,11 +84,21 @@ function create_response(schema::AbstractResponseSchema, api_key::AbstractString
     headers = OpenAI.auth_header(OpenAI.DEFAULT_PROVIDER, api_key)
 
     if !isnothing(streamcallback)
+        # Streaming is not yet supported for the Responses API
+        # The Responses API uses a different SSE format than Chat Completions,
+        # requiring a dedicated ResponseStream flavor in StreamCallbacks.jl
+        throw(ArgumentError("Streaming is not yet supported for OpenAI Responses API (OpenAIResponseSchema). Use non-streaming requests for now."))
+
         # Configure streaming callback - only pass schema, no extra kwargs
         streamcallback, stream_kwargs = configure_callback!(streamcallback, schema)
 
+        # Convert body dict to IOBuffer for streaming (streamed_request! expects IOBuffer)
+        input = IOBuffer()
+        JSON3.write(input, body)
+        seekstart(input)
+
         # Use streaming request
-        resp = streamed_request!(streamcallback, url, headers, body; http_kwargs...)
+        resp = streamed_request!(streamcallback, url, headers, input; http_kwargs...)
         return OpenAI.OpenAIResponse(resp.status, JSON3.read(resp.body))
     else
         # Convert the body to JSON for non-streaming
