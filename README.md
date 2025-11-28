@@ -619,6 +619,12 @@ println(msg.extras[:reasoning_content])
 # Continue conversations using previous_response_id
 msg2 = aigenerate(schema, "Tell me more";
     model="gpt-5-mini", previous_response_id=msg.extras[:response_id])
+
+# Streaming responses
+msg = aigenerate(schema, "Count from 1 to 10, one number per line.";
+    model = "gpt-5-mini",
+    streamcallback = stdout,
+    verbose = false)
 ```
 
 **When to use which API:**

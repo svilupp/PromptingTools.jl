@@ -11,7 +11,7 @@ Below is an overview of the model providers supported by PromptingTools.jl, alon
 | Abstract Schema         | Schema                    | Model Provider                         | aigenerate | aiembed | aiextract | aiscan | aiimage | aiclassify |
 |-------------------------|---------------------------|----------------------------------------|------------|---------|-----------|--------|---------|------------|
 | AbstractOpenAISchema    | OpenAISchema              | OpenAI (Chat Completions)              | ✅         | ✅     | ✅       | ✅     | ✅     | ✅         |
-| AbstractResponseSchema  | OpenAIResponseSchema***   | OpenAI (Responses API)                 | ✅         | ❌     | ✅       | ❌     | ❌     | ❌         |
+| AbstractOpenAIResponseSchema  | OpenAIResponseSchema***   | OpenAI (Responses API)                 | ✅         | ❌     | ✅       | ❌     | ❌     | ❌         |
 | AbstractOpenAISchema    | CustomOpenAISchema*       | Any OpenAI-compatible API (eg, vLLM)*  | ✅         | ✅     | ✅       | ✅     | ✅     | ❌         |
 | AbstractOpenAISchema    | LocalServerOpenAISchema** | Any OpenAI-compatible Local server**   | ✅         | ✅     | ✅       | ✅     | ✅     | ❌         |
 | AbstractOpenAISchema    | MistralOpenAISchema       | Mistral AI                             | ✅         | ✅     | ✅       | ✅     | ✅     | ❌         |

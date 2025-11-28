@@ -22,18 +22,17 @@ function configure_callback!(cb::T, schema::AbstractPromptSchema;
             api_kwargs = (;
                 api_kwargs..., stream = true, stream_options = (; include_usage = true))
             flavor = OpenAIStream()
-        elseif schema isa AbstractResponseSchema
+        elseif schema isa AbstractOpenAIResponseSchema
             ## Enable streaming for Response API
-            ## Note: Using OpenAIStream until ResponseStream is available in StreamCallbacks
             api_kwargs = (; api_kwargs..., stream = true)
-            flavor = OpenAIStream()
+            flavor = OpenAIResponsesStream()
         elseif schema isa Union{AbstractAnthropicSchema, AbstractOllamaSchema}
             api_kwargs = (; api_kwargs..., stream = true)
             flavor = schema isa AbstractOllamaSchema ? OllamaStream() : AnthropicStream()
         elseif schema isa AbstractOllamaManagedSchema
             throw(ErrorException("OllamaManagedSchema is not supported for streaming. Use OllamaSchema instead."))
         else
-            error("Unsupported schema type: $(typeof(schema)). Currently supported: OpenAISchema, AbstractResponseSchema, and AnthropicSchema.")
+            error("Unsupported schema type: $(typeof(schema)). Currently supported: OpenAISchema, AbstractOpenAIResponseSchema, and AnthropicSchema.")
         end
         cb.flavor = flavor
     end

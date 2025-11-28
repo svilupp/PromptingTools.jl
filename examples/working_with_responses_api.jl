@@ -215,8 +215,8 @@ println("Usage: ", response.extras[:usage])
 # ## 10. Using with Templates
 #
 # Works with PromptingTools templates:
-
-response = aigenerate(schema, :BlankSystemUser;
+tpl = PT.render(AITemplate(:BlankSystemUser))
+response = aigenerate(schema, tpl;
     system = "You are a helpful coding assistant specialized in Julia.",
     user = "How do I read a CSV file?",
     model = "gpt-5-mini",
@@ -224,6 +224,53 @@ response = aigenerate(schema, :BlankSystemUser;
 
 println("\n=== Template Usage ===")
 println("Template response: ", response.content)
+
+# ## 11. Streaming Responses
+#
+# Stream responses in real-time for better interactivity.
+# Uses `OpenAIResponsesStream` flavor from StreamCallbacks.jl.
+
+using PromptingTools: StreamCallback
+
+# Basic streaming to stdout - see tokens appear as they're generated
+println("\n=== Streaming to stdout ===")
+response = aigenerate(schema, "Count from 1 to 10, one number per line.";
+    model = "gpt-5-mini",
+    streamcallback = stdout,
+    verbose = false)
+
+# Streaming with custom StreamCallback to capture chunks
+println("\n\n=== Streaming with StreamCallback ===")
+cb = StreamCallback()  # captures all chunks for inspection
+response = aigenerate(schema, "What is Julia in one sentence?";
+    model = "gpt-5-mini",
+    streamcallback = cb,
+    verbose = false)
+
+println("Final content: ", response.content)
+println("Number of chunks received: ", length(cb.chunks))
+
+# Streaming to an IOBuffer for programmatic capture
+output = IOBuffer()
+cb = StreamCallback(; out = output)
+response = aigenerate(schema, "Say hello in 3 languages.";
+    model = "gpt-5-mini",
+    streamcallback = cb,
+    verbose = false)
+
+streamed_text = String(take!(output))
+println("Captured streamed text: ", streamed_text)
+
+# Streaming with reasoning models - see reasoning and output streamed
+println("\n=== Streaming with Reasoning ===")
+cb = StreamCallback(; out = stdout)
+response = aigenerate(schema, "What is 15 * 7? Think step by step.";
+    model = "o4-mini",
+    api_kwargs = (reasoning = Dict("effort" => "medium", "summary" => "auto"),),
+    streamcallback = cb,
+    verbose = false)
+
+println("\nReasoning content: ", response.extras[:reasoning_content])
 
 # ## Summary of Key Features
 #
@@ -236,4 +283,5 @@ println("Template response: ", response.content)
 # | Multi-turn (efficient) | `previous_response_id = response.extras[:response_id]` |
 # | Structured extraction | `aiextract(schema, prompt; return_type=MyStruct)` |
 # | Web search | `enable_websearch = true` |
+# | Streaming | `streamcallback = stdout` or `StreamCallback()` |
 # | Access reasoning | `response.extras[:reasoning_content]` |

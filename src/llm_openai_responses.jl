@@ -15,7 +15,7 @@ function create_response(schema::TestEchoOpenAIResponseSchema, api_key::Abstract
 end
 
 """
-    create_response(schema::AbstractResponseSchema, api_key::AbstractString,
+    create_response(schema::AbstractOpenAIResponseSchema, api_key::AbstractString,
                    model::AbstractString,
                    input;
                    instructions::Union{Nothing, AbstractString} = nothing,
@@ -29,7 +29,7 @@ end
 Creates a response using the OpenAI Responses API with streaming support.
 
 # Arguments
-- `schema::AbstractResponseSchema`: The response schema to use
+- `schema::AbstractOpenAIResponseSchema`: The response schema to use
 - `api_key::AbstractString`: The API key to use for the OpenAI API
 - `model::AbstractString`: The model to use for generating the response
 - `input`: The input for the model, can be a string or structured input
@@ -46,7 +46,7 @@ Creates a response using the OpenAI Responses API with streaming support.
 # Returns
 - `response`: The response from the OpenAI API
 """
-function create_response(schema::AbstractResponseSchema, api_key::AbstractString,
+function create_response(schema::AbstractOpenAIResponseSchema, api_key::AbstractString,
         model::AbstractString,
         input;
         instructions::Union{Nothing, AbstractString} = nothing,
@@ -73,23 +73,19 @@ function create_response(schema::AbstractResponseSchema, api_key::AbstractString
         body["stream"] = true
     end
 
-    # Add all parameters from api_kwargs
+    # Add all parameters from api_kwargs (except url which is used for testing)
     # Supports: reasoning, text, temperature, max_output_tokens, etc.
     for (key, value) in pairs(api_kwargs)
+        key == :url && continue  # url is used for testing, not sent to API
         body[string(key)] = value
     end
 
-    # Make the API request
-    url = OpenAI.build_url(OpenAI.DEFAULT_PROVIDER, "responses")
+    # Make the API request (url can be overridden via api_kwargs for testing)
+    url = get(api_kwargs, :url, OpenAI.build_url(OpenAI.DEFAULT_PROVIDER, "responses"))
     headers = OpenAI.auth_header(OpenAI.DEFAULT_PROVIDER, api_key)
 
     if !isnothing(streamcallback)
-        # Streaming is not yet supported for the Responses API
-        # The Responses API uses a different SSE format than Chat Completions,
-        # requiring a dedicated ResponseStream flavor in StreamCallbacks.jl
-        throw(ArgumentError("Streaming is not yet supported for OpenAI Responses API (OpenAIResponseSchema). Use non-streaming requests for now."))
-
-        # Configure streaming callback - only pass schema, no extra kwargs
+        # Configure streaming callback
         streamcallback, stream_kwargs = configure_callback!(streamcallback, schema)
 
         # Convert body dict to IOBuffer for streaming (streamed_request! expects IOBuffer)
@@ -99,7 +95,10 @@ function create_response(schema::AbstractResponseSchema, api_key::AbstractString
 
         # Use streaming request
         resp = streamed_request!(streamcallback, url, headers, input; http_kwargs...)
-        return OpenAI.OpenAIResponse(resp.status, JSON3.read(resp.body))
+
+        # Build response body from chunks using StreamCallbacks
+        response_body = build_response_body(streamcallback.flavor, streamcallback)
+        return OpenAI.OpenAIResponse(resp.status, response_body)
     else
         # Convert the body to JSON for non-streaming
         json_body = JSON3.write(body)
@@ -111,7 +110,7 @@ function create_response(schema::AbstractResponseSchema, api_key::AbstractString
 end
 
 """
-    render(schema::AbstractResponseSchema, messages::Vector{<:AbstractMessage};
+    render(schema::AbstractOpenAIResponseSchema, messages::Vector{<:AbstractMessage};
            conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
            no_system_message::Bool = false,
            kwargs...)
@@ -124,7 +123,7 @@ The Responses API expects:
 - `instructions`: System-level instructions (from SystemMessage, optional)
 
 # Arguments
-- `schema::AbstractResponseSchema`: The response schema
+- `schema::AbstractOpenAIResponseSchema`: The response schema
 - `messages::Vector{<:AbstractMessage}`: Messages to render
 - `conversation`: Previous conversation history (currently limited support)
 - `no_system_message`: If true, don't add default system message
@@ -133,7 +132,7 @@ The Responses API expects:
 # Returns
 - `NamedTuple{(:input, :instructions), Tuple{String, Union{Nothing, String}}}`: Rendered input and instructions
 """
-function render(schema::AbstractResponseSchema,
+function render(schema::AbstractOpenAIResponseSchema,
         messages::Vector{<:AbstractMessage};
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
         no_system_message::Bool = false,
@@ -165,23 +164,23 @@ function render(schema::AbstractResponseSchema,
 end
 
 # Render for string prompts - wrap in UserMessage and process
-function render(schema::AbstractResponseSchema, prompt::AbstractString;
+function render(schema::AbstractOpenAIResponseSchema, prompt::AbstractString;
         no_system_message::Bool = true, kwargs...)
     render(schema, [UserMessage(prompt)]; no_system_message, kwargs...)
 end
 
 # Render for single message
-function render(schema::AbstractResponseSchema, msg::AbstractMessage; kwargs...)
+function render(schema::AbstractOpenAIResponseSchema, msg::AbstractMessage; kwargs...)
     render(schema, [msg]; kwargs...)
 end
 
 # Render for AITemplate
-function render(schema::AbstractResponseSchema, template::AITemplate; kwargs...)
+function render(schema::AbstractOpenAIResponseSchema, template::AITemplate; kwargs...)
     render(schema, render(template); kwargs...)
 end
 
 # Render for Symbol (template name)
-function render(schema::AbstractResponseSchema, template::Symbol; kwargs...)
+function render(schema::AbstractOpenAIResponseSchema, template::Symbol; kwargs...)
     render(schema, AITemplate(template); kwargs...)
 end
 
@@ -225,7 +224,7 @@ function extract_response_content(response)
 end
 
 """
-    aigenerate(schema::AbstractResponseSchema, prompt::ALLOWED_PROMPT_TYPE;
+    aigenerate(schema::AbstractOpenAIResponseSchema, prompt::ALLOWED_PROMPT_TYPE;
                previous_response_id::Union{Nothing, AbstractString} = nothing,
                enable_websearch::Bool = false,
                model::AbstractString = MODEL_CHAT,
@@ -238,7 +237,7 @@ Generate an AI response using the OpenAI Responses API with streaming support.
 Returns an AIMessage with the response content and additional information in the extras field.
 
 # Arguments
-- `schema::AbstractResponseSchema`: The schema to use (e.g., `OpenAIResponseSchema()`)
+- `schema::AbstractOpenAIResponseSchema`: The schema to use (e.g., `OpenAIResponseSchema()`)
 - `prompt`: The prompt to send to the API, can be:
   - A string (sent as user input)
   - A vector of AbstractMessages (SystemMessage becomes instructions, UserMessage becomes input)
@@ -285,7 +284,7 @@ response = aigenerate(schema, "Solve 2+2*3";
 println(response.extras[:reasoning_content])
 ```
 """
-function aigenerate(schema::AbstractResponseSchema, prompt::ALLOWED_PROMPT_TYPE;
+function aigenerate(schema::AbstractOpenAIResponseSchema, prompt::ALLOWED_PROMPT_TYPE;
         previous_response_id::Union{Nothing, AbstractString} = nothing,
         enable_websearch::Bool = false,
         model::AbstractString = MODEL_CHAT,
@@ -367,7 +366,7 @@ function aigenerate(schema::AbstractResponseSchema, prompt::ALLOWED_PROMPT_TYPE;
 end
 
 """
-    aiextract(schema::AbstractResponseSchema, prompt::ALLOWED_PROMPT_TYPE;
+    aiextract(schema::AbstractOpenAIResponseSchema, prompt::ALLOWED_PROMPT_TYPE;
               return_type::Union{Type, AbstractTool},
               model::AbstractString = MODEL_CHAT,
               api_key::AbstractString = "",
@@ -383,7 +382,7 @@ Note: Unlike the Chat Completions API, the Responses API `text.format` only supp
 JSON schema. For multi-type extraction (union of structs), use the Chat Completions API instead.
 
 # Arguments
-- `schema::AbstractResponseSchema`: The schema to use
+- `schema::AbstractOpenAIResponseSchema`: The schema to use
 - `prompt`: The input prompt
 - `return_type`: A Julia struct type or AbstractTool to extract (single type only)
 - `model`: The model to use
@@ -424,7 +423,7 @@ result = aiextract(schema, "Solve: What is 15% of 80?";
 println(result.extras[:reasoning_content])
 ```
 """
-function aiextract(schema::AbstractResponseSchema, prompt::ALLOWED_PROMPT_TYPE;
+function aiextract(schema::AbstractOpenAIResponseSchema, prompt::ALLOWED_PROMPT_TYPE;
         return_type::Union{Type, AbstractTool},
         model::AbstractString = MODEL_CHAT,
         api_key::AbstractString = "",

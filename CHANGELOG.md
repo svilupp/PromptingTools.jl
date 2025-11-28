@@ -13,7 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.88.0]
 
 ### Added
-- Added support for OpenAI's Responses API (`/responses` endpoint) via `OpenAIResponseSchema`. Supports reasoning traces, multi-turn conversations with `previous_response_id`, and structured extraction with `aiextract`. Use `aigenerate(OpenAIResponseSchema(), prompt; model="o4-mini")` for reasoning models (access via `result.extras[:reasoning_content]`). See `examples/working_with_responses_api.jl`. Note: Many features are not supported yet, eg, streaming, built-in tools, etc.
+- Added support for OpenAI's Responses API (`/responses` endpoint) via `OpenAIResponseSchema`. Supports reasoning traces, multi-turn conversations with `previous_response_id`, and structured extraction with `aiextract`. Use `aigenerate(OpenAIResponseSchema(), prompt; model="o4-mini")` for reasoning models (access via `result.extras[:reasoning_content]`). See `examples/working_with_responses_api.jl`. Note: Many features are not supported yet, eg, built-in tools, etc.
+- Added support for streaming responses with `OpenAIResponseSchema` via a dedicated `StreamCallback` flavor. See `examples/working_with_responses_api.jl`.
 
 ## [0.87.0]
 

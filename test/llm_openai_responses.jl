@@ -1,5 +1,5 @@
 using PromptingTools: TestEchoOpenAIResponseSchema, OpenAIResponseSchema,
-                      AbstractResponseSchema, render
+                      AbstractOpenAIResponseSchema, render
 using PromptingTools: AIMessage, DataMessage, SystemMessage, UserMessage, AbstractMessage
 using PromptingTools: aigenerate, aiextract, create_response, call_cost
 using PromptingTools: tool_call_signature, parse_tool
@@ -284,4 +284,202 @@ end
     @test haskey(PromptingTools.MODEL_REGISTRY, "gpt-5.1-codex-mini")
     @test PromptingTools.MODEL_REGISTRY["gpt-5.1-codex-mini"].schema isa
           OpenAIResponseSchema
+end
+
+@testset "aigenerate-OpenAIResponses-streaming" begin
+    using PromptingTools: StreamCallback, OpenAIResponsesStream, configure_callback!
+
+    # Test configure_callback! returns correct flavor
+    @testset "configure_callback! setup" begin
+        cb, api_kwargs = configure_callback!(StreamCallback(), OpenAIResponseSchema())
+        @test cb.flavor isa OpenAIResponsesStream
+        @test api_kwargs[:stream] == true
+    end
+
+    # Test streaming with mock server
+    @testset "Streaming with mock server" begin
+        # Create SSE response mimicking OpenAI Responses API streaming format
+        sse_response = """event: response.created
+data: {"type":"response.created","sequence_number":0,"response":{"id":"resp_test123","model":"gpt-5.1-codex","status":"in_progress","output":[]}}
+
+event: response.in_progress
+data: {"type":"response.in_progress","sequence_number":1,"response":{"id":"resp_test123","status":"in_progress"}}
+
+event: response.output_item.added
+data: {"type":"response.output_item.added","sequence_number":2,"output_index":0,"item":{"type":"message","role":"assistant","content":[]}}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","sequence_number":3,"item_id":"msg_001","output_index":0,"content_index":0,"delta":"Hello"}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","sequence_number":4,"item_id":"msg_001","output_index":0,"content_index":0,"delta":" world"}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","sequence_number":5,"item_id":"msg_001","output_index":0,"content_index":0,"delta":"!"}
+
+event: response.output_text.done
+data: {"type":"response.output_text.done","sequence_number":6,"item_id":"msg_001","output_index":0,"content_index":0,"text":"Hello world!"}
+
+event: response.output_item.done
+data: {"type":"response.output_item.done","sequence_number":7,"output_index":0,"item":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Hello world!"}]}}
+
+event: response.completed
+data: {"type":"response.completed","sequence_number":8,"response":{"id":"resp_test123","model":"gpt-5.1-codex","status":"completed","output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Hello world!"}]}],"usage":{"input_tokens":10,"output_tokens":5,"total_tokens":15}}}
+
+"""
+        PORT = rand(20000:30000)
+        echo_server = HTTP.serve!(PORT; verbose = -1) do req
+            return HTTP.Response(
+                200,
+                ["Content-Type" => "text/event-stream",
+                    "Cache-Control" => "no-cache"],
+                sse_response
+            )
+        end
+
+        try
+            # Create a callback to capture streamed content
+            output = IOBuffer()
+            cb = StreamCallback(; out = output)
+
+            result = aigenerate(
+                OpenAIResponseSchema(), "Say hello";
+                model = "test-model",
+                api_key = "test-key",
+                streamcallback = cb,
+                api_kwargs = (; url = "http://localhost:$(PORT)"),
+                verbose = false
+            )
+
+            @test result isa AIMessage
+            @test result.content == "Hello world!"
+            @test result.tokens == (10, 5)
+            @test result.status == 200
+
+            # Verify streamed output was written
+            streamed_content = String(take!(output))
+            @test streamed_content == "Hello world!"
+
+            # Verify chunks were captured
+            @test length(cb.chunks) > 0
+        finally
+            close(echo_server)
+        end
+    end
+
+    # Test streaming with reasoning content
+    @testset "Streaming with reasoning content" begin
+        sse_response = """event: response.created
+data: {"type":"response.created","sequence_number":0,"response":{"id":"resp_reason","model":"o4-mini","status":"in_progress","output":[]}}
+
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","sequence_number":1,"delta":"Thinking about "}
+
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","sequence_number":2,"delta":"the problem..."}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","sequence_number":3,"delta":"The answer is 42."}
+
+event: response.completed
+data: {"type":"response.completed","sequence_number":4,"response":{"id":"resp_reason","model":"o4-mini","status":"completed","output":[{"type":"reasoning","summary":[{"type":"summary_text","text":"Thinking about the problem..."}]},{"type":"message","role":"assistant","content":[{"type":"output_text","text":"The answer is 42."}]}],"usage":{"input_tokens":15,"output_tokens":10,"total_tokens":25}}}
+
+"""
+        PORT = rand(20000:30000)
+        echo_server = HTTP.serve!(PORT; verbose = -1) do req
+            return HTTP.Response(
+                200,
+                ["Content-Type" => "text/event-stream",
+                    "Cache-Control" => "no-cache"],
+                sse_response
+            )
+        end
+
+        try
+            output = IOBuffer()
+            cb = StreamCallback(; out = output)
+
+            result = aigenerate(
+                OpenAIResponseSchema(), "What is the meaning of life?";
+                model = "o4-mini",
+                api_key = "test-key",
+                streamcallback = cb,
+                api_kwargs = (; url = "http://localhost:$(PORT)"),
+                verbose = false
+            )
+
+            @test result isa AIMessage
+            @test result.content == "The answer is 42."
+            @test result.tokens == (15, 10)
+
+            # Verify reasoning content was captured
+            @test haskey(result.extras, :reasoning_content)
+            @test length(result.extras[:reasoning_content]) >= 1
+        finally
+            close(echo_server)
+        end
+    end
+
+    # Test streaming to Channel
+    @testset "Streaming to Channel" begin
+        sse_response = """event: response.created
+data: {"type":"response.created","sequence_number":0,"response":{"id":"resp_chan","model":"gpt-5.1-codex","status":"in_progress"}}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","sequence_number":1,"delta":"A"}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","sequence_number":2,"delta":"B"}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","sequence_number":3,"delta":"C"}
+
+event: response.completed
+data: {"type":"response.completed","sequence_number":4,"response":{"id":"resp_chan","status":"completed","output":[{"type":"message","content":[{"type":"output_text","text":"ABC"}]}],"usage":{"input_tokens":5,"output_tokens":3,"total_tokens":8}}}
+
+"""
+        PORT = rand(20000:30000)
+        echo_server = HTTP.serve!(PORT; verbose = -1) do req
+            return HTTP.Response(
+                200,
+                ["Content-Type" => "text/event-stream"],
+                sse_response
+            )
+        end
+
+        try
+            # Use a Channel to capture streamed tokens
+            channel = Channel{String}(10)
+            cb = StreamCallback(; out = channel)
+
+            # Run in a task to avoid blocking
+            result_task = @async aigenerate(
+                OpenAIResponseSchema(), "Count";
+                model = "test-model",
+                api_key = "test-key",
+                streamcallback = cb,
+                api_kwargs = (; url = "http://localhost:$(PORT)"),
+                verbose = false
+            )
+
+            # Collect tokens from channel
+            tokens = String[]
+            while isopen(channel) || isready(channel)
+                if isready(channel)
+                    push!(tokens, take!(channel))
+                elseif istaskdone(result_task)
+                    break
+                else
+                    sleep(0.01)
+                end
+            end
+
+            result = fetch(result_task)
+            @test result isa AIMessage
+            @test result.content == "ABC"
+            @test join(tokens) == "ABC"
+        finally
+            close(echo_server)
+        end
+    end
 end

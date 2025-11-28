@@ -587,19 +587,19 @@ isextracted(x) = x isa AbstractExtractedData
 # which is used by models like gpt-5.1-codex that don't support the standard chat completions API.
 
 """
-    AbstractResponseSchema
+    AbstractOpenAIResponseSchema
 
-Abstract type for all response-based schemas that use the `/responses` endpoint instead of `/chat/completions`.
+Abstract type for all OpenAI response-based schemas that use the `/responses` endpoint instead of `/chat/completions`.
 """
-abstract type AbstractResponseSchema <: AbstractPromptSchema end
+abstract type AbstractOpenAIResponseSchema <: AbstractPromptSchema end
 
 """
-    OpenAIResponseSchema <: AbstractResponseSchema
+    OpenAIResponseSchema <: AbstractOpenAIResponseSchema
 
 A schema for OpenAI's Responses API (`/responses` endpoint).
 
 This schema is used for models that only support the Responses API, such as `gpt-5.1-codex`.
-Unlike the standard chat completions API, the Responses API uses `input` and `instructions` 
+Unlike the standard chat completions API, the Responses API uses `input` and `instructions`
 fields instead of a messages array.
 
 # Example
@@ -608,10 +608,10 @@ schema = OpenAIResponseSchema()
 response = aigenerate(schema, "What is Julia?"; model="gpt-5.1-codex")
 ```
 """
-struct OpenAIResponseSchema <: AbstractResponseSchema end
+struct OpenAIResponseSchema <: AbstractOpenAIResponseSchema end
 
 "Echoes the user's input back to them. Used for testing the Responses API implementation"
-@kwdef mutable struct TestEchoOpenAIResponseSchema <: AbstractResponseSchema
+@kwdef mutable struct TestEchoOpenAIResponseSchema <: AbstractOpenAIResponseSchema
     response::AbstractDict = Dict(
         "id" => "resp_test123",
         "object" => "response",
