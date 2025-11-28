@@ -186,13 +186,17 @@ function aigenerate(prompt_schema::AbstractOllamaSchema, prompt::ALLOWED_PROMPT_
 
         tokens_prompt = get(resp.response, :prompt_eval_count, 0)
         tokens_completion = get(resp.response, :eval_count, 0)
+        ## Build extras for observability (Logfire.jl integration)
+        extras = Dict{Symbol, Any}()
+        haskey(resp.response, :model) && (extras[:model] = resp.response[:model])
         msg = AIMessage(; content = resp.response[:message][:content] |> strip,
             status = Int(resp.status),
             cost = call_cost(tokens_prompt, tokens_completion, model_id),
             ## not coming through yet anyway
             ## finish_reason = get(resp.response, :finish_reason, nothing),
             tokens = (tokens_prompt, tokens_completion),
-            elapsed = time)
+            elapsed = time,
+            extras)
         ## Reporting
         verbose && @info _report_stats(msg, model_id)
     else

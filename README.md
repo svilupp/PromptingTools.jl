@@ -103,6 +103,7 @@ For more practical examples, see the `examples/` folder and the [Advanced Exampl
     - [Using MistralAI API and other OpenAI-compatible APIs](#using-mistralai-api-and-other-openai-compatible-apis)
     - [Using OpenAI Responses API](#using-openai-responses-api)
     - [Using Anthropic Models](#using-anthropic-models)
+    - [Advanced Observability with Logfire.jl](#advanced-observability-with-logfirejl)
     - [More Examples](#more-examples)
   - [Package Interface](#package-interface)
   - [Frequently Asked Questions](#frequently-asked-questions)
@@ -656,6 +657,65 @@ msg = aigenerate(
     model = "cladeo")
 ```
 
+
+### Advanced Observability with Logfire.jl
+
+[Logfire.jl](https://github.com/svilupp/Logfire.jl) provides OpenTelemetry-based observability for your LLM applications. It automatically traces all your AI calls with detailed information about tokens, costs, messages, and latency.
+
+**Quick Setup:**
+
+```julia
+using Pkg
+Pkg.add(["Logfire", "DotEnv"])  # Install Logfire.jl to enable the extension
+
+using DotEnv
+DotEnv.load!()  # Load LOGFIRE_TOKEN and API keys from .env file
+
+using Logfire, PromptingTools
+
+# 1. Configure Logfire (uses LOGFIRE_TOKEN env var, or pass token directly)
+Logfire.configure(service_name = "my-app")
+
+# 2. Instrument all registered models - wraps them with tracing schema
+Logfire.instrument_promptingtools!()
+
+# 3. Use PromptingTools as normal - traces are automatic!
+aigenerate("What is 2 + 2?"; model = "gpt4om")
+```
+
+**What Gets Captured:**
+- Token usage (input/output/total) and cost estimates
+- Full conversation history (system, user, assistant messages)
+- Model parameters (temperature, max_tokens, etc.)
+- Latency measurements and cache/streaming flags
+- Tool/function calls and structured extraction results
+
+**Instrument Individual Models:**
+
+You don't have to instrument all models. Wrap only specific models for selective tracing:
+
+```julia
+Logfire.instrument_promptingtools_model!("my-local-llm")
+```
+
+**Alternative Backends:**
+
+You don't have to use Logfire cloud - send traces to any OpenTelemetry-compatible backend:
+
+```julia
+# Local development with Jaeger
+ENV["OTEL_EXPORTER_OTLP_ENDPOINT"] = "http://localhost:4318"
+Logfire.configure(service_name = "my-app", send_to_logfire = :always)
+
+# Or use Langfuse
+ENV["OTEL_EXPORTER_OTLP_ENDPOINT"] = "https://cloud.langfuse.com/api/public/otel"
+ENV["OTEL_EXPORTER_OTLP_HEADERS"] = "Authorization=Basic <base64-credentials>"
+Logfire.configure(service_name = "my-app", send_to_logfire = :always)
+```
+
+That said, I strongly recommend [Pydantic Logfire](https://pydantic.dev/logfire) - their free tier provides hundreds of thousands of traced conversations per month, which is more than enough for most use cases.
+
+See the [Logfire.jl documentation](https://svilupp.github.io/Logfire.jl/dev) and [`examples/observability_with_logfire.jl`](examples/observability_with_logfire.jl) for more details.
 
 ### More Examples
 

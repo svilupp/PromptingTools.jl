@@ -531,10 +531,38 @@ function aigenerate(
         end
         ## Build metadata
         extras = Dict{Symbol, Any}()
-        haskey(resp.response[:usage], :cache_creation_input_tokens) &&
-            (extras[:cache_creation_input_tokens] = resp.response[:usage][:cache_creation_input_tokens])
-        haskey(resp.response[:usage], :cache_read_input_tokens) &&
-            (extras[:cache_read_input_tokens] = resp.response[:usage][:cache_read_input_tokens])
+        usage = resp.response[:usage]
+        ## Original Anthropic cache keys (backwards compatibility)
+        haskey(usage, :cache_creation_input_tokens) &&
+            (extras[:cache_creation_input_tokens] = usage[:cache_creation_input_tokens])
+        haskey(usage, :cache_read_input_tokens) &&
+            (extras[:cache_read_input_tokens] = usage[:cache_read_input_tokens])
+        ## Unified keys for cross-provider compatibility
+        haskey(usage, :cache_read_input_tokens) &&
+            (extras[:cache_read_tokens] = usage[:cache_read_input_tokens])
+        haskey(usage, :cache_creation_input_tokens) &&
+            (extras[:cache_write_tokens] = usage[:cache_creation_input_tokens])
+        ## Ephemeral cache details
+        if haskey(usage, :cache_creation)
+            details = usage[:cache_creation]
+            extras[:cache_creation] = details
+            haskey(details, :ephemeral_1h_input_tokens) &&
+                (extras[:cache_write_1h_tokens] = details[:ephemeral_1h_input_tokens])
+            haskey(details, :ephemeral_5m_input_tokens) &&
+                (extras[:cache_write_5m_tokens] = details[:ephemeral_5m_input_tokens])
+        end
+        ## Server tool use
+        if haskey(usage, :server_tool_use)
+            details = usage[:server_tool_use]
+            extras[:server_tool_use] = details
+            haskey(details, :web_search_requests) &&
+                (extras[:web_search_requests] = details[:web_search_requests])
+        end
+        ## Service tier
+        haskey(usage, :service_tier) && (extras[:service_tier] = usage[:service_tier])
+        ## Provider metadata for observability (Logfire.jl integration)
+        haskey(resp.response, :model) && (extras[:model] = resp.response[:model])
+        haskey(resp.response, :id) && (extras[:response_id] = resp.response[:id])
         ## Build the message
         msg = AIMessage(; content,
             status = Int(resp.status),
@@ -798,10 +826,38 @@ function aiextract(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMP
         end
         ## Build metadata
         extras = Dict{Symbol, Any}()
-        haskey(resp.response[:usage], :cache_creation_input_tokens) &&
-            (extras[:cache_creation_input_tokens] = resp.response[:usage][:cache_creation_input_tokens])
-        haskey(resp.response[:usage], :cache_read_input_tokens) &&
-            (extras[:cache_read_input_tokens] = resp.response[:usage][:cache_read_input_tokens])
+        usage = resp.response[:usage]
+        ## Original Anthropic cache keys (backwards compatibility)
+        haskey(usage, :cache_creation_input_tokens) &&
+            (extras[:cache_creation_input_tokens] = usage[:cache_creation_input_tokens])
+        haskey(usage, :cache_read_input_tokens) &&
+            (extras[:cache_read_input_tokens] = usage[:cache_read_input_tokens])
+        ## Unified keys for cross-provider compatibility
+        haskey(usage, :cache_read_input_tokens) &&
+            (extras[:cache_read_tokens] = usage[:cache_read_input_tokens])
+        haskey(usage, :cache_creation_input_tokens) &&
+            (extras[:cache_write_tokens] = usage[:cache_creation_input_tokens])
+        ## Ephemeral cache details
+        if haskey(usage, :cache_creation)
+            details = usage[:cache_creation]
+            extras[:cache_creation] = details
+            haskey(details, :ephemeral_1h_input_tokens) &&
+                (extras[:cache_write_1h_tokens] = details[:ephemeral_1h_input_tokens])
+            haskey(details, :ephemeral_5m_input_tokens) &&
+                (extras[:cache_write_5m_tokens] = details[:ephemeral_5m_input_tokens])
+        end
+        ## Server tool use
+        if haskey(usage, :server_tool_use)
+            details = usage[:server_tool_use]
+            extras[:server_tool_use] = details
+            haskey(details, :web_search_requests) &&
+                (extras[:web_search_requests] = details[:web_search_requests])
+        end
+        ## Service tier
+        haskey(usage, :service_tier) && (extras[:service_tier] = usage[:service_tier])
+        ## Provider metadata for observability (Logfire.jl integration)
+        haskey(resp.response, :model) && (extras[:model] = resp.response[:model])
+        haskey(resp.response, :id) && (extras[:response_id] = resp.response[:id])
         ## Build data message
         msg = DataMessage(; content,
             status = Int(resp.status),
@@ -1011,10 +1067,38 @@ function aitools(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMPT_
         end
         ## Build metadata
         extras = Dict{Symbol, Any}()
-        haskey(resp.response[:usage], :cache_creation_input_tokens) &&
-            (extras[:cache_creation_input_tokens] = resp.response[:usage][:cache_creation_input_tokens])
-        haskey(resp.response[:usage], :cache_read_input_tokens) &&
-            (extras[:cache_read_input_tokens] = resp.response[:usage][:cache_read_input_tokens])
+        usage = resp.response[:usage]
+        ## Original Anthropic cache keys (backwards compatibility)
+        haskey(usage, :cache_creation_input_tokens) &&
+            (extras[:cache_creation_input_tokens] = usage[:cache_creation_input_tokens])
+        haskey(usage, :cache_read_input_tokens) &&
+            (extras[:cache_read_input_tokens] = usage[:cache_read_input_tokens])
+        ## Unified keys for cross-provider compatibility
+        haskey(usage, :cache_read_input_tokens) &&
+            (extras[:cache_read_tokens] = usage[:cache_read_input_tokens])
+        haskey(usage, :cache_creation_input_tokens) &&
+            (extras[:cache_write_tokens] = usage[:cache_creation_input_tokens])
+        ## Ephemeral cache details
+        if haskey(usage, :cache_creation)
+            details = usage[:cache_creation]
+            extras[:cache_creation] = details
+            haskey(details, :ephemeral_1h_input_tokens) &&
+                (extras[:cache_write_1h_tokens] = details[:ephemeral_1h_input_tokens])
+            haskey(details, :ephemeral_5m_input_tokens) &&
+                (extras[:cache_write_5m_tokens] = details[:ephemeral_5m_input_tokens])
+        end
+        ## Server tool use
+        if haskey(usage, :server_tool_use)
+            details = usage[:server_tool_use]
+            extras[:server_tool_use] = details
+            haskey(details, :web_search_requests) &&
+                (extras[:web_search_requests] = details[:web_search_requests])
+        end
+        ## Service tier
+        haskey(usage, :service_tier) && (extras[:service_tier] = usage[:service_tier])
+        ## Provider metadata for observability (Logfire.jl integration)
+        haskey(resp.response, :model) && (extras[:model] = resp.response[:model])
+        haskey(resp.response, :id) && (extras[:response_id] = resp.response[:id])
         length(tools_array) > 0 && (extras[:tool_calls] = tools_array)
         extras[:content] = content_str
         ## Build  message
