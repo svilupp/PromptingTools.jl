@@ -38,7 +38,9 @@ Creates a response using the OpenAI Responses API with streaming support.
 - `http_kwargs::NamedTuple`: Additional keyword arguments for the HTTP request
 - `streamcallback::Any`: Callback function for streaming responses
 - `tools::Vector{<:Any}`: Tools for the model to use
-- `api_kwargs::NamedTuple`: Additional API-specific keyword arguments (e.g., reasoning)
+- `api_kwargs::NamedTuple`: Additional API-specific keyword arguments:
+  - `reasoning`: Dict controlling reasoning (e.g., `Dict("effort" => "low")` or `Dict("summary" => "detailed")`)
+  - `text`: Dict controlling text output (e.g., `Dict("format" => Dict("type" => "json_schema", ...))`)
 - `kwargs...`: Additional keyword arguments for the API call
 
 # Returns
@@ -71,19 +73,10 @@ function create_response(schema::AbstractResponseSchema, api_key::AbstractString
         body["stream"] = true
     end
 
-    # Add reasoning configuration from api_kwargs, default to detailed summary
-    # Valid summary values: "detailed", "concise", "none"
-    if haskey(api_kwargs, :reasoning)
-        body["reasoning"] = api_kwargs.reasoning
-    else
-        body["reasoning"] = Dict("summary" => "detailed")
-    end
-
-    # Add any other parameters from api_kwargs only
+    # Add all parameters from api_kwargs
+    # Supports: reasoning, text, temperature, max_output_tokens, etc.
     for (key, value) in pairs(api_kwargs)
-        if key != :reasoning  # already handled above
-            body[string(key)] = value
-        end
+        body[string(key)] = value
     end
 
     # Make the API request
@@ -91,11 +84,21 @@ function create_response(schema::AbstractResponseSchema, api_key::AbstractString
     headers = OpenAI.auth_header(OpenAI.DEFAULT_PROVIDER, api_key)
 
     if !isnothing(streamcallback)
+        # Streaming is not yet supported for the Responses API
+        # The Responses API uses a different SSE format than Chat Completions,
+        # requiring a dedicated ResponseStream flavor in StreamCallbacks.jl
+        throw(ArgumentError("Streaming is not yet supported for OpenAI Responses API (OpenAIResponseSchema). Use non-streaming requests for now."))
+
         # Configure streaming callback - only pass schema, no extra kwargs
         streamcallback, stream_kwargs = configure_callback!(streamcallback, schema)
 
+        # Convert body dict to IOBuffer for streaming (streamed_request! expects IOBuffer)
+        input = IOBuffer()
+        JSON3.write(input, body)
+        seekstart(input)
+
         # Use streaming request
-        resp = streamed_request!(streamcallback, url, headers, body; http_kwargs...)
+        resp = streamed_request!(streamcallback, url, headers, input; http_kwargs...)
         return OpenAI.OpenAIResponse(resp.status, JSON3.read(resp.body))
     else
         # Convert the body to JSON for non-streaming
@@ -110,6 +113,7 @@ end
 """
     render(schema::AbstractResponseSchema, messages::Vector{<:AbstractMessage};
            conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
+           no_system_message::Bool = false,
            kwargs...)
 
 Render messages for the OpenAI Responses API. Returns a NamedTuple with `input` and `instructions`
@@ -123,6 +127,7 @@ The Responses API expects:
 - `schema::AbstractResponseSchema`: The response schema
 - `messages::Vector{<:AbstractMessage}`: Messages to render
 - `conversation`: Previous conversation history (currently limited support)
+- `no_system_message`: If true, don't add default system message
 - `kwargs...`: Placeholder replacements for templates
 
 # Returns
@@ -131,9 +136,10 @@ The Responses API expects:
 function render(schema::AbstractResponseSchema,
         messages::Vector{<:AbstractMessage};
         conversation::AbstractVector{<:AbstractMessage} = AbstractMessage[],
+        no_system_message::Bool = false,
         kwargs...)
     # First, use NoSchema to process placeholders and organize messages
-    processed = render(NoSchema(), messages; conversation, kwargs...)
+    processed = render(NoSchema(), messages; conversation, no_system_message, kwargs...)
 
     # Extract system message (instructions) and user message (input)
     system_msg = nothing
@@ -159,8 +165,9 @@ function render(schema::AbstractResponseSchema,
 end
 
 # Render for string prompts - wrap in UserMessage and process
-function render(schema::AbstractResponseSchema, prompt::AbstractString; kwargs...)
-    render(schema, [UserMessage(prompt)]; kwargs...)
+function render(schema::AbstractResponseSchema, prompt::AbstractString;
+        no_system_message::Bool = true, kwargs...)
+    render(schema, [UserMessage(prompt)]; no_system_message, kwargs...)
 end
 
 # Render for single message
@@ -176,6 +183,45 @@ end
 # Render for Symbol (template name)
 function render(schema::AbstractResponseSchema, template::Symbol; kwargs...)
     render(schema, AITemplate(template); kwargs...)
+end
+
+"""
+    extract_response_content(response) -> (content, reasoning_content)
+
+Extract text content and reasoning content from an OpenAI Responses API response.
+
+Returns a tuple of (main_content::String, reasoning_content::Vector{String})
+"""
+function extract_response_content(response)
+    content = ""
+    reasoning_content = String[]
+
+    if haskey(response, :output)
+        for item in response[:output]
+            item_type = get(item, :type, "")
+
+            if item_type == "message"
+                # Extract main message content
+                for msg_content in get(item, :content, [])
+                    if get(msg_content, :type, "") == "output_text"
+                        content *= get(msg_content, :text, "") * "\n"
+                    end
+                end
+            elseif item_type == "reasoning"
+                # Extract reasoning summary from the summary array
+                # OpenAI format: {"type": "reasoning", "summary": [{"type": "summary_text", "text": "..."}]}
+                for summary_item in get(item, :summary, [])
+                    text = get(summary_item, :text, "")
+                    if !isempty(text)
+                        push!(reasoning_content, text)
+                    end
+                end
+            end
+        end
+        content = rstrip(content)
+    end
+
+    return content, reasoning_content
 end
 
 """
@@ -203,38 +249,40 @@ Returns an AIMessage with the response content and additional information in the
 - `verbose=true`: Whether to print verbose information
 - `api_key`: The API key for OpenAI (defaults to `""`, falls back to ENV["OPENAI_API_KEY"])
 - `streamcallback=nothing`: Callback function for streaming responses
-- `api_kwargs`: Additional API-specific keyword arguments (e.g., `reasoning = Dict("summary" => "concise")`)
+- `api_kwargs`: Additional API-specific keyword arguments:
+  - `reasoning`: Control reasoning effort/verbosity, e.g., `Dict("effort" => "low")` or `Dict("summary" => "auto")`
+    - `effort`: "low", "medium", or "high" - controls how much reasoning effort the model applies
+    - `summary`: "auto", "concise", or "detailed" - controls verbosity of reasoning summary in response
+  - `text`: Control text output format
 
 # Returns
 - `AIMessage`: The response from the API with extras containing:
   - `response_id`: The response ID for continuing conversations
-  - `reasoning`: Reasoning traces (if available)
+  - `reasoning`: Full reasoning object from API
+  - `reasoning_content`: Extracted reasoning summary text (Vector{String})
   - `usage`: Token usage information
   - `full_response`: The complete API response
+
+# Notes
+- Reasoning content is only available for models that support reasoning (e.g., o1, o3, o4-mini, gpt-5)
+- By default, reasoning traces are encrypted and hidden from the client for safety
+- The `reasoning_content` field contains the summary text, not the full reasoning trace
+- Use `reasoning = Dict("summary" => "auto")` or `"detailed"` to get more verbose summaries
 
 # Example
 ```julia
 schema = OpenAIResponseSchema()
 
-# Basic usage
-response = aigenerate(schema, "What is Julia?"; model="gpt-5.1-codex")
+# Basic usage (no reasoning by default)
+response = aigenerate(schema, "What is Julia?"; model="gpt-4o-mini")
 
-# With streaming
-response = aigenerate(schema, "Count to 10"; model="gpt-5.1-codex", streamcallback=stdout)
-
-# With web search
-response = aigenerate(schema, "Latest news about AI"; model="gpt-5.1-codex", enable_websearch=true)
-
-# Custom reasoning configuration
+# With reasoning enabled (for reasoning models like o1, o3)
 response = aigenerate(schema, "Solve 2+2*3";
-    model="gpt-5.1-codex",
-    api_kwargs = (reasoning = Dict("summary" => "concise"),))
+    model="o3-mini",
+    api_kwargs = (reasoning = Dict("effort" => "medium", "summary" => "auto"),))
 
-# Using templates
-response = aigenerate(schema, :BlankSystemUser;
-    system="You are a helpful assistant",
-    user="Hello!",
-    model="gpt-5.1-codex")
+# Access reasoning summary
+println(response.extras[:reasoning_content])
 ```
 """
 function aigenerate(schema::AbstractResponseSchema, prompt::ALLOWED_PROMPT_TYPE;
@@ -244,6 +292,7 @@ function aigenerate(schema::AbstractResponseSchema, prompt::ALLOWED_PROMPT_TYPE;
         verbose::Bool = true,
         api_key::AbstractString = "",
         streamcallback::Any = nothing,
+        no_system_message::Bool = false,
         kwargs...)
     # Resolve API key - use provided key or fall back to environment variable
     api_key = isempty(api_key) ? get(ENV, "OPENAI_API_KEY", "") : api_key
@@ -251,7 +300,7 @@ function aigenerate(schema::AbstractResponseSchema, prompt::ALLOWED_PROMPT_TYPE;
     start_time = time()
 
     # Process the prompt to get input and instructions using unified render
-    rendered = render(schema, prompt; kwargs...)
+    rendered = render(schema, prompt; no_system_message, kwargs...)
 
     # Prepare tools if web search is enabled
     tools = Any[]
@@ -276,20 +325,9 @@ function aigenerate(schema::AbstractResponseSchema, prompt::ALLOWED_PROMPT_TYPE;
 
     elapsed = time() - start_time
 
-    # Extract the text content from the response
-    content = ""
-    if haskey(response.response, :output)
-        for item in response.response[:output]
-            if item[:type] == "message"
-                for msg_content in item[:content]
-                    if msg_content[:type] == "output_text"
-                        content *= msg_content[:text] * "\n"
-                    end
-                end
-            end
-        end
-        content = rstrip(content)
-    else
+    # Extract content and reasoning
+    content, reasoning_content = extract_response_content(response.response)
+    if isempty(content)
         content = "No output content found in response"
     end
 
@@ -298,10 +336,11 @@ function aigenerate(schema::AbstractResponseSchema, prompt::ALLOWED_PROMPT_TYPE;
     input_tokens = get(usage_data, :input_tokens, -1)
     output_tokens = get(usage_data, :output_tokens, -1)
 
-    # Create extras dictionary
+    # Create extras dictionary with reasoning content
     extras = Dict{Symbol, Any}(
         :response_id => get(response.response, :id, ""),
         :reasoning => get(response.response, :reasoning, Dict()),
+        :reasoning_content => reasoning_content,
         :usage => usage_data,
         :full_response => response.response
     )
@@ -319,6 +358,172 @@ function aigenerate(schema::AbstractResponseSchema, prompt::ALLOWED_PROMPT_TYPE;
         cost = cost,
         log_prob = nothing,
         finish_reason = finish_reason,
+        run_id = Int(rand(Int32)),
+        sample_id = nothing
+    )
+
+    verbose && @info _report_stats(result, model)
+    return result
+end
+
+"""
+    aiextract(schema::AbstractResponseSchema, prompt::ALLOWED_PROMPT_TYPE;
+              return_type::Union{Type, AbstractTool},
+              model::AbstractString = MODEL_CHAT,
+              api_key::AbstractString = "",
+              verbose::Bool = true,
+              strict::Union{Nothing, Bool} = true,
+              kwargs...)
+
+Extract structured data from text using the OpenAI Responses API with JSON schema output.
+
+Uses the existing `tool_call_signature` and `parse_tool` utilities for schema generation and parsing.
+
+Note: Unlike the Chat Completions API, the Responses API `text.format` only supports a single
+JSON schema. For multi-type extraction (union of structs), use the Chat Completions API instead.
+
+# Arguments
+- `schema::AbstractResponseSchema`: The schema to use
+- `prompt`: The input prompt
+- `return_type`: A Julia struct type or AbstractTool to extract (single type only)
+- `model`: The model to use
+- `api_key`: OpenAI API key
+- `verbose`: Print stats
+- `strict`: Whether to enforce strict JSON schema mode (default: true)
+- `api_kwargs`: Additional API kwargs (e.g., `reasoning` for reasoning traces)
+
+# Returns
+- `DataMessage`: Contains the extracted data in the `content` field, with extras containing reasoning
+
+# Example
+```julia
+using PromptingTools
+
+# Define the structure to extract
+struct CalendarEvent
+    name::String
+    date::String
+    participants::Vector{String}
+end
+
+schema = OpenAIResponseSchema()
+result = aiextract(schema, "Alice and Bob are going to a science fair on Friday.";
+    return_type=CalendarEvent,
+    model="gpt-4o")
+
+# Access extracted data
+event = result.content
+println(event.name)          # "Science Fair"
+println(event.participants)  # ["Alice", "Bob"]
+
+# With reasoning enabled
+result = aiextract(schema, "Solve: What is 15% of 80?";
+    return_type=MathAnswer,
+    model="gpt-4o",
+    api_kwargs=(reasoning=Dict("effort"=>"high"),))
+println(result.extras[:reasoning_content])
+```
+"""
+function aiextract(schema::AbstractResponseSchema, prompt::ALLOWED_PROMPT_TYPE;
+        return_type::Union{Type, AbstractTool},
+        model::AbstractString = MODEL_CHAT,
+        api_key::AbstractString = "",
+        verbose::Bool = true,
+        strict::Union{Nothing, Bool} = true,
+        no_system_message::Bool = false,
+        kwargs...)
+    # Resolve API key
+    api_key = isempty(api_key) ? get(ENV, "OPENAI_API_KEY", "") : api_key
+
+    start_time = time()
+
+    # Process the prompt
+    rendered = render(schema, prompt; no_system_message, kwargs...)
+
+    # Use existing tool_call_signature utility to generate JSON schema
+    # Note: Responses API text.format only supports a single schema, unlike Chat Completions tools
+    tool_map = tool_call_signature(return_type; strict = strict)
+    if length(tool_map) != 1
+        throw(ArgumentError("Responses API aiextract only supports a single return_type. " *
+                            "Got $(length(tool_map)) types. Use Chat Completions API for multi-type extraction."))
+    end
+    name, tool = only(tool_map)
+
+    # Configure text output format for structured extraction
+    # Responses API uses text.format instead of tools
+    api_kwargs = get(kwargs, :api_kwargs, NamedTuple())
+
+    # Build text format, preserving user's text settings (e.g., verbosity) but overriding format
+    user_text = get(api_kwargs, :text, Dict())
+    text_format = if user_text isa Dict
+        # Merge user settings with our format (our format takes precedence)
+        merge(user_text,
+            Dict(
+                "format" => Dict(
+                "type" => "json_schema",
+                "name" => tool.name,
+                "schema" => tool.parameters,
+                "strict" => something(tool.strict, true)
+            )
+            ))
+    else
+        Dict(
+            "format" => Dict(
+            "type" => "json_schema",
+            "name" => tool.name,
+            "schema" => tool.parameters,
+            "strict" => something(tool.strict, true)
+        )
+        )
+    end
+
+    # Merge with existing api_kwargs, replacing text with our merged version
+    merged_kwargs = (;
+        [k => v for (k, v) in pairs(api_kwargs) if k != :text]..., text = text_format)
+
+    # Call the API
+    response = create_response(
+        schema,
+        api_key,
+        model,
+        rendered.input;
+        instructions = rendered.instructions,
+        http_kwargs = (retry_non_idempotent = true, retries = 3, readtimeout = 120),
+        api_kwargs = merged_kwargs
+    )
+
+    elapsed = time() - start_time
+
+    # Extract content and reasoning
+    content_str, reasoning_content = extract_response_content(response.response)
+
+    # Parse the JSON response using existing parse_tool utility
+    parsed_content = parse_tool(tool, content_str)
+
+    # Extract usage
+    usage_data = get(response.response, :usage, Dict())
+    input_tokens = get(usage_data, :input_tokens, -1)
+    output_tokens = get(usage_data, :output_tokens, -1)
+
+    # Create extras with reasoning content
+    extras = Dict{Symbol, Any}(
+        :response_id => get(response.response, :id, ""),
+        :reasoning => get(response.response, :reasoning, Dict()),
+        :reasoning_content => reasoning_content,
+        :raw_content => content_str,
+        :usage => usage_data,
+        :full_response => response.response
+    )
+
+    cost = call_cost(input_tokens, output_tokens, model)
+
+    result = DataMessage(;
+        content = parsed_content,
+        status = Int(response.status),
+        tokens = (input_tokens, output_tokens),
+        elapsed = elapsed,
+        extras = extras,
+        cost = cost,
         run_id = Int(rand(Int32)),
         sample_id = nothing
     )

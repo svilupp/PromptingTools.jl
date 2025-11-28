@@ -1,24 +1,25 @@
 using PromptingTools: TestEchoOpenAIResponseSchema, OpenAIResponseSchema,
                       AbstractResponseSchema, render
-using PromptingTools: AIMessage, SystemMessage, UserMessage, AbstractMessage
-using PromptingTools: aigenerate, create_response, call_cost
+using PromptingTools: AIMessage, DataMessage, SystemMessage, UserMessage, AbstractMessage
+using PromptingTools: aigenerate, aiextract, create_response, call_cost
+using PromptingTools: tool_call_signature, parse_tool
 
 @testset "render-OpenAIResponses" begin
     schema = OpenAIResponseSchema()
 
-    # Test rendering a simple string prompt (default system message is added)
+    # Test rendering a simple string prompt (no default system message for strings)
     @testset "String prompt" begin
         result = render(schema, "Hello, world!")
         @test result.input == "Hello, world!"
-        # NoSchema adds default system message
-        @test result.instructions == "Act as a helpful AI assistant"
+        # String prompts default to no_system_message=true
+        @test isnothing(result.instructions)
     end
 
     # Test rendering a UserMessage (default system message is added)
     @testset "UserMessage" begin
         result = render(schema, UserMessage("User question"))
         @test result.input == "User question"
-        # Default system message should be added
+        # Default system message should be added for UserMessage
         @test result.instructions == "Act as a helpful AI assistant"
     end
 
@@ -197,6 +198,81 @@ end
 
         @test result.content == "No output content found in response"
     end
+end
+
+@testset "Reasoning content extraction" begin
+    # Test extraction of reasoning content from response
+    # Uses actual OpenAI format: reasoning items have "summary" array, not "content" with "reasoning_text"
+    mock_response = Dict{Symbol, Any}(
+        :id => "resp_reasoning",
+        :status => "completed",
+        :output => [
+            Dict{Symbol, Any}(
+                :type => "reasoning",
+                :id => "rs_123",
+                :summary => [
+                    Dict{Symbol, Any}(:type => "summary_text", :text => "Step 1: Think"),
+                    Dict{Symbol, Any}(:type => "summary_text", :text => "Step 2: Reason")
+                ]
+            ),
+            Dict{Symbol, Any}(
+                :type => "message",
+                :content => [
+                    Dict{Symbol, Any}(:type => "output_text", :text => "Final answer")
+                ]
+            )
+        ],
+        :usage => Dict{Symbol, Any}(:input_tokens => 10, :output_tokens => 20)
+    )
+    schema = TestEchoOpenAIResponseSchema(; response = mock_response, status = 200)
+    result = aigenerate(schema, "Test"; model = "test", verbose = false)
+
+    @test result.content == "Final answer"
+    @test haskey(result.extras, :reasoning_content)
+    @test length(result.extras[:reasoning_content]) == 2
+    @test result.extras[:reasoning_content][1] == "Step 1: Think"
+    @test result.extras[:reasoning_content][2] == "Step 2: Reason"
+end
+
+@testset "aiextract-OpenAIResponses" begin
+    # Test structured extraction
+
+    # Define a test struct
+    struct TestExtractStruct
+        name::String
+        value::Int
+    end
+
+    # Mock response with JSON content
+    mock_response = Dict{Symbol, Any}(
+        :id => "resp_extract",
+        :status => "completed",
+        :output => [
+            Dict{Symbol, Any}(
+            :type => "message",
+            :content => [
+                Dict{Symbol, Any}(
+                :type => "output_text",
+                :text => "{\"name\": \"test\", \"value\": 42}"
+            )
+            ]
+        )
+        ],
+        :usage => Dict{Symbol, Any}(:input_tokens => 15, :output_tokens => 10)
+    )
+
+    schema = TestEchoOpenAIResponseSchema(; response = mock_response, status = 200)
+    result = aiextract(schema, "Extract name and value";
+        return_type = TestExtractStruct,
+        model = "test",
+        verbose = false)
+
+    @test result isa DataMessage
+    @test result.content isa TestExtractStruct
+    @test result.content.name == "test"
+    @test result.content.value == 42
+    @test haskey(result.extras, :reasoning_content)
+    @test haskey(result.extras, :raw_content)
 end
 
 @testset "Model registry integration" begin

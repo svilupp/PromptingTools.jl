@@ -378,3 +378,152 @@ It took 1 retry (see `result.config.retries`) and we have the correct output fro
 
 If you're interested in the `result` object, it's a struct (`AICall`) with a field `conversation`, which holds the conversation up to this point.
 AIGenerate is an alias for AICall using `aigenerate` function. See `?AICall` (the underlying struct type) for more details on the fields and methods available.
+
+## Walkthrough Example for the Responses API
+
+The Responses API is OpenAI's newer API endpoint designed for agentic workflows and reasoning models. Unlike the Chat Completions API which requires you to manage conversation state client-side, the Responses API can manage state server-side.
+
+### When to Use the Responses API
+
+Use the Responses API when you need:
+- **Server-side state management**: Avoid sending full conversation history with each request
+- **Built-in tools**: Web search, file search, code interpreter without implementing them yourself
+- **Reasoning models**: Better support for o1, o3, o4-mini, and GPT-5 models
+- **Better caching**: 40-80% improved cache utilization for cost and latency benefits
+
+### Basic Usage
+
+```julia
+using PromptingTools
+const PT = PromptingTools
+
+# Explicitly use the Responses API with OpenAIResponseSchema
+schema = PT.OpenAIResponseSchema()
+
+msg = aigenerate(schema, "What is the capital of France?"; model="gpt-5-mini")
+```
+
+### How It Works Under the Hood
+
+Let's trace through what happens when you make a Responses API call:
+
+```julia
+# Step 1: Render the prompt for the Responses API
+prompt = "What is Julia programming language?"
+rendered = PT.render(schema, prompt)
+```
+
+The `render` function for `OpenAIResponseSchema` produces a different output than `OpenAISchema`:
+
+```plaintext
+(input = "What is Julia programming language?", instructions = nothing)
+```
+
+Notice that instead of a vector of messages with "role" and "content" keys, we get a named tuple with `input` and `instructions` fields. This matches the Responses API specification.
+
+If we use a template with a system message:
+
+```julia
+conversation = [
+    PT.SystemMessage("You are a helpful Julia programming assistant."),
+    PT.UserMessage("What is Julia?")
+]
+rendered = PT.render(schema, conversation)
+```
+
+```plaintext
+(input = "What is Julia?", instructions = "You are a helpful Julia programming assistant.")
+```
+
+### Server-Side State Management
+
+One of the key advantages of the Responses API is server-side state management:
+
+```julia
+# First message
+msg1 = aigenerate(schema, "My name is Alice."; model="gpt-5-mini")
+
+# Continue the conversation using previous_response_id
+# No need to send the full conversation history!
+msg2 = aigenerate(schema, "What is my name?";
+    model="gpt-5-mini",
+    previous_response_id=msg1.extras[:response_id])
+
+# The model remembers: "Your name is Alice."
+```
+
+With Chat Completions, you would need to send all previous messages with each request. The Responses API handles this server-side.
+
+### Built-in Web Search
+
+The Responses API provides hosted tools that execute server-side:
+
+```julia
+msg = aigenerate(schema, "What are the latest Julia 1.11 features?";
+    model="gpt-5-mini",
+    enable_websearch=true)
+```
+
+This uses OpenAI's built-in web search tool without any additional setup.
+
+### Reasoning Models
+
+For reasoning models like o1, o3, and o4-mini, you can control the reasoning effort:
+
+```julia
+msg = aigenerate(schema, "Solve: If a train travels 120 km in 2 hours, and then 180 km in 3 hours, what is its average speed for the entire journey?";
+    model="o3-mini",
+    api_kwargs = (reasoning = Dict("effort" => "high", "summary" => "detailed"),))
+
+# Access the reasoning summary
+println(msg.extras[:reasoning_content])
+```
+
+Reasoning options:
+- `effort`: "low", "medium", or "high" - controls how much reasoning effort the model applies
+- `summary`: "auto", "concise", or "detailed" - controls verbosity of reasoning summary
+
+### Structured Data Extraction
+
+The Responses API supports structured output via JSON schema:
+
+```julia
+struct WeatherInfo
+    location::String
+    temperature::Float64
+    conditions::String
+end
+
+result = aiextract(schema, "The weather in Paris is 22°C and sunny.";
+    return_type=WeatherInfo,
+    model="gpt-5-mini")
+
+result.content
+# WeatherInfo("Paris", 22.0, "sunny")
+```
+
+### Response Extras
+
+The `AIMessage` returned by the Responses API includes additional information in the `extras` field:
+
+```julia
+msg = aigenerate(schema, "Hello!"; model="gpt-5-mini")
+
+msg.extras[:response_id]        # ID for continuing conversations
+msg.extras[:reasoning_content]  # Vector of reasoning summaries (for reasoning models)
+msg.extras[:usage]              # Token usage details
+msg.extras[:full_response]      # Complete API response
+```
+
+### Chat Completions vs Responses API Comparison
+
+| Aspect | Chat Completions | Responses API |
+|--------|------------------|---------------|
+| State Management | Client-side (send all messages) | Server-side (`previous_response_id`) |
+| Built-in Tools | None | Web search, file search, code interpreter |
+| Reasoning Models | Limited | Full support with effort/summary controls |
+| Cache Efficiency | Standard | 40-80% better cache hits |
+| Endpoint | `/v1/chat/completions` | `/v1/responses` |
+| Schema | `OpenAISchema()` | `OpenAIResponseSchema()` |
+
+For more details on when to use each API, see the [FAQ section on Responses API](frequently_asked_questions.md#Why-use-the-Responses-API-instead-of-Chat-Completions).

@@ -8,6 +8,107 @@ There will be situations not or cannot use it (eg, privacy, cost, etc.). In that
 
 Note: To get started with [Ollama.ai](https://ollama.ai/), see the [Setup Guide for Ollama](#setup-guide-for-ollama) section below.
 
+## Why use the Responses API instead of Chat Completions?
+
+OpenAI offers two main APIs for interacting with their models:
+- **Chat Completions API** (`/v1/chat/completions`) - The traditional, widely-adopted approach
+- **Responses API** (`/v1/responses`) - A newer API designed for agentic workflows and reasoning models
+
+### Key Advantages of the Responses API
+
+**1. Server-Side State Management**
+
+With Chat Completions, you must maintain conversation history yourself, sending the full message array with each request. This becomes unwieldy with long conversations, attachments, and tools.
+
+The Responses API manages state server-side. You simply reference a `previous_response_id` to continue conversations:
+
+```julia
+schema = OpenAIResponseSchema()
+msg1 = aigenerate(schema, "What is Julia?"; model="gpt-5-mini")
+
+# Continue the conversation without resending history
+msg2 = aigenerate(schema, "Tell me more about its type system";
+    model="gpt-5-mini", previous_response_id=msg1.extras[:response_id])
+```
+
+**2. Better Performance and Cost Efficiency**
+
+OpenAI reports 40-80% better cache utilization with the Responses API, leading to:
+- Reduced latency (cached tokens are processed faster)
+- Lower costs (cached tokens are cheaper)
+- More efficient multi-turn conversations
+
+**3. Built-in Tools**
+
+The Responses API provides hosted tools that execute server-side:
+
+| Tool | Cost | Description |
+|------|------|-------------|
+| Web Search | \$25-50 per 1,000 queries | Integrated search capability |
+| File Search | \$2.50 per 1,000 queries | Vector store integration for RAG |
+| Code Interpreter | Included | Sandbox for code execution |
+| Computer Use | Varies | Agent automation tasks |
+
+```julia
+# Enable built-in web search
+msg = aigenerate(schema, "What are the latest developments in Julia 1.11?";
+    model="gpt-5-mini", enable_websearch=true)
+```
+
+**4. Better Reasoning Model Support**
+
+Reasoning models (o1, o3, o4-mini, GPT-5) use internal "chain-of-thought" that isn't directly exposed. The Responses API:
+- Preserves reasoning traces across multi-turn conversations server-side
+- Provides reasoning summaries in responses
+- Enables control over reasoning effort and verbosity
+
+```julia
+msg = aigenerate(schema, "Solve: A train travels 120 km in 2 hours...";
+    model="o3-mini",
+    api_kwargs = (reasoning = Dict("effort" => "high", "summary" => "detailed"),))
+
+# Access reasoning summary
+println(msg.extras[:reasoning_content])
+```
+
+**5. Structured Outputs**
+
+The Responses API supports JSON schema output natively:
+
+```julia
+struct CalendarEvent
+    name::String
+    date::String
+    participants::Vector{String}
+end
+
+result = aiextract(schema, "Alice and Bob are meeting on Friday for lunch.";
+    return_type=CalendarEvent, model="gpt-5-mini")
+```
+
+### When to Use Each API
+
+| Use Case | Recommended API |
+|----------|-----------------|
+| Simple, one-off queries | Chat Completions |
+| Existing integrations | Chat Completions |
+| Multi-turn conversations | Responses API |
+| Agentic workflows with tools | Responses API |
+| Reasoning models (o1, o3) | Responses API |
+| Web search or file search | Responses API |
+| Maximum compatibility | Chat Completions |
+
+### Important Notes
+
+- **Assistants API Deprecation**: OpenAI's Assistants API (launched 2023) will sunset in H1 2026 in favor of the Responses API
+- **Chat Completions Stability**: The Chat Completions API is not going away and remains fully supported
+- **Schema Selection**: Use `OpenAIResponseSchema()` to explicitly use the Responses API
+
+### Further Reading
+
+- [OpenAI: Responses vs Chat Completions](https://platform.openai.com/docs/guides/responses-vs-chat-completions)
+- [Why We Built the Responses API](https://developers.openai.com/blog/responses-api/)
+
 ### What if I cannot access OpenAI?
 
 There are many alternatives:

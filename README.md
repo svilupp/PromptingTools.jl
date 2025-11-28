@@ -101,6 +101,7 @@ For more practical examples, see the `examples/` folder and the [Advanced Exampl
   - [Experimental Agent Workflows / Output Validation with `airetry!`](#experimental-agent-workflows--output-validation-with-airetry)
     - [Using Ollama models](#using-ollama-models)
     - [Using MistralAI API and other OpenAI-compatible APIs](#using-mistralai-api-and-other-openai-compatible-apis)
+    - [Using OpenAI Responses API](#using-openai-responses-api)
     - [Using Anthropic Models](#using-anthropic-models)
     - [More Examples](#more-examples)
   - [Package Interface](#package-interface)
@@ -587,13 +588,52 @@ As you can see, it also works for any local models that you might have running o
 
 Note: At the moment, we only support `aigenerate` and `aiembed` functions for MistralAI and other OpenAI-compatible APIs. We plan to extend the support in the future.
 
+### Using OpenAI Responses API
+
+PromptingTools.jl supports OpenAI's **Responses API** (`/responses` endpoint) in addition to the traditional Chat Completions API. The Responses API offers several advantages for agentic workflows and reasoning models:
+
+**Key Benefits:**
+- **Server-side state management**: No need to send full conversation history with each request
+- **Better cache utilization**: 40-80% improved cache hits, reducing latency and costs
+- **Built-in tools**: Native web search, file search, and code interpreter without round-trips
+- **Reasoning model support**: Better preservation of reasoning traces for models like o1, o3, and GPT-5
+- **Multimodal-first design**: Text, images, and tools as first-class citizens
+
+```julia
+# Use the Responses API with any compatible model
+schema = OpenAIResponseSchema()
+msg = aigenerate(schema, "What is Julia?"; model="gpt-5-mini")
+
+# Enable web search (built-in tool)
+msg = aigenerate(schema, "What are the latest Julia releases?";
+    model="gpt-5-mini", enable_websearch=true)
+
+# With reasoning enabled (for reasoning models)
+msg = aigenerate(schema, "Solve: What is 15% of 80?";
+    model="o3-mini",
+    api_kwargs = (reasoning = Dict("effort" => "medium", "summary" => "auto"),))
+
+# Access reasoning summary
+println(msg.extras[:reasoning_content])
+
+# Continue conversations using previous_response_id
+msg2 = aigenerate(schema, "Tell me more";
+    model="gpt-5-mini", previous_response_id=msg.extras[:response_id])
+```
+
+**When to use which API:**
+- **Chat Completions API** (default): Straightforward conversations, established integrations, maximum compatibility
+- **Responses API**: Complex agent workflows, tool use, reasoning models, state-heavy applications
+
+See the [FAQ](https://svilupp.github.io/PromptingTools.jl/dev/frequently_asked_questions/#Why-use-the-Responses-API-instead-of-Chat-Completions?) for more details.
+
 ### Using Anthropic Models
 
 Make sure the `ANTHROPIC_API_KEY` environment variable is set to your API key.
 
 ```julia
 # cladeuh is alias for Claude 3 Haiku
-ai"Say hi!"claudeh 
+ai"Say hi!"claudeh
 ```
 
 Preset model aliases are `claudeo`, `claudes`, and `claudeh`, for Claude 3 Opus, Sonnet, and Haiku, respectively.
