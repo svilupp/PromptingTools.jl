@@ -10,7 +10,8 @@ Below is an overview of the model providers supported by PromptingTools.jl, alon
 
 | Abstract Schema         | Schema                    | Model Provider                         | aigenerate | aiembed | aiextract | aiscan | aiimage | aiclassify |
 |-------------------------|---------------------------|----------------------------------------|------------|---------|-----------|--------|---------|------------|
-| AbstractOpenAISchema    | OpenAISchema              | OpenAI                                 | ✅         | ✅     | ✅       | ✅     | ✅     | ✅         |
+| AbstractOpenAISchema    | OpenAISchema              | OpenAI (Chat Completions)              | ✅         | ✅     | ✅       | ✅     | ✅     | ✅         |
+| AbstractResponseSchema  | OpenAIResponseSchema***   | OpenAI (Responses API)                 | ✅         | ❌     | ✅       | ❌     | ❌     | ❌         |
 | AbstractOpenAISchema    | CustomOpenAISchema*       | Any OpenAI-compatible API (eg, vLLM)*  | ✅         | ✅     | ✅       | ✅     | ✅     | ❌         |
 | AbstractOpenAISchema    | LocalServerOpenAISchema** | Any OpenAI-compatible Local server**   | ✅         | ✅     | ✅       | ✅     | ✅     | ❌         |
 | AbstractOpenAISchema    | MistralOpenAISchema       | Mistral AI                             | ✅         | ✅     | ✅       | ✅     | ✅     | ❌         |
@@ -27,6 +28,8 @@ Below is an overview of the model providers supported by PromptingTools.jl, alon
 \* Catch-all implementation - Requires providing a `url` with `api_kwargs` and corresponding API key.
 
 \*\* This schema is a flavor of CustomOpenAISchema with a `url` key preset by global preference key `LOCAL_SERVER`. It is specifically designed for seamless integration with Llama.jl and utilizes an ENV variable for the URL, making integration easier in certain workflows, such as when nested calls are involved and passing `api_kwargs` is more challenging.
+
+\*\*\* The Responses API (`OpenAIResponseSchema`) is OpenAI's newer API designed for agentic workflows and reasoning models. Key features include server-side state management (no need to send full conversation history), built-in tools (web search, file search, code interpreter), and better support for reasoning models (o1, o3, GPT-5). Use `previous_response_id` kwarg to continue conversations. See [Why use the Responses API?](@ref) in the FAQ for details.
 
 **Note 1:** `aitools` has identical support as `aiextract` for all providers, as it has the API requirements.
 
