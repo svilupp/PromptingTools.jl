@@ -6,6 +6,59 @@
 #
 #
 
+## Helper function for observability metadata extraction
+"""
+    _extract_openai_extras!(extras::Dict{Symbol, Any}, resp)
+
+Extract observability metadata from OpenAI API response into the extras dict.
+Populates provider metadata (model, response_id, system_fingerprint, service_tier)
+and detailed usage statistics (cache tokens, reasoning tokens, audio tokens, etc.).
+"""
+function _extract_openai_extras!(extras::Dict{Symbol, Any}, resp)
+    ## Provider metadata for observability (Logfire.jl integration)
+    if haskey(resp.response, :model)
+        extras[:model] = resp.response[:model]
+    end
+    if haskey(resp.response, :system_fingerprint) &&
+       !isnothing(resp.response[:system_fingerprint])
+        extras[:system_fingerprint] = resp.response[:system_fingerprint]
+    end
+    ## Detailed usage stats (OpenAI caching, reasoning tokens, etc.)
+    if haskey(resp.response, :usage)
+        response_usage = resp.response[:usage]
+        ## Prompt token details
+        if haskey(response_usage, :prompt_tokens_details)
+            details = response_usage[:prompt_tokens_details]
+            extras[:prompt_tokens_details] = details
+            ## Unified keys for cross-provider compatibility
+            haskey(details, :cached_tokens) &&
+                (extras[:cache_read_tokens] = details[:cached_tokens])
+            haskey(details, :audio_tokens) &&
+                (extras[:audio_input_tokens] = details[:audio_tokens])
+        end
+        ## Completion token details
+        if haskey(response_usage, :completion_tokens_details)
+            details = response_usage[:completion_tokens_details]
+            extras[:completion_tokens_details] = details
+            ## Unified keys for cross-provider compatibility
+            haskey(details, :reasoning_tokens) &&
+                (extras[:reasoning_tokens] = details[:reasoning_tokens])
+            haskey(details, :audio_tokens) &&
+                (extras[:audio_output_tokens] = details[:audio_tokens])
+            haskey(details, :accepted_prediction_tokens) &&
+                (extras[:accepted_prediction_tokens] = details[:accepted_prediction_tokens])
+            haskey(details, :rejected_prediction_tokens) &&
+                (extras[:rejected_prediction_tokens] = details[:rejected_prediction_tokens])
+        end
+    end
+    ## Response ID for observability
+    haskey(resp.response, :id) && (extras[:response_id] = resp.response[:id])
+    ## Service tier
+    haskey(resp.response, :service_tier) &&
+        (extras[:service_tier] = resp.response[:service_tier])
+    return extras
+end
+
 ## Rendering of converation history for the OpenAI API
 """
     render(schema::AbstractOpenAISchema,
@@ -206,6 +259,7 @@ function response_to_message(schema::AbstractOpenAISchema,
     if has_reasoning_content
         extras[:reasoning_content] = reasoning_content
     end
+    _extract_openai_extras!(extras, resp)
     ## build AIMessage object
     msg = MSG(;
         content = choice[:message][:content] |> strip,
@@ -918,6 +972,7 @@ function response_to_message(schema::AbstractOpenAISchema,
     if has_reasoning_content
         extras[:reasoning_content] = reasoning_content
     end
+    _extract_openai_extras!(extras, resp)
 
     ## build DataMessage object
     msg = MSG(;
@@ -1596,6 +1651,7 @@ function response_to_message(schema::AbstractOpenAISchema,
     if has_reasoning_content
         extras[:reasoning_content] = reasoning_content
     end
+    _extract_openai_extras!(extras, resp)
 
     ## build AIToolRequest object
     msg = MSG(;

@@ -270,12 +270,15 @@ Logic:
 - calls `finalize_tracer`
 """
 function aiextract(tracer_schema::AbstractTracerSchema, prompt::ALLOWED_PROMPT_TYPE;
-        tracer_kwargs = NamedTuple(), model = "", kwargs...)
+        tracer_kwargs = NamedTuple(), model = "", return_all::Bool = false, kwargs...)
     tracer = initialize_tracer(tracer_schema; model, prompt, tracer_kwargs..., kwargs...)
+    # Force to return all convo and then subset as necessary
     merged_kwargs = isempty(model) ? kwargs : (; model, kwargs...) # to not override default model for each schema if not provided
-    extract_or_conv = aiextract(tracer_schema.schema, prompt; merged_kwargs...)
-    return finalize_tracer(
+    extract_or_conv = aiextract(
+        tracer_schema.schema, prompt; return_all = true, merged_kwargs...)
+    output = finalize_tracer(
         tracer_schema, tracer, extract_or_conv; model, tracer_kwargs..., kwargs...)
+    return return_all ? output : last(output)
 end
 
 """
@@ -290,12 +293,15 @@ Logic:
 - calls `finalize_tracer`
 """
 function aitools(tracer_schema::AbstractTracerSchema, prompt::ALLOWED_PROMPT_TYPE;
-        tracer_kwargs = NamedTuple(), model = "", kwargs...)
+        tracer_kwargs = NamedTuple(), model = "", return_all::Bool = false, kwargs...)
     tracer = initialize_tracer(tracer_schema; model, prompt, tracer_kwargs..., kwargs...)
+    # Force to return all convo and then subset as necessary
     merged_kwargs = isempty(model) ? kwargs : (; model, kwargs...) # to not override default model for each schema if not provided
-    extract_or_conv = aitools(tracer_schema.schema, prompt; merged_kwargs...)
-    return finalize_tracer(
+    extract_or_conv = aitools(
+        tracer_schema.schema, prompt; return_all = true, merged_kwargs...)
+    output = finalize_tracer(
         tracer_schema, tracer, extract_or_conv; model, tracer_kwargs..., kwargs...)
+    return return_all ? output : last(output)
 end
 
 """
@@ -310,12 +316,15 @@ Logic:
 - calls `finalize_tracer`
 """
 function aiscan(tracer_schema::AbstractTracerSchema, prompt::ALLOWED_PROMPT_TYPE;
-        tracer_kwargs = NamedTuple(), model = "", kwargs...)
+        tracer_kwargs = NamedTuple(), model = "", return_all::Bool = false, kwargs...)
     tracer = initialize_tracer(tracer_schema; model, prompt, tracer_kwargs..., kwargs...)
+    # Force to return all convo and then subset as necessary
     merged_kwargs = isempty(model) ? kwargs : (; model, kwargs...) # to not override default model for each schema if not provided
-    scan_or_conv = aiscan(tracer_schema.schema, prompt; merged_kwargs...)
-    return finalize_tracer(
+    scan_or_conv = aiscan(
+        tracer_schema.schema, prompt; return_all = true, merged_kwargs...)
+    output = finalize_tracer(
         tracer_schema, tracer, scan_or_conv; model, tracer_kwargs..., kwargs...)
+    return return_all ? output : last(output)
 end
 
 """
@@ -330,10 +339,13 @@ Logic:
 - calls `finalize_tracer`
 """
 function aiimage(tracer_schema::AbstractTracerSchema, prompt::ALLOWED_PROMPT_TYPE;
-        tracer_kwargs = NamedTuple(), model = "", kwargs...)
+        tracer_kwargs = NamedTuple(), model = "", return_all::Bool = false, kwargs...)
     tracer = initialize_tracer(tracer_schema; model, prompt, tracer_kwargs..., kwargs...)
+    # Force to return all convo and then subset as necessary
     merged_kwargs = isempty(model) ? kwargs : (; model, kwargs...) # to not override default model for each schema if not provided
-    image_or_conv = aiimage(tracer_schema.schema, prompt; merged_kwargs...)
-    return finalize_tracer(
+    image_or_conv = aiimage(
+        tracer_schema.schema, prompt; return_all = true, merged_kwargs...)
+    output = finalize_tracer(
         tracer_schema, tracer, image_or_conv; model, tracer_kwargs..., kwargs...)
+    return return_all ? output : last(output)
 end

@@ -3,6 +3,7 @@ using PromptingTools: TestEchoOpenAIResponseSchema, OpenAIResponseSchema,
 using PromptingTools: AIMessage, DataMessage, SystemMessage, UserMessage, AbstractMessage
 using PromptingTools: aigenerate, aiextract, create_response, call_cost
 using PromptingTools: tool_call_signature, parse_tool
+using PromptingTools: issystemmessage, isusermessage, isaimessage
 
 @testset "render-OpenAIResponses" begin
     schema = OpenAIResponseSchema()
@@ -273,6 +274,123 @@ end
     @test result.content.value == 42
     @test haskey(result.extras, :reasoning_content)
     @test haskey(result.extras, :raw_content)
+end
+
+@testset "aigenerate-OpenAIResponses-return_all" begin
+    # Test return_all functionality for tracer compatibility
+    mock_response = Dict{Symbol, Any}(
+        :id => "resp_return_all",
+        :status => "completed",
+        :output => [
+            Dict{Symbol, Any}(
+            :type => "message",
+            :content => [
+                Dict{Symbol, Any}(:type => "output_text", :text => "Hello from response!")
+            ]
+        )
+        ],
+        :usage => Dict{Symbol, Any}(
+            :input_tokens => 10,
+            :output_tokens => 5
+        )
+    )
+
+    @testset "return_all=false returns single AIMessage" begin
+        schema = TestEchoOpenAIResponseSchema(; response = mock_response, status = 200)
+        result = aigenerate(schema, "Test prompt";
+            model = "test", return_all = false, verbose = false)
+
+        @test result isa AIMessage
+        @test result.content == "Hello from response!"
+    end
+
+    @testset "return_all=true returns conversation vector" begin
+        schema = TestEchoOpenAIResponseSchema(; response = mock_response, status = 200)
+        result = aigenerate(schema, "Test prompt";
+            model = "test", return_all = true, verbose = false)
+
+        @test result isa Vector{<:AbstractMessage}
+        @test length(result) >= 2  # At least user message + AI message
+        @test result[end] isa AIMessage
+        @test result[end].content == "Hello from response!"
+        # Check that input messages are preserved
+        @test any(isusermessage, result)
+    end
+
+    @testset "return_all=true with SystemMessage and UserMessage" begin
+        schema = TestEchoOpenAIResponseSchema(; response = mock_response, status = 200)
+        messages = [
+            SystemMessage("You are helpful"),
+            UserMessage("Tell me something")
+        ]
+        result = aigenerate(schema, messages;
+            model = "test", return_all = true, verbose = false)
+
+        @test result isa Vector{<:AbstractMessage}
+        @test length(result) == 3  # System + User + AI
+        @test issystemmessage(result[1])
+        @test isusermessage(result[2])
+        @test isaimessage(result[3])
+    end
+
+    @testset "return_all works with last() for tracer compatibility" begin
+        # This is the key test - tracers call last(output) on the result
+        schema = TestEchoOpenAIResponseSchema(; response = mock_response, status = 200)
+        result = aigenerate(schema, "Test";
+            model = "test", return_all = true, verbose = false)
+
+        # Should not throw MethodError: no method matching lastindex(::AIMessage)
+        @test last(result) isa AIMessage
+        @test last(result).content == "Hello from response!"
+    end
+end
+
+@testset "aiextract-OpenAIResponses-return_all" begin
+    # Test return_all functionality for aiextract
+
+    struct TestReturnAllStruct
+        name::String
+        value::Int
+    end
+
+    mock_response = Dict{Symbol, Any}(
+        :id => "resp_extract_return_all",
+        :status => "completed",
+        :output => [
+            Dict{Symbol, Any}(
+            :type => "message",
+            :content => [
+                Dict{Symbol, Any}(
+                :type => "output_text",
+                :text => "{\"name\": \"test\", \"value\": 42}"
+            )
+            ]
+        )
+        ],
+        :usage => Dict{Symbol, Any}(:input_tokens => 15, :output_tokens => 10)
+    )
+
+    @testset "return_all=false returns single DataMessage" begin
+        schema = TestEchoOpenAIResponseSchema(; response = mock_response, status = 200)
+        result = aiextract(schema, "Extract data";
+            return_type = TestReturnAllStruct,
+            model = "test", return_all = false, verbose = false)
+
+        @test result isa DataMessage
+        @test result.content isa TestReturnAllStruct
+    end
+
+    @testset "return_all=true returns conversation vector" begin
+        schema = TestEchoOpenAIResponseSchema(; response = mock_response, status = 200)
+        result = aiextract(schema, "Extract data";
+            return_type = TestReturnAllStruct,
+            model = "test", return_all = true, verbose = false)
+
+        @test result isa Vector{<:AbstractMessage}
+        @test length(result) >= 2
+        @test result[end] isa DataMessage
+        @test result[end].content isa TestReturnAllStruct
+    end
 end
 
 @testset "Model registry integration" begin

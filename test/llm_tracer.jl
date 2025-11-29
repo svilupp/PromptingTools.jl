@@ -267,6 +267,21 @@ end
 
     msg = aiextract(schema1, :BlankSystemUser; return_type)
     @test istracermessage(msg)
+
+    # Test return_all=false (default) returns single TracerMessage
+    msg = aiextract(schema1, "Extract number 1"; return_type, model = "gpt4")
+    @test istracermessage(msg)
+    @test !(msg isa Vector)
+    @test unwrap(msg) isa DataMessage
+
+    # Test return_all=true returns vector of TracerMessages
+    conv = aiextract(
+        schema1, "Extract number 1"; return_type, model = "gpt4", return_all = true)
+    @test conv isa Vector
+    @test length(conv) >= 1
+    @test all(istracermessage, conv)
+    @test istracermessage(last(conv))
+    @test unwrap(last(conv)) isa DataMessage
 end
 
 # TODO: add aitools tracer tests
@@ -315,6 +330,21 @@ end
     msg = aitools(schema, :BlankSystemUser; tools = [calculator])
     @test istracermessage(msg)
     @test unwrap(msg) isa AIToolRequest
+
+    # Test return_all=false (default) returns single TracerMessage
+    msg = aitools(schema, "What is 2 + 3?"; tools = [calculator], model = "gpt-4")
+    @test istracermessage(msg)
+    @test !(msg isa Vector)
+    @test unwrap(msg) isa AIToolRequest
+
+    # Test return_all=true returns vector of TracerMessages
+    conv = aitools(
+        schema, "What is 2 + 3?"; tools = [calculator], model = "gpt-4", return_all = true)
+    @test conv isa Vector
+    @test length(conv) >= 1
+    @test all(istracermessage, conv)
+    @test istracermessage(last(conv))
+    @test unwrap(last(conv)) isa AIToolRequest
 end
 
 @testset "aiscan-Tracer" begin
@@ -341,6 +371,22 @@ end
 
     msg = aiscan(schema1, :BlankSystemUser; image_url = "https://example.com/image.png")
     @test istracermessage(msg)
+
+    # Test return_all=false (default) returns single TracerMessage
+    msg = aiscan(schema1, "Describe the image";
+        image_url = "https://example.com/image.png", model = "gpt4")
+    @test istracermessage(msg)
+    @test !(msg isa Vector)
+    @test unwrap(msg) isa AIMessage
+
+    # Test return_all=true returns vector of TracerMessages
+    conv = aiscan(schema1, "Describe the image";
+        image_url = "https://example.com/image.png", model = "gpt4", return_all = true)
+    @test conv isa Vector
+    @test length(conv) >= 1
+    @test all(istracermessage, conv)
+    @test istracermessage(last(conv))
+    @test unwrap(last(conv)) isa AIMessage
 end
 
 @testset "aiimage-Tracer" begin
@@ -355,4 +401,18 @@ end
 
     msg = aiimage(schema1, :BlankSystemUser)
     @test istracermessage(msg)
+
+    # Test return_all=false (default) returns single TracerMessage
+    msg = aiimage(schema1, "Hello World")
+    @test istracermessage(msg)
+    @test !(msg isa Vector)
+    @test unwrap(msg) isa DataMessage
+
+    # Test return_all=true returns vector of TracerMessages
+    conv = aiimage(schema1, "Hello World"; return_all = true)
+    @test conv isa Vector
+    @test length(conv) >= 1
+    @test all(istracermessage, conv)
+    @test istracermessage(last(conv))
+    @test unwrap(last(conv)) isa DataMessage
 end

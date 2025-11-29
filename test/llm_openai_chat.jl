@@ -1311,3 +1311,214 @@ end
     @test_throws AssertionError aiimage(
         OpenAISchema(), "my input"; conversation = [PT.UserMessage("hi")])
 end
+
+@testset "extras-observability-OpenAI" begin
+    # Test that new observability fields are captured in extras for Logfire.jl integration
+    # Test with full response metadata including model, system_fingerprint, and detailed usage
+    response_with_metadata = Dict(
+        :model => "gpt-4o-2024-08-06",
+        :id => "chatcmpl-abc123xyz",
+        :system_fingerprint => "fp_def456",
+        :choices => [
+            Dict(:message => Dict(:content => "Hello!"),
+            :finish_reason => "stop")
+        ],
+        :usage => Dict(
+            :total_tokens => 103,
+            :prompt_tokens => 100,
+            :completion_tokens => 3,
+            :prompt_tokens_details => Dict(:cached_tokens => 50),
+            :completion_tokens_details => Dict(:reasoning_tokens => 0)
+        ))
+
+    schema1 = TestEchoOpenAISchema(; response = response_with_metadata, status = 200)
+    msg = aigenerate(schema1, "Hello World")
+
+    # Check that extras contains the new observability fields
+    @test haskey(msg.extras, :model)
+    @test msg.extras[:model] == "gpt-4o-2024-08-06"
+    @test haskey(msg.extras, :response_id)
+    @test msg.extras[:response_id] == "chatcmpl-abc123xyz"
+    @test haskey(msg.extras, :system_fingerprint)
+    @test msg.extras[:system_fingerprint] == "fp_def456"
+    # Raw provider dicts
+    @test haskey(msg.extras, :prompt_tokens_details)
+    @test msg.extras[:prompt_tokens_details][:cached_tokens] == 50
+    @test haskey(msg.extras, :completion_tokens_details)
+    @test msg.extras[:completion_tokens_details][:reasoning_tokens] == 0
+    # Unified keys for cross-provider compatibility
+    @test haskey(msg.extras, :cache_read_tokens)
+    @test msg.extras[:cache_read_tokens] == 50
+    @test haskey(msg.extras, :reasoning_tokens)
+    @test msg.extras[:reasoning_tokens] == 0
+
+    # Test without system_fingerprint (some providers don't return it)
+    response_no_fingerprint = Dict(
+        :model => "gpt-4o",
+        :choices => [
+            Dict(:message => Dict(:content => "Hi!"),
+            :finish_reason => "stop")
+        ],
+        :usage => Dict(:total_tokens => 3, :prompt_tokens => 2, :completion_tokens => 1))
+
+    schema2 = TestEchoOpenAISchema(; response = response_no_fingerprint, status = 200)
+    msg2 = aigenerate(schema2, "Hello")
+    @test haskey(msg2.extras, :model)
+    @test msg2.extras[:model] == "gpt-4o"
+    @test !haskey(msg2.extras, :system_fingerprint)
+    @test !haskey(msg2.extras, :prompt_tokens_details)
+
+    # Test with system_fingerprint = nothing (OpenAI sometimes returns null)
+    response_null_fingerprint = Dict(
+        :model => "gpt-4o",
+        :system_fingerprint => nothing,
+        :choices => [
+            Dict(:message => Dict(:content => "Hi!"),
+            :finish_reason => "stop")
+        ],
+        :usage => Dict(:total_tokens => 3, :prompt_tokens => 2, :completion_tokens => 1))
+
+    schema3 = TestEchoOpenAISchema(; response = response_null_fingerprint, status = 200)
+    msg3 = aigenerate(schema3, "Hello")
+    @test haskey(msg3.extras, :model)
+    @test !haskey(msg3.extras, :system_fingerprint)  # Should not be added if null
+
+    # Test aitools with observability extras
+    struct ObservabilityWeatherTool
+        city::String
+    end
+
+    response_tools = Dict(
+        :model => "gpt-4o-2024-08-06",
+        :system_fingerprint => "fp_tools123",
+        :choices => [
+            Dict(
+            :message => Dict(
+                :content => nothing,
+                :tool_calls => [
+                    Dict(
+                    :id => "call_123",
+                    :type => "function",
+                    :function => Dict(
+                        :name => "get_weather",
+                        :arguments => "{\"city\":\"Paris\"}"
+                    )
+                )
+                ]
+            ),
+            :finish_reason => "tool_calls"
+        )
+        ],
+        :usage => Dict(
+            :total_tokens => 50,
+            :prompt_tokens => 40,
+            :completion_tokens => 10,
+            :prompt_tokens_details => Dict(:cached_tokens => 20)
+        ))
+
+    schema4 = TestEchoOpenAISchema(; response = response_tools, status = 200)
+    msg4 = aitools(schema4, "What's the weather?";
+        tools = [Tool(; name = "get_weather", callable = ObservabilityWeatherTool)])
+
+    @test msg4 isa AIToolRequest
+    @test haskey(msg4.extras, :model)
+    @test msg4.extras[:model] == "gpt-4o-2024-08-06"
+    @test haskey(msg4.extras, :system_fingerprint)
+    @test msg4.extras[:system_fingerprint] == "fp_tools123"
+    @test haskey(msg4.extras, :prompt_tokens_details)
+    @test msg4.extras[:prompt_tokens_details][:cached_tokens] == 20
+    # Unified key
+    @test haskey(msg4.extras, :cache_read_tokens)
+    @test msg4.extras[:cache_read_tokens] == 20
+
+    # Test with full detailed usage stats
+    response_full_details = Dict(
+        :model => "gpt-4o-2024-08-06",
+        :id => "chatcmpl-full123",
+        :system_fingerprint => "fp_full456",
+        :service_tier => "default",
+        :choices => [
+            Dict(:message => Dict(:content => "Hello!"),
+            :finish_reason => "stop")
+        ],
+        :usage => Dict(
+            :total_tokens => 200,
+            :prompt_tokens => 150,
+            :completion_tokens => 50,
+            :prompt_tokens_details => Dict(
+                :cached_tokens => 100,
+                :audio_tokens => 10
+            ),
+            :completion_tokens_details => Dict(
+                :reasoning_tokens => 25,
+                :audio_tokens => 5,
+                :accepted_prediction_tokens => 15,
+                :rejected_prediction_tokens => 3
+            )
+        ))
+
+    schema5 = TestEchoOpenAISchema(; response = response_full_details, status = 200)
+    msg5 = aigenerate(schema5, "Hello World")
+
+    # Provider metadata
+    @test msg5.extras[:model] == "gpt-4o-2024-08-06"
+    @test msg5.extras[:response_id] == "chatcmpl-full123"
+    @test msg5.extras[:system_fingerprint] == "fp_full456"
+    @test msg5.extras[:service_tier] == "default"
+    # Raw dicts preserved
+    @test msg5.extras[:prompt_tokens_details][:cached_tokens] == 100
+    @test msg5.extras[:prompt_tokens_details][:audio_tokens] == 10
+    @test msg5.extras[:completion_tokens_details][:reasoning_tokens] == 25
+    # Unified keys
+    @test msg5.extras[:cache_read_tokens] == 100
+    @test msg5.extras[:audio_input_tokens] == 10
+    @test msg5.extras[:reasoning_tokens] == 25
+    @test msg5.extras[:audio_output_tokens] == 5
+    @test msg5.extras[:accepted_prediction_tokens] == 15
+    @test msg5.extras[:rejected_prediction_tokens] == 3
+
+    # Test aiextract with observability extras
+    struct ObservabilityExtractCity
+        name::String
+        country::String
+    end
+
+    response_extract = Dict(
+        :model => "gpt-4o-2024-08-06",
+        :id => "chatcmpl-extract123",
+        :system_fingerprint => "fp_extract456",
+        :choices => [
+            Dict(
+            :message => Dict(
+                :content => nothing,
+                :tool_calls => [
+                    Dict(
+                    :id => "call_extract",
+                    :type => "function",
+                    :function => Dict(
+                        :name => "ObservabilityExtractCity",
+                        :arguments => "{\"name\":\"Paris\",\"country\":\"France\"}"
+                    )
+                )
+                ]
+            ),
+            :finish_reason => "tool_calls"
+        )
+        ],
+        :usage => Dict(
+            :total_tokens => 60,
+            :prompt_tokens => 50,
+            :completion_tokens => 10,
+            :prompt_tokens_details => Dict(:cached_tokens => 30)
+        ))
+
+    schema6 = TestEchoOpenAISchema(; response = response_extract, status = 200)
+    msg6 = aiextract(schema6, "Extract city info";
+        return_type = ObservabilityExtractCity)
+
+    @test msg6 isa DataMessage
+    @test msg6.extras[:model] == "gpt-4o-2024-08-06"
+    @test msg6.extras[:response_id] == "chatcmpl-extract123"
+    @test msg6.extras[:system_fingerprint] == "fp_extract456"
+    @test msg6.extras[:cache_read_tokens] == 30
+end

@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Fixed
+
 ### Updated
 
 ## [0.88.0]
@@ -15,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Added support for OpenAI's Responses API (`/responses` endpoint) via `OpenAIResponseSchema`. Supports reasoning traces, multi-turn conversations with `previous_response_id`, and structured extraction with `aiextract`. Use `aigenerate(OpenAIResponseSchema(), prompt; model="o4-mini")` for reasoning models (access via `result.extras[:reasoning_content]`). See `examples/working_with_responses_api.jl`. Note: Many features are not supported yet, eg, built-in tools, etc.
 - Added support for streaming responses with `OpenAIResponseSchema` via a dedicated `StreamCallback` flavor. See `examples/working_with_responses_api.jl`.
+- Added comprehensive observability metadata to `AIMessage.extras` for Logfire.jl integration (provider metadata, unified usage keys, cache/reasoning tokens). See `examples/observability_with_logfire.jl`.
+
+### Fixed
+- Fixed `return_all` parameter not being handled correctly in tracer wrappers for `aiextract`, `aitools`, `aiscan`, and `aiimage`. Previously, when using `TracerSchema` or `SaverSchema`, these functions would pass through the raw vector result instead of returning a single message when `return_all=false` (the default).
+- Fixed `aigenerate` and `aiextract` for `OpenAIResponseSchema` ignoring the `return_all` parameter, which broke compatibility with the tracer infrastructure and other patterns that rely on `return_all=true`.
 
 ## [0.87.0]
 

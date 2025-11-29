@@ -239,11 +239,15 @@ function aigenerate(
             streamcallback, api_kwargs...)
         tokens_prompt = get(resp.response, :prompt_eval_count, 0)
         tokens_completion = get(resp.response, :eval_count, 0)
+        ## Build extras for observability (Logfire.jl integration)
+        extras = Dict{Symbol, Any}()
+        haskey(resp.response, :model) && (extras[:model] = resp.response[:model])
         msg = AIMessage(; content = resp.response[:response] |> strip,
             status = Int(resp.status),
             cost = call_cost(tokens_prompt, tokens_completion, model_id),
             tokens = (tokens_prompt, tokens_completion),
-            elapsed = time)
+            elapsed = time,
+            extras)
         ## Reporting
         verbose && @info _report_stats(msg, model_id)
     else

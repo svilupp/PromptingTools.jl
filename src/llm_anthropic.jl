@@ -3,6 +3,51 @@
 ## Schema dedicated to Claude models.
 ## See more information [here](https://docs.anthropic.com/claude/reference/getting-started-with-the-api).
 ##
+
+## Helper function for observability metadata extraction
+"""
+    _extract_anthropic_extras!(extras::Dict{Symbol, Any}, resp)
+
+Extract observability metadata from Anthropic API response into the extras dict.
+Populates cache tokens (with both Anthropic-specific and unified keys for cross-provider compatibility),
+ephemeral cache details, server tool use, service tier, and provider metadata (model, response_id).
+"""
+function _extract_anthropic_extras!(extras::Dict{Symbol, Any}, resp)
+    usage = resp.response[:usage]
+    ## Original Anthropic cache keys (backwards compatibility)
+    haskey(usage, :cache_creation_input_tokens) &&
+        (extras[:cache_creation_input_tokens] = usage[:cache_creation_input_tokens])
+    haskey(usage, :cache_read_input_tokens) &&
+        (extras[:cache_read_input_tokens] = usage[:cache_read_input_tokens])
+    ## Unified keys for cross-provider compatibility
+    haskey(usage, :cache_read_input_tokens) &&
+        (extras[:cache_read_tokens] = usage[:cache_read_input_tokens])
+    haskey(usage, :cache_creation_input_tokens) &&
+        (extras[:cache_write_tokens] = usage[:cache_creation_input_tokens])
+    ## Ephemeral cache details
+    if haskey(usage, :cache_creation)
+        details = usage[:cache_creation]
+        extras[:cache_creation] = details
+        haskey(details, :ephemeral_1h_input_tokens) &&
+            (extras[:cache_write_1h_tokens] = details[:ephemeral_1h_input_tokens])
+        haskey(details, :ephemeral_5m_input_tokens) &&
+            (extras[:cache_write_5m_tokens] = details[:ephemeral_5m_input_tokens])
+    end
+    ## Server tool use
+    if haskey(usage, :server_tool_use)
+        details = usage[:server_tool_use]
+        extras[:server_tool_use] = details
+        haskey(details, :web_search_requests) &&
+            (extras[:web_search_requests] = details[:web_search_requests])
+    end
+    ## Service tier
+    haskey(usage, :service_tier) && (extras[:service_tier] = usage[:service_tier])
+    ## Provider metadata for observability (Logfire.jl integration)
+    haskey(resp.response, :model) && (extras[:model] = resp.response[:model])
+    haskey(resp.response, :id) && (extras[:response_id] = resp.response[:id])
+    return extras
+end
+
 ## Rendering of converation history for the Anthropic API
 """
     render(schema::AbstractAnthropicSchema,
@@ -531,10 +576,7 @@ function aigenerate(
         end
         ## Build metadata
         extras = Dict{Symbol, Any}()
-        haskey(resp.response[:usage], :cache_creation_input_tokens) &&
-            (extras[:cache_creation_input_tokens] = resp.response[:usage][:cache_creation_input_tokens])
-        haskey(resp.response[:usage], :cache_read_input_tokens) &&
-            (extras[:cache_read_input_tokens] = resp.response[:usage][:cache_read_input_tokens])
+        _extract_anthropic_extras!(extras, resp)
         ## Build the message
         msg = AIMessage(; content,
             status = Int(resp.status),
@@ -798,10 +840,7 @@ function aiextract(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMP
         end
         ## Build metadata
         extras = Dict{Symbol, Any}()
-        haskey(resp.response[:usage], :cache_creation_input_tokens) &&
-            (extras[:cache_creation_input_tokens] = resp.response[:usage][:cache_creation_input_tokens])
-        haskey(resp.response[:usage], :cache_read_input_tokens) &&
-            (extras[:cache_read_input_tokens] = resp.response[:usage][:cache_read_input_tokens])
+        _extract_anthropic_extras!(extras, resp)
         ## Build data message
         msg = DataMessage(; content,
             status = Int(resp.status),
@@ -1011,10 +1050,7 @@ function aitools(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMPT_
         end
         ## Build metadata
         extras = Dict{Symbol, Any}()
-        haskey(resp.response[:usage], :cache_creation_input_tokens) &&
-            (extras[:cache_creation_input_tokens] = resp.response[:usage][:cache_creation_input_tokens])
-        haskey(resp.response[:usage], :cache_read_input_tokens) &&
-            (extras[:cache_read_input_tokens] = resp.response[:usage][:cache_read_input_tokens])
+        _extract_anthropic_extras!(extras, resp)
         length(tools_array) > 0 && (extras[:tool_calls] = tools_array)
         extras[:content] = content_str
         ## Build  message

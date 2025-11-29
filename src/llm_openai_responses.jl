@@ -288,6 +288,7 @@ function aigenerate(schema::AbstractOpenAIResponseSchema, prompt::ALLOWED_PROMPT
         previous_response_id::Union{Nothing, AbstractString} = nothing,
         enable_websearch::Bool = false,
         model::AbstractString = MODEL_CHAT,
+        return_all::Bool = false,
         verbose::Bool = true,
         api_key::AbstractString = "",
         streamcallback::Any = nothing,
@@ -362,7 +363,11 @@ function aigenerate(schema::AbstractOpenAIResponseSchema, prompt::ALLOWED_PROMPT
     )
 
     verbose && @info _report_stats(result, model)
-    return result
+
+    ## Select what to return
+    output = finalize_outputs(prompt, rendered, result;
+        return_all, no_system_message, kwargs...)
+    return output
 end
 
 """
@@ -426,6 +431,7 @@ println(result.extras[:reasoning_content])
 function aiextract(schema::AbstractOpenAIResponseSchema, prompt::ALLOWED_PROMPT_TYPE;
         return_type::Union{Type, AbstractTool},
         model::AbstractString = MODEL_CHAT,
+        return_all::Bool = false,
         api_key::AbstractString = "",
         verbose::Bool = true,
         strict::Union{Nothing, Bool} = true,
@@ -446,7 +452,7 @@ function aiextract(schema::AbstractOpenAIResponseSchema, prompt::ALLOWED_PROMPT_
         throw(ArgumentError("Responses API aiextract only supports a single return_type. " *
                             "Got $(length(tool_map)) types. Use Chat Completions API for multi-type extraction."))
     end
-    name, tool = only(tool_map)
+    _, tool = only(tool_map)
 
     # Configure text output format for structured extraction
     # Responses API uses text.format instead of tools
@@ -528,5 +534,9 @@ function aiextract(schema::AbstractOpenAIResponseSchema, prompt::ALLOWED_PROMPT_
     )
 
     verbose && @info _report_stats(result, model)
-    return result
+
+    ## Select what to return
+    output = finalize_outputs(prompt, rendered, result;
+        return_all, no_system_message, kwargs...)
+    return output
 end

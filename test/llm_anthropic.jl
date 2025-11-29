@@ -607,7 +607,8 @@ end
         finish_reason = "stop",
         cost = msg.cost,
         extras = Dict{Symbol, Any}(
-            :cache_read_input_tokens => 0, :cache_creation_input_tokens => 1),
+            :cache_read_input_tokens => 0, :cache_creation_input_tokens => 1,
+            :cache_read_tokens => 0, :cache_write_tokens => 1),
         elapsed = msg.elapsed)
     @test msg == expected_output
     @test schema3.inputs.system == [Dict("cache_control" => Dict("type" => "ephemeral"),
@@ -709,7 +710,8 @@ end
         finish_reason = "tool_use",
         cost = msg.cost,
         extras = Dict{Symbol, Any}(
-            :cache_read_input_tokens => 0, :cache_creation_input_tokens => 1),
+            :cache_read_input_tokens => 0, :cache_creation_input_tokens => 1,
+            :cache_read_tokens => 0, :cache_write_tokens => 1),
         elapsed = msg.elapsed)
     @test msg == expected_output
 
@@ -905,4 +907,158 @@ end
     catch e
         @test false  # Should not reach here
     end
+end
+
+@testset "extras-observability-Anthropic" begin
+    # Test that model is captured in extras for Logfire.jl integration
+    response_with_model = Dict(
+        :model => "claude-sonnet-4-20250514",
+        :content => [Dict(:text => "Hello!")],
+        :stop_reason => "stop",
+        :usage => Dict(
+            :input_tokens => 10,
+            :output_tokens => 5,
+            :cache_creation_input_tokens => 100,
+            :cache_read_input_tokens => 50
+        ))
+
+    schema1 = TestEchoAnthropicSchema(; response = response_with_model, status = 200)
+    msg = aigenerate(schema1, "Hello World"; model = "claudes")
+
+    # Check that extras contains the model field
+    @test haskey(msg.extras, :model)
+    @test msg.extras[:model] == "claude-sonnet-4-20250514"
+    # Original Anthropic cache fields (backwards compatibility)
+    @test haskey(msg.extras, :cache_creation_input_tokens)
+    @test msg.extras[:cache_creation_input_tokens] == 100
+    @test haskey(msg.extras, :cache_read_input_tokens)
+    @test msg.extras[:cache_read_input_tokens] == 50
+    # Unified keys for cross-provider compatibility
+    @test haskey(msg.extras, :cache_write_tokens)
+    @test msg.extras[:cache_write_tokens] == 100
+    @test haskey(msg.extras, :cache_read_tokens)
+    @test msg.extras[:cache_read_tokens] == 50
+
+    # Test without model field in response (backwards compatibility)
+    response_no_model = Dict(
+        :content => [Dict(:text => "Hi!")],
+        :stop_reason => "stop",
+        :usage => Dict(:input_tokens => 2, :output_tokens => 1))
+
+    schema2 = TestEchoAnthropicSchema(; response = response_no_model, status = 200)
+    msg2 = aigenerate(schema2, "Hello"; model = "claudes")
+    @test !haskey(msg2.extras, :model)
+
+    # Test aitools with model in extras
+    struct AnthropicObservabilityWeatherTool
+        city::String
+    end
+
+    response_tools = Dict(
+        :model => "claude-sonnet-4-20250514",
+        :content => [
+            Dict(:type => "text", :text => "I'll check the weather"),
+            Dict(
+                :type => "tool_use",
+                :id => "tool_123",
+                :name => "get_weather",
+                :input => Dict(:city => "Paris")
+            )
+        ],
+        :stop_reason => "tool_use",
+        :usage => Dict(
+            :input_tokens => 20,
+            :output_tokens => 15,
+            :cache_read_input_tokens => 10
+        ))
+
+    schema3 = TestEchoAnthropicSchema(; response = response_tools, status = 200)
+    msg3 = aitools(schema3, "What's the weather?";
+        tools = [Tool(; name = "get_weather", callable = AnthropicObservabilityWeatherTool)],
+        model = "claudes")
+
+    @test msg3 isa AIToolRequest
+    @test haskey(msg3.extras, :model)
+    @test msg3.extras[:model] == "claude-sonnet-4-20250514"
+    @test haskey(msg3.extras, :cache_read_input_tokens)
+    @test msg3.extras[:cache_read_input_tokens] == 10
+    # Unified key
+    @test haskey(msg3.extras, :cache_read_tokens)
+    @test msg3.extras[:cache_read_tokens] == 10
+
+    # Test with full detailed usage stats (new Anthropic API fields)
+    response_full_details = Dict(
+        :id => "msg_full123",
+        :model => "claude-sonnet-4-20250514",
+        :content => [Dict(:text => "Hello!")],
+        :stop_reason => "stop",
+        :usage => Dict(
+            :input_tokens => 100,
+            :output_tokens => 50,
+            :cache_creation_input_tokens => 200,
+            :cache_read_input_tokens => 150,
+            :cache_creation => Dict(
+                :ephemeral_1h_input_tokens => 50,
+                :ephemeral_5m_input_tokens => 25
+            ),
+            :server_tool_use => Dict(
+                :web_search_requests => 3
+            ),
+            :service_tier => "standard"
+        ))
+
+    schema4 = TestEchoAnthropicSchema(; response = response_full_details, status = 200)
+    msg4 = aigenerate(schema4, "Hello World"; model = "claudes")
+
+    # Provider metadata
+    @test msg4.extras[:model] == "claude-sonnet-4-20250514"
+    @test msg4.extras[:response_id] == "msg_full123"
+    @test msg4.extras[:service_tier] == "standard"
+    # Original Anthropic keys (backwards compatibility)
+    @test msg4.extras[:cache_creation_input_tokens] == 200
+    @test msg4.extras[:cache_read_input_tokens] == 150
+    # Unified keys
+    @test msg4.extras[:cache_write_tokens] == 200
+    @test msg4.extras[:cache_read_tokens] == 150
+    @test msg4.extras[:cache_write_1h_tokens] == 50
+    @test msg4.extras[:cache_write_5m_tokens] == 25
+    @test msg4.extras[:web_search_requests] == 3
+    # Raw dicts preserved
+    @test msg4.extras[:cache_creation][:ephemeral_1h_input_tokens] == 50
+    @test msg4.extras[:server_tool_use][:web_search_requests] == 3
+
+    # Test aiextract with observability extras
+    struct AnthropicObservabilityExtractCity
+        name::String
+        country::String
+    end
+
+    response_extract = Dict(
+        :id => "msg_extract123",
+        :model => "claude-sonnet-4-20250514",
+        :content => [
+            Dict(
+            :type => "tool_use",
+            :id => "tool_extract",
+            :name => "AnthropicObservabilityExtractCity",
+            :input => Dict(:name => "Paris", :country => "France")
+        )
+        ],
+        :stop_reason => "tool_use",
+        :usage => Dict(
+            :input_tokens => 40,
+            :output_tokens => 20,
+            :cache_read_input_tokens => 25
+        ))
+
+    schema5 = TestEchoAnthropicSchema(; response = response_extract, status = 200)
+    msg5 = aiextract(schema5, "Extract city info";
+        return_type = AnthropicObservabilityExtractCity,
+        model = "claudes")
+
+    @test msg5 isa DataMessage
+    @test msg5.extras[:model] == "claude-sonnet-4-20250514"
+    @test msg5.extras[:response_id] == "msg_extract123"
+    @test msg5.extras[:cache_read_tokens] == 25
+    @test msg5.extras[:cache_read_input_tokens] == 25
 end
