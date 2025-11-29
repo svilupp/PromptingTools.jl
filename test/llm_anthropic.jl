@@ -1026,4 +1026,39 @@ end
     # Raw dicts preserved
     @test msg4.extras[:cache_creation][:ephemeral_1h_input_tokens] == 50
     @test msg4.extras[:server_tool_use][:web_search_requests] == 3
+
+    # Test aiextract with observability extras
+    struct AnthropicObservabilityExtractCity
+        name::String
+        country::String
+    end
+
+    response_extract = Dict(
+        :id => "msg_extract123",
+        :model => "claude-sonnet-4-20250514",
+        :content => [
+            Dict(
+            :type => "tool_use",
+            :id => "tool_extract",
+            :name => "AnthropicObservabilityExtractCity",
+            :input => Dict(:name => "Paris", :country => "France")
+        )
+        ],
+        :stop_reason => "tool_use",
+        :usage => Dict(
+            :input_tokens => 40,
+            :output_tokens => 20,
+            :cache_read_input_tokens => 25
+        ))
+
+    schema5 = TestEchoAnthropicSchema(; response = response_extract, status = 200)
+    msg5 = aiextract(schema5, "Extract city info";
+        return_type = AnthropicObservabilityExtractCity,
+        model = "claudes")
+
+    @test msg5 isa DataMessage
+    @test msg5.extras[:model] == "claude-sonnet-4-20250514"
+    @test msg5.extras[:response_id] == "msg_extract123"
+    @test msg5.extras[:cache_read_tokens] == 25
+    @test msg5.extras[:cache_read_input_tokens] == 25
 end

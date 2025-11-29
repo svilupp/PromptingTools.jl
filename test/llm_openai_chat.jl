@@ -1476,4 +1476,49 @@ end
     @test msg5.extras[:audio_output_tokens] == 5
     @test msg5.extras[:accepted_prediction_tokens] == 15
     @test msg5.extras[:rejected_prediction_tokens] == 3
+
+    # Test aiextract with observability extras
+    struct ObservabilityExtractCity
+        name::String
+        country::String
+    end
+
+    response_extract = Dict(
+        :model => "gpt-4o-2024-08-06",
+        :id => "chatcmpl-extract123",
+        :system_fingerprint => "fp_extract456",
+        :choices => [
+            Dict(
+            :message => Dict(
+                :content => nothing,
+                :tool_calls => [
+                    Dict(
+                    :id => "call_extract",
+                    :type => "function",
+                    :function => Dict(
+                        :name => "ObservabilityExtractCity",
+                        :arguments => "{\"name\":\"Paris\",\"country\":\"France\"}"
+                    )
+                )
+                ]
+            ),
+            :finish_reason => "tool_calls"
+        )
+        ],
+        :usage => Dict(
+            :total_tokens => 60,
+            :prompt_tokens => 50,
+            :completion_tokens => 10,
+            :prompt_tokens_details => Dict(:cached_tokens => 30)
+        ))
+
+    schema6 = TestEchoOpenAISchema(; response = response_extract, status = 200)
+    msg6 = aiextract(schema6, "Extract city info";
+        return_type = ObservabilityExtractCity)
+
+    @test msg6 isa DataMessage
+    @test msg6.extras[:model] == "gpt-4o-2024-08-06"
+    @test msg6.extras[:response_id] == "chatcmpl-extract123"
+    @test msg6.extras[:system_fingerprint] == "fp_extract456"
+    @test msg6.extras[:cache_read_tokens] == 30
 end
