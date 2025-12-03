@@ -2,6 +2,27 @@
 
 [Logfire.jl](https://github.com/svilupp/Logfire.jl) provides OpenTelemetry-based observability for your LLM applications built with PromptingTools.jl. It automatically traces all your AI calls with detailed information about tokens, costs, messages, and latency.
 
+## Why Logfire.jl?
+
+| Benefit | Description |
+|---------|-------------|
+| **Automatic Tracing** | All `ai*` function calls are traced with zero code changes |
+| **Full Visibility** | Token usage, costs, latency, messages, and errors captured |
+| **Flexible Backends** | Use Logfire cloud, Jaeger, Langfuse, or any OTLP-compatible backend |
+| **Cross-Language** | Same observability infrastructure works with Python and TypeScript |
+| **Generous Free Tier** | Hundreds of thousands of traced conversations/month on Logfire cloud |
+
+## Cross-Language Ecosystem
+
+Logfire is available across multiple languages, enabling teams to share observability infrastructure:
+
+| Language | Package | Installation |
+|----------|---------|--------------|
+| **Julia** | [Logfire.jl](https://github.com/svilupp/Logfire.jl) | `Pkg.add("Logfire")` |
+| **Python** | [logfire](https://docs.pydantic.dev/logfire/) | `pip install logfire` |
+
+All traces flow to the same [Pydantic Logfire](https://pydantic.dev/logfire) dashboard, giving you unified visibility across your entire stack!
+
 ## Installation
 
 Logfire.jl is a separate package that provides a PromptingTools extension. Install it along with DotEnv for loading secrets:
@@ -185,8 +206,30 @@ While you can use any OTLP-compatible backend, we strongly recommend [Pydantic L
 
 See the full example at [`examples/observability_with_logfire.jl`](https://github.com/svilupp/PromptingTools.jl/blob/main/examples/observability_with_logfire.jl).
 
+## Combining with TextPrompts.jl
+
+For a complete LLM workflow, combine Logfire.jl with [TextPrompts.jl](prompt_management_textprompts.md) for prompt management:
+
+```julia
+using TextPrompts, PromptingTools, Logfire
+
+Logfire.configure(service_name = "my-app")
+Logfire.instrument_promptingtools!()
+
+# Load prompts from version-controlled files
+system = load_prompt("prompts/system.txt")(; role = "Expert") |> SystemMessage
+user = load_prompt("prompts/task.txt")(; task = "analyze data") |> UserMessage
+
+# Traces include full conversation with formatted prompts
+response = aigenerate([system, user]; model = "gpt4om")
+```
+
+This enables a powerful workflow: version prompts in git, trace calls in Logfire, and continuously improve based on real-world performance.
+
 ## Further Reading
 
 - [Logfire.jl Documentation](https://svilupp.github.io/Logfire.jl/dev)
 - [Logfire.jl GitHub](https://github.com/svilupp/Logfire.jl)
 - [Pydantic Logfire](https://pydantic.dev/logfire)
+- [TextPrompts.jl - Prompt Management](prompt_management_textprompts.md)
+- [Discourse Announcement](https://discourse.julialang.org/t/announcing-logfire-jl-textprompts-jl-observability-and-prompt-management-for-julia-genai/134268)
