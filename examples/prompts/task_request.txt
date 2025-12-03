@@ -1,0 +1,6 @@
+---
+title = "Task Request"
+version = "1.0"
+description = "A user task request template"
+---
+Please help me with the following task: {task}

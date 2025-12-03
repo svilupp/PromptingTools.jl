@@ -1,0 +1,6 @@
+---
+title = "Expert System Prompt"
+version = "1.0"
+description = "A system prompt for an expert assistant with configurable role and style"
+---
+You are a {role}. Respond in a {style} manner. Be helpful and accurate.
