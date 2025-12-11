@@ -28,7 +28,7 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
       ]),
       _cache[5] || (_cache[5] = createBaseVNode("p", null, [
         createBaseVNode("a", {
-          href: "https://github.com/svilupp/PromptingTools.jl/blob/4324fc41644fd469bc563c9ec4a982711d11a4a3/src/llm_interface.jl#L415-L429",
+          href: "https://github.com/svilupp/PromptingTools.jl/blob/51f07c7564bd82810e0e2a61287842e44a5ade2e/src/llm_interface.jl#L415-L429",
           target: "_blank",
           rel: "noreferrer"
         }, "source")
@@ -104,7 +104,7 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
       ], -1)),
       _cache[32] || (_cache[32] = createBaseVNode("p", null, [
         createBaseVNode("a", {
-          href: "https://github.com/svilupp/PromptingTools.jl/blob/4324fc41644fd469bc563c9ec4a982711d11a4a3/src/llm_ollama_managed.jl#L9-L21",
+          href: "https://github.com/svilupp/PromptingTools.jl/blob/51f07c7564bd82810e0e2a61287842e44a5ade2e/src/llm_ollama_managed.jl#L9-L21",
           target: "_blank",
           rel: "noreferrer"
         }, "source")
@@ -150,7 +150,7 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
       ]),
       _cache[46] || (_cache[46] = createBaseVNode("p", null, [
         createBaseVNode("a", {
-          href: "https://github.com/svilupp/PromptingTools.jl/blob/4324fc41644fd469bc563c9ec4a982711d11a4a3/src/llm_shared.jl#L12-L32",
+          href: "https://github.com/svilupp/PromptingTools.jl/blob/51f07c7564bd82810e0e2a61287842e44a5ade2e/src/llm_shared.jl#L12-L32",
           target: "_blank",
           rel: "noreferrer"
         }, "source")
@@ -562,7 +562,7 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
       createBaseVNode("p", null, 'tool_map = tool_call_signature(MyMeasurement; hidden_fields = ["ctx_user_id"]) ```'),
       createBaseVNode("p", null, [
         createBaseVNode("a", {
-          href: "https://github.com/svilupp/PromptingTools.jl/blob/4324fc41644fd469bc563c9ec4a982711d11a4a3/src/extraction.jl#L463-L555",
+          href: "https://github.com/svilupp/PromptingTools.jl/blob/51f07c7564bd82810e0e2a61287842e44a5ade2e/src/extraction.jl#L463-L555",
           target: "_blank",
           rel: "noreferrer"
         }, "source")
