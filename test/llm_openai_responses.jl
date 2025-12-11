@@ -404,6 +404,62 @@ end
           OpenAIResponseSchema
 end
 
+@testset "Model alias resolution" begin
+    # Test that model aliases are correctly resolved to full model names
+    # This is critical for OpenAIResponseSchema since it uses a different API endpoint
+
+    mock_response = Dict{Symbol, Any}(
+        :id => "resp_alias_test",
+        :status => "completed",
+        :output => [
+            Dict{Symbol, Any}(
+            :type => "message",
+            :content => [
+                Dict{Symbol, Any}(:type => "output_text", :text => "Test response")
+            ]
+        )
+        ],
+        :usage => Dict{Symbol, Any}(:input_tokens => 5, :output_tokens => 5)
+    )
+
+    @testset "aigenerate resolves model alias" begin
+        schema = TestEchoOpenAIResponseSchema(; response = mock_response, status = 200)
+        result = aigenerate(schema, "Test"; model = "gpt51c", verbose = false)
+
+        # The alias "gpt51c" should be resolved to the full model name
+        @test schema.model_id == "gpt-5.1-codex"
+        @test result isa AIMessage
+    end
+
+    @testset "aiextract resolves model alias" begin
+        struct AliasTestStruct
+            value::String
+        end
+
+        extract_response = Dict{Symbol, Any}(
+            :id => "resp_extract_alias",
+            :status => "completed",
+            :output => [
+                Dict{Symbol, Any}(
+                :type => "message",
+                :content => [
+                    Dict{Symbol, Any}(:type => "output_text", :text => "{\"value\": \"test\"}")
+                ]
+            )
+            ],
+            :usage => Dict{Symbol, Any}(:input_tokens => 10, :output_tokens => 5)
+        )
+
+        schema = TestEchoOpenAIResponseSchema(; response = extract_response, status = 200)
+        result = aiextract(schema, "Extract value";
+            return_type = AliasTestStruct, model = "gpt51cm", verbose = false)
+
+        # The alias "gpt51cm" should be resolved to the full model name
+        @test schema.model_id == "gpt-5.1-codex-mini"
+        @test result isa DataMessage
+    end
+end
+
 @testset "aigenerate-OpenAIResponses-streaming" begin
     using PromptingTools: StreamCallback, OpenAIResponsesStream, configure_callback!
 
