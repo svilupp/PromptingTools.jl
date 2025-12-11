@@ -294,6 +294,9 @@ function aigenerate(schema::AbstractOpenAIResponseSchema, prompt::ALLOWED_PROMPT
         streamcallback::Any = nothing,
         no_system_message::Bool = false,
         kwargs...)
+    global MODEL_ALIASES
+    # Resolve model alias to full model name
+    model_id = get(MODEL_ALIASES, model, model)
     # Resolve API key - use provided key or fall back to environment variable
     api_key = isempty(api_key) ? get(ENV, "OPENAI_API_KEY", "") : api_key
 
@@ -313,7 +316,7 @@ function aigenerate(schema::AbstractOpenAIResponseSchema, prompt::ALLOWED_PROMPT
     response = create_response(
         schema,
         api_key,
-        model,
+        model_id,
         rendered.input;
         instructions = rendered.instructions,
         previous_response_id = previous_response_id,
@@ -346,7 +349,7 @@ function aigenerate(schema::AbstractOpenAIResponseSchema, prompt::ALLOWED_PROMPT
     )
 
     finish_reason = get(response.response, :status, nothing)
-    cost = call_cost(input_tokens, output_tokens, model)
+    cost = call_cost(input_tokens, output_tokens, model_id)
 
     result = AIMessage(;
         content = content,
@@ -362,7 +365,7 @@ function aigenerate(schema::AbstractOpenAIResponseSchema, prompt::ALLOWED_PROMPT
         sample_id = nothing
     )
 
-    verbose && @info _report_stats(result, model)
+    verbose && @info _report_stats(result, model_id)
 
     ## Select what to return
     output = finalize_outputs(prompt, rendered, result;
@@ -437,6 +440,9 @@ function aiextract(schema::AbstractOpenAIResponseSchema, prompt::ALLOWED_PROMPT_
         strict::Union{Nothing, Bool} = true,
         no_system_message::Bool = false,
         kwargs...)
+    global MODEL_ALIASES
+    # Resolve model alias to full model name
+    model_id = get(MODEL_ALIASES, model, model)
     # Resolve API key
     api_key = isempty(api_key) ? get(ENV, "OPENAI_API_KEY", "") : api_key
 
@@ -490,7 +496,7 @@ function aiextract(schema::AbstractOpenAIResponseSchema, prompt::ALLOWED_PROMPT_
     response = create_response(
         schema,
         api_key,
-        model,
+        model_id,
         rendered.input;
         instructions = rendered.instructions,
         http_kwargs = (retry_non_idempotent = true, retries = 3, readtimeout = 120),
@@ -520,7 +526,7 @@ function aiextract(schema::AbstractOpenAIResponseSchema, prompt::ALLOWED_PROMPT_
         :full_response => response.response
     )
 
-    cost = call_cost(input_tokens, output_tokens, model)
+    cost = call_cost(input_tokens, output_tokens, model_id)
 
     result = DataMessage(;
         content = parsed_content,
@@ -533,7 +539,7 @@ function aiextract(schema::AbstractOpenAIResponseSchema, prompt::ALLOWED_PROMPT_
         sample_id = nothing
     )
 
-    verbose && @info _report_stats(result, model)
+    verbose && @info _report_stats(result, model_id)
 
     ## Select what to return
     output = finalize_outputs(prompt, rendered, result;

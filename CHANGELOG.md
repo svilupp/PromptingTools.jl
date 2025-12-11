@@ -12,6 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Updated
 
+## [0.89.0]
+
+### Added
+- Added support for OpenAI's GPT-5.2 family: `gpt-5.2` (Thinking, alias `gpt52`), `gpt-5.2-chat-latest` (Instant, alias `gpt52i`), and `gpt-5.2-pro` (alias `gpt52p`). GPT-5.2 features 400K context and 128K output. The Pro variant requires the Responses API.
+
+### Fixed
+- Fixed model alias resolution not working for `OpenAIResponseSchema` in `aigenerate` and `aiextract`. Previously, using model aliases like `gpt52p` would fail with "model not found" errors.
+
 ## [0.88.0]
 
 ### Added
