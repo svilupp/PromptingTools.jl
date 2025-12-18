@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Updated
 
+## [0.90.0]
+
+### Added
+- Added support for Google's Gemini 3 Flash Preview model (`gemini-3-flash-preview`, alias `gem3f`) with 1M context and 65K output. Pricing: $0.50/1M input tokens, $3/1M output tokens.
+
 ## [0.89.0]
 
 ### Added
