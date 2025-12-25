@@ -26,6 +26,97 @@ const ALLOWED_PROMPT_TYPE = Union{
     Vector{<:AbstractMessage}
 }
 
+## Token Usage Tracking
+"""
+    TokenUsage
+
+Standardized token usage tracking across all LLM providers.
+
+Provides unified field names for cross-provider compatibility while preserving
+provider-specific details in the `extras` field.
+
+# Core Fields (always populated when available)
+- `input_tokens::Int`: Standard input/prompt tokens (default: 0)
+- `output_tokens::Int`: Standard output/completion tokens (default: 0)
+
+# Cache Fields (for providers with caching)
+- `cache_read_tokens::Int`: Tokens read from cache (discounted) (default: 0)
+- `cache_write_tokens::Int`: Tokens written to cache (premium for Anthropic) (default: 0)
+
+# Extended Fields (provider-specific)
+- `reasoning_tokens::Int`: Reasoning/thinking tokens (OpenAI o1/DeepSeek) (default: 0)
+- `audio_input_tokens::Int`: Audio input tokens (OpenAI) (default: 0)
+- `audio_output_tokens::Int`: Audio output tokens (OpenAI) (default: 0)
+
+# Metadata
+- `model_id::String`: Model identifier used for this usage (default: "")
+- `cost::Float64`: Calculated cost including cache discounts (default: 0.0)
+- `elapsed::Float64`: Time taken for the API call in seconds (default: 0.0)
+- `extras::Dict{Symbol,Any}`: Provider-specific raw usage data (default: empty)
+
+# Example
+```julia
+usage = TokenUsage(
+    input_tokens = 100,
+    output_tokens = 50,
+    cache_read_tokens = 80,
+    model_id = "claude-sonnet-4-20250514"
+)
+```
+"""
+@kwdef struct TokenUsage
+    # Core tokens
+    input_tokens::Int = 0
+    output_tokens::Int = 0
+
+    # Cache tokens
+    cache_read_tokens::Int = 0
+    cache_write_tokens::Int = 0
+
+    # Extended tokens (provider-specific)
+    reasoning_tokens::Int = 0
+    audio_input_tokens::Int = 0
+    audio_output_tokens::Int = 0
+
+    # Metadata
+    model_id::String = ""
+    cost::Float64 = 0.0
+    elapsed::Float64 = 0.0
+
+    # Raw provider data
+    extras::Dict{Symbol, Any} = Dict{Symbol, Any}()
+end
+
+# Arithmetic operations for aggregation
+function Base.:+(a::TokenUsage, b::TokenUsage)
+    TokenUsage(
+        input_tokens = a.input_tokens + b.input_tokens,
+        output_tokens = a.output_tokens + b.output_tokens,
+        cache_read_tokens = a.cache_read_tokens + b.cache_read_tokens,
+        cache_write_tokens = a.cache_write_tokens + b.cache_write_tokens,
+        reasoning_tokens = a.reasoning_tokens + b.reasoning_tokens,
+        audio_input_tokens = a.audio_input_tokens + b.audio_input_tokens,
+        audio_output_tokens = a.audio_output_tokens + b.audio_output_tokens,
+        model_id = isempty(a.model_id) ? b.model_id : a.model_id,
+        cost = a.cost + b.cost,
+        elapsed = a.elapsed + b.elapsed,
+        extras = merge(a.extras, b.extras)
+    )
+end
+
+"Total tokens including all token types"
+total_tokens(u::TokenUsage) = u.input_tokens + u.output_tokens +
+                              u.cache_read_tokens + u.cache_write_tokens + u.reasoning_tokens
+
+function Base.show(io::IO, u::TokenUsage)
+    print(io, "TokenUsage(in=$(u.input_tokens), out=$(u.output_tokens)")
+    u.cache_read_tokens > 0 && print(io, ", cache_read=$(u.cache_read_tokens)")
+    u.cache_write_tokens > 0 && print(io, ", cache_write=$(u.cache_write_tokens)")
+    u.reasoning_tokens > 0 && print(io, ", reasoning=$(u.reasoning_tokens)")
+    u.cost > 0 && print(io, ", cost=\$$(round(u.cost; digits=6))")
+    print(io, ")")
+end
+
 # Workaround to be able to add metadata to serialized conversations, templates, etc.
 # Ignored by `render` directives
 Base.@kwdef struct MetadataMessage{T <: AbstractString} <: AbstractChatMessage
@@ -109,16 +200,17 @@ end
 """
     AIMessage
 
-A message type for AI-generated text-based responses. 
+A message type for AI-generated text-based responses.
 Returned by `aigenerate`, `aiclassify`, and `aiscan` functions.
-    
+
 # Fields
 - `content::Union{AbstractString, Nothing}`: The content of the message.
 - `status::Union{Int, Nothing}`: The status of the message from the API.
 - `name::Union{Nothing, String}`: The name of the `role` in the conversation.
-- `tokens::Tuple{Int, Int}`: The number of tokens used (prompt,completion).
-- `elapsed::Float64`: The time taken to generate the response in seconds.
-- `cost::Union{Nothing, Float64}`: The cost of the API call (calculated with information from `MODEL_REGISTRY`).
+- `tokens::Tuple{Int, Int}`: The number of tokens used (prompt,completion). Legacy field, prefer `usage`.
+- `elapsed::Float64`: The time taken to generate the response in seconds. Legacy field, prefer `usage.elapsed`.
+- `cost::Union{Nothing, Float64}`: The cost of the API call. Legacy field, prefer `usage.cost`.
+- `usage::Union{Nothing, TokenUsage}`: Detailed token usage including cache tokens, cost, and timing.
 - `log_prob::Union{Nothing, Float64}`: The log probability of the response.
 - `extras::Union{Nothing, Dict{Symbol, Any}}`: A dictionary for additional metadata that is not part of the key message fields. Try to limit to a small number of items and singletons to be serializable.
 - `finish_reason::Union{Nothing, String}`: The reason the response was finished.
@@ -132,6 +224,7 @@ Base.@kwdef struct AIMessage{T <: Union{AbstractString, Nothing}} <: AbstractCha
     tokens::Tuple{Int, Int} = (-1, -1)
     elapsed::Float64 = -1.0
     cost::Union{Nothing, Float64} = nothing
+    usage::Union{Nothing, TokenUsage} = nothing
     log_prob::Union{Nothing, Float64} = nothing
     extras::Union{Nothing, Dict{Symbol, Any}} = nothing
     finish_reason::Union{Nothing, String} = nothing
@@ -143,15 +236,16 @@ end
 """
     DataMessage
 
-A message type for AI-generated data-based responses, ie, different `content` than text. 
-Returned by `aiextract`, and `aiextract` functions.
-    
+A message type for AI-generated data-based responses, ie, different `content` than text.
+Returned by `aiextract` function.
+
 # Fields
 - `content::Union{AbstractString, Nothing}`: The content of the message.
 - `status::Union{Int, Nothing}`: The status of the message from the API.
-- `tokens::Tuple{Int, Int}`: The number of tokens used (prompt,completion).
-- `elapsed::Float64`: The time taken to generate the response in seconds.
-- `cost::Union{Nothing, Float64}`: The cost of the API call (calculated with information from `MODEL_REGISTRY`).
+- `tokens::Tuple{Int, Int}`: The number of tokens used (prompt,completion). Legacy field, prefer `usage`.
+- `elapsed::Float64`: The time taken to generate the response in seconds. Legacy field, prefer `usage.elapsed`.
+- `cost::Union{Nothing, Float64}`: The cost of the API call. Legacy field, prefer `usage.cost`.
+- `usage::Union{Nothing, TokenUsage}`: Detailed token usage including cache tokens, cost, and timing.
 - `log_prob::Union{Nothing, Float64}`: The log probability of the response.
 - `extras::Union{Nothing, Dict{Symbol, Any}}`: A dictionary for additional metadata that is not part of the key message fields. Try to limit to a small number of items and singletons to be serializable.
 - `finish_reason::Union{Nothing, String}`: The reason the response was finished.
@@ -164,6 +258,7 @@ Base.@kwdef struct DataMessage{T <: Any} <: AbstractDataMessage
     tokens::Tuple{Int, Int} = (-1, -1)
     elapsed::Float64 = -1.0
     cost::Union{Nothing, Float64} = nothing
+    usage::Union{Nothing, TokenUsage} = nothing
     log_prob::Union{Nothing, Float64} = nothing
     extras::Union{Nothing, Dict{Symbol, Any}} = nothing
     finish_reason::Union{Nothing, String} = nothing
@@ -200,17 +295,18 @@ end
 """
     AIToolRequest
 
-A message type for AI-generated tool requests. 
+A message type for AI-generated tool requests.
 Returned by `aitools` functions.
-    
+
 # Fields
 - `content::Union{AbstractString, Nothing}`: The content of the message.
 - `tool_calls::Vector{ToolMessage}`: The vector of tool call requests.
 - `name::Union{Nothing, String}`: The name of the `role` in the conversation.
 - `status::Union{Int, Nothing}`: The status of the message from the API.
-- `tokens::Tuple{Int, Int}`: The number of tokens used (prompt,completion).
-- `elapsed::Float64`: The time taken to generate the response in seconds.
-- `cost::Union{Nothing, Float64}`: The cost of the API call (calculated with information from `MODEL_REGISTRY`).
+- `tokens::Tuple{Int, Int}`: The number of tokens used (prompt,completion). Legacy field, prefer `usage`.
+- `elapsed::Float64`: The time taken to generate the response in seconds. Legacy field, prefer `usage.elapsed`.
+- `cost::Union{Nothing, Float64}`: The cost of the API call. Legacy field, prefer `usage.cost`.
+- `usage::Union{Nothing, TokenUsage}`: Detailed token usage including cache tokens, cost, and timing.
 - `log_prob::Union{Nothing, Float64}`: The log probability of the response.
 - `extras::Union{Nothing, Dict{Symbol, Any}}`: A dictionary for additional metadata that is not part of the key message fields. Try to limit to a small number of items and singletons to be serializable.
 - `finish_reason::Union{Nothing, String}`: The reason the response was finished.
@@ -229,6 +325,7 @@ Base.@kwdef struct AIToolRequest{T <: Union{AbstractString, Nothing}} <: Abstrac
     tokens::Tuple{Int, Int} = (-1, -1)
     elapsed::Float64 = -1.0
     cost::Union{Nothing, Float64} = nothing
+    usage::Union{Nothing, TokenUsage} = nothing
     log_prob::Union{Nothing, Float64} = nothing
     extras::Union{Nothing, Dict{Symbol, Any}} = nothing
     finish_reason::Union{Nothing, String} = nothing
@@ -648,6 +745,7 @@ function StructTypes.subtypes(::Type{AbstractTracer})
     (tracermessagelike = TracerMessageLike,)
 end
 
+StructTypes.StructType(::Type{TokenUsage}) = StructTypes.Struct()
 StructTypes.StructType(::Type{MetadataMessage}) = StructTypes.Struct()
 StructTypes.StructType(::Type{SystemMessage}) = StructTypes.Struct()
 StructTypes.StructType(::Type{UserMessage}) = StructTypes.Struct()

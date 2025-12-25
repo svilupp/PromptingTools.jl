@@ -67,7 +67,7 @@ include("llm_interface.jl")
 include("user_preferences.jl")
 
 ## Conversation history / Prompt elements
-export AIMessage
+export AIMessage, TokenUsage, total_tokens
 include("messages.jl")
 
 export ConversationMemory

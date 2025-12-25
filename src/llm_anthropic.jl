@@ -48,6 +48,32 @@ function _extract_anthropic_extras!(extras::Dict{Symbol, Any}, resp)
     return extras
 end
 
+"""
+    extract_usage(schema::AbstractAnthropicSchema, resp; model_id="", elapsed=0.0) -> TokenUsage
+
+Extract token usage from an Anthropic API response into a standardized TokenUsage struct.
+
+Extracts input/output tokens, cache read/write tokens, and calculates cost with cache discounts.
+"""
+function extract_usage(::AbstractAnthropicSchema, resp; model_id::String = "", elapsed::Float64 = 0.0)
+    usage_dict = get(resp.response, :usage, Dict())
+
+    input_tokens = get(usage_dict, :input_tokens, 0)
+    output_tokens = get(usage_dict, :output_tokens, 0)
+    cache_read_tokens = get(usage_dict, :cache_read_input_tokens, 0)
+    cache_write_tokens = get(usage_dict, :cache_creation_input_tokens, 0)
+
+    # Calculate cost with cache adjustments
+    cost = call_cost_with_cache(input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, model_id)
+
+    TokenUsage(;
+        input_tokens, output_tokens,
+        cache_read_tokens, cache_write_tokens,
+        model_id, cost, elapsed,
+        extras = isempty(usage_dict) ? Dict{Symbol, Any}() : Dict{Symbol, Any}(:raw_usage => usage_dict)
+    )
+end
+
 ## Rendering of converation history for the Anthropic API
 """
     render(schema::AbstractAnthropicSchema,
@@ -565,8 +591,7 @@ function aigenerate(
             conv_rendered.system, endpoint = "messages", model = model_id,
             streamcallback, http_kwargs, cache, betas,
             api_kwargs...)
-        tokens_prompt = get(resp.response[:usage], :input_tokens, 0)
-        tokens_completion = get(resp.response[:usage], :output_tokens, 0)
+
         content = mapreduce(x -> get(x, :text, ""), *, resp.response[:content]) |> strip
         ## add aiprefill to the content
         if !isnothing(aiprefill) && !isempty(aiprefill)
@@ -574,17 +599,20 @@ function aigenerate(
             ## remove the prefill from the end of the conversation
             pop!(conv_rendered.conversation)
         end
+
+        # Extract usage using unified extraction
+        usage = extract_usage(prompt_schema, resp; model_id, elapsed = time)
+
         ## Build metadata
         extras = Dict{Symbol, Any}()
         _extract_anthropic_extras!(extras, resp)
-        ## Build the message
-        msg = AIMessage(; content,
+
+        ## Build the message using unified builder
+        msg = build_message(AIMessage, content, usage;
             status = Int(resp.status),
-            cost = call_cost(tokens_prompt, tokens_completion, model_id),
             finish_reason = get(resp.response, :stop_reason, nothing),
-            tokens = (tokens_prompt, tokens_completion),
-            extras,
-            elapsed = time)
+            extras)
+
         ## Reporting
         verbose && @info _report_stats(msg, model_id)
     else
@@ -824,8 +852,7 @@ function aiextract(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMP
             prompt_schema, conv_rendered.conversation; api_key,
             conv_rendered.system, endpoint = "messages", model = model_id, cache, http_kwargs, betas,
             api_kwargs...)
-        tokens_prompt = get(resp.response[:usage], :input_tokens, 0)
-        tokens_completion = get(resp.response[:usage], :output_tokens, 0)
+
         finish_reason = get(resp.response, :stop_reason, nothing)
         content = if finish_reason == "tool_use"
             tool_array = [parse_tool(tool_map[tool_use[:name]], tool_use[:input])
@@ -838,16 +865,18 @@ function aiextract(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMP
             @warn "No tool_use found in the response. Returning the raw text instead."
             mapreduce(x -> get(x, :text, ""), *, resp.response[:content]) |> strip
         end
+
+        # Extract usage using unified extraction
+        usage = extract_usage(prompt_schema, resp; model_id, elapsed = time)
+
         ## Build metadata
         extras = Dict{Symbol, Any}()
         _extract_anthropic_extras!(extras, resp)
-        ## Build data message
-        msg = DataMessage(; content,
+
+        ## Build data message using unified builder
+        msg = build_message(DataMessage, content, usage;
             status = Int(resp.status),
-            cost = call_cost(tokens_prompt, tokens_completion, model_id),
             finish_reason,
-            tokens = (tokens_prompt, tokens_completion),
-            elapsed = time,
             extras)
 
         ## Reporting
@@ -1031,8 +1060,7 @@ function aitools(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMPT_
             prompt_schema, conv_rendered.conversation; api_key,
             conv_rendered.system, endpoint = "messages", model = model_id, cache, http_kwargs, betas,
             api_kwargs...)
-        tokens_prompt = get(resp.response[:usage], :input_tokens, 0)
-        tokens_completion = get(resp.response[:usage], :output_tokens, 0)
+
         finish_reason = get(resp.response, :stop_reason, nothing)
         content_str = mapreduce(x -> get(x, :text, ""), *,
             filter(x -> x[:type] != "tool_use", resp.response[:content]), init = "") |>
@@ -1043,26 +1071,22 @@ function aitools(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMPT_
                            args = tool_call[:input], name = tool_call[:name])
                        for tool_call in resp.response[:content]
                        if tool_call[:type] == "tool_use"]
-        if finish_reason == "tool_use"
-            content = nothing
-        else
-            content = content_str
-        end
+        content = finish_reason == "tool_use" ? nothing : content_str
+
+        # Extract usage using unified extraction
+        usage = extract_usage(prompt_schema, resp; model_id, elapsed = time)
+
         ## Build metadata
         extras = Dict{Symbol, Any}()
         _extract_anthropic_extras!(extras, resp)
         length(tools_array) > 0 && (extras[:tool_calls] = tools_array)
         extras[:content] = content_str
-        ## Build  message
-        msg = AIToolRequest(;
-            content,
+
+        ## Build message using unified builder
+        msg = build_message(AIToolRequest, content, usage;
             tool_calls = tools_array,
             status = Int(resp.status),
-            cost = call_cost(tokens_prompt, tokens_completion, model_id),
             finish_reason,
-            tokens = (tokens_prompt,
-                tokens_completion),
-            elapsed = time,
             extras)
 
         ## Reporting

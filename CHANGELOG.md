@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Added `TokenUsage` struct for standardized token usage tracking across all LLM providers. The struct includes fields for input/output tokens, cache tokens (read/write), reasoning tokens, audio tokens, cost, elapsed time, and model ID.
+- Added `usage` field to `AIMessage`, `DataMessage`, and `AIToolRequest` message types for unified usage tracking. The legacy `tokens`, `cost`, and `elapsed` fields are preserved for backwards compatibility.
+- Added `extract_usage(schema, resp)` functions for each provider (OpenAI, Anthropic, Ollama) to extract token usage from API responses into the standardized `TokenUsage` struct.
+- Added `call_cost_with_cache(input_tokens, output_tokens, cache_read, cache_write, model)` for cost calculation with cache discounts.
+- Added `CACHE_DISCOUNTS` configuration with provider-specific cache pricing: OpenAI GPT-4 (50% read discount), GPT-5/Gemini (90% read discount), Anthropic (90% read discount, 25% write premium).
+- Added `build_message(MSG, content, usage; kwargs...)` utility for unified message construction across providers, reducing code duplication.
+- Added `total_tokens(usage)` helper function to sum all token types.
+- Added `extract_log_prob(choice)` utility for extracting log probabilities from OpenAI-style responses.
 
 ### Fixed
 
