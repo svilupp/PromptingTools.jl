@@ -54,6 +54,10 @@ const RESERVED_KWARGS = [
     :betas
 ]
 
+## Conversation history / Prompt elements
+export AIMessage, TokenUsage, total_tokens
+include("messages.jl")
+
 # export replace_words, recursive_splitter, split_by_length, call_cost, auth_header # for debugging only
 # export length_longest_common_subsequence, distance_longest_common_subsequence
 # export pprint
@@ -63,12 +67,14 @@ export aigenerate, aiembed, aiclassify, aiextract, aitools, aiscan, aiimage
 # export render # for debugging only
 include("llm_interface.jl")
 
+# Usage extraction functions (require AbstractPromptSchema from llm_interface.jl)
+include("utils_usage.jl")
+
+# Render functions for messages (requires AbstractPromptSchema from llm_interface.jl)
+include("messages_render.jl")
+
 # sets up the global registry of models and default model choices
 include("user_preferences.jl")
-
-## Conversation history / Prompt elements
-export AIMessage, TokenUsage, total_tokens
-include("messages.jl")
 
 export ConversationMemory
 include("memory.jl")
