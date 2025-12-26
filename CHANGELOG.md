@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Updated
 
+## [0.91.0]
+
+### Added
+- Added `TokenUsage` struct for standardized token usage tracking across all LLM providers (input/output tokens, cache tokens, reasoning tokens, cost, elapsed time). New `usage` field added to `AIMessage`, `DataMessage`, and `AIToolRequest` with backwards compatibility for legacy `tokens`, `cost`, `elapsed` fields.
+- Added cache-aware cost calculation with provider-specific discounts via `call_cost_with_cache` and `CACHE_DISCOUNTS`.
+
 ## [0.90.0]
 
 ### Added

@@ -23,8 +23,9 @@ using PromptingTools: response_to_message, AbstractPromptSchema, isextracted,
         tokens = (2, 1),
         run_id = msg.run_id,
         finish_reason = "stop",
-        extras = Dict{Symbol, Any}(),
+        extras = msg.extras,
         cost = 0.0,
+        usage = msg.usage,
         elapsed = msg.elapsed)
     @test msg == expected_output
 
@@ -37,7 +38,8 @@ using PromptingTools: response_to_message, AbstractPromptSchema, isextracted,
         tokens = (2, 1),
         run_id = msg.run_id,
         cost = 0.0,
-        extras = Dict{Symbol, Any}(),
+        usage = msg.usage,
+        extras = msg.extras,
         finish_reason = "stop",
         elapsed = msg.elapsed)
     @test msg == expected_output
@@ -69,10 +71,9 @@ using PromptingTools: response_to_message, AbstractPromptSchema, isextracted,
         tokens = (2, 1),
         run_id = msg.run_id,
         cost = 0.0,
+        usage = msg.usage,
         finish_reason = "stop",
-        extras = Dict{Symbol, Any}(:tool_calls => [Dict(:id => "1",
-            :function => Dict(
-                :name => "MyType", :arguments => "{\"content\": \"x\"}"))]),
+        extras = msg.extras,
         elapsed = msg.elapsed)
     @test msg == expected_output
 
