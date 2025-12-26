@@ -105,8 +105,10 @@ function Base.:+(a::TokenUsage, b::TokenUsage)
 end
 
 "Total tokens including all token types"
-total_tokens(u::TokenUsage) = u.input_tokens + u.output_tokens +
-                              u.cache_read_tokens + u.cache_write_tokens + u.reasoning_tokens
+function total_tokens(u::TokenUsage)
+    u.input_tokens + u.output_tokens +
+    u.cache_read_tokens + u.cache_write_tokens + u.reasoning_tokens
+end
 
 function Base.show(io::IO, u::TokenUsage)
     print(io, "TokenUsage(in=$(u.input_tokens), out=$(u.output_tokens)")
@@ -120,16 +122,16 @@ end
 # Custom equality for TokenUsage (needed because extras Dict compares by identity, not value)
 function Base.:(==)(a::TokenUsage, b::TokenUsage)
     a.input_tokens == b.input_tokens &&
-    a.output_tokens == b.output_tokens &&
-    a.cache_read_tokens == b.cache_read_tokens &&
-    a.cache_write_tokens == b.cache_write_tokens &&
-    a.reasoning_tokens == b.reasoning_tokens &&
-    a.audio_input_tokens == b.audio_input_tokens &&
-    a.audio_output_tokens == b.audio_output_tokens &&
-    a.model_id == b.model_id &&
-    a.cost == b.cost &&
-    a.elapsed == b.elapsed &&
-    a.extras == b.extras
+        a.output_tokens == b.output_tokens &&
+        a.cache_read_tokens == b.cache_read_tokens &&
+        a.cache_write_tokens == b.cache_write_tokens &&
+        a.reasoning_tokens == b.reasoning_tokens &&
+        a.audio_input_tokens == b.audio_input_tokens &&
+        a.audio_output_tokens == b.audio_output_tokens &&
+        a.model_id == b.model_id &&
+        a.cost == b.cost &&
+        a.elapsed == b.elapsed &&
+        a.extras == b.extras
 end
 
 # Workaround to be able to add metadata to serialized conversations, templates, etc.

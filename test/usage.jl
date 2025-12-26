@@ -68,9 +68,12 @@ end
     @testset "Schema-based lookup (Priority 1 & 2)" begin
         # Priority 1: Explicit schema parameter
         @test get_cache_discounts("any-model"; schema = OpenAISchema()).read_discount == 0.5
-        @test get_cache_discounts("any-model"; schema = GoogleOpenAISchema()).read_discount == 0.9
-        @test get_cache_discounts("any-model"; schema = AnthropicSchema()).read_discount == 0.9
-        @test get_cache_discounts("any-model"; schema = AnthropicSchema()).write_premium == 0.25
+        @test get_cache_discounts("any-model"; schema = GoogleOpenAISchema()).read_discount ==
+              0.9
+        @test get_cache_discounts("any-model"; schema = AnthropicSchema()).read_discount ==
+              0.9
+        @test get_cache_discounts("any-model"; schema = AnthropicSchema()).write_premium ==
+              0.25
 
         # Unknown schema defaults to 0%
         @test get_cache_discounts("any-model"; schema = OllamaSchema()).read_discount == 0.0
@@ -104,7 +107,8 @@ end
         @test discounts.write_premium == 0.0
 
         # CustomOpenAISchema (unknown provider) defaults to 0%
-        @test get_cache_discounts("custom"; schema = PromptingTools.CustomOpenAISchema()).read_discount == 0.0
+        @test get_cache_discounts("custom"; schema = PromptingTools.CustomOpenAISchema()).read_discount ==
+              0.0
     end
 
     @testset "Custom model name with GoogleOpenAISchema" begin
@@ -193,10 +197,10 @@ end
         resp = (
             response = Dict(
                 :usage => Dict(
-                    :prompt_tokens => 100,
-                    :completion_tokens => 50,
-                    :total_tokens => 150
-                )
+                :prompt_tokens => 100,
+                :completion_tokens => 50,
+                :total_tokens => 150
+            )
             ),
             status = 200
         )
@@ -210,9 +214,9 @@ end
         resp = (
             response = Dict(
                 :usage => Dict(
-                    :promptTokens => 100,
-                    :completionTokens => 50
-                )
+                :promptTokens => 100,
+                :completionTokens => 50
+            )
             ),
             status = 200
         )
@@ -225,12 +229,12 @@ end
         resp = (
             response = Dict(
                 :usage => Dict(
-                    :prompt_tokens => 100,
-                    :completion_tokens => 50,
-                    :prompt_tokens_details => Dict(
-                        :cached_tokens => 80
-                    )
+                :prompt_tokens => 100,
+                :completion_tokens => 50,
+                :prompt_tokens_details => Dict(
+                    :cached_tokens => 80
                 )
+            )
             ),
             status = 200
         )
@@ -242,12 +246,12 @@ end
         resp = (
             response = Dict(
                 :usage => Dict(
-                    :prompt_tokens => 100,
-                    :completion_tokens => 200,
-                    :completion_tokens_details => Dict(
-                        :reasoning_tokens => 150
-                    )
+                :prompt_tokens => 100,
+                :completion_tokens => 200,
+                :completion_tokens_details => Dict(
+                    :reasoning_tokens => 150
                 )
+            )
             ),
             status = 200
         )
@@ -270,9 +274,9 @@ end
         resp = (
             response = Dict(
                 :usage => Dict(
-                    :input_tokens => 100,
-                    :output_tokens => 50
-                )
+                :input_tokens => 100,
+                :output_tokens => 50
+            )
             ),
             status = 200
         )
@@ -285,11 +289,11 @@ end
         resp = (
             response = Dict(
                 :usage => Dict(
-                    :input_tokens => 100,
-                    :output_tokens => 50,
-                    :cache_read_input_tokens => 80,
-                    :cache_creation_input_tokens => 20
-                )
+                :input_tokens => 100,
+                :output_tokens => 50,
+                :cache_read_input_tokens => 80,
+                :cache_creation_input_tokens => 20
+            )
             ),
             status = 200
         )
@@ -319,12 +323,12 @@ end
     @testset "With log probs" begin
         choice = Dict(
             :logprobs => Dict(
-                :content => [
-                    Dict(:logprob => -0.5),
-                    Dict(:logprob => -0.3),
-                    Dict(:logprob => -0.2)
-                ]
-            )
+            :content => [
+            Dict(:logprob => -0.5),
+            Dict(:logprob => -0.3),
+            Dict(:logprob => -0.2)
+        ]
+        )
         )
         log_prob = extract_log_prob(choice)
         @test log_prob ≈ -1.0

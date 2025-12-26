@@ -64,13 +64,15 @@ function extract_usage(::AbstractAnthropicSchema, resp; model_id::String = "", e
     cache_write_tokens = get(usage_dict, :cache_creation_input_tokens, 0)
 
     # Calculate cost with cache adjustments
-    cost = call_cost_with_cache(input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, model_id)
+    cost = call_cost_with_cache(
+        input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, model_id)
 
     TokenUsage(;
         input_tokens, output_tokens,
         cache_read_tokens, cache_write_tokens,
         model_id, cost, elapsed,
-        extras = isempty(usage_dict) ? Dict{Symbol, Any}() : Dict{Symbol, Any}(:raw_usage => usage_dict)
+        extras = isempty(usage_dict) ? Dict{Symbol, Any}() :
+                 Dict{Symbol, Any}(:raw_usage => usage_dict)
     )
 end
 

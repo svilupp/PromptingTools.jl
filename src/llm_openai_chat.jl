@@ -104,7 +104,8 @@ function extract_usage(::AbstractOpenAISchema, resp; model_id::String = "", elap
         audio_input_tokens = audio_input,
         audio_output_tokens = audio_output,
         model_id, cost, elapsed,
-        extras = isempty(usage_dict) ? Dict{Symbol, Any}() : Dict{Symbol, Any}(:raw_usage => usage_dict)
+        extras = isempty(usage_dict) ? Dict{Symbol, Any}() :
+                 Dict{Symbol, Any}(:raw_usage => usage_dict)
     )
 end
 

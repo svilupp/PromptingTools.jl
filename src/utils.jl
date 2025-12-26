@@ -482,7 +482,9 @@ Example: `(read_discount = 0.9, write_premium = 0.25)` means:
 - Cache reads cost 10% of normal input token price
 - Cache writes cost 125% of normal input token price
 """
-const CACHE_DISCOUNTS = Dict{Union{Type, String}, NamedTuple{(:read_discount, :write_premium), Tuple{Float64, Float64}}}(
+const CACHE_DISCOUNTS = Dict{
+    Union{Type, String}, NamedTuple{
+        (:read_discount, :write_premium), Tuple{Float64, Float64}}}(
     # === MODEL NAME PATTERNS (Fallback for unregistered models) ===
     # Note: Schema types will be added in utils_usage.jl after schemas are defined
     # OpenAI GPT-4 family (50% read discount, no write cost - automatic caching)
@@ -499,7 +501,7 @@ const CACHE_DISCOUNTS = Dict{Union{Type, String}, NamedTuple{(:read_discount, :w
     # Anthropic Claude (90% read discount, 25% write premium for 5min cache)
     "claude" => (read_discount = 0.9, write_premium = 0.25),
     # Gemini (90% read discount, automatic caching)
-    "gemini" => (read_discount = 0.9, write_premium = 0.0),
+    "gemini" => (read_discount = 0.9, write_premium = 0.0)
 )
 
 # Note: _lookup_schema_type and get_cache_discounts are defined in utils_usage.jl
@@ -534,7 +536,6 @@ function call_cost_with_cache(
             (; cost_of_token_prompt = 0.0)).cost_of_token_prompt,
         cost_of_token_generation::Number = get(MODEL_REGISTRY, model,
             (; cost_of_token_generation = 0.0)).cost_of_token_generation)
-
     discounts = get_cache_discounts(model)
 
     # Regular input cost (excluding cached tokens)
@@ -571,7 +572,6 @@ function call_cost(usage::TokenUsage)
         usage.model_id
     )
 end
-
 
 """
     extract_log_prob(choice) -> Union{Nothing, Float64}
@@ -633,7 +633,6 @@ function build_message(
         run_id::Int = Int(rand(Int32)),
         sample_id::Union{Nothing, Int} = nothing,
         name::Union{Nothing, String} = nothing)
-
     AIMessage(;
         content = content isa AbstractString ? strip(content) : content,
         status,
@@ -662,7 +661,6 @@ function build_message(
         log_prob::Union{Nothing, Float64} = nothing,
         run_id::Int = Int(rand(Int32)),
         sample_id::Union{Nothing, Int} = nothing)
-
     DataMessage(;
         content,
         status,
@@ -690,7 +688,6 @@ function build_message(
         run_id::Int = Int(rand(Int32)),
         sample_id::Union{Nothing, Int} = nothing,
         name::Union{Nothing, String} = nothing)
-
     AIToolRequest(;
         content,
         tool_calls,
