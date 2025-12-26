@@ -470,6 +470,244 @@ function call_cost_alternative(
     end
 end
 
+## Cache Discount Configuration
+"""
+Cache discount configuration by model family.
+
+Each entry maps a model prefix to (read_discount, write_premium):
+- `read_discount`: Fraction of cost saved when reading from cache (0.0 = no discount, 0.9 = 90% off)
+- `write_premium`: Extra fraction charged for writing to cache (0.0 = no extra, 0.25 = 25% extra)
+
+Example: `(read_discount = 0.9, write_premium = 0.25)` means:
+- Cache reads cost 10% of normal input token price
+- Cache writes cost 125% of normal input token price
+"""
+const CACHE_DISCOUNTS = Dict{Union{Type, String}, NamedTuple{(:read_discount, :write_premium), Tuple{Float64, Float64}}}(
+    # === MODEL NAME PATTERNS (Fallback for unregistered models) ===
+    # Note: Schema types will be added in utils_usage.jl after schemas are defined
+    # OpenAI GPT-4 family (50% read discount, no write cost - automatic caching)
+    "gpt-4" => (read_discount = 0.5, write_premium = 0.0),
+    "gpt-4o" => (read_discount = 0.5, write_premium = 0.0),
+    "gpt-4o-mini" => (read_discount = 0.5, write_premium = 0.0),
+    "gpt-4-turbo" => (read_discount = 0.5, write_premium = 0.0),
+    "gpt-4.1" => (read_discount = 0.5, write_premium = 0.0),
+    # OpenAI GPT-5 family (90% read discount)
+    "gpt-5" => (read_discount = 0.9, write_premium = 0.0),
+    # OpenAI o1/o3 family (50% read discount)
+    "o1" => (read_discount = 0.5, write_premium = 0.0),
+    "o3" => (read_discount = 0.5, write_premium = 0.0),
+    # Anthropic Claude (90% read discount, 25% write premium for 5min cache)
+    "claude" => (read_discount = 0.9, write_premium = 0.25),
+    # Gemini (90% read discount, automatic caching)
+    "gemini" => (read_discount = 0.9, write_premium = 0.0),
+)
+
+# Note: _lookup_schema_type and get_cache_discounts are defined in utils_usage.jl
+# after schema types are available
+
+"""
+    call_cost_with_cache(input_tokens, output_tokens, cache_read, cache_write, model; kwargs...)
+
+Calculate cost with cache discounts applied.
+
+Cache read tokens are charged at `(1 - read_discount) * prompt_cost`.
+Cache write tokens are charged at `(1 + write_premium) * prompt_cost`.
+
+# Arguments
+- `input_tokens::Int`: Regular input tokens (total, including cache-hit tokens)
+- `output_tokens::Int`: Output/completion tokens
+- `cache_read::Int`: Tokens read from cache (subset of input_tokens that hit cache)
+- `cache_write::Int`: Tokens written to cache (charged at premium for Anthropic)
+- `model::String`: Model ID for pricing lookup
+
+# Example
+```julia
+# Anthropic with cache: 100 input tokens, 80 from cache, 20 written to cache
+cost = call_cost_with_cache(100, 50, 80, 20, "claude-sonnet-4-20250514")
+```
+"""
+function call_cost_with_cache(
+        input_tokens::Int, output_tokens::Int,
+        cache_read::Int, cache_write::Int,
+        model::String;
+        cost_of_token_prompt::Number = get(MODEL_REGISTRY, model,
+            (; cost_of_token_prompt = 0.0)).cost_of_token_prompt,
+        cost_of_token_generation::Number = get(MODEL_REGISTRY, model,
+            (; cost_of_token_generation = 0.0)).cost_of_token_generation)
+
+    discounts = get_cache_discounts(model)
+
+    # Regular input cost (excluding cached tokens)
+    regular_input = max(0, input_tokens - cache_read)
+    input_cost = regular_input * cost_of_token_prompt
+
+    # Cache read: discounted rate
+    cache_read_cost = cache_read * cost_of_token_prompt * (1.0 - discounts.read_discount)
+
+    # Cache write: premium rate (Anthropic charges extra for cache writes)
+    cache_write_cost = cache_write * cost_of_token_prompt * (1.0 + discounts.write_premium)
+
+    # Output cost (unchanged)
+    output_cost = output_tokens * cost_of_token_generation
+
+    return input_cost + cache_read_cost + cache_write_cost + output_cost
+end
+
+"""
+    call_cost(usage::TokenUsage)
+
+Calculate cost from a TokenUsage struct, using the stored model_id for pricing lookup.
+If cost is already calculated in the usage struct, returns that value.
+"""
+function call_cost(usage::TokenUsage)
+    # If cost already calculated, return it
+    usage.cost > 0 && return usage.cost
+    # If no model_id, can't calculate
+    isempty(usage.model_id) && return 0.0
+    # Calculate with cache support
+    call_cost_with_cache(
+        usage.input_tokens, usage.output_tokens,
+        usage.cache_read_tokens, usage.cache_write_tokens,
+        usage.model_id
+    )
+end
+
+
+"""
+    extract_log_prob(choice) -> Union{Nothing, Float64}
+
+Extract the sum of log probabilities from an OpenAI-style choice object.
+Returns `nothing` if log probabilities are not available.
+"""
+function extract_log_prob(choice)
+    has_log_prob = haskey(choice, :logprobs) &&
+                   !isnothing(get(choice, :logprobs, nothing)) &&
+                   haskey(choice[:logprobs], :content) &&
+                   !isnothing(choice[:logprobs][:content])
+    if has_log_prob
+        sum([get(c, :logprob, 0.0) for c in choice[:logprobs][:content]])
+    else
+        nothing
+    end
+end
+
+## Message Building Utilities
+
+"""
+    build_message(MSG::Type, content, usage::TokenUsage; kwargs...) -> AbstractMessage
+
+Unified message builder that constructs any message type from standardized components.
+
+This is the single point where all AI response messages should be constructed,
+ensuring consistent field population and reducing code duplication across providers.
+
+# Arguments
+- `MSG::Type`: Message type to construct (`AIMessage`, `DataMessage`, or `AIToolRequest`)
+- `content`: Message content (String for AIMessage, parsed data for DataMessage)
+- `usage::TokenUsage`: TokenUsage struct with all usage/cost information
+
+# Keyword Arguments
+- `status::Int = 200`: HTTP status code
+- `finish_reason`: Reason for completion
+- `extras`: Additional provider-specific metadata
+- `log_prob`: Log probability (if available)
+- `run_id`: Run identifier
+- `sample_id`: Sample identifier (for multi-sample)
+- `name`: Assistant name
+- `tool_calls`: Vector of ToolMessage (for AIToolRequest only)
+
+# Example
+```julia
+usage = TokenUsage(input_tokens=100, output_tokens=50, model_id="gpt-4o", cost=0.001, elapsed=1.5)
+msg = build_message(AIMessage, "Hello!", usage; status=200, finish_reason="stop")
+```
+"""
+function build_message(
+        MSG::Type{AIMessage},
+        content::Union{AbstractString, Nothing},
+        usage::TokenUsage;
+        status::Int = 200,
+        finish_reason::Union{Nothing, String} = nothing,
+        extras::Dict{Symbol, Any} = Dict{Symbol, Any}(),
+        log_prob::Union{Nothing, Float64} = nothing,
+        run_id::Int = Int(rand(Int32)),
+        sample_id::Union{Nothing, Int} = nothing,
+        name::Union{Nothing, String} = nothing)
+
+    AIMessage(;
+        content = content isa AbstractString ? strip(content) : content,
+        status,
+        name,
+        # Legacy fields (for backwards compatibility)
+        tokens = (usage.input_tokens, usage.output_tokens),
+        elapsed = usage.elapsed,
+        cost = usage.cost,
+        # New unified field
+        usage,
+        log_prob,
+        extras = isempty(extras) ? nothing : extras,
+        finish_reason,
+        run_id,
+        sample_id
+    )
+end
+
+function build_message(
+        MSG::Type{DataMessage},
+        content,  # Parsed/extracted data
+        usage::TokenUsage;
+        status::Int = 200,
+        finish_reason::Union{Nothing, String} = nothing,
+        extras::Dict{Symbol, Any} = Dict{Symbol, Any}(),
+        log_prob::Union{Nothing, Float64} = nothing,
+        run_id::Int = Int(rand(Int32)),
+        sample_id::Union{Nothing, Int} = nothing)
+
+    DataMessage(;
+        content,
+        status,
+        tokens = (usage.input_tokens, usage.output_tokens),
+        elapsed = usage.elapsed,
+        cost = usage.cost,
+        usage,
+        log_prob,
+        extras = isempty(extras) ? nothing : extras,
+        finish_reason,
+        run_id,
+        sample_id
+    )
+end
+
+function build_message(
+        MSG::Type{AIToolRequest},
+        content::Union{AbstractString, Nothing},
+        usage::TokenUsage;
+        tool_calls::Vector{ToolMessage} = ToolMessage[],
+        status::Int = 200,
+        finish_reason::Union{Nothing, String} = nothing,
+        extras::Dict{Symbol, Any} = Dict{Symbol, Any}(),
+        log_prob::Union{Nothing, Float64} = nothing,
+        run_id::Int = Int(rand(Int32)),
+        sample_id::Union{Nothing, Int} = nothing,
+        name::Union{Nothing, String} = nothing)
+
+    AIToolRequest(;
+        content,
+        tool_calls,
+        name,
+        status,
+        tokens = (usage.input_tokens, usage.output_tokens),
+        elapsed = usage.elapsed,
+        cost = usage.cost,
+        usage,
+        log_prob,
+        extras = isempty(extras) ? nothing : extras,
+        finish_reason,
+        run_id,
+        sample_id
+    )
+end
+
 # helper to produce summary message of how many tokens were used and for how much
 function _report_stats(msg,
         model::String)
