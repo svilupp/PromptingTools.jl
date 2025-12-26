@@ -26,6 +26,112 @@ const ALLOWED_PROMPT_TYPE = Union{
     Vector{<:AbstractMessage}
 }
 
+## Token Usage Tracking
+"""
+    TokenUsage
+
+Standardized token usage tracking across all LLM providers.
+
+Provides unified field names for cross-provider compatibility while preserving
+provider-specific details in the `extras` field.
+
+# Core Fields (always populated when available)
+- `input_tokens::Int`: Standard input/prompt tokens (default: 0)
+- `output_tokens::Int`: Standard output/completion tokens (default: 0)
+
+# Cache Fields (for providers with caching)
+- `cache_read_tokens::Int`: Tokens read from cache (discounted) (default: 0)
+- `cache_write_tokens::Int`: Tokens written to cache (premium for Anthropic) (default: 0)
+
+# Extended Fields (provider-specific)
+- `reasoning_tokens::Int`: Reasoning/thinking tokens (OpenAI o1/DeepSeek) (default: 0)
+- `audio_input_tokens::Int`: Audio input tokens (OpenAI) (default: 0)
+- `audio_output_tokens::Int`: Audio output tokens (OpenAI) (default: 0)
+
+# Metadata
+- `model_id::String`: Model identifier used for this usage (default: "")
+- `cost::Float64`: Calculated cost including cache discounts (default: 0.0)
+- `elapsed::Float64`: Time taken for the API call in seconds (default: 0.0)
+- `extras::Dict{Symbol,Any}`: Provider-specific raw usage data (default: empty)
+
+# Example
+```julia
+usage = TokenUsage(
+    input_tokens = 100,
+    output_tokens = 50,
+    cache_read_tokens = 80,
+    model_id = "claude-sonnet-4-20250514"
+)
+```
+"""
+@kwdef struct TokenUsage
+    # Core tokens
+    input_tokens::Int = 0
+    output_tokens::Int = 0
+
+    # Cache tokens
+    cache_read_tokens::Int = 0
+    cache_write_tokens::Int = 0
+
+    # Extended tokens (provider-specific)
+    reasoning_tokens::Int = 0
+    audio_input_tokens::Int = 0
+    audio_output_tokens::Int = 0
+
+    # Metadata
+    model_id::String = ""
+    cost::Float64 = 0.0
+    elapsed::Float64 = 0.0
+
+    # Raw provider data
+    extras::Dict{Symbol, Any} = Dict{Symbol, Any}()
+end
+
+# Arithmetic operations for aggregation
+function Base.:+(a::TokenUsage, b::TokenUsage)
+    TokenUsage(
+        input_tokens = a.input_tokens + b.input_tokens,
+        output_tokens = a.output_tokens + b.output_tokens,
+        cache_read_tokens = a.cache_read_tokens + b.cache_read_tokens,
+        cache_write_tokens = a.cache_write_tokens + b.cache_write_tokens,
+        reasoning_tokens = a.reasoning_tokens + b.reasoning_tokens,
+        audio_input_tokens = a.audio_input_tokens + b.audio_input_tokens,
+        audio_output_tokens = a.audio_output_tokens + b.audio_output_tokens,
+        model_id = isempty(a.model_id) ? b.model_id : a.model_id,
+        cost = a.cost + b.cost,
+        elapsed = a.elapsed + b.elapsed,
+        extras = merge(a.extras, b.extras)
+    )
+end
+
+"Total tokens including all token types"
+total_tokens(u::TokenUsage) = u.input_tokens + u.output_tokens +
+                              u.cache_read_tokens + u.cache_write_tokens + u.reasoning_tokens
+
+function Base.show(io::IO, u::TokenUsage)
+    print(io, "TokenUsage(in=$(u.input_tokens), out=$(u.output_tokens)")
+    u.cache_read_tokens > 0 && print(io, ", cache_read=$(u.cache_read_tokens)")
+    u.cache_write_tokens > 0 && print(io, ", cache_write=$(u.cache_write_tokens)")
+    u.reasoning_tokens > 0 && print(io, ", reasoning=$(u.reasoning_tokens)")
+    u.cost > 0 && print(io, ", cost=\$$(round(u.cost; digits=6))")
+    print(io, ")")
+end
+
+# Custom equality for TokenUsage (needed because extras Dict compares by identity, not value)
+function Base.:(==)(a::TokenUsage, b::TokenUsage)
+    a.input_tokens == b.input_tokens &&
+    a.output_tokens == b.output_tokens &&
+    a.cache_read_tokens == b.cache_read_tokens &&
+    a.cache_write_tokens == b.cache_write_tokens &&
+    a.reasoning_tokens == b.reasoning_tokens &&
+    a.audio_input_tokens == b.audio_input_tokens &&
+    a.audio_output_tokens == b.audio_output_tokens &&
+    a.model_id == b.model_id &&
+    a.cost == b.cost &&
+    a.elapsed == b.elapsed &&
+    a.extras == b.extras
+end
+
 # Workaround to be able to add metadata to serialized conversations, templates, etc.
 # Ignored by `render` directives
 Base.@kwdef struct MetadataMessage{T <: AbstractString} <: AbstractChatMessage
@@ -109,16 +215,17 @@ end
 """
     AIMessage
 
-A message type for AI-generated text-based responses. 
+A message type for AI-generated text-based responses.
 Returned by `aigenerate`, `aiclassify`, and `aiscan` functions.
-    
+
 # Fields
 - `content::Union{AbstractString, Nothing}`: The content of the message.
 - `status::Union{Int, Nothing}`: The status of the message from the API.
 - `name::Union{Nothing, String}`: The name of the `role` in the conversation.
-- `tokens::Tuple{Int, Int}`: The number of tokens used (prompt,completion).
-- `elapsed::Float64`: The time taken to generate the response in seconds.
-- `cost::Union{Nothing, Float64}`: The cost of the API call (calculated with information from `MODEL_REGISTRY`).
+- `tokens::Tuple{Int, Int}`: The number of tokens used (prompt,completion). Legacy field, prefer `usage`.
+- `elapsed::Float64`: The time taken to generate the response in seconds. Legacy field, prefer `usage.elapsed`.
+- `cost::Union{Nothing, Float64}`: The cost of the API call. Legacy field, prefer `usage.cost`.
+- `usage::Union{Nothing, TokenUsage}`: Detailed token usage including cache tokens, cost, and timing.
 - `log_prob::Union{Nothing, Float64}`: The log probability of the response.
 - `extras::Union{Nothing, Dict{Symbol, Any}}`: A dictionary for additional metadata that is not part of the key message fields. Try to limit to a small number of items and singletons to be serializable.
 - `finish_reason::Union{Nothing, String}`: The reason the response was finished.
@@ -132,6 +239,7 @@ Base.@kwdef struct AIMessage{T <: Union{AbstractString, Nothing}} <: AbstractCha
     tokens::Tuple{Int, Int} = (-1, -1)
     elapsed::Float64 = -1.0
     cost::Union{Nothing, Float64} = nothing
+    usage::Union{Nothing, TokenUsage} = nothing
     log_prob::Union{Nothing, Float64} = nothing
     extras::Union{Nothing, Dict{Symbol, Any}} = nothing
     finish_reason::Union{Nothing, String} = nothing
@@ -143,15 +251,16 @@ end
 """
     DataMessage
 
-A message type for AI-generated data-based responses, ie, different `content` than text. 
-Returned by `aiextract`, and `aiextract` functions.
-    
+A message type for AI-generated data-based responses, ie, different `content` than text.
+Returned by `aiextract` function.
+
 # Fields
 - `content::Union{AbstractString, Nothing}`: The content of the message.
 - `status::Union{Int, Nothing}`: The status of the message from the API.
-- `tokens::Tuple{Int, Int}`: The number of tokens used (prompt,completion).
-- `elapsed::Float64`: The time taken to generate the response in seconds.
-- `cost::Union{Nothing, Float64}`: The cost of the API call (calculated with information from `MODEL_REGISTRY`).
+- `tokens::Tuple{Int, Int}`: The number of tokens used (prompt,completion). Legacy field, prefer `usage`.
+- `elapsed::Float64`: The time taken to generate the response in seconds. Legacy field, prefer `usage.elapsed`.
+- `cost::Union{Nothing, Float64}`: The cost of the API call. Legacy field, prefer `usage.cost`.
+- `usage::Union{Nothing, TokenUsage}`: Detailed token usage including cache tokens, cost, and timing.
 - `log_prob::Union{Nothing, Float64}`: The log probability of the response.
 - `extras::Union{Nothing, Dict{Symbol, Any}}`: A dictionary for additional metadata that is not part of the key message fields. Try to limit to a small number of items and singletons to be serializable.
 - `finish_reason::Union{Nothing, String}`: The reason the response was finished.
@@ -164,6 +273,7 @@ Base.@kwdef struct DataMessage{T <: Any} <: AbstractDataMessage
     tokens::Tuple{Int, Int} = (-1, -1)
     elapsed::Float64 = -1.0
     cost::Union{Nothing, Float64} = nothing
+    usage::Union{Nothing, TokenUsage} = nothing
     log_prob::Union{Nothing, Float64} = nothing
     extras::Union{Nothing, Dict{Symbol, Any}} = nothing
     finish_reason::Union{Nothing, String} = nothing
@@ -200,17 +310,18 @@ end
 """
     AIToolRequest
 
-A message type for AI-generated tool requests. 
+A message type for AI-generated tool requests.
 Returned by `aitools` functions.
-    
+
 # Fields
 - `content::Union{AbstractString, Nothing}`: The content of the message.
 - `tool_calls::Vector{ToolMessage}`: The vector of tool call requests.
 - `name::Union{Nothing, String}`: The name of the `role` in the conversation.
 - `status::Union{Int, Nothing}`: The status of the message from the API.
-- `tokens::Tuple{Int, Int}`: The number of tokens used (prompt,completion).
-- `elapsed::Float64`: The time taken to generate the response in seconds.
-- `cost::Union{Nothing, Float64}`: The cost of the API call (calculated with information from `MODEL_REGISTRY`).
+- `tokens::Tuple{Int, Int}`: The number of tokens used (prompt,completion). Legacy field, prefer `usage`.
+- `elapsed::Float64`: The time taken to generate the response in seconds. Legacy field, prefer `usage.elapsed`.
+- `cost::Union{Nothing, Float64}`: The cost of the API call. Legacy field, prefer `usage.cost`.
+- `usage::Union{Nothing, TokenUsage}`: Detailed token usage including cache tokens, cost, and timing.
 - `log_prob::Union{Nothing, Float64}`: The log probability of the response.
 - `extras::Union{Nothing, Dict{Symbol, Any}}`: A dictionary for additional metadata that is not part of the key message fields. Try to limit to a small number of items and singletons to be serializable.
 - `finish_reason::Union{Nothing, String}`: The reason the response was finished.
@@ -229,6 +340,7 @@ Base.@kwdef struct AIToolRequest{T <: Union{AbstractString, Nothing}} <: Abstrac
     tokens::Tuple{Int, Int} = (-1, -1)
     elapsed::Float64 = -1.0
     cost::Union{Nothing, Float64} = nothing
+    usage::Union{Nothing, TokenUsage} = nothing
     log_prob::Union{Nothing, Float64} = nothing
     extras::Union{Nothing, Dict{Symbol, Any}} = nothing
     finish_reason::Union{Nothing, String} = nothing
@@ -592,145 +704,3 @@ end
 #         kwargs...)
 #     render(schema, messages; kwargs...)
 # end
-function role4render(schema::AbstractPromptSchema, msg::AbstractTracerMessage)
-    role4render(schema, msg.object)
-end
-function render(schema::AbstractPromptSchema, msg::AbstractMessage; kwargs...)
-    render(schema, [msg]; kwargs...)
-end
-function render(schema::AbstractPromptSchema, msg::AbstractString;
-        name_user::Union{Nothing, String} = nothing, kwargs...)
-    render(schema, [UserMessage(; content = msg, name = name_user)]; kwargs...)
-end
-
-## Serialization via JSON3
-StructTypes.StructType(::Type{AbstractMessage}) = StructTypes.AbstractType()
-StructTypes.subtypekey(::Type{AbstractMessage}) = :_type
-function StructTypes.subtypes(::Type{AbstractMessage})
-    (usermessage = UserMessage,
-        usermessagewithimages = UserMessageWithImages,
-        aimessage = AIMessage,
-        toolmessage = ToolMessage,
-        aitoolrequest = AIToolRequest,
-        systemmessage = SystemMessage,
-        metadatamessage = MetadataMessage,
-        datamessage = DataMessage,
-        tracermessage = TracerMessage,
-        annotationmessage = AnnotationMessage)
-end
-
-StructTypes.StructType(::Type{AbstractChatMessage}) = StructTypes.AbstractType()
-StructTypes.subtypekey(::Type{AbstractChatMessage}) = :_type
-function StructTypes.subtypes(::Type{AbstractChatMessage})
-    (usermessage = UserMessage,
-        usermessagewithimages = UserMessageWithImages,
-        aimessage = AIMessage,
-        systemmessage = SystemMessage,
-        metadatamessage = MetadataMessage,
-        annotationmessage = AnnotationMessage)
-end
-
-StructTypes.StructType(::Type{AbstractAnnotationMessage}) = StructTypes.AbstractType()
-StructTypes.subtypekey(::Type{AbstractAnnotationMessage}) = :_type
-function StructTypes.subtypes(::Type{AbstractAnnotationMessage})
-    (annotationmessage = AnnotationMessage,)
-end
-
-StructTypes.StructType(::Type{AbstractTracerMessage}) = StructTypes.AbstractType()
-StructTypes.subtypekey(::Type{AbstractTracerMessage}) = :_type
-function StructTypes.subtypes(::Type{AbstractTracerMessage})
-    (tracermessage = TracerMessage,)
-end
-
-StructTypes.StructType(::Type{AbstractTracer}) = StructTypes.AbstractType()
-StructTypes.subtypekey(::Type{AbstractTracer}) = :_type
-function StructTypes.subtypes(::Type{AbstractTracer})
-    (tracermessagelike = TracerMessageLike,)
-end
-
-StructTypes.StructType(::Type{MetadataMessage}) = StructTypes.Struct()
-StructTypes.StructType(::Type{SystemMessage}) = StructTypes.Struct()
-StructTypes.StructType(::Type{UserMessage}) = StructTypes.Struct()
-StructTypes.StructType(::Type{UserMessageWithImages}) = StructTypes.Struct()
-StructTypes.StructType(::Type{ToolMessage}) = StructTypes.Struct()
-StructTypes.StructType(::Type{AIToolRequest}) = StructTypes.Struct()
-StructTypes.StructType(::Type{AIMessage}) = StructTypes.Struct()
-StructTypes.StructType(::Type{DataMessage}) = StructTypes.Struct()
-StructTypes.StructType(::Type{AnnotationMessage}) = StructTypes.Struct()
-StructTypes.StructType(::Type{TracerMessage}) = StructTypes.Struct() # Ignore mutability once we serialize
-StructTypes.StructType(::Type{TracerMessageLike}) = StructTypes.Struct() # Ignore mutability once we serialize
-
-### Utilities for Pretty Printing
-"""
-    pprint(io::IO, msg::AbstractMessage; text_width::Int = displaysize(io)[2])
-
-Pretty print a single `AbstractMessage` to the given IO stream.
-
-`text_width` is the width of the text to be displayed. If not provided, it defaults to the width of the given IO stream and add `newline` separators as needed.
-"""
-function pprint(io::IO, msg::AbstractMessage; text_width::Int = displaysize(io)[2])
-    ## never use extension, because we don't have good method for single message
-    role = if msg isa Union{UserMessage, UserMessageWithImages}
-        "User Message"
-    elseif msg isa DataMessage
-        "Data Message"
-    elseif msg isa SystemMessage
-        "System Message"
-    elseif msg isa AIMessage
-        "AI Message"
-    elseif msg isa AIToolRequest
-        "AI Tool Request"
-    elseif msg isa ToolMessage
-        "Tool Message"
-    elseif msg isa AnnotationMessage
-        "Annotation Message"
-    else
-        "Unknown Message"
-    end
-    content = if msg isa DataMessage
-        length_ = msg.content isa AbstractArray ? " (Size: $(size(msg.content)))" : ""
-        "Data: $(typeof(msg.content))$(length_)"
-    elseif isaitoolrequest(msg)
-        if isnothing(msg.content)
-            join(
-                ["Tool Request: $(tool.name), args: $(tool.args)"
-                 for (tool) in msg.tool_calls],
-                "\n")
-        else
-            wrap_string(msg.content, text_width)
-        end
-    elseif istoolmessage(msg)
-        isnothing(msg.content) ? string("Name: ", msg.name, ", Args: ", msg.raw) :
-        string(msg.content)
-    elseif isabstractannotationmessage(msg)
-        tags_str = isempty(msg.tags) ? "" : "\n [$(join(msg.tags, ", "))]"
-        comment_str = isempty(msg.comment) ? "" : "\n ($(msg.comment))"
-        "$(msg.content)$tags_str$comment_str"
-    else
-        wrap_string(msg.content, text_width)
-    end
-    print(io, "-"^20, "\n")
-    printstyled(io, role, color = :blue, bold = true)
-    print(io, "\n", "-"^20, "\n")
-    print(io, content, "\n\n")
-end
-
-function pprint(io::IO, t::Union{AbstractTracerMessage, AbstractTracer};
-        text_width::Int = displaysize(io)[2])
-    role = "$(nameof(typeof(t))) with:"
-    print(io, "-"^20, "\n")
-    print(io, role, "\n")
-    pprint(io, unwrap(t); text_width)
-end
-"""
-    pprint(io::IO, conversation::AbstractVector{<:AbstractMessage})
-
-Pretty print a vector of `AbstractMessage` to the given IO stream.
-"""
-function pprint(
-        io::IO, conversation::AbstractVector{<:AbstractMessage};
-        text_width::Int = displaysize(io)[2])
-    for msg in conversation
-        pprint(io, msg; text_width)
-    end
-end

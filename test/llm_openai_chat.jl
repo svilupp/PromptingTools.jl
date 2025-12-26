@@ -666,7 +666,8 @@ end
         tokens = (2, 1),
         finish_reason = "stop",
         cost = msg.cost,
-        extras = Dict{Symbol, Any}(),
+        usage = msg.usage,
+        extras = nothing,
         elapsed = msg.elapsed)
     @test msg == expected_output
     @test schema1.inputs ==
@@ -683,7 +684,8 @@ end
         content = "Hello!" |> strip,
         status = 200,
         tokens = (2, 1),
-        extras = Dict{Symbol, Any}(),
+        extras = nothing,
+        usage = msg.usage,
         finish_reason = "stop",
         cost = msg.cost,
         elapsed = msg.elapsed)
@@ -914,8 +916,9 @@ end
         tokens = (2, 1),
         finish_reason = "stop",
         cost = msg.cost,
+        usage = msg.usage,
         elapsed = msg.elapsed,
-        extras = Dict{Symbol, Any}())
+        extras = nothing)
     @test msg == expected_output
     @test schema1.inputs ==
           Dict{String, Any}[
@@ -932,8 +935,9 @@ end
         tokens = (2, 1),
         finish_reason = "stop",
         cost = conv[end].cost,
+        usage = conv[end].usage,
         elapsed = conv[end].elapsed,
-        extras = Dict{Symbol, Any}())
+        extras = nothing)
     @test conv[end] == expected_output
 end
 
