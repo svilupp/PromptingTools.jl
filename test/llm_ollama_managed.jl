@@ -192,6 +192,38 @@ end
     end
 end
 
+@testset "OllamaManagedSchema - usage field" begin
+    @testset "aigenerate with usage" begin
+        response = Dict(:response => "Test response",
+            :model => "llama2",
+            :prompt_eval_count => 80,
+            :eval_count => 40)
+        schema = PT.TestEchoOllamaManagedSchema(; response, status = 200)
+
+        msg = PT.aigenerate(schema, "Test"; model = "llama2")
+
+        @test !isnothing(msg.usage)
+        @test msg.usage isa PT.TokenUsage
+        @test msg.usage.input_tokens == 80
+        @test msg.usage.output_tokens == 40
+        @test msg.usage.cost == 0.0  # Ollama is free
+        @test msg.tokens == (80, 40)  # Legacy field
+    end
+
+    @testset "aigenerate with missing token counts" begin
+        # Test resilience when token counts are missing
+        response = Dict(:response => "Test response")
+        schema = PT.TestEchoOllamaManagedSchema(; response, status = 200)
+
+        msg = PT.aigenerate(schema, "Test")
+
+        @test !isnothing(msg.usage)
+        @test msg.usage.input_tokens == 0
+        @test msg.usage.output_tokens == 0
+        @test msg.tokens == (0, 0)
+    end
+end
+
 @testset "not implemented ai* functions" begin
     @test_throws ErrorException aiextract(OllamaManagedSchema(), "prompt")
     @test_throws ErrorException aiclassify(OllamaManagedSchema(), "prompt")

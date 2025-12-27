@@ -408,6 +408,12 @@ struct GoogleSchema <: AbstractGoogleSchema end
     model_id::String = ""
     inputs::Any = nothing
     config_kwargs::Dict{Symbol, Any} = Dict{Symbol, Any}()
+    usage_metadata::Dict{Symbol,
+        Any} = Dict{Symbol, Any}(
+        :promptTokenCount => 50,
+        :candidatesTokenCount => length(string(text)),
+        :totalTokenCount => 50 + length(string(text))
+    )
 end
 
 abstract type AbstractAnthropicSchema <: AbstractPromptSchema end

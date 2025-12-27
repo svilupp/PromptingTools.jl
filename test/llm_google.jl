@@ -316,6 +316,54 @@ end
     @test config_kwargs[:system_instruction] == ""
 end
 
+@testset "GoogleSchema - usage field" begin
+    @testset "extract_usage" begin
+        # Test with full metadata
+        resp = (
+            text = "Test response",
+            response_status = 200,
+            usage_metadata = (
+                promptTokenCount = 100,
+                candidatesTokenCount = 50,
+                totalTokenCount = 150,
+                cachedContentTokenCount = 30
+            )
+        )
+        usage = PT.extract_usage(PT.GoogleSchema(), resp; model_id = "gemini-pro", elapsed = 1.5)
+        @test usage.input_tokens == 100
+        @test usage.output_tokens == 50
+        @test usage.cache_read_tokens == 30
+        @test usage.model_id == "gemini-pro"
+        @test usage.elapsed == 1.5
+
+        # Test with missing usage_metadata (should default to 0)
+        resp_no_usage = (text = "response", response_status = 200)
+        usage = PT.extract_usage(PT.GoogleSchema(), resp_no_usage; model_id = "gemini-pro")
+        @test usage.input_tokens == 0
+        @test usage.output_tokens == 0
+        @test usage.cache_read_tokens == 0
+    end
+
+    @testset "aigenerate with usage" begin
+        schema = PT.TestEchoGoogleSchema(;
+            text = "Hello!",
+            response_status = 200,
+            usage_metadata = Dict{Symbol, Any}(
+                :promptTokenCount => 50,
+                :candidatesTokenCount => 6
+            )
+        )
+        msg = PT.aigenerate(schema, "Test")
+
+        @test !isnothing(msg.usage)
+        @test msg.usage isa PT.TokenUsage
+        @test msg.usage.input_tokens == 50
+        @test msg.usage.output_tokens == 6
+        @test msg.tokens == (50, 6)  # Legacy field
+        @test msg.elapsed == msg.usage.elapsed
+    end
+end
+
 @testset "not implemented ai* functions" begin
     @test_throws ErrorException aiembed(GoogleSchema(), "prompt")
     @test_throws ErrorException aiextract(GoogleSchema(), "prompt")

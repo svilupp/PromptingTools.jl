@@ -117,6 +117,44 @@ function process_google_config(api_kwargs, system_instruction, http_kwargs)
     return config_kwargs
 end
 
+"""
+    extract_usage(schema::AbstractGoogleSchema, resp; model_id="", elapsed=0.0) -> TokenUsage
+
+Extract token usage from a Google Gemini API response into a standardized TokenUsage struct.
+
+The Google API returns usage in `usage_metadata` with camelCase field names.
+Token counts may be character estimates for some models.
+
+# Response structure (from GoogleGenAI.jl):
+- `usage_metadata.promptTokenCount`: Input tokens
+- `usage_metadata.candidatesTokenCount`: Output tokens
+- `usage_metadata.cachedContentTokenCount`: Cached tokens (if caching enabled)
+"""
+function extract_usage(::AbstractGoogleSchema, resp; model_id::String = "", elapsed::Float64 = 0.0)
+    input_tokens = 0
+    output_tokens = 0
+    cache_read_tokens = 0
+
+    # Extract from usage_metadata if it exists (GoogleGenAI.jl response structure)
+    if hasproperty(resp, :usage_metadata) && !isnothing(resp.usage_metadata)
+        usage_meta = resp.usage_metadata
+        # Google uses camelCase
+        input_tokens = get(usage_meta, :promptTokenCount, 0)
+        output_tokens = get(usage_meta, :candidatesTokenCount, 0)
+        cache_read_tokens = get(usage_meta, :cachedContentTokenCount, 0)
+    end
+
+    # Calculate cost (many Google models are free, so this may be 0)
+    cost = call_cost_with_cache(input_tokens, output_tokens, cache_read_tokens, 0, model_id)
+
+    TokenUsage(;
+        input_tokens, output_tokens,
+        cache_read_tokens,
+        model_id, cost, elapsed,
+        extras = Dict{Symbol, Any}()
+    )
+end
+
 "Stub - to be extended in extension: GoogleGenAIPromptingToolsExt. `ggi` stands for GoogleGenAI"
 function ggi_generate_content end
 function ggi_generate_content(schema::TestEchoGoogleSchema, api_key::AbstractString,
@@ -248,15 +286,18 @@ function aigenerate(prompt_schema::AbstractGoogleSchema, prompt::ALLOWED_PROMPT_
             system_instruction,
             http_kwargs,
             api_kwargs...)
-        ## Big overestimate
-        input_token_estimate = length(JSON3.write(conv_rendered))
-        output_token_estimate = length(r.text)
-        msg = AIMessage(;
-            content = r.text |> strip,
+
+        content = r.text |> strip
+
+        # Extract usage using unified extraction
+        usage = extract_usage(prompt_schema, r; model_id, elapsed = time)
+
+        # Build message using unified builder
+        msg = build_message(AIMessage, content, usage;
             status = convert(Int, r.response_status),
-            ## for google it's CHARACTERS, not tokens
-            tokens = (input_token_estimate, output_token_estimate),
-            elapsed = time)
+            extras = Dict{Symbol, Any}()
+        )
+
         ## Reporting
         verbose && @info _report_stats(msg, model_id)
     else
