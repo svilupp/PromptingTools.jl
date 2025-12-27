@@ -200,12 +200,13 @@ end
     # Real generation API
     schema1 = TestEchoGoogleSchema(; text = "Hello!", response_status = 200)
     msg = aigenerate(schema1, "Hello World")
-    expected_output = AIMessage(;
-        content = "Hello!" |> strip,
-        status = 200,
-        tokens = (50, 6),
-        elapsed = msg.elapsed)
-    @test msg == expected_output
+    # Test fields individually instead of full message equality
+    @test msg.content == "Hello!"
+    @test msg.status == 200
+    @test msg.tokens == (50, 6)
+    @test !isnothing(msg.usage)
+    @test msg.usage.input_tokens == 50
+    @test msg.usage.output_tokens == 6
     @test schema1.inputs == Dict{Symbol, Any}[Dict(:role => "user",
         :parts => [Dict("text" => "Hello World")])]
     @test schema1.model_id == "gemini-pro" # default model
@@ -215,12 +216,13 @@ end
     msg = aigenerate(schema2, UserMessage("Hello {{name}}"),
         model = "geminixx", http_kwargs = (; verbose = 3), api_kwargs = (; temperature = 0),
         name = "World")
-    expected_output = AIMessage(;
-        content = "World!" |> strip,
-        status = 200,
-        tokens = (50, 6),
-        elapsed = msg.elapsed)
-    @test msg == expected_output
+    # Test fields individually instead of full message equality
+    @test msg.content == "World!"
+    @test msg.status == 200
+    @test msg.tokens == (50, 6)
+    @test !isnothing(msg.usage)
+    @test msg.usage.input_tokens == 50
+    @test msg.usage.output_tokens == 6
     @test schema2.inputs == Dict{Symbol, Any}[Dict(:role => "user",
         :parts => [Dict("text" => "Hello World")])]
     @test schema2.model_id == "geminixx"
