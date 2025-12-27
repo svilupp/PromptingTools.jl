@@ -200,12 +200,13 @@ end
     # Real generation API
     schema1 = TestEchoGoogleSchema(; text = "Hello!", response_status = 200)
     msg = aigenerate(schema1, "Hello World")
-    expected_output = AIMessage(;
-        content = "Hello!" |> strip,
-        status = 200,
-        tokens = (50, 6),
-        elapsed = msg.elapsed)
-    @test msg == expected_output
+    # Test fields individually instead of full message equality
+    @test msg.content == "Hello!"
+    @test msg.status == 200
+    @test msg.tokens == (50, 6)
+    @test !isnothing(msg.usage)
+    @test msg.usage.input_tokens == 50
+    @test msg.usage.output_tokens == 6
     @test schema1.inputs == Dict{Symbol, Any}[Dict(:role => "user",
         :parts => [Dict("text" => "Hello World")])]
     @test schema1.model_id == "gemini-pro" # default model
@@ -215,12 +216,13 @@ end
     msg = aigenerate(schema2, UserMessage("Hello {{name}}"),
         model = "geminixx", http_kwargs = (; verbose = 3), api_kwargs = (; temperature = 0),
         name = "World")
-    expected_output = AIMessage(;
-        content = "World!" |> strip,
-        status = 200,
-        tokens = (50, 6),
-        elapsed = msg.elapsed)
-    @test msg == expected_output
+    # Test fields individually instead of full message equality
+    @test msg.content == "World!"
+    @test msg.status == 200
+    @test msg.tokens == (50, 6)
+    @test !isnothing(msg.usage)
+    @test msg.usage.input_tokens == 50
+    @test msg.usage.output_tokens == 6
     @test schema2.inputs == Dict{Symbol, Any}[Dict(:role => "user",
         :parts => [Dict("text" => "Hello World")])]
     @test schema2.model_id == "geminixx"
@@ -314,6 +316,54 @@ end
     @test config_kwargs[:temperature] == 0.0
     @test config_kwargs[:max_output_tokens] == 1
     @test config_kwargs[:system_instruction] == ""
+end
+
+@testset "GoogleSchema - usage field" begin
+    @testset "extract_usage" begin
+        # Test with full metadata
+        resp = (
+            text = "Test response",
+            response_status = 200,
+            usage_metadata = (
+                promptTokenCount = 100,
+                candidatesTokenCount = 50,
+                totalTokenCount = 150,
+                cachedContentTokenCount = 30
+            )
+        )
+        usage = PT.extract_usage(PT.GoogleSchema(), resp; model_id = "gemini-pro", elapsed = 1.5)
+        @test usage.input_tokens == 100
+        @test usage.output_tokens == 50
+        @test usage.cache_read_tokens == 30
+        @test usage.model_id == "gemini-pro"
+        @test usage.elapsed == 1.5
+
+        # Test with missing usage_metadata (should default to 0)
+        resp_no_usage = (text = "response", response_status = 200)
+        usage = PT.extract_usage(PT.GoogleSchema(), resp_no_usage; model_id = "gemini-pro")
+        @test usage.input_tokens == 0
+        @test usage.output_tokens == 0
+        @test usage.cache_read_tokens == 0
+    end
+
+    @testset "aigenerate with usage" begin
+        schema = PT.TestEchoGoogleSchema(;
+            text = "Hello!",
+            response_status = 200,
+            usage_metadata = Dict{Symbol, Any}(
+                :promptTokenCount => 50,
+                :candidatesTokenCount => 6
+            )
+        )
+        msg = PT.aigenerate(schema, "Test")
+
+        @test !isnothing(msg.usage)
+        @test msg.usage isa PT.TokenUsage
+        @test msg.usage.input_tokens == 50
+        @test msg.usage.output_tokens == 6
+        @test msg.tokens == (50, 6)  # Legacy field
+        @test msg.elapsed == msg.usage.elapsed
+    end
 end
 
 @testset "not implemented ai* functions" begin

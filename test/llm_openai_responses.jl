@@ -657,3 +657,63 @@ data: {"type":"response.completed","sequence_number":4,"response":{"id":"resp_ch
         end
     end
 end
+
+@testset "OpenAIResponseSchema - usage field" begin
+    @testset "extract_usage" begin
+        # Full usage with reasoning and cache tokens
+        resp = OpenAI.OpenAIResponse(
+            Int16(200),
+            Dict{Symbol, Any}(
+                :id => "resp_123",
+                :usage => Dict{Symbol, Any}(
+                    :input_tokens => 150,
+                    :output_tokens => 75,
+                    :input_tokens_details => Dict(:cached_tokens => 50),
+                    :output_tokens_details => Dict(:reasoning_tokens => 30)
+                )
+            )
+        )
+
+        usage = PT.extract_usage(PT.OpenAIResponseSchema(), resp; model_id = "gpt-4o", elapsed = 2.0)
+        @test usage.input_tokens == 150
+        @test usage.output_tokens == 75
+        @test usage.cache_read_tokens == 50
+        @test usage.reasoning_tokens == 30
+        @test usage.model_id == "gpt-4o"
+        @test usage.elapsed == 2.0
+        @test usage.cost >= 0
+
+        # Missing usage (should default to 0)
+        resp_no_usage = OpenAI.OpenAIResponse(Int16(200), Dict{Symbol, Any}(:id => "resp_123"))
+        usage = PT.extract_usage(PT.OpenAIResponseSchema(), resp_no_usage; model_id = "gpt-4o")
+        @test usage.input_tokens == 0
+        @test usage.output_tokens == 0
+    end
+
+    @testset "aigenerate with usage" begin
+        schema = TestEchoOpenAIResponseSchema(;
+            response = Dict{Symbol, Any}(
+            :id => "resp_test",
+            :status => "completed",
+            :usage => Dict{Symbol, Any}(
+                :input_tokens => 100,
+                :output_tokens => 50,
+                :output_tokens_details => Dict{Symbol, Any}(:reasoning_tokens => 25)
+            ),
+            :output => [Dict{Symbol, Any}(
+                :type => "message",
+                :content => [Dict{Symbol, Any}(:type => "output_text", :text => "Test")]
+            )]
+        )
+        )
+
+        msg = aigenerate(schema, "Test"; model = "gpt-4o", verbose = false)
+
+        @test !isnothing(msg.usage)
+        @test msg.usage isa PT.TokenUsage
+        @test msg.usage.input_tokens == 100
+        @test msg.usage.output_tokens == 50
+        @test msg.usage.reasoning_tokens == 25
+        @test msg.tokens == (100, 50)  # Legacy field
+    end
+end

@@ -59,6 +59,56 @@ function _extract_openai_extras!(extras::Dict{Symbol, Any}, resp)
     return extras
 end
 
+"""
+    extract_usage(schema::AbstractOpenAISchema, resp; model_id="", elapsed=0.0) -> TokenUsage
+
+Extract token usage from an OpenAI API response into a standardized TokenUsage struct.
+
+Handles both snake_case and camelCase keys for compatibility with various OpenAI-compatible APIs.
+Extracts cache tokens, reasoning tokens, and audio tokens when available.
+"""
+function extract_usage(::AbstractOpenAISchema, resp; model_id::String = "", elapsed::Float64 = 0.0)
+    usage_dict = get(resp.response, :usage, Dict())
+
+    # Core tokens (handle both snake_case and camelCase)
+    input_tokens = get(usage_dict, :prompt_tokens,
+        get(usage_dict, :promptTokens, 0))
+    output_tokens = get(usage_dict, :completion_tokens,
+        get(usage_dict, :completionTokens, 0))
+
+    # Cache tokens (from prompt_tokens_details)
+    cache_read_tokens = 0
+    audio_input = 0
+    prompt_details = get(usage_dict, :prompt_tokens_details, Dict())
+    if !isempty(prompt_details) && !isnothing(prompt_details)
+        cache_read_tokens = get(prompt_details, :cached_tokens, 0)
+        audio_input = get(prompt_details, :audio_tokens, 0)
+    end
+
+    # Extended tokens (from completion_tokens_details)
+    reasoning_tokens = 0
+    audio_output = 0
+    completion_details = get(usage_dict, :completion_tokens_details, Dict())
+    if !isempty(completion_details) && !isnothing(completion_details)
+        reasoning_tokens = get(completion_details, :reasoning_tokens, 0)
+        audio_output = get(completion_details, :audio_tokens, 0)
+    end
+
+    # Calculate cost with cache discount
+    cost = call_cost_with_cache(input_tokens, output_tokens, cache_read_tokens, 0, model_id)
+
+    TokenUsage(;
+        input_tokens, output_tokens,
+        cache_read_tokens,
+        reasoning_tokens,
+        audio_input_tokens = audio_input,
+        audio_output_tokens = audio_output,
+        model_id, cost, elapsed,
+        extras = isempty(usage_dict) ? Dict{Symbol, Any}() :
+                 Dict{Symbol, Any}(:raw_usage => usage_dict)
+    )
+end
+
 ## Rendering of converation history for the OpenAI API
 """
     render(schema::AbstractOpenAISchema,
@@ -219,61 +269,35 @@ function response_to_message(schema::AbstractOpenAISchema,
         run_id::Int = Int(rand(Int32)),
         sample_id::Union{Nothing, Integer} = nothing,
         name_assistant::Union{Nothing, String} = nothing)
-    ## extract sum log probability
-    has_log_prob = haskey(choice, :logprobs) &&
-                   !isnothing(get(choice, :logprobs, nothing)) &&
-                   haskey(choice[:logprobs], :content) &&
-                   !isnothing(choice[:logprobs][:content])
-    log_prob = if has_log_prob
-        sum([get(c, :logprob, 0.0) for c in choice[:logprobs][:content]])
-    else
-        nothing
-    end
-    ## Has reasoning content -- currently only provided by DeepSeek API
-    has_reasoning_content = haskey(choice, :message) &&
-                            haskey(choice[:message], :reasoning_content)
-    reasoning_content = if has_reasoning_content
-        choice[:message][:reasoning_content]
-    else
-        nothing
-    end
-    # Extract usage information with default values for tokens
-    tokens_prompt = 0
-    tokens_completion = 0
-    # Merge with response usage if available
-    if haskey(resp.response, :usage)
-        response_usage = resp.response[:usage]
-        # Handle both snake_case and camelCase keys
-        tokens_prompt = get(response_usage, :prompt_tokens,
-            get(response_usage, :promptTokens, 0))
-        tokens_completion = get(response_usage, :completion_tokens,
-            get(response_usage, :completionTokens, 0))
-    end
-    ## calculate cost
-    cost = call_cost(tokens_prompt, tokens_completion, model_id)
-    ## Add extras, usually keys that are provider-specific
+    # Extract content
+    content = get(get(choice, :message, Dict()), :content, nothing)
+
+    # Extract log probability using shared utility
+    log_prob = extract_log_prob(choice)
+
+    # Extract usage using unified extraction
+    usage = extract_usage(schema, resp; model_id, elapsed = time)
+
+    # Build extras
     extras = Dict{Symbol, Any}()
-    if has_log_prob
-        extras[:log_prob] = choice[:logprobs]
-    end
-    if has_reasoning_content
-        extras[:reasoning_content] = reasoning_content
+    !isnothing(log_prob) && (extras[:log_prob] = choice[:logprobs])
+
+    # Has reasoning content -- currently only provided by DeepSeek API
+    if haskey(choice, :message) && haskey(choice[:message], :reasoning_content)
+        extras[:reasoning_content] = choice[:message][:reasoning_content]
     end
     _extract_openai_extras!(extras, resp)
-    ## build AIMessage object
-    msg = MSG(;
-        content = choice[:message][:content] |> strip,
+
+    # Build message using unified builder
+    build_message(MSG, content, usage;
         status = Int(resp.status),
-        name = name_assistant,
-        cost,
+        finish_reason = get(choice, :finish_reason, nothing),
+        extras,
+        log_prob,
         run_id,
         sample_id,
-        log_prob,
-        finish_reason = get(choice, :finish_reason, nothing),
-        tokens = (tokens_prompt,
-            tokens_completion),
-        elapsed = time,
-        extras)
+        name = name_assistant
+    )
 end
 
 ## User-Facing API
@@ -913,80 +937,52 @@ function response_to_message(schema::AbstractOpenAISchema,
         sample_id::Union{Nothing, Integer} = nothing,
         json_mode::Union{Nothing, Bool} = nothing)
     @assert !isnothing(tool_map) "You must provide a tool_map for DataMessage construction"
-    ## extract sum log probability
-    has_log_prob = haskey(choice, :logprobs) &&
-                   !isnothing(get(choice, :logprobs, nothing)) &&
-                   haskey(choice[:logprobs], :content) &&
-                   !isnothing(choice[:logprobs][:content])
-    log_prob = if has_log_prob
-        sum([get(c, :logprob, 0.0) for c in choice[:logprobs][:content]])
-    else
-        nothing
-    end
-    ## Has reasoning content -- currently only provided by DeepSeek API
-    has_reasoning_content = haskey(choice, :message) &&
-                            haskey(choice[:message], :reasoning_content)
-    reasoning_content = if has_reasoning_content
-        choice[:message][:reasoning_content]
-    else
-        nothing
-    end
-    # Extract usage information with default values for tokens
-    tokens_prompt = 0
-    tokens_completion = 0
-    # Merge with response usage if available
-    if haskey(resp.response, :usage)
-        response_usage = resp.response[:usage]
-        # Handle both snake_case and camelCase keys
-        tokens_prompt = get(response_usage, :prompt_tokens,
-            get(response_usage, :promptTokens, 0))
-        tokens_completion = get(response_usage, :completion_tokens,
-            get(response_usage, :completionTokens, 0))
-    end
-    ## calculate cost
-    cost = call_cost(tokens_prompt, tokens_completion, model_id)
+
+    # Extract log probability using shared utility
+    log_prob = extract_log_prob(choice)
+
+    # Extract usage using unified extraction
+    usage = extract_usage(schema, resp; model_id, elapsed = time)
+
     # "Safe" parsing of the response - it still fails if JSON is invalid
     tools_array = if json_mode == true
         name, tool = only(tool_map)
         content_blob = choice[:message][:content]
         content_obj = content_blob isa String ? JSON3.read(content_blob) : content_blob
-        [parse_tool(
-            tool.callable, content_obj)]
+        [parse_tool(tool.callable, content_obj)]
     else
         @assert haskey(choice[:message], :tool_calls) "`:tool_calls` key is missing in the response message! Retry the request."
-        ## If name does not match, we use the callable from the tool_map 
+        ## If name does not match, we use the callable from the tool_map
         ## Can happen only in testing with auto-generated struct
         [parse_tool(
              get(tool_map, tool_call[:function][:name], (; callable = Dict)).callable,
              tool_call[:function][:arguments])
          for tool_call in choice[:message][:tool_calls]]
     end
-    ## Remember the tools
+
+    # Build extras
     extras = Dict{Symbol, Any}()
     if haskey(choice[:message], :tool_calls) && !isempty(choice[:message][:tool_calls])
         extras[:tool_calls] = choice[:message][:tool_calls]
     end
-    if has_log_prob
-        extras[:log_prob] = choice[:logprobs]
-    end
-    if has_reasoning_content
-        extras[:reasoning_content] = reasoning_content
+    !isnothing(log_prob) && (extras[:log_prob] = choice[:logprobs])
+
+    # Has reasoning content -- currently only provided by DeepSeek API
+    if haskey(choice, :message) && haskey(choice[:message], :reasoning_content)
+        extras[:reasoning_content] = choice[:message][:reasoning_content]
     end
     _extract_openai_extras!(extras, resp)
 
-    ## build DataMessage object
-    msg = MSG(;
-        content = length(tools_array) == 1 ? only(tools_array) : tools_array,
+    # Build message using unified builder
+    content = length(tools_array) == 1 ? only(tools_array) : tools_array
+    build_message(MSG, content, usage;
         status = Int(resp.status),
-        cost,
-        run_id,
-        sample_id,
-        log_prob,
         finish_reason = get(choice, :finish_reason, nothing),
-        tokens = (tokens_prompt,
-            tokens_completion),
-        elapsed = time,
-        extras)
+        extras,
+        log_prob,
+        run_id,
+        sample_id
+    )
 end
 
 """
@@ -1581,39 +1577,14 @@ function response_to_message(schema::AbstractOpenAISchema,
         name_user::Union{Nothing, String} = nothing,
         name_assistant::Union{Nothing, String} = nothing)
     @assert !isnothing(tool_map) "You must provide a tool_map for AIToolRequest construction"
-    ## extract sum log probability
-    has_log_prob = haskey(choice, :logprobs) &&
-                   !isnothing(get(choice, :logprobs, nothing)) &&
-                   haskey(choice[:logprobs], :content) &&
-                   !isnothing(choice[:logprobs][:content])
-    log_prob = if has_log_prob
-        sum([get(c, :logprob, 0.0) for c in choice[:logprobs][:content]])
-    else
-        nothing
-    end
-    ## Has reasoning content -- currently only provided by DeepSeek API
-    has_reasoning_content = haskey(choice, :message) &&
-                            haskey(choice[:message], :reasoning_content)
-    reasoning_content = if has_reasoning_content
-        choice[:message][:reasoning_content]
-    else
-        nothing
-    end
-    # Extract usage information with default values for tokens
-    tokens_prompt = 0
-    tokens_completion = 0
-    # Merge with response usage if available
-    if haskey(resp.response, :usage)
-        response_usage = resp.response[:usage]
-        # Handle both snake_case and camelCase keys
-        tokens_prompt = get(response_usage, :prompt_tokens,
-            get(response_usage, :promptTokens, 0))
-        tokens_completion = get(response_usage, :completion_tokens,
-            get(response_usage, :completionTokens, 0))
-    end
-    ## calculate cost
-    cost = call_cost(tokens_prompt, tokens_completion, model_id)
-    # "Safe" parsing of the response - it still fails if JSON is invalid
+
+    # Extract log probability using shared utility
+    log_prob = extract_log_prob(choice)
+
+    # Extract usage using unified extraction
+    usage = extract_usage(schema, resp; model_id, elapsed = time)
+
+    # Parse tool calls from response
     has_tools = haskey(choice[:message], :tool_calls) &&
                 !isempty(choice[:message][:tool_calls])
     tools_array = if json_mode == true
@@ -1637,37 +1608,33 @@ function response_to_message(schema::AbstractOpenAISchema,
     else
         ToolMessage[]
     end
+
     ## Check if content key was provided (not required for tool calls)
     content = json_mode != true && haskey(choice[:message], :content) ?
               choice[:message][:content] : nothing
-    ## Remember the tools
+
+    # Build extras
     extras = Dict{Symbol, Any}()
-    if has_tools
-        extras[:tool_calls] = choice[:message][:tool_calls]
-    end
-    if has_log_prob
-        extras[:log_prob] = choice[:logprobs]
-    end
-    if has_reasoning_content
-        extras[:reasoning_content] = reasoning_content
+    has_tools && (extras[:tool_calls] = choice[:message][:tool_calls])
+    !isnothing(log_prob) && (extras[:log_prob] = choice[:logprobs])
+
+    # Has reasoning content -- currently only provided by DeepSeek API
+    if haskey(choice, :message) && haskey(choice[:message], :reasoning_content)
+        extras[:reasoning_content] = choice[:message][:reasoning_content]
     end
     _extract_openai_extras!(extras, resp)
 
-    ## build AIToolRequest object
-    msg = MSG(;
-        content = content,
-        name = name_assistant,
+    # Build message using unified builder
+    build_message(MSG, content, usage;
         tool_calls = tools_array,
         status = Int(resp.status),
-        cost,
+        finish_reason = get(choice, :finish_reason, nothing),
+        extras,
+        log_prob,
         run_id,
         sample_id,
-        log_prob,
-        finish_reason = get(choice, :finish_reason, nothing),
-        tokens = (tokens_prompt,
-            tokens_completion),
-        elapsed = time,
-        extras)
+        name = name_assistant
+    )
 end
 
 """

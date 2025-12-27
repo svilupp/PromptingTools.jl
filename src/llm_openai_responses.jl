@@ -224,6 +224,54 @@ function extract_response_content(response)
 end
 
 """
+    extract_usage(schema::AbstractOpenAIResponseSchema, resp; model_id="", elapsed=0.0) -> TokenUsage
+
+Extract token usage from an OpenAI Responses API response into a standardized TokenUsage struct.
+
+The Responses API uses `input_tokens`/`output_tokens` (not `prompt_tokens`/`completion_tokens`).
+May include reasoning tokens for o-series models and cache tokens.
+
+# Response structure:
+- `usage.input_tokens`: Input tokens
+- `usage.output_tokens`: Output tokens
+- `usage.input_tokens_details.cached_tokens`: Cached input tokens
+- `usage.output_tokens_details.reasoning_tokens`: Reasoning tokens (o1, o3, gpt-5 models)
+"""
+function extract_usage(::AbstractOpenAIResponseSchema, resp; model_id::String = "", elapsed::Float64 = 0.0)
+    usage_dict = get(resp.response, :usage, Dict())
+
+    # Responses API uses different field names than Chat Completions API
+    input_tokens = get(usage_dict, :input_tokens, 0)
+    output_tokens = get(usage_dict, :output_tokens, 0)
+
+    # Cache tokens (from input_tokens_details)
+    cache_read_tokens = 0
+    input_details = get(usage_dict, :input_tokens_details, Dict())
+    if !isempty(input_details) && !isnothing(input_details)
+        cache_read_tokens = get(input_details, :cached_tokens, 0)
+    end
+
+    # Reasoning tokens (from output_tokens_details) - for o-series models
+    reasoning_tokens = 0
+    output_details = get(usage_dict, :output_tokens_details, Dict())
+    if !isempty(output_details) && !isnothing(output_details)
+        reasoning_tokens = get(output_details, :reasoning_tokens, 0)
+    end
+
+    # Calculate cost with cache discount
+    cost = call_cost_with_cache(input_tokens, output_tokens, cache_read_tokens, 0, model_id)
+
+    TokenUsage(;
+        input_tokens, output_tokens,
+        cache_read_tokens,
+        reasoning_tokens,
+        model_id, cost, elapsed,
+        extras = isempty(usage_dict) ? Dict{Symbol, Any}() :
+                 Dict{Symbol, Any}(:raw_usage => usage_dict)
+    )
+end
+
+"""
     aigenerate(schema::AbstractOpenAIResponseSchema, prompt::ALLOWED_PROMPT_TYPE;
                previous_response_id::Union{Nothing, AbstractString} = nothing,
                enable_websearch::Bool = false,
@@ -334,35 +382,24 @@ function aigenerate(schema::AbstractOpenAIResponseSchema, prompt::ALLOWED_PROMPT
         content = "No output content found in response"
     end
 
-    # Extract usage information
-    usage_data = get(response.response, :usage, Dict())
-    input_tokens = get(usage_data, :input_tokens, -1)
-    output_tokens = get(usage_data, :output_tokens, -1)
+    # Extract usage using unified extraction
+    usage = extract_usage(schema, response; model_id, elapsed)
 
     # Create extras dictionary with reasoning content
     extras = Dict{Symbol, Any}(
         :response_id => get(response.response, :id, ""),
         :reasoning => get(response.response, :reasoning, Dict()),
         :reasoning_content => reasoning_content,
-        :usage => usage_data,
         :full_response => response.response
     )
 
     finish_reason = get(response.response, :status, nothing)
-    cost = call_cost(input_tokens, output_tokens, model_id)
 
-    result = AIMessage(;
-        content = content,
+    # Build message using unified builder
+    result = build_message(AIMessage, content, usage;
         status = Int(response.status),
-        tokens = (input_tokens, output_tokens),
-        elapsed = elapsed,
-        extras = extras,
-        name = nothing,
-        cost = cost,
-        log_prob = nothing,
-        finish_reason = finish_reason,
-        run_id = Int(rand(Int32)),
-        sample_id = nothing
+        finish_reason,
+        extras
     )
 
     verbose && @info _report_stats(result, model_id)
@@ -511,10 +548,8 @@ function aiextract(schema::AbstractOpenAIResponseSchema, prompt::ALLOWED_PROMPT_
     # Parse the JSON response using existing parse_tool utility
     parsed_content = parse_tool(tool, content_str)
 
-    # Extract usage
-    usage_data = get(response.response, :usage, Dict())
-    input_tokens = get(usage_data, :input_tokens, -1)
-    output_tokens = get(usage_data, :output_tokens, -1)
+    # Extract usage using unified extraction
+    usage = extract_usage(schema, response; model_id, elapsed)
 
     # Create extras with reasoning content
     extras = Dict{Symbol, Any}(
@@ -522,21 +557,13 @@ function aiextract(schema::AbstractOpenAIResponseSchema, prompt::ALLOWED_PROMPT_
         :reasoning => get(response.response, :reasoning, Dict()),
         :reasoning_content => reasoning_content,
         :raw_content => content_str,
-        :usage => usage_data,
         :full_response => response.response
     )
 
-    cost = call_cost(input_tokens, output_tokens, model_id)
-
-    result = DataMessage(;
-        content = parsed_content,
+    # Build message using unified builder
+    result = build_message(DataMessage, parsed_content, usage;
         status = Int(response.status),
-        tokens = (input_tokens, output_tokens),
-        elapsed = elapsed,
-        extras = extras,
-        cost = cost,
-        run_id = Int(rand(Int32)),
-        sample_id = nothing
+        extras
     )
 
     verbose && @info _report_stats(result, model_id)

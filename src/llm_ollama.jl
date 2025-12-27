@@ -54,6 +54,25 @@ function render(schema::AbstractOllamaSchema,
     return conversation
 end
 
+"""
+    extract_usage(schema::AbstractOllamaSchema, resp; model_id="", elapsed=0.0) -> TokenUsage
+
+Extract token usage from an Ollama API response into a standardized TokenUsage struct.
+
+Ollama uses `prompt_eval_count` and `eval_count` for token counts.
+Ollama is typically free/local, so cost is always 0.
+"""
+function extract_usage(::AbstractOllamaSchema, resp; model_id::String = "", elapsed::Float64 = 0.0)
+    input_tokens = get(resp.response, :prompt_eval_count, 0)
+    output_tokens = get(resp.response, :eval_count, 0)
+
+    TokenUsage(;
+        input_tokens, output_tokens,
+        model_id, elapsed,
+        cost = 0.0  # Ollama is free/local
+    )
+end
+
 ## Ollama back-end
 # uses ollama_api defined in src/llm_ollama_managed.jl
 function ollama_api(prompt_schema::TestEchoOllamaSchema,
@@ -184,19 +203,20 @@ function aigenerate(prompt_schema::AbstractOllamaSchema, prompt::ALLOWED_PROMPT_
             http_kwargs, streamcallback,
             api_kwargs...)
 
-        tokens_prompt = get(resp.response, :prompt_eval_count, 0)
-        tokens_completion = get(resp.response, :eval_count, 0)
+        content = resp.response[:message][:content] |> strip
+
+        # Extract usage using unified extraction
+        usage = extract_usage(prompt_schema, resp; model_id, elapsed = time)
+
         ## Build extras for observability (Logfire.jl integration)
         extras = Dict{Symbol, Any}()
         haskey(resp.response, :model) && (extras[:model] = resp.response[:model])
-        msg = AIMessage(; content = resp.response[:message][:content] |> strip,
+
+        ## Build message using unified builder
+        msg = build_message(AIMessage, content, usage;
             status = Int(resp.status),
-            cost = call_cost(tokens_prompt, tokens_completion, model_id),
-            ## not coming through yet anyway
-            ## finish_reason = get(resp.response, :finish_reason, nothing),
-            tokens = (tokens_prompt, tokens_completion),
-            elapsed = time,
             extras)
+
         ## Reporting
         verbose && @info _report_stats(msg, model_id)
     else
@@ -350,13 +370,16 @@ function aiscan(prompt_schema::AbstractOllamaSchema, prompt::ALLOWED_PROMPT_TYPE
             system = nothing, messages = conv_rendered, endpoint = "chat", model = model_id,
             http_kwargs,
             api_kwargs...)
-        tokens_prompt = get(resp.response, :prompt_eval_count, 0)
-        tokens_completion = get(resp.response, :eval_count, 0)
-        msg = AIMessage(; content = resp.response[:message][:content] |> strip,
-            status = Int(resp.status),
-            cost = call_cost(tokens_prompt, tokens_completion, model_id),
-            tokens = (tokens_prompt, tokens_completion),
-            elapsed = time)
+
+        content = resp.response[:message][:content] |> strip
+
+        # Extract usage using unified extraction
+        usage = extract_usage(prompt_schema, resp; model_id, elapsed = time)
+
+        ## Build message using unified builder
+        msg = build_message(AIMessage, content, usage;
+            status = Int(resp.status))
+
         ## Reporting
         verbose && @info _report_stats(msg, model_id)
     else

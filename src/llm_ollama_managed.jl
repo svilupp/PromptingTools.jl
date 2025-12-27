@@ -237,17 +237,21 @@ function aigenerate(
         time = @elapsed resp = ollama_api(prompt_schema, conv_rendered.prompt;
             conv_rendered.system, endpoint = "generate", model = model_id, http_kwargs,
             streamcallback, api_kwargs...)
-        tokens_prompt = get(resp.response, :prompt_eval_count, 0)
-        tokens_completion = get(resp.response, :eval_count, 0)
+
+        content = resp.response[:response] |> strip
+
+        # Extract usage using unified extraction (reuse OllamaSchema implementation)
+        usage = extract_usage(OllamaSchema(), resp; model_id, elapsed = time)
+
         ## Build extras for observability (Logfire.jl integration)
         extras = Dict{Symbol, Any}()
         haskey(resp.response, :model) && (extras[:model] = resp.response[:model])
-        msg = AIMessage(; content = resp.response[:response] |> strip,
+
+        # Build message using unified builder
+        msg = build_message(AIMessage, content, usage;
             status = Int(resp.status),
-            cost = call_cost(tokens_prompt, tokens_completion, model_id),
-            tokens = (tokens_prompt, tokens_completion),
-            elapsed = time,
             extras)
+
         ## Reporting
         verbose && @info _report_stats(msg, model_id)
     else
