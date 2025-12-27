@@ -12,7 +12,7 @@ const _hoisted_8 = { style: { "border-width": "1px", "border-style": "solid", "b
 const _hoisted_9 = { style: { "border-width": "1px", "border-style": "solid", "border-color": "black", "padding": "1em", "border-radius": "25px" } };
 function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
   return openBlock(), createElementBlock("div", null, [
-    _cache[47] || (_cache[47] = createStaticVNode("", 44)),
+    _cache[47] || (_cache[47] = createStaticVNode("", 46)),
     createBaseVNode("div", _hoisted_1, [
       _cache[4] || (_cache[4] = createStaticVNode("", 11)),
       createBaseVNode("p", null, [
@@ -28,13 +28,13 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
       ]),
       _cache[5] || (_cache[5] = createBaseVNode("p", null, [
         createBaseVNode("a", {
-          href: "https://github.com/svilupp/PromptingTools.jl/blob/9c465898703392c2851ab3ca3ced01aae6709e4d/src/llm_interface.jl#L415-L429",
+          href: "https://github.com/svilupp/PromptingTools.jl/blob/44c443919c24120e7962ce4ccd3b803d260c3013/src/llm_interface.jl#L421-L435",
           target: "_blank",
           rel: "noreferrer"
         }, "source")
       ], -1))
     ]),
-    _cache[48] || (_cache[48] = createStaticVNode("", 125)),
+    _cache[48] || (_cache[48] = createStaticVNode("", 129)),
     createBaseVNode("div", _hoisted_2, [
       _cache[10] || (_cache[10] = createStaticVNode("", 9)),
       createBaseVNode("p", null, [
@@ -46,7 +46,7 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
       ]),
       _cache[11] || (_cache[11] = createStaticVNode("", 21))
     ]),
-    _cache[49] || (_cache[49] = createStaticVNode("", 79)),
+    _cache[49] || (_cache[49] = createStaticVNode("", 85)),
     createBaseVNode("div", _hoisted_3, [
       _cache[16] || (_cache[16] = createStaticVNode("", 10)),
       createBaseVNode("p", null, [
@@ -58,7 +58,7 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
       ]),
       _cache[17] || (_cache[17] = createStaticVNode("", 19))
     ]),
-    _cache[50] || (_cache[50] = createStaticVNode("", 115)),
+    _cache[50] || (_cache[50] = createStaticVNode("", 131)),
     createBaseVNode("div", _hoisted_4, [
       _cache[20] || (_cache[20] = createStaticVNode("", 7)),
       createBaseVNode("p", null, [
@@ -104,7 +104,7 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
       ], -1)),
       _cache[32] || (_cache[32] = createBaseVNode("p", null, [
         createBaseVNode("a", {
-          href: "https://github.com/svilupp/PromptingTools.jl/blob/9c465898703392c2851ab3ca3ced01aae6709e4d/src/llm_ollama_managed.jl#L9-L21",
+          href: "https://github.com/svilupp/PromptingTools.jl/blob/44c443919c24120e7962ce4ccd3b803d260c3013/src/llm_ollama_managed.jl#L9-L21",
           target: "_blank",
           rel: "noreferrer"
         }, "source")
@@ -150,7 +150,7 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
       ]),
       _cache[46] || (_cache[46] = createBaseVNode("p", null, [
         createBaseVNode("a", {
-          href: "https://github.com/svilupp/PromptingTools.jl/blob/9c465898703392c2851ab3ca3ced01aae6709e4d/src/llm_shared.jl#L12-L32",
+          href: "https://github.com/svilupp/PromptingTools.jl/blob/44c443919c24120e7962ce4ccd3b803d260c3013/src/llm_shared.jl#L12-L32",
           target: "_blank",
           rel: "noreferrer"
         }, "source")
@@ -562,13 +562,13 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
       createBaseVNode("p", null, 'tool_map = tool_call_signature(MyMeasurement; hidden_fields = ["ctx_user_id"]) ```'),
       createBaseVNode("p", null, [
         createBaseVNode("a", {
-          href: "https://github.com/svilupp/PromptingTools.jl/blob/9c465898703392c2851ab3ca3ced01aae6709e4d/src/extraction.jl#L463-L555",
+          href: "https://github.com/svilupp/PromptingTools.jl/blob/44c443919c24120e7962ce4ccd3b803d260c3013/src/extraction.jl#L463-L555",
           target: "_blank",
           rel: "noreferrer"
         }, "source")
       ])
     ], -1)),
-    _cache[58] || (_cache[58] = createStaticVNode("", 35))
+    _cache[58] || (_cache[58] = createStaticVNode("", 37))
   ]);
 }
 const reference = /* @__PURE__ */ _export_sfc(_sfc_main, [["render", _sfc_render]]);
