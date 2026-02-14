@@ -399,7 +399,6 @@ aliases = merge(
         "gpt52" => "gpt-5.2",
         "gpt52i" => "gpt-5.2-chat-latest",
         "gpt52p" => "gpt-5.2-pro",
-        "gpt53" => "gpt-5.3-codex",
         "gpt53c" => "gpt-5.3-codex",
         "gpt45" => "gpt-4.5-preview", # 4.5 is for "4.5"
         "chatgpt" => "chatgpt-4o-latest",
