@@ -532,7 +532,7 @@ end
     @test schema1.inputs.system == "Act as a helpful AI assistant"
     @test schema1.inputs.messages == [Dict(
         "role" => "user", "content" => [Dict("type" => "text", "text" => "Hello World")])]
-    @test schema1.model_id == "claude-opus-4-5-20251101"
+    @test schema1.model_id == "claude-opus-4-6"
 
     # Test different input combinations and different prompts
     schema2 = TestEchoAnthropicSchema(; response, status = 200)
@@ -672,7 +672,7 @@ end
           [Dict("role" => "user",
         "content" => Dict{String, Any}[Dict(
             "text" => "Hello World! Banana", "type" => "text")])]
-    @test schema1.model_id == "claude-opus-4-5-20251101"
+    @test schema1.model_id == "claude-opus-4-6"
 
     # Test badly formatted response
     response = Dict(

@@ -146,3 +146,4 @@ To add a new model to the package, follow these steps:
    - Test the alias: `aigenerate("say hi", model="alias")`
    - Verify both work correctly and produce expected responses
    - Add unit tests if the model uses a new schema or has unique behavior
+   - **IMPORTANT**: If you change an existing alias to point to a new model, you MUST grep the test suite for the old model name that the alias previously pointed to (e.g., `grep -r "old-model-name" test/`). Tests may assert that an alias resolves to a specific model name, and these assertions must be updated to reflect the new target.
