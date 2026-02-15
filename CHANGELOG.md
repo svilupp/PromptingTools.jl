@@ -12,17 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Updated
 
-## [0.92.0]
-
-### Added
-- Added support for OpenAI's GPT-5.3 Codex model (`gpt-5.3-codex`, alias `gpt53` / `gpt53c`). GPT-5.3 Codex is OpenAI's most capable agentic coding model combining frontier coding and reasoning capabilities. 400K context, 128K output. Requires the Responses API.
-- Added support for Anthropic's Claude Opus 4.6 model (`claude-opus-4-6`, alias `claudeo`). Claude Opus 4.6 is Anthropic's latest Opus-class model with 1M context and 128K output.
-
 ## [0.91.0]
 
 ### Added
 - Added `TokenUsage` struct for standardized token usage tracking across all LLM providers (input/output tokens, cache tokens, reasoning tokens, cost, elapsed time). New `usage` field added to `AIMessage`, `DataMessage`, and `AIToolRequest` with backwards compatibility for legacy `tokens`, `cost`, `elapsed` fields.
 - Added cache-aware cost calculation with provider-specific discounts via `call_cost_with_cache` and `CACHE_DISCOUNTS`.
+- Added support for OpenAI's GPT-5.3 Codex model (`gpt-5.3-codex`, alias `gpt53` / `gpt53c`). GPT-5.3 Codex is OpenAI's most capable agentic coding model combining frontier coding and reasoning capabilities. 400K context, 128K output. Requires the Responses API.
+- Added support for Anthropic's Claude Opus 4.6 model (`claude-opus-4-6`, alias `claudeo`). Claude Opus 4.6 is Anthropic's latest Opus-class model with 1M context and 128K output.
 
 ## [0.90.0]
 
