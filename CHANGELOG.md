@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Updated
 
+## [0.92.0]
+
+### Added
+- Added support for Anthropic's Claude Sonnet 4.6 model (`claude-sonnet-4-6`, alias `claudes`). Claude Sonnet 4.6 delivers near-flagship intelligence at Sonnet-tier pricing with 1M context and 128K output. The `claude` and `claudes` aliases now point to this model.
+
 ## [0.91.0]
 
 ### Added
