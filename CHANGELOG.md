@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Added support for Anthropic's Claude Sonnet 4.6 model (`claude-sonnet-4-6`, alias `claudes`). Claude Sonnet 4.6 delivers near-flagship intelligence at Sonnet-tier pricing with 1M context and 128K output. The `claude` and `claudes` aliases now point to this model.
+- Added support for Google's Gemini 3.1 Pro Preview model (`gemini-3.1-pro-preview`, alias `gem31p`) with enhanced agentic capabilities. 1M context, 64K output. Pricing: $2/1M input tokens, $12/1M output tokens (for ≤200K context).
 
 ## [0.91.0]
 
