@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added support for Anthropic's Claude Sonnet 4.6 model (`claude-sonnet-4-6`, alias `claudes`). Claude Sonnet 4.6 delivers near-flagship intelligence at Sonnet-tier pricing with 1M context and 128K output. The `claude` and `claudes` aliases now point to this model.
 - Added support for Google's Gemini 3.1 Pro Preview model (`gemini-3.1-pro-preview`, alias `gem31p`) with enhanced agentic capabilities. 1M context, 64K output. Pricing: $2/1M input tokens, $12/1M output tokens (for ≤200K context).
 - Added support for OpenAI's GPT-5.3 Instant model (`gpt-5.3-chat-latest`, alias `gpt53i`). GPT-5.3 Instant delivers improved accuracy with 26.8% fewer hallucinations and better conversational flow. 400K context, 128K output.
+- Added support for Google's Gemini 3.1 Flash Lite Preview model (`gemini-3.1-flash-lite-preview`, alias `gem31fl`). The fastest and most cost-efficient Gemini model. 1M context, 64K output. Pricing: $0.25/1M input tokens, $1.50/1M output tokens.
 
 ## [0.91.0]
 
