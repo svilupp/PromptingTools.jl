@@ -15,9 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.93.0]
 
 ### Added
-- Added support for OpenAI's GPT-5.4 model (`gpt-5.4`, alias `gpt54`). GPT-5.4 is OpenAI's most capable frontier model for complex professional work with 1M context, native computer use, and full-resolution vision. Pricing: $2.50/1M input, $15/1M output.
-- Added support for OpenAI's GPT-5.4 Thinking model (`gpt-5.4-thinking`, alias `gpt54t`). The reasoning variant of GPT-5.4 with configurable reasoning effort levels. 1M context.
-- Added support for OpenAI's GPT-5.4 Pro model (`gpt-5.4-pro`, alias `gpt54p`). The highest-performance variant for maximum accuracy on the most difficult tasks. 1M context. Pricing: $30/1M input, $180/1M output.
+- Added support for OpenAI's GPT-5.4 family: `gpt-5.4` (alias `gpt54`), `gpt-5.4-thinking` (alias `gpt54t`), and `gpt-5.4-pro` (alias `gpt54p`). GPT-5.4 is OpenAI's most capable frontier model for complex professional work with 1M context, native computer use, and full-resolution vision. The Pro variant requires the Responses API.
 
 ## [0.92.0]
 
