@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Updated
 
+## [0.93.0]
+
+### Added
+- Added support for OpenAI's GPT-5.4 family: `gpt-5.4` (alias `gpt54`), `gpt-5.4-thinking` (alias `gpt54t`), and `gpt-5.4-pro` (alias `gpt54p`). 1M context. The Pro variant requires the Responses API.
+
 ## [0.92.0]
 
 ### Added
