@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Updated
 
+## [0.94.0]
+
+### Added
+- Added support for OpenAI's GPT-5.4 Mini (`gpt-5.4-mini`, alias `gpt54m`) and GPT-5.4 Nano (`gpt-5.4-nano`, alias `gpt54n`). GPT-5.4 Mini is a fast, capable small model for high-volume workloads. GPT-5.4 Nano is the smallest and cheapest variant for classification, extraction, and ranking. Both have 400K context.
+
 ## [0.93.0]
 
 ### Added
