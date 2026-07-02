@@ -17,3 +17,5 @@ docs/package-lock.json
 
 # Ignore any local preferences
 **/LocalPreferences.toml
+# Riptide artifacts (cloud-synced)
+.humanlayer/tasks/

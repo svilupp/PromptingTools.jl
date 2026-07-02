@@ -12,6 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Updated
 
+## [0.94.0]
+
+### Added
+- Added support for OpenAI's GPT-5.5 model (`gpt-5.5`, alias `gpt55`). GPT-5.5 is OpenAI's latest flagship model for complex tasks like coding, analysis, and planning. 400K context, 128K output.
+- Added support for Anthropic's Claude Sonnet 5 model (`claude-sonnet-5`, alias `claude5`). Claude Sonnet 5 is the latest Sonnet-class model balancing intelligence and speed with 1M context and 64K output. The `claude` and `claudes` aliases now point to this model.
+- Added support for Anthropic's Claude Fable 5 model (`claude-fable-5`, alias `claudef`). Claude Fable 5 is a fast and cost-effective member of the Claude 5 family with 200K context and 64K output.
+- Added support for Anthropic's Claude Opus 4.8 model (`claude-opus-4-8`, alias `claudeo`). Claude Opus 4.8 is the most capable Opus-tier model with state-of-the-art long-horizon agentic and knowledge work. 1M context, 128K output. The `claudeo` alias now points to this model.
+
 ## [0.93.0]
 
 ### Added
