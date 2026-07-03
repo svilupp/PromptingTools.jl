@@ -12,6 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Updated
 
+## [0.94.0]
+
+### Added
+- Added support for Anthropic's Claude Sonnet 5 model (`claude-sonnet-5`, alias `claudes`). 1M context, 128K output. Standard pricing $3/$15 per 1M input/output tokens (introductory pricing of $2/$10 applies through 2026-08-31). The `claude` and `claudes` aliases now point to this model.
+- Added support for Anthropic's Claude Fable 5 model (`claude-fable-5`, alias `claudef`), the first Claude 5 family model in the new Mythos-class tier above Opus. 1M context, 128K output. Pricing: $10/$50 per 1M input/output tokens.
+- Added support for Anthropic's Claude Opus 4.8 model (`claude-opus-4-8`, alias `claudeo`). 1M context, 128K output. Pricing: $5/$25 per 1M input/output tokens (unchanged from Opus 4.6). The `claudeo` alias now points to this model instead of `claude-opus-4-6`.
+- Added support for OpenAI's GPT-5.5 model (`gpt-5.5`, alias `gpt55`). 1M context, 128K output. Pricing: $5/$30 per 1M input/output tokens.
+
 ## [0.93.0]
 
 ### Added
