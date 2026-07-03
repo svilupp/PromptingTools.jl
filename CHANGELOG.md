@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Added `aiscan` function for Anthropic models, allowing users to analyze images with Claude models by passing an image path.
 
 ### Fixed
 
