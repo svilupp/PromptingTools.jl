@@ -11,6 +11,14 @@
 # - llm_openai_chat.jl: Chat Completions API (`/chat/completions` endpoint)
 # - llm_openai_responses.jl: Responses API (`/responses` endpoint) for models like gpt-5.1-codex
 
+# Add exports for each schema
+export NoSchema
+export OpenAISchema, CustomOpenAISchema, LocalServerOpenAISchema, DatabricksOpenAISchema
+export MistralOpenAISchema
+export OllamaManagedSchema, OllamaSchema
+export ChatMLSchema
+export GoogleSchema
+
 ## Main Functions
 function role4render end
 function render end
