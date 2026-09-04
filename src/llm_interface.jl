@@ -349,6 +349,14 @@ It's very similar to OpenAISchema, but it appends images differently.
 """
 struct OllamaSchema <: AbstractOllamaSchema end
 
+"""
+LlmmanSchema calls [llmman](https://github.com/llmmanorg/llmman), a local model runner that serves the Ollama API on port 17434.
+
+It behaves exactly like `OllamaSchema`, only the default port differs.
+ Override the address with `api_kwargs = (; url = "http://myhost", port = 17434)` if needed.
+"""
+struct LlmmanSchema <: AbstractOllamaSchema end
+
 "Echoes the user's input back to them. Used for testing the implementation"
 @kwdef mutable struct TestEchoOllamaSchema <: AbstractOllamaSchema
     response::AbstractDict

@@ -235,8 +235,11 @@ function aigenerate(prompt_schema::AbstractOllamaSchema, prompt::ALLOWED_PROMPT_
     return output
 end
 
-function aiembed(prompt_schema::AbstractOllamaSchema, args...; kwargs...)
-    aiembed(OllamaManagedSchema(), args...; kwargs...)
+function aiembed(prompt_schema::AbstractOllamaSchema, args...;
+        api_kwargs::NamedTuple = NamedTuple(), kwargs...)
+    # keep the schema's port (eg, 17434 for LlmmanSchema) when delegating
+    aiembed(OllamaManagedSchema(), args...;
+        api_kwargs = merge((; port = default_port(prompt_schema)), api_kwargs), kwargs...)
 end
 
 """

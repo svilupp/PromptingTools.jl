@@ -1,4 +1,5 @@
 using PromptingTools: TestEchoOllamaSchema, render, OllamaSchema, ollama_api
+using PromptingTools: LlmmanSchema, AbstractOllamaSchema, OllamaManagedSchema, default_port
 using PromptingTools: AIMessage, SystemMessage, AbstractMessage
 using PromptingTools: UserMessage, UserMessageWithImages, DataMessage, _encode_local_image
 
@@ -151,4 +152,13 @@ end
     @test_throws ErrorException aiextract(OllamaSchema(), "prompt")
     @test_throws ErrorException aiclassify(OllamaSchema(), "prompt")
     @test_throws ErrorException aitools(OllamaSchema(), "prompt")
+end
+@testset "LlmmanSchema" begin
+    # llmman speaks the Ollama API, only on a different port
+    @test LlmmanSchema() isa AbstractOllamaSchema
+    @test default_port(LlmmanSchema()) == 17434
+    @test default_port(OllamaSchema()) == 11434
+    @test default_port(OllamaManagedSchema()) == 11434
+    @test render(LlmmanSchema(), [UserMessage("Hello there!")]) ==
+          render(OllamaSchema(), [UserMessage("Hello there!")])
 end

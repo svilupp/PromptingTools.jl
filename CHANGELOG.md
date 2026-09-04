@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Added `LlmmanSchema` for [llmman](https://github.com/llmmanorg/llmman), a local model runner that serves the Ollama API on port 17434. It reuses the `OllamaSchema` implementation (`aigenerate`, `aiembed`, `aiscan`, streaming) with a different default port.
 
 ### Fixed
 
