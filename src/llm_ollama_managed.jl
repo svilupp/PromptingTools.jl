@@ -56,6 +56,10 @@ function render(schema::AbstractOllamaManagedSchema,
 end
 
 ## Model-calling
+"Default port of the Ollama API for the schema (llmman listens on 17434)."
+default_port(::Union{AbstractOllamaManagedSchema, AbstractOllamaSchema}) = 11434
+default_port(::LlmmanSchema) = 17434
+
 """
     ollama_api(prompt_schema::Union{AbstractOllamaManagedSchema, AbstractOllamaSchema},
         prompt::Union{AbstractString, Nothing} = nothing;
@@ -64,7 +68,7 @@ end
         endpoint::String = "generate",
         model::String = "llama2", http_kwargs::NamedTuple = NamedTuple(),
         stream::Bool = false,
-        url::String = "http://localhost", port::Int = 11434,
+        url::String = "http://localhost", port::Int = default_port(prompt_schema),
         kwargs...)
 
 Simple wrapper for a call to Ollama API.
@@ -79,7 +83,7 @@ Simple wrapper for a call to Ollama API.
 - `stream`: A boolean indicating whether to stream the response. Defaults to `false`.
 - `streamcallback::Any`: A callback function to handle streaming responses. Can be simply `stdout` or a `StreamCallback` object. See `?StreamCallback` for details.
 - `url`: The URL of the Ollama API. Defaults to "http://localhost". If no protocol is specified, "http://" will be automatically added.
-- `port`: The port of the Ollama API. Defaults to 11434.
+- `port`: The port of the Ollama API. Defaults to 11434 (17434 for `LlmmanSchema`).
 - `kwargs`: Prompt variables to be used to fill the prompt/template
 """
 function ollama_api(
@@ -91,7 +95,7 @@ function ollama_api(
         model::String = "llama2", http_kwargs::NamedTuple = NamedTuple(),
         streamcallback::Any = nothing,
         stream::Bool = false,
-        url::String = "http://localhost", port::Int = 11434,
+        url::String = "http://localhost", port::Int = default_port(prompt_schema),
         kwargs...)
     @assert endpoint in ["chat", "generate", "embeddings"] "Only 'chat', 'generate' and 'embeddings' Ollama endpoints are supported."
     ##
