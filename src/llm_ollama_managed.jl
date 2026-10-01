@@ -58,7 +58,7 @@ end
 ## Model-calling
 "Default port of the Ollama API for the schema (llmman listens on 17434)."
 default_port(::Union{AbstractOllamaManagedSchema, AbstractOllamaSchema}) = 11434
-default_port(::LlmmanSchema) = 17434
+default_port(::LlmManSchema) = 17434
 
 """
     ollama_api(prompt_schema::Union{AbstractOllamaManagedSchema, AbstractOllamaSchema},
@@ -83,7 +83,7 @@ Simple wrapper for a call to Ollama API.
 - `stream`: A boolean indicating whether to stream the response. Defaults to `false`.
 - `streamcallback::Any`: A callback function to handle streaming responses. Can be simply `stdout` or a `StreamCallback` object. See `?StreamCallback` for details.
 - `url`: The URL of the Ollama API. Defaults to "http://localhost". If no protocol is specified, "http://" will be automatically added.
-- `port`: The port of the Ollama API. Defaults to 11434 (17434 for `LlmmanSchema`).
+- `port`: The port of the Ollama API. Defaults to 11434 (17434 for `LlmManSchema`).
 - `kwargs`: Prompt variables to be used to fill the prompt/template
 """
 function ollama_api(

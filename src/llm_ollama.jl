@@ -237,7 +237,7 @@ end
 
 function aiembed(prompt_schema::AbstractOllamaSchema, args...;
         api_kwargs::NamedTuple = NamedTuple(), kwargs...)
-    # keep the schema's port (eg, 17434 for LlmmanSchema) when delegating
+    # keep the schema's port (eg, 17434 for LlmManSchema) when delegating
     aiembed(OllamaManagedSchema(), args...;
         api_kwargs = merge((; port = default_port(prompt_schema)), api_kwargs), kwargs...)
 end

@@ -557,7 +557,7 @@ You can now also use `aiscan` to provide images to Ollama models! See the docs f
 
 If you're getting errors, check that Ollama is running - see the [Setup Guide for Ollama](#setup-guide-for-ollama) section below.
 
-The same API is served by [llmman](https://github.com/llmmanorg/llmman), a local model runner that pulls models as OCI artifacts or from Hugging Face and serves the Ollama API on port 17434. Use `PT.LlmmanSchema()` in place of `PT.OllamaSchema()`, eg, `aigenerate(PT.LlmmanSchema(), "Say hi!"; model="gemma4")` (after `llmman pull gemma4` and `llmman serve`).
+The same API is served by [llmman](https://github.com/llmmanorg/llmman), a local model runner that pulls models as OCI artifacts or from Hugging Face and serves the Ollama API on port 17434. Use `PT.LlmManSchema()` in place of `PT.OllamaSchema()`, eg, `aigenerate(PT.LlmManSchema(), "Say hi!"; model="gemma4")` (after `llmman pull gemma4` and `llmman serve`).
 
 ### Using MistralAI API and other OpenAI-compatible APIs
 
