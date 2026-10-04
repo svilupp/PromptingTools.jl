@@ -7,11 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Added `LlmManSchema` for [llmman](https://github.com/llmmanorg/llmman), a local model runner that serves the Ollama API on port 17434. It reuses the `OllamaSchema` implementation (`aigenerate`, `aiembed`, `aiscan`, streaming) with a different default port.
 
 ### Fixed
 
 ### Updated
+
+## [0.95.0]
+
+### Added
+- Added `LlmManSchema` for [llmman](https://github.com/llmmanorg/llmman), a local model runner that serves the Ollama API on port 17434. It reuses the `OllamaSchema` implementation (`aigenerate`, `aiembed`, `aiscan`, streaming) with a different default port.
+- OpenAI: `gpt-6-sol` (`gpt6`, `gpt6s`), `gpt-6.1-sol` (`gpt61`, `gpt61s`), `gpt-6-astra` (`gpt6a`), and `gpt-6-luna` (`gpt6l`).
+- Gemini: `gemini-3.1-flash-lite` (`gem31fl`), `gemini-3.5-flash` (`gem35f`), `gemini-3.5-flash-lite` (`gem35fl`), and `gemini-3.6-flash` (`gem36f`), `gemini-3.7-flash` (`gem37f`), and `gemini-3.8-flash` (`gem38f`); text embeddings `gemini-embedding-001` (`gememb1`) and `gemini-embedding-2` (`gememb2`, `gememb`).
+- Claude: `claude-opus-5` (`claudeo5`), `claude-opus-5-5` (`claudeo55`), `claude-sonnet-5-5` (`claudes55`), and `claude-fable-5-1` (`claudef51`).
+
+### Updated
+- Generic GPT, Claude, and Gemini aliases now point to current releases; `chatgpt` points to `chat-latest` with Chat Completions.
+
+### Fixed
+- Google compatible endpoint URLs and model-specific cache prices, preserving explicit schema overrides.
+- Default Claude extraction uses automatic tool selection on Sonnet 5.5, Opus 5.5, and Fable 5.1, which reject forced tool use.
 
 ## [0.94.0]
 

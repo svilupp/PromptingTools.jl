@@ -2,6 +2,10 @@ using Test
 using PromptingTools: GoogleOpenAISchema, AIMessage, aigenerate, aiembed
 
 @testset "GoogleOpenAISchema" begin
+    @test OpenAI.build_url(PT.GoogleProvider(), "chat/completions") ==
+          "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+    @test OpenAI.build_url(PT.GoogleProvider(), "embeddings") ==
+          "https://generativelanguage.googleapis.com/v1beta/openai/embeddings"
     # Save original API key
     original_api_key = PromptingTools.GOOGLE_API_KEY
 

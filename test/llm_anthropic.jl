@@ -532,7 +532,7 @@ end
     @test schema1.inputs.system == "Act as a helpful AI assistant"
     @test schema1.inputs.messages == [Dict(
         "role" => "user", "content" => [Dict("type" => "text", "text" => "Hello World")])]
-    @test schema1.model_id == "claude-opus-4-8"
+    @test schema1.model_id == PT.MODEL_ALIASES["claudeo"]
 
     # Test different input combinations and different prompts
     schema2 = TestEchoAnthropicSchema(; response, status = 200)
@@ -552,7 +552,7 @@ end
     @test schema2.inputs.system == "Act as a helpful AI assistant"
     @test schema2.inputs.messages == [Dict(
         "role" => "user", "content" => [Dict("type" => "text", "text" => "Hello World")])]
-    @test schema2.model_id == "claude-sonnet-5"
+    @test schema2.model_id == PT.MODEL_ALIASES["claude"]
 
     # Test aiprefill functionality
     schema2 = TestEchoAnthropicSchema(;
@@ -587,7 +587,7 @@ end
         Dict("role" => "assistant",
             "content" => [Dict("type" => "text", "text" => aiprefill)])
     ]
-    @test schema2.model_id == "claude-sonnet-5"
+    @test schema2.model_id == PT.MODEL_ALIASES["claude"]
 
     # With caching
     response3 = Dict(
@@ -617,9 +617,10 @@ end
     @test schema3.inputs.system == [Dict("cache_control" => Dict("type" => "ephemeral"),
         "text" => "Act as a helpful AI assistant", "type" => "text")]
     @test schema3.inputs.messages == [Dict("role" => "user",
-        "content" => Dict{String, Any}[Dict("cache_control" => Dict("type" => "ephemeral"),
-            "text" => "Hello World", "type" => "text")])]
-    @test schema3.model_id == "claude-sonnet-5"
+        "content" =>
+            Dict{String, Any}[Dict("cache_control" => Dict("type" => "ephemeral"),
+                "text" => "Hello World", "type" => "text")])]
+    @test schema3.model_id == PT.MODEL_ALIASES["claude"]
 
     ## Bad cache
     @test_throws AssertionError aigenerate(
@@ -653,6 +654,31 @@ end
         :stop_reason => "tool_use",
         :usage => Dict(:input_tokens => 2, :output_tokens => 1))
 
+    # Check the actual request for restricted models and explicit overrides.
+    choices = String[]
+    port = rand(20000:30000)
+    server = HTTP.serve!("127.0.0.1", port; verbose = -1) do req
+        push!(choices, JSON3.read(req.body).tool_choice.type)
+        HTTP.Response(200, JSON3.write(response))
+    end
+    try
+        url = "http://127.0.0.1:$port"
+        for (model, options, choice) in [
+            ("claudes", (;), "auto"),
+            ("claudeo", (;), "auto"),
+            ("claudef", (;), "auto"),
+            ("claudeh", (;), "tool"),
+            ("claudes", (; tool_choice = "exact"), "tool")]
+            msg = aiextract(AnthropicSchema(), "banana"; model,
+                return_type = Fruit, api_key = "test-key", verbose = false,
+                api_kwargs = (; url, options...))
+            @test last(choices) == choice
+            @test msg.content == Fruit("banana")
+        end
+    finally
+        close(server)
+    end
+
     # Real generation API
     schema1 = TestEchoAnthropicSchema(; response, status = 200)
     msg = aiextract(schema1, "Hello World! Banana"; model = "claudeo", return_type = Fruit)
@@ -672,7 +698,7 @@ end
           [Dict("role" => "user",
         "content" => Dict{String, Any}[Dict(
             "text" => "Hello World! Banana", "type" => "text")])]
-    @test schema1.model_id == "claude-opus-4-8"
+    @test schema1.model_id == PT.MODEL_ALIASES["claudeo"]
 
     # Test badly formatted response
     response = Dict(

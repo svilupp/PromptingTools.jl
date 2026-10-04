@@ -78,6 +78,10 @@ end
         # Unknown schema defaults to 0%
         @test get_cache_discounts("any-model"; schema = OllamaSchema()).read_discount == 0.0
 
+        # Explicit schemas override model-specific rates.
+        @test get_cache_discounts("gpt-4o"; schema = GoogleOpenAISchema()).read_discount == 0.9
+        @test get_cache_discounts("gpt61").read_discount == 0.95
+
         # Priority 2: Model registry lookup (registered models use their schema)
         # Gemini models in registry have GoogleOpenAISchema → 90%
         @test get_cache_discounts("gemini-2.5-flash").read_discount == 0.9

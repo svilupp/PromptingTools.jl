@@ -24,6 +24,7 @@ Below is an overview of the model providers supported by PromptingTools.jl, alon
 | AbstractManagedSchema   | AbstractOllamaManagedSchema | Ollama (endpoint `api/generate`)     | ✅         | ✅     | ❌       | ❌     | ❌     | ❌         |
 | AbstractAnthropicSchema | AnthropicSchema           | Anthropic                              | ✅         | ❌     | ✅       | ❌     | ❌     | ❌         |
 | AbstractGoogleSchema    | GoogleSchema              | Google Gemini                          | ✅         | ❌     | ❌       | ❌     | ❌     | ❌         |
+| AbstractOpenAISchema    | GoogleOpenAISchema        | Google Gemini (OpenAI-compatible API)  | ✅         | ✅     | ✅       | ✅     | ❌     | ✅         |
 
 
 \* Catch-all implementation - Requires providing a `url` with `api_kwargs` and corresponding API key.

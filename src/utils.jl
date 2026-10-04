@@ -495,6 +495,14 @@ const CACHE_DISCOUNTS = Dict{
     "gpt-4.1" => (read_discount = 0.5, write_premium = 0.0),
     # OpenAI GPT-5 family (90% read discount)
     "gpt-5" => (read_discount = 0.9, write_premium = 0.0),
+    "chat-latest" => (read_discount = 0.9, write_premium = 0.0),
+    # Verified model-specific rates take precedence over provider defaults.
+    "gpt-6-sol" => (read_discount = 0.9, write_premium = 0.25),
+    "gpt-6.1-sol" => (read_discount = 0.95, write_premium = 0.25),
+    "gpt-6-astra" => (read_discount = 0.9, write_premium = 0.25),
+    "gpt-6-luna" => (read_discount = 0.9, write_premium = 0.25),
+    "claude-opus-5-5" => (read_discount = 0.95, write_premium = 0.25),
+    "claude-fable-5-1" => (read_discount = 0.975, write_premium = 0.25),
     # OpenAI o1/o3 family (50% read discount)
     "o1" => (read_discount = 0.5, write_premium = 0.0),
     "o3" => (read_discount = 0.5, write_premium = 0.0),
