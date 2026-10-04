@@ -36,9 +36,10 @@ Get cache discount configuration for a model.
 
 Lookup priority:
 1. Explicit schema parameter (if provided)
-2. Schema from MODEL_REGISTRY (if model_id registered)
-3. Model name prefix matching
-4. Default (0%, 0%) for unknown models/providers
+2. Exact model-specific rate (after resolving aliases)
+3. Schema from MODEL_REGISTRY (if model_id registered)
+4. Model name prefix matching
+5. Default (0%, 0%) for unknown models/providers
 
 Returns `(read_discount=0.0, write_premium=0.0)` if no match found.
 
@@ -64,7 +65,11 @@ function get_cache_discounts(model_id::String; schema::Union{Nothing, AbstractPr
         !isnothing(discount) && return discount
     end
 
-    # Priority 2: Look up schema from MODEL_REGISTRY
+    # Priority 2: Exact model-specific rate
+    resolved_model = get(MODEL_ALIASES, model_id, model_id)
+    haskey(CACHE_DISCOUNTS, resolved_model) && return CACHE_DISCOUNTS[resolved_model]
+
+    # Priority 3: Look up schema from MODEL_REGISTRY
     if haskey(MODEL_REGISTRY, model_id)
         model_spec = MODEL_REGISTRY[model_id]
         # Only lookup if schema is not nothing
@@ -74,14 +79,14 @@ function get_cache_discounts(model_id::String; schema::Union{Nothing, AbstractPr
         end
     end
 
-    # Priority 3: Model name prefix matching
+    # Priority 4: Model name prefix matching
     for (key, discount) in CACHE_DISCOUNTS
         if key isa String && startswith(model_id, key)
             return discount
         end
     end
 
-    # Priority 4: Default (safe for unknown providers)
+    # Priority 5: Default (safe for unknown providers)
     return (read_discount = 0.0, write_premium = 0.0)
 end
 

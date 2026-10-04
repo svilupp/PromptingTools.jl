@@ -239,7 +239,7 @@ end
 # Add GoogleProvider implementation
 Base.@kwdef struct GoogleProvider <: AbstractCustomProvider
     api_key::String = ""
-    base_url::String = "https://generativelanguage.googleapis.com/v1beta"
+    base_url::String = "https://generativelanguage.googleapis.com/v1beta/openai"
     api_version::String = ""
 end
 
@@ -253,7 +253,7 @@ function OpenAI.create_chat(schema::GoogleOpenAISchema,
         api_key::AbstractString,
         model::AbstractString,
         conversation;
-        url::String = "https://generativelanguage.googleapis.com/v1beta",
+        url::String = "https://generativelanguage.googleapis.com/v1beta/openai",
         kwargs...)
     api_key = !isempty(api_key) ? api_key : GOOGLE_API_KEY
     # Use GoogleProvider instead of CustomProvider
@@ -441,7 +441,7 @@ function OpenAI.create_embeddings(schema::GoogleOpenAISchema,
         api_key::AbstractString,
         docs,
         model::AbstractString;
-        url::String = "https://generativelanguage.googleapis.com/v1beta",
+        url::String = "https://generativelanguage.googleapis.com/v1beta/openai",
         kwargs...)
     api_key = !isempty(api_key) ? api_key : GOOGLE_API_KEY
     provider = GoogleProvider(; api_key, base_url = url)

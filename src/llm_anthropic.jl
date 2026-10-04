@@ -828,8 +828,13 @@ function aiextract(prompt_schema::AbstractAnthropicSchema, prompt::ALLOWED_PROMP
     @assert length(tools)>0 "No tools found for extraction! Please provide in keyword argument `return_type`."
     ## force our function to be used
     tool_choice_ = get(api_kwargs, :tool_choice, nothing)
-    tool_choice = if tool_choice_ == "exact" ||
-                     (isnothing(tool_choice_) && length(tools) == 1)
+    # These models reject forced tool use even with a single extraction tool.
+    # Preserve explicit user choices and the forced default on older models.
+    auto_only = model_id in ("claude-sonnet-5-5", "claude-opus-5-5", "claude-fable-5-1")
+    tool_choice = if isnothing(tool_choice_) && auto_only
+        Dict(:type => "auto")
+    elseif tool_choice_ == "exact" ||
+           (isnothing(tool_choice_) && length(tools) == 1)
         Dict(:type => "tool", :name => only(tools)[:name])
     elseif tool_choice_ == "any" || (isnothing(tool_choice_) && length(tools) > 1)
         # User provided value, eg, "auto", "any" for various providers like Mistral, Together, etc.
