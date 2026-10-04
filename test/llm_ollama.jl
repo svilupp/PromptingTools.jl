@@ -1,4 +1,5 @@
 using PromptingTools: TestEchoOllamaSchema, render, OllamaSchema, ollama_api
+using PromptingTools: LlmManSchema, AbstractOllamaSchema, OllamaManagedSchema, default_port
 using PromptingTools: AIMessage, SystemMessage, AbstractMessage
 using PromptingTools: UserMessage, UserMessageWithImages, DataMessage, _encode_local_image
 
@@ -151,4 +152,32 @@ end
     @test_throws ErrorException aiextract(OllamaSchema(), "prompt")
     @test_throws ErrorException aiclassify(OllamaSchema(), "prompt")
     @test_throws ErrorException aitools(OllamaSchema(), "prompt")
+end
+@testset "LlmManSchema" begin
+    # llmman speaks the Ollama API, only on a different port
+    @test LlmManSchema() isa AbstractOllamaSchema
+    @test default_port(LlmManSchema()) == 17434
+    @test default_port(OllamaSchema()) == 11434
+    @test default_port(OllamaManagedSchema()) == 11434
+    @test render(LlmManSchema(), [UserMessage("Hello there!")]) ==
+          render(OllamaSchema(), [UserMessage("Hello there!")])
+
+    # a provided port is honored (mock server), not just the defaults
+    PORT = rand(2000:3000)
+    server = HTTP.serve!(PORT, verbose = -1) do req
+        HTTP.Response(200,
+            JSON3.write(Dict(:message => Dict(:content => "ok"), :embedding => [1.0, 2.0])))
+    end
+    for schema in (OllamaSchema(), LlmManSchema())
+        resp = ollama_api(schema, nothing; endpoint = "chat",
+            messages = [Dict("role" => "user", "content" => "hi")],
+            url = "localhost", port = PORT)
+        @test resp.status == 200
+        @test resp.response[:message][:content] == "ok"
+        # aiembed delegates to the managed schema and keeps the provided port
+        msg = aiembed(schema, "hi"; verbose = false,
+            api_kwargs = (; url = "localhost", port = PORT))
+        @test msg.content == [1.0, 2.0]
+    end
+    close(server)
 end
