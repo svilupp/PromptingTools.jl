@@ -165,7 +165,8 @@ end
     # a provided port is honored (mock server), not just the defaults
     PORT = rand(2000:3000)
     server = HTTP.serve!(PORT, verbose = -1) do req
-        HTTP.Response(200, JSON3.write(Dict(:message => Dict(:content => "ok"))))
+        HTTP.Response(200,
+            JSON3.write(Dict(:message => Dict(:content => "ok"), :embedding => [1.0, 2.0])))
     end
     for schema in (OllamaSchema(), LlmManSchema())
         resp = ollama_api(schema, nothing; endpoint = "chat",
@@ -173,6 +174,10 @@ end
             url = "localhost", port = PORT)
         @test resp.status == 200
         @test resp.response[:message][:content] == "ok"
+        # aiembed delegates to the managed schema and keeps the provided port
+        msg = aiembed(schema, "hi"; verbose = false,
+            api_kwargs = (; url = "localhost", port = PORT))
+        @test msg.content == [1.0, 2.0]
     end
     close(server)
 end
