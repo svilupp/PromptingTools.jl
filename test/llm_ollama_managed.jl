@@ -177,6 +177,12 @@ end
         @test schema.inputs == (; system = nothing, prompt = doc)
         @test schema.model_id == "llama2"
     end
+    @testset "single doc in a vector" begin
+        response = Dict(:embedding => ones(16))
+        schema = TestEchoOllamaManagedSchema(; response, status = 200)
+        msg = aiembed(schema, ["embed me"]; model = "llama2")
+        @test msg.content == ones(16) # a vector, not a 16x1 matrix
+    end
     @testset "multi doc + postprocess" begin
         response = Dict(:embedding => ones(16))
         schema = TestEchoOllamaManagedSchema(; response, status = 200)

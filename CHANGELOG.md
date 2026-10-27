@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Fixed
+- Fixed `aiembed` (OpenAI-compatible and Ollama managed schemas) returning a one-column matrix instead of a vector for a single embedding on Julia 1.13, where `mapreduce(f, hcat, xs)` now calls `hcat` on a lone element.
 
 ### Updated
 

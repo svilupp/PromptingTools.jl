@@ -541,8 +541,11 @@ function aiembed(prompt_schema::AbstractOpenAISchema,
     tokens_prompt = haskey(r.response, :usage) ?
                     get(
         r.response[:usage], :prompt_tokens, get(r.response[:usage], :promptTokens, 0)) : 0
+    data = r.response[:data]
     msg = DataMessage(;
-        content = mapreduce(x -> postprocess(x[:embedding]), hcat, r.response[:data]),
+        ## a single embedding stays a vector (since Julia 1.13, `mapreduce` would `hcat` it into a one-column matrix)
+        content = length(data) == 1 ? postprocess(only(data)[:embedding]) :
+                  mapreduce(x -> postprocess(x[:embedding]), hcat, data),
         status = Int(r.status),
         cost = call_cost(tokens_prompt, 0, model_id),
         tokens = (tokens_prompt, 0),

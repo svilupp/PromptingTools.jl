@@ -392,7 +392,9 @@ function aiembed(prompt_schema::AbstractOllamaManagedSchema,
                 for doc in docs]
     ## Aggregate results
     msg = DataMessage(;
-        content = mapreduce(x -> x.content, hcat, messages),
+        ## a single embedding stays a vector (since Julia 1.13, `mapreduce` would `hcat` it into a one-column matrix)
+        content = length(messages) == 1 ? only(messages).content :
+                  mapreduce(x -> x.content, hcat, messages),
         status = mapreduce(x -> x.status, max, messages),
         cost = mapreduce(x -> x.cost, +, messages),
         tokens = (0, 0),# not tracked for embeddings in Ollama
