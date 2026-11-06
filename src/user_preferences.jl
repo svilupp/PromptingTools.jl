@@ -29,6 +29,7 @@ Check your preferences by calling `get_preferences(key::String)`.
 - `XAI_API_KEY`: The API key for the XAI API. Get your key from [here](https://console.x.ai/).
 - `MOONSHOT_API_KEY`: The API key for the Moonshot API. Get your key from [here](https://platform.moonshot.ai/).
 - `MINIMAX_API_KEY`: The API key for the MiniMax API. Get your key from [here](https://intl.minimaxi.com/document/platform%20introduction).
+- `CHEAPER_INFERENCE_API_KEY`: The API key for the Cheaper Inference API. Get your key from [here](https://cheaperinference.com/).
 - `MODEL_CHAT`: The default model to use for aigenerate and most ai* calls. See `MODEL_REGISTRY` for a list of available models or define your own.
 - `MODEL_EMBEDDING`: The default model to use for aiembed (embedding documents). See `MODEL_REGISTRY` for a list of available models or define your own.
 - `PROMPT_SCHEMA`: The default prompt schema to use for aigenerate and most ai* calls (if not specified in `MODEL_REGISTRY`). Set as a string, eg, `"OpenAISchema"`.
@@ -66,6 +67,7 @@ Define your `register_model!()` calls in your `startup.jl` file to make them ava
 - `XAI_API_KEY`: The API key for the XAI API. Get your key from [here](https://console.x.ai/).
 - `MOONSHOT_API_KEY`: The API key for the Moonshot API. Get your key from [here](https://platform.moonshot.cn/).
 - `MINIMAX_API_KEY`: The API key for the MiniMax API. Get your key from [here](https://intl.minimaxi.com/document/platform%20introduction).
+- `CHEAPER_INFERENCE_API_KEY`: The API key for the Cheaper Inference API. Get your key from [here](https://cheaperinference.com/).
 
 Preferences.jl takes priority over ENV variables, so if you set a preference, it will take precedence over the ENV variable.
 
@@ -93,6 +95,7 @@ const ALLOWED_PREFERENCES = ["MISTRAL_API_KEY",
     "XAI_API_KEY",
     "MOONSHOT_API_KEY",  # Added XAI_API_KEY
     "MINIMAX_API_KEY",
+    "CHEAPER_INFERENCE_API_KEY",
     "MODEL_CHAT",
     "MODEL_EMBEDDING",
     "MODEL_ALIASES",
@@ -181,6 +184,7 @@ global LOG_DIR::String = ""
 global XAI_API_KEY::String = ""
 global MOONSHOT_API_KEY::String = ""
 global MINIMAX_API_KEY::String = ""
+global CHEAPER_INFERENCE_API_KEY::String = ""
 
 # Load them on init
 "Loads API keys from environment variables and preferences"
@@ -258,6 +262,9 @@ function load_api_keys!()
     global MINIMAX_API_KEY
     MINIMAX_API_KEY = @load_preference("MINIMAX_API_KEY",
         default=get(ENV, "MINIMAX_API_KEY", ""))
+    global CHEAPER_INFERENCE_API_KEY
+    CHEAPER_INFERENCE_API_KEY = @load_preference("CHEAPER_INFERENCE_API_KEY",
+        default=get(ENV, "CHEAPER_INFERENCE_API_KEY", ""))
 
     return nothing
 end

@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Added `CheaperInferenceOpenAISchema` for [Cheaper Inference](https://cheaperinference.com/), an OpenAI-compatible LLM gateway (save api key to `CHEAPER_INFERENCE_API_KEY`).
 
 ### Fixed
 

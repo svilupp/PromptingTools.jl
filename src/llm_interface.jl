@@ -335,6 +335,20 @@ Requires one environment variable to be set:
 """
 struct MoonshotOpenAISchema <: AbstractOpenAISchema end
 
+"""
+    CheaperInferenceOpenAISchema
+
+Schema to call the [Cheaper Inference](https://cheaperinference.com/) API (an OpenAI-compatible LLM gateway).
+
+Links:
+- [Get your API key](https://cheaperinference.com/)
+- [API Reference](https://cheaperinference.com/docs)
+
+Requires one environment variable to be set:
+- `CHEAPER_INFERENCE_API_KEY`: Your API key (often starts with "ci_live_...")
+"""
+struct CheaperInferenceOpenAISchema <: AbstractOpenAISchema end
+
 abstract type AbstractOllamaSchema <: AbstractPromptSchema end
 
 """
