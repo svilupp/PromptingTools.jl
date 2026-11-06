@@ -235,6 +235,15 @@ function OpenAI.create_chat(schema::MiniMaxOpenAISchema,
     api_key = !isempty(api_key) ? api_key : MINIMAX_API_KEY
     OpenAI.create_chat(CustomOpenAISchema(), api_key, model, conversation; url, kwargs...)
 end
+function OpenAI.create_chat(schema::CheaperInferenceOpenAISchema,
+        api_key::AbstractString,
+        model::AbstractString,
+        conversation;
+        url::String = "https://api.cheaperinference.com/v1",
+        kwargs...)
+    api_key = !isempty(api_key) ? api_key : CHEAPER_INFERENCE_API_KEY
+    OpenAI.create_chat(CustomOpenAISchema(), api_key, model, conversation; url, kwargs...)
+end
 
 # Add GoogleProvider implementation
 Base.@kwdef struct GoogleProvider <: AbstractCustomProvider
